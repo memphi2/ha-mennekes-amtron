@@ -1,24 +1,23 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
   <title>Mennekes Amtron · Weekly plans</title>
-  <link rel="stylesheet" href="./app_settings.css"><link rel="stylesheet" href="./app_weekly.css">
-  <script src="./app_nav.js" defer></script>
+  <link rel="stylesheet" href="./app_settings.css">
   <script src="./app_weekly.js" defer></script>
 </head>
-<body><main>
-  <p class="eyebrow">Mennekes Amtron</p>
-  <nav class="overview-nav" aria-label="Service" data-nav="weekly"></nav>
+<body><!-- app-nav -->
+<main>
   <header><h1 data-text="title">Weekly plans</h1><p data-text="intro">Save a recipe, inspect its dates, then confirm the vehicle for this connection.</p></header>
   <p id="weekly_notice" role="status" aria-live="polite" data-text="loading">Loading…</p>
   <noscript>JavaScript is required for this local service page.</noscript>
-  <section class="overview-card" id="weekly_active" hidden>
+  <div class="cards">
+  <section class="card wide" id="weekly_active" hidden>
     <h2 data-text="activation">Current activation</h2><p id="active_description"></p>
     <button id="deactivate" type="button" data-text="stop">Stop weekly automation</button>
     <p class="hint" data-text="stop_hint">Stops its own job and recurrence, and the plan no longer activates itself for its car. An independent guest or manual job is not changed.</p>
   </section>
-  <section class="overview-card">
+  <section class="card">
     <label for="plan_select" data-text="saved_plans">Saved vehicle plans</label>
     <select id="plan_select"><option value="" data-text="new_plan">New plan</option></select>
     <form id="weekly_form">
@@ -56,12 +55,12 @@
       </fieldset>
     </form>
   </section>
-  <section class="overview-card" id="weekly_preview" hidden>
+  <section class="card" id="weekly_preview" hidden>
     <h2 data-text="proposal">Confirm recipe</h2><p id="plan_summary"></p><p id="plan_warning"></p>
-    <ul id="upcoming_rows" class="overview-commands"></ul>
+    <ul id="upcoming_rows" class="commands"></ul>
     <button id="save_plan" type="button" data-text="save">Save this recipe</button>
   </section>
-  <section class="overview-card">
+  <section class="card">
     <h2 data-text="activate_title">Activate saved plan for this vehicle</h2>
     <p class="hint" data-text="consent_hint">Recurrence applies to this connection, for at most seven days. Each departure has its own energy ceiling; between departures Home Assistant controls charging. Restart, unplugging, a manual stop or editing the active recipe ends it. If the car itself has reported this connection to Home Assistant, the plan remembers the car and activates itself whenever Home Assistant detects it again: after plugging in, after a restart and beyond seven days. It then waits for the next departure’s window.</p>
     <label class="check"><input id="confirm_vehicle" type="checkbox"><span data-text="confirm_vehicle">I have checked that the selected vehicle is connected.</span></label>
@@ -69,5 +68,6 @@
     <div id="activation_preview" hidden><p id="activation_summary"></p><button id="activate" type="button" data-text="activate">Confirm activation</button></div>
     <p><a href="./jobs" data-text="open_job">View or stop the accepted charging job</a></p>
   </section>
+  </div>
   <footer data-text="footer">No automatic authorization or unlocking. Missing local clock times are not silently moved. Actual starts and stops remain subject to wallbox timing.</footer>
 </main></body></html>

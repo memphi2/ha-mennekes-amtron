@@ -13,6 +13,7 @@ import importlib
 import json
 import sys
 from collections.abc import Awaitable, Callable
+from importlib import resources
 
 from aiohttp import ClientSession, ClientTimeout, web
 
@@ -59,10 +60,15 @@ async def check_assets(expected: dict[str, str]) -> None:
             for path, (filename, content_type) in ASSETS.items():
                 async with session.get(f"http://127.0.0.1:{port}{path}", allow_redirects=False) as response:
                     content = await response.read()
-                    if (
-                        response.status != 200 or response.content_type != content_type
-                        or hashlib.sha256(content).hexdigest() != expected[filename]
-                    ):
+                    if response.status != 200 or response.content_type != content_type:
+                        raise ValueError(f"installed app asset differs or cannot be served: {path}")
+                    if content_type == "text/html":
+                        # A page is served with its navigation rendered in:
+                        # require the bar and compare the installed file.
+                        if b'class="app-bar"' not in content:
+                            raise ValueError(f"installed app page lacks its navigation: {path}")
+                        content = resources.files("amtron_device").joinpath(filename).read_bytes()
+                    if hashlib.sha256(content).hexdigest() != expected[filename]:
                         raise ValueError(f"installed app asset differs or cannot be served: {path}")
     finally:
         await runner.cleanup()

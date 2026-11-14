@@ -2,22 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
   <title>Mennekes Amtron · Charging jobs</title>
   <link rel="stylesheet" href="./app_settings.css">
-  <script src="./app_nav.js" defer></script>
   <script src="./app_jobs.js" defer></script>
 </head>
 <body>
+<!-- app-nav -->
 <main id="jobs">
-  <p class="eyebrow">Mennekes Amtron</p>
-  <nav class="overview-nav" aria-label="Service" data-nav="jobs"></nav>
   <h1 data-text="jobs">Charging jobs</h1>
   <p data-text="intro">A local time window with an additional-energy ceiling. Existing release and battery limits remain in force.</p>
   <p id="job_notice" role="status" aria-live="polite"></p>
-  <section class="overview-card" id="job_status" hidden>
+  <div class="cards">
+  <section class="card" id="job_status" hidden>
     <h2 data-text="active">Current order</h2>
-    <p class="overview-state" id="job_state"></p>
+    <p class="state" id="job_state"></p>
     <p id="job_detail"></p><p id="job_progress"></p>
     <section id="job_forecast" aria-labelledby="job_forecast_title" hidden>
       <h3 id="job_forecast_title" data-text="forecast_title">Estimated time to the AC-energy ceiling</h3>
@@ -41,7 +40,7 @@
       </div>
     </section>
   </section>
-  <section class="overview-card">
+  <section class="card">
     <h2 data-text="new">New order</h2>
     <form id="job_form">
       <fieldset id="job_fields" disabled>
@@ -61,13 +60,14 @@
         <button type="submit" id="job_preview" data-text="preview">Preview</button>
       </fieldset>
     </form>
-    <section id="job_confirmation" class="adapter-preview" hidden>
+    <section id="job_confirmation" class="card" hidden>
       <h2 data-text="confirm_title">Confirm the charging order</h2>
       <p id="job_summary"></p>
       <p class="hint" data-text="limits">This is not a guaranteed energy delivery or finish-time forecast. The vehicle and all existing safety limits remain authoritative.</p>
       <button type="button" id="job_confirm" data-text="confirm">Confirm this order</button>
     </section>
   </section>
+  </div>
   <footer data-text="footer">A requested stop is not a confirmed physical stop. Check the overview and command results. No automatic retry after an uncertain browser response.</footer>
 </main>
 </body>

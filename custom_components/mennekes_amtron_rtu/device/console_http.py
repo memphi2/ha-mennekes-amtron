@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from importlib.resources import files
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
-from .app_settings import SettingsError, create_settings_app, localize_page
+from .app_settings import SettingsError, create_settings_app, serve_asset
 from .console_runtime_settings import RuntimeSettingsConsole
 
 if TYPE_CHECKING:
@@ -21,11 +20,9 @@ CONSOLE_ASSETS = {
     "/app_jobs.js": ("app_jobs.js", "text/javascript"),
     "/runtime": ("app_runtime.html", "text/html"),
     "/app_runtime.js": ("app_runtime.js", "text/javascript"),
-    "/registers": ("app_registers.html", "text/html"),
     "/app_registers.js": ("app_registers.js", "text/javascript"),
     "/weekly": ("app_weekly.html", "text/html"),
     "/app_weekly.js": ("app_weekly.js", "text/javascript"),
-    "/app_weekly.css": ("app_weekly.css", "text/css"),
 }
 
 
@@ -56,12 +53,7 @@ class ServiceConsole(RuntimeSettingsConsole):
 def add_console_asset_routes(app: web.Application) -> None:
     """Static assets inherit the caller's middleware; never create a public port."""
     async def asset(request: web.Request) -> web.Response:
-        filename, content_type = CONSOLE_ASSETS[request.path]
-        resource = files(__package__).joinpath(filename)
-        content = await asyncio.to_thread(resource.read_bytes)
-        if content_type == "text/html":
-            content = localize_page(content, request.headers.get("Accept-Language", ""))
-        return web.Response(body=content, content_type=content_type)
+        return await serve_asset(request, CONSOLE_ASSETS)
 
     for path in CONSOLE_ASSETS:
         app.router.add_get(path, asset)

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
+  <title>Mennekes Amtron · Log</title>
+  <link rel="stylesheet" href="./app_settings.css">
+  <script src="./app_log.js" defer></script>
+</head>
+<body>
+<!-- app-nav -->
+<main id="log">
+  <header><h1 data-text="title">Live log</h1><p data-text="intro">Every exchange with the wallbox, as it happens. The log runs while this page is open.</p></header>
+  <noscript>JavaScript is required to show the log.</noscript>
+  <section class="card">
+    <div class="toolbar">
+      <div><label for="log_filter" data-text="filter">Filter</label><input id="log_filter" type="search" autocomplete="off"></div>
+      <div class="actions">
+        <button id="log_pause" type="button" class="secondary" data-text="pause">Pause</button>
+        <button id="log_clear" type="button" class="secondary" data-text="clear">Clear</button>
+        <button id="log_download" type="button" class="secondary" data-text="download">Download</button>
+      </div>
+    </div>
+    <p id="log_status" class="hint" aria-live="polite" data-text="starting">Starting…</p>
+    <div id="log_lines" class="log" tabindex="0" role="log" aria-labelledby="log_status"></div>
+    <p class="hint" data-text="privacy">Serial numbers and text values are hidden and the network login is never recorded. Nothing is saved; the recording ends a few minutes after this page is closed.</p>
+  </section>
+</main>
+</body>
+</html>

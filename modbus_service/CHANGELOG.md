@@ -1,5 +1,14 @@
 # Changes
 
+## 0.9.0b3
+
+- The web pages have the look of Home Assistant, use the whole width and
+  group their pages into Overview, Charging, Settings and Log. A change of
+  page no longer flashes an empty white frame.
+- The registers are a card of the overview.
+- **Log** replaces the Debug log tab: it starts by itself, follows the newest
+  line and can be paused, filtered and downloaded.
+
 ## 0.9.0b2
 
 Update the app together with integration 0.9.0b2.

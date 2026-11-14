@@ -1,4 +1,4 @@
-"""Execute the shipped register, navigation and forecast UI with DOM fixtures."""
+"""Execute the shipped register, log and forecast UI with DOM fixtures."""
 
 import shutil
 import subprocess
@@ -8,7 +8,7 @@ import pytest
 
 
 @pytest.mark.parametrize("script", [
-    "registers_frontend.test.cjs", "app_nav_frontend.test.cjs", "forecast_frontend.test.cjs",
+    "registers_frontend.test.cjs", "log_frontend.test.cjs", "forecast_frontend.test.cjs",
     "overview_frontend.test.cjs",
 ])
 def test_app_page_frontend_contract(script: str) -> None:

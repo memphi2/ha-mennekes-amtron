@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const root = path.join(__dirname, "../custom_components/mennekes_amtron_rtu/device");
-const html = fs.readFileSync(path.join(root, "app_registers.html"), "utf8");
+const html = fs.readFileSync(path.join(root, "app_overview.html"), "utf8");
 const source = fs.readFileSync(path.join(root, "app_registers.js"), "utf8");
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const registers = () => ({schema:1, registers:[

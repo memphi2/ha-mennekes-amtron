@@ -2,24 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
   <title>Mennekes Amtron</title>
   <link rel="stylesheet" href="./app_settings.css">
-  <script src="./app_nav.js" defer></script>
   <script src="./app_overview.js" defer></script>
+  <script src="./app_registers.js" defer></script>
 </head>
 <body>
-  <main id="overview">
-    <p class="eyebrow">Mennekes Amtron</p>
-    <nav class="overview-nav" aria-label="Service" data-nav="overview"></nav>
+  <!-- app-nav -->
+<main id="overview">
     <header><h1 data-overview="title">Charging overview</h1><p data-overview="intro">Observed state and service decisions. This page does not change charging.</p></header>
-    <p id="overview_notice" class="overview-notice" role="status" aria-live="polite" data-overview="loading">Loading service state…</p>
+    <p id="overview_notice" class="notice" role="status" aria-live="polite" data-overview="loading">Loading service state…</p>
     <noscript>JavaScript is required to display current service state.</noscript>
-    <div id="overview_data" hidden>
-      <section id="operation" class="overview-card" aria-labelledby="operation_title" hidden>
+    <div id="overview_data" class="cards" hidden>
+      <section id="operation" class="card" aria-labelledby="operation_title" hidden>
         <h2 id="operation_title" data-overview="op_title">Charging control</h2>
-        <p id="op_controller" class="overview-state"></p>
-        <dl class="overview-values">
+        <p id="op_controller" class="state"></p>
+        <dl class="values">
           <div><dt data-overview="op_wait">Why it waits</dt><dd id="op_waiting"></dd></div>
           <div><dt data-overview="op_next">Next step</dt><dd id="op_step"></dd></div>
           <div><dt data-overview="op_target">Target</dt><dd id="op_goal"></dd></div>
@@ -27,34 +26,45 @@
         </dl>
         <p class="hint" data-overview="op_hint">A summary of the service's own controllers. It explains, it does not command.</p>
       </section>
-      <section class="overview-card" aria-labelledby="observed_title">
+      <section class="card" aria-labelledby="observed_title">
         <h2 id="observed_title" data-overview="observed">Observed charging state</h2>
-        <p id="charge_state" class="overview-state"></p>
+        <p id="charge_state" class="state"></p>
         <p id="charge_reason"></p>
-        <div class="overview-badges"><span id="service_mode"></span><span id="heartbeat_state"></span></div>
-        <dl class="overview-values">
+        <div class="badges"><span id="service_mode"></span><span id="heartbeat_state"></span></div>
+        <dl class="values">
           <div><dt data-overview="power">Power</dt><dd id="power"></dd></div>
           <div><dt data-overview="energy">Session energy</dt><dd id="energy"></dd></div>
           <div><dt data-overview="limit">Observed current limit</dt><dd id="current_limit"></dd></div>
         </dl>
       </section>
-      <section class="overview-card" aria-labelledby="next_title">
+      <section class="card" aria-labelledby="next_title">
         <h2 id="next_title" data-overview="next">Next queued action</h2>
         <p id="next_action"></p><p id="next_due" class="hint"></p>
         <p data-overview="guard_hint" class="hint">A queued action is not a confirmed write. The earliest execution time can change; permissions and other guards still apply.</p>
-        <dl class="overview-values">
+        <dl class="values">
           <div><dt data-overview="energy_target">Energy target</dt><dd id="energy_target"></dd></div>
           <div><dt data-overview="soc_target">Battery target</dt><dd id="soc_target"></dd></div>
         </dl>
         <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress. The car's current battery level stays in Home Assistant.</p>
       </section>
-      <section class="overview-card" aria-labelledby="commands_title">
+      <section class="card wide" aria-labelledby="commands_title">
         <h2 id="commands_title" data-overview="commands">Recent command results</h2>
         <p class="hint" data-overview="history_hint">Up to 32 results since the service started, newest first. Sequence numbers are not timestamps. This is not a charging-session journal.</p>
         <p id="commands_empty" data-overview="no_commands">No command results yet.</p>
-        <ol id="command_results" class="overview-commands"></ol>
+        <ol id="command_results" class="commands"></ol>
       </section>
     </div>
+    <section id="registers" class="card" aria-labelledby="registers_title" hidden>
+<h2 id="registers_title" data-text="registers">Registers</h2>
+<p class="hint" data-text="explanation">Passive observations only. No extra Modbus transactions. Last valid values keep their original timestamps after failures.</p>
+<p id="register_notice" class="hint" aria-live="polite"></p>
+<div class="toolbar"><div><label for="register_search" data-text="search">Filter by address, name or value</label><input id="register_search" type="search" autocomplete="off"></div><div><label for="register_status" data-text="status">Quality</label><select id="register_status"><option value="all" data-text="all">All</option><option value="problems" data-text="problems">Problems</option><option value="ok">OK</option><option value="degraded" data-text="degraded">Degraded</option><option value="error" data-text="error">Error</option><option value="unknown" data-text="unknown">Unknown</option><option value="unsupported" data-text="unsupported">Unsupported</option><option value="write_only" data-text="write_only">Write only</option></select></div>
+<div><label for="register_order" data-text="sort">Sort</label><select id="register_order"><option value="address" data-text="address">Address</option><option value="status" data-text="status">Quality</option><option value="updated_at" data-text="updated">Last successful read</option></select></div>
+<label class="check"><input id="register_pause" type="checkbox"><span data-text="freeze">Freeze display (bus polling continues)</span></label></div>
+<p id="register_summary" class="hint"></p>
+<div class="table-scroll registers" tabindex="0" role="region" aria-label="Register table"><table><thead><tr><th data-text="address">Address</th><th data-text="name">Register / type</th><th data-text="raw">Raw words</th><th data-text="value">Decoded / translated</th><th data-text="updated">Last successful read</th><th data-text="attempt">Last attempt</th><th data-text="status">Quality</th></tr></thead><tbody id="register_rows"></tbody></table></div>
+<p class="hint" data-text="quality">OK describes a successful read, not a fault-free wallbox. Writes are acknowledgements, not readbacks. Serial number redacted.</p>
+</section>
     <footer data-overview="footer">Local, read-only service overview. Open Home Assistant to change charging.</footer>
   </main>
 </body>

@@ -110,7 +110,7 @@ def test_authenticated_preview_save_activate_stop_and_remove(tmp_path, monkeypat
             assert (await client.post(path, headers=headers, json={"x": "x" * 5000})).status == 413
             if ingress:
                 weekly = {route: value for route, value in CONSOLE_ASSETS.items() if "weekly" in route}
-                assert len(weekly) == 3
+                assert len(weekly) == 2
                 for route, (_name, mime) in weekly.items():
                     asset = await client.get(route, headers={**headers, "Accept-Language": "nl"})
                     assert asset.status == 200

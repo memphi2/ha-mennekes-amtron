@@ -4,16 +4,18 @@ Open the service app and select **Open Web UI**. The pages are for Home
 Assistant administrators and open through Home Assistant itself; no port or
 token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
 
-| Page | What it is for |
-|---|---|
-| [Overview](#overview) | What the wallbox and the app are doing right now. Read-only. |
-| [Connection](#connection-and-debug-log) | USB or LAN connection, optional LAN-adapter setup. |
-| [Debug log](#connection-and-debug-log) | A short live recording of the Modbus traffic for troubleshooting. |
-| [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
-| [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
-| [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start and an estimated finish. |
-| [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
-| [Weekly plans](#weekly-plans) | Recurring departures for one car, turned into charging jobs for up to seven days. |
+The bar at the top has four groups; **Charging** and **Settings** show their
+pages in a second row.
+
+| Group | Page | What it is for |
+|---|---|---|
+| **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now, and every [register](#registers). Read-only. |
+| **Charging** | [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start and an estimated finish. |
+| | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
+| | [Weekly plans](#weekly-plans) | Recurring departures for one car, turned into charging jobs for up to seven days. |
+| **Settings** | [Connection](#connection) | USB or LAN connection, optional LAN-adapter setup. |
+| | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
+| **Log** | [Log](#log) | The Modbus traffic as it happens, for troubleshooting. |
 
 Every page follows the browser language in English, German, French, Dutch and
 Italian, and every page has the same navigation bar.
@@ -304,7 +306,7 @@ After you edit the active plan, it activates itself again at the next plug-in.
 
 ## Registers
 
-**Registers** lists every register the integration knows, with address, raw
+The **Registers** card at the end of the overview lists every register the integration knows, with address, raw
 words, decoded value, last successful read and last attempt. The **Quality**
 column describes the reading, not the wallbox:
 
@@ -315,7 +317,7 @@ column describes the reading, not the wallbox:
 | Error | No usable value, or the wallbox is not reachable. |
 | Unknown, unsupported, write-only | Not read yet, not supported by this wallbox's firmware, or not readable. |
 
-Filter, sort and **Freeze display** only affect the browser. The page adds no
+Filter, sort and **Freeze display** only affect the browser. The card adds no
 Modbus traffic and no Recorder history. The serial number is hidden.
 
 ## Runtime settings
@@ -345,17 +347,24 @@ If someone changed the settings meanwhile, the page asks you to reload. If a
 save could not be confirmed, the page blocks further saves until the app
 restarts; check the **Configuration** tab to see what was saved.
 
-## Connection and Debug log
+## Connection
 
 **Connection** (German: **Verbindung**) holds the USB or LAN connection and the
 optional LAN-adapter setup; see [first setup](modbus-service.md#3-configure-and-start-read-only)
 and [LAN adapters](lan-adapters.md#service-app). Changes take effect after an
 app restart.
 
-**Debug log** records the app's own Modbus reads and writes for up to 10 minutes
-and at most 200 entries, in memory only. It stops and erases itself, adds no
-extra bus traffic and hides serial numbers and login traffic. See
-[troubleshooting](troubleshooting.md).
+## Log
+
+**Log** (German: **Protokoll**) shows the app's own Modbus reads, writes and
+heartbeats one line each, as they happen. It starts when you open the page and
+follows the newest line; scroll up to read on undisturbed. **Pause** holds the
+view while new lines are still collected, **Filter** narrows it to a register
+or result, **Download** saves the lines shown as a text file.
+
+The recording lives in memory only, adds no bus traffic and hides serial
+numbers and login traffic. It ends by itself within ten minutes after the page
+is closed. See [troubleshooting](troubleshooting.md#watch-app-modbus-communication-live).
 
 ## Limits
 

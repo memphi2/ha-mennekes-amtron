@@ -39,11 +39,17 @@ class ModbusTrace:
         self._timer: asyncio.TimerHandle | None = None
 
     def set_enabled(self, enabled: bool) -> None:
-        """Start once without extending an active session, or erase its data."""
+        """Start or keep a session, or erase its data.
+
+        The open log page asks again every few minutes; a closed page lets
+        the capture end by itself.
+        """
         self._expire()
         if enabled and self._deadline:
-            return
-        self.close()
+            if self._timer is not None:
+                self._timer.cancel()
+        else:
+            self.close()
         if enabled:
             self._deadline = self._clock() + CAPTURE_SECONDS
             self._timer = asyncio.get_running_loop().call_later(CAPTURE_SECONDS, self.close)

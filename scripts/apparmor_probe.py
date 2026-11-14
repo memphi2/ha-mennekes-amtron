@@ -262,7 +262,7 @@ async def check_connection_page(session: ClientSession, mode: str, original: dic
     headers = {"X-Remote-User-Id": "a" * 32, "X-Remote-User-Groups": "system-admin"}
     for path, expected_type in (
         ("/", "text/html"), ("/connection", "text/html"),
-        ("/app_overview.js", "text/javascript"), ("/app_nav.js", "text/javascript"),
+        ("/app_overview.js", "text/javascript"), ("/log", "text/html"), ("/app_log.js", "text/javascript"),
         ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css"),
         ("/jobs", "text/html"),
     ):

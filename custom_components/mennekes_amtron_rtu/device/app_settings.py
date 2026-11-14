@@ -13,7 +13,7 @@ import hmac
 import json
 import re
 import secrets
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Mapping
 from contextlib import AbstractAsyncContextManager, nullcontext, suppress
 from dataclasses import dataclass, field
 from importlib.resources import files
@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
 from .app_adapter_setup import AdapterSetup
+from .app_nav import PLACEHOLDER, render_nav
 from .connection import validate_network_host
 from .decode import is_hex32
 from .modbus_trace import ModbusTrace
@@ -55,8 +56,9 @@ _NETWORK_EXTRAS = {"tcp_authentication", "tcp_auth_password", "adapter_token", "
 _ASSETS = {
     "/": ("app_overview.html", "text/html"),
     "/connection": ("app_settings.html", "text/html"),
+    "/log": ("app_log.html", "text/html"),
     "/app_overview.js": ("app_overview.js", "text/javascript"),
-    "/app_nav.js": ("app_nav.js", "text/javascript"),
+    "/app_log.js": ("app_log.js", "text/javascript"),
     "/app_settings.js": ("app_settings.js", "text/javascript"),
     "/app_settings.css": ("app_settings.css", "text/css"),
 }
@@ -71,9 +73,30 @@ def _language(header: str) -> str:
     return "en"
 
 
-def localize_page(content: bytes, accept_language: str) -> bytes:
-    """Set a page's language from the browser; every page script reads it."""
-    return content.replace(b'lang="en"', f'lang="{_language(accept_language)}"'.encode(), 1)
+def localize_page(content: bytes, accept_language: str, path: str = "/", available: Collection[str] = ()) -> bytes:
+    """Set a page's language from the browser and render its navigation.
+
+    Every page script reads the language; the navigation arrives complete.
+    """
+    language = _language(accept_language)
+    content = content.replace(b'lang="en"', f'lang="{language}"'.encode(), 1)
+    return content.replace(PLACEHOLDER, render_nav(path, language, available), 1)
+
+
+async def serve_asset(request: web.Request, assets: Mapping[str, tuple[str, str]]) -> web.Response:
+    """Serve one packaged file; scripts and styles revalidate instead of reloading."""
+    filename, content_type = assets[request.path]
+    content = await asyncio.to_thread(files(__package__).joinpath(filename).read_bytes)
+    if content_type == "text/html":
+        available = {route.resource.canonical for route in request.app.router.routes() if route.resource is not None}
+        content = localize_page(content, request.headers.get("Accept-Language", ""), request.path, available)
+        return web.Response(body=content, content_type=content_type)
+    # An unchanged file answers with 304: a change of page shows at once.
+    etag = f'"{hashlib.sha256(content).hexdigest()[:32]}"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if request.headers.get("If-None-Match") == etag:
+        return web.Response(status=304, headers=headers)
+    return web.Response(body=content, content_type=content_type, headers=headers)
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,14 +332,15 @@ class AppSettings:
 
     async def read_modbus_debug(self, request: web.Request) -> web.Response:
         """Read passive, redacted observations only through authorized ingress."""
-        await self._authorize(request)
+        user = await self._authorize(request)
         after = request.query.get("after", "0")
         if not re.fullmatch(r"[0-9]{1,18}", after) or set(request.query) - {"after"}:
             raise SettingsError("invalid_request")
         if self._modbus_trace is None:
             return web.json_response({"available": False, "enabled": False,
                                       "expires_in": 0, "latest_sequence": 0, "generation": 0, "records": []})
-        return web.json_response(self._modbus_trace.snapshot(after=int(after)))
+        # The log page starts the capture itself and needs the token for it.
+        return web.json_response({**self._modbus_trace.snapshot(after=int(after)), "csrf": self._digest("csrf", user)})
 
     async def set_modbus_debug(self, request: web.Request) -> web.Response:
         """Change RAM-only capture settings, using the same admin and CSRF gate."""
@@ -549,8 +573,10 @@ class AppSettings:
             response = web.json_response({"error": err.key}, status=err.status)
         except (ClientError, TimeoutError, OSError, ValueError, TypeError):
             response = web.json_response({"error": "supervisor_unavailable"}, status=503)
+        # Only packaged scripts and styles may be kept, and only to revalidate.
+        asset = "ETag" in response.headers and not request.path.startswith("/api/")
         response.headers.update({
-            "Cache-Control": "no-store",
+            "Cache-Control": "no-cache" if asset else "no-store",
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": "no-referrer",
             "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
@@ -561,12 +587,7 @@ class AppSettings:
 def add_settings_asset_routes(app: web.Application) -> None:
     """Register packaged assets within the caller's existing access boundary."""
     async def asset(request: web.Request) -> web.Response:
-        filename, content_type = _ASSETS[request.path]
-        resource = files(__package__).joinpath(filename)
-        content = await asyncio.to_thread(resource.read_bytes)
-        if content_type == "text/html":
-            content = localize_page(content, request.headers.get("Accept-Language", ""))
-        return web.Response(body=content, content_type=content_type)
+        return await serve_asset(request, _ASSETS)
 
     for path in _ASSETS:
         app.router.add_get(path, asset)

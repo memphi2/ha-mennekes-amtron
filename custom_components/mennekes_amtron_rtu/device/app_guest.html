@@ -2,21 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
   <title>Mennekes Amtron · Guest charging</title>
   <link rel="stylesheet" href="./app_settings.css">
-  <script src="./app_nav.js" defer></script>
   <script src="./app_guest.js" defer></script>
 </head>
 <body>
-  <main id="guest">
-    <p class="eyebrow">Mennekes Amtron</p>
-    <nav class="overview-nav" aria-label="Service" data-nav="guest"></nav>
+  <!-- app-nav -->
+<main id="guest">
     <h1 data-text="title">Guest charging</h1>
     <p data-text="intro">One immediate energy/time order for the connected guest vehicle. No battery data or saved vehicle target is used.</p>
     <p id="guest_notice" role="status" aria-live="polite"></p>
     <noscript>JavaScript is required to read the current service state.</noscript>
-    <section class="overview-card" id="guest_status" hidden>
+    <div class="cards">
+    <section class="card" id="guest_status" hidden>
       <h2 data-text="status">Current order</h2>
       <p id="guest_state"></p><p id="guest_detail"></p>
       <div class="actions">
@@ -24,9 +23,9 @@
         <button id="guest_clear" type="button" class="secondary" data-text="clear" disabled>Clear stopped order without resuming</button>
       </div>
     </section>
-    <form id="guest_form">
-      <fieldset id="guest_fields" disabled>
-        <legend data-text="new">New guest order</legend>
+    <form id="guest_form" class="card">
+      <h2 data-text="new">New guest order</h2>
+      <fieldset id="guest_fields" class="plain" disabled>
         <label for="guest_energy" data-text="energy">Additional energy ceiling, kWh</label>
         <input id="guest_energy" type="number" min="0.1" max="1000" step="0.1" value="15" required>
         <label for="guest_duration" data-text="duration">Maximum duration, minutes</label>
@@ -37,12 +36,13 @@
         <button type="submit" data-text="preview">Preview</button>
       </fieldset>
     </form>
-    <section class="overview-card" id="guest_confirmation" hidden>
+    <section class="card" id="guest_confirmation" hidden>
       <h2 data-text="confirm_title">Confirm guest order</h2>
       <p id="guest_summary"></p>
       <p class="hint" data-text="scope">Only this physical connection. Stops at the energy ceiling or deadline, subject to polling and hardware timing. Reconnection requires a new order.</p>
       <button id="guest_confirm" type="button" data-text="confirm">Confirm and start when permitted</button>
     </section>
+    </div>
     <footer data-text="footer">No guaranteed delivered amount. A requested stop is not a confirmed hardware stop. Check the overview and command results.</footer>
   </main>
 </body>
