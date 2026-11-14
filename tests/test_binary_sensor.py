@@ -156,6 +156,16 @@ def test_heartbeat_health_rides_on_connection_quality_and_records_only_transitio
                 await recorder.async_block_till_done()
                 assert rows() == (before, attributes)
 
+                # Successful read retries remain download diagnostics; their
+                # counters must not write another row on every status poll.
+                for _ in range(100):
+                    entry.runtime_data.client.link_quality.observe_retry()
+                    await entry.runtime_data.coordinator.async_refresh()
+                await recorder.async_block_till_done()
+                assert entry.runtime_data.coordinator.data.connection_retries == 100
+                assert "retried_transactions" not in hass.states.get(entity_id).attributes
+                assert rows() == (before, attributes)
+
                 heartbeat._deadline_handle.cancel()
                 heartbeat._deadline_expired()
                 assert health() == "problem"

@@ -529,3 +529,28 @@ def test_a_reading_carries_the_time_its_source_reported_it(tmp_path):
         missing = VehicleSocObserver(hass, Control(), Coordinator(), None, use_vehicle_soc=True)
         assert missing.latest_soc_reading is None
     asyncio.run(run())
+
+
+def test_automatic_target_waiting_for_lock_cannot_override_new_manual_choice(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        control = Control()
+        observer = VehicleSocObserver(hass, control, Coordinator(), "sensor.car")
+        try:
+            hass.states.async_set("sensor.car", "20", {"unit_of_measurement": "%"})
+            await observer.async_start()
+            await observer._command_lock.acquire()
+            revision = observer.target_choice_generation
+            auto = asyncio.create_task(observer.async_set_target(80, automatic=True, expected_choice=revision))
+            await asyncio.sleep(0)
+            manual = asyncio.create_task(observer.async_set_target(60))
+            await asyncio.sleep(0)
+            observer._command_lock.release()
+            with pytest.raises(ServiceValidationError):
+                await auto
+            await manual
+            assert control.soc_goal.target_percent == 60
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

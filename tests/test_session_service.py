@@ -267,6 +267,7 @@ def test_store_discards_only_invalid_optional_history(tmp_path, caplog, history)
         "charging_release_requested": False, "charging_setpoint": 8,
         "energy_goal": energy_goal.snapshot(), "soc_goal": soc_goal.snapshot(),
         "charging_session_history": history,
+        "plug_charge": WriteState().plug_charge.durable(),
     }
     path.write_text(json.dumps(payload))
     state = WriteState(pause_requested=False, charging_setpoint=6)
@@ -356,12 +357,12 @@ def test_invalid_optional_history_does_not_block_service_heartbeat(tmp_path, cap
     asyncio.run(run())
 
 
-def test_store_accepts_older_intent_without_session_metadata(tmp_path):
+def test_store_rejects_older_intent_without_current_metadata(tmp_path):
     path = Path(tmp_path) / "intent.json"
     path.write_text(json.dumps({"version": 1, "identity": "wallbox", "pause_requested": True}))
     state = WriteState()
-    IntentStore(path, "wallbox").load(state)
-    assert state.pause_requested is True
+    assert IntentStore(path, "wallbox").load(state) is False
+    assert state.pause_requested is None
     assert state.session_history.latest is None
 
 

@@ -113,6 +113,11 @@ async def async_get_config_entry_diagnostics(
             ),
         },
         "plug_charge": _plug_charge_diagnostics(runtime_data),
+        "connection_quality": {
+            "state": data.connection_quality,
+            "failed_transactions": data.connection_failures,
+            "retried_transactions": data.connection_retries,
+        },
         "write_diagnostics": {
             "heartbeats_sent": runtime_data.diagnostics.heartbeats_sent,
             "heartbeats_failed": runtime_data.diagnostics.heartbeats_failed,

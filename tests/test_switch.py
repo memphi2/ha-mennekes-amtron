@@ -133,7 +133,7 @@ def test_control_intent_is_restored_separately_from_fault_readback(
         ("charging_paused", "pause_requested", "on", True),
     ],
 )
-def test_upgrades_preserve_a_previously_stopped_charge(
+def test_observed_state_is_not_restored_as_user_intent(
     old_state, extra_value, entity_key, intent_key, blocked_state, intent
 ):
     async def run():
@@ -155,9 +155,7 @@ def test_upgrades_preserve_a_previously_stopped_charge(
         switch.async_get_last_extra_data = extra
         switch.async_get_last_state = state
         await switch.async_added_to_hass()
-        assert getattr(entry.runtime_data.control, intent_key) is (
-            intent if old_state == blocked_state else None
-        )
+        assert getattr(entry.runtime_data.control, intent_key) is None
 
     asyncio.run(run())
 

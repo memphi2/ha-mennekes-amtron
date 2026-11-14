@@ -8,7 +8,6 @@ from homeassistant.core import State
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
-    LEGACY_PROFILE_ID,
     profiles,
     vehicle_options,
 )
@@ -58,7 +57,7 @@ async def open_profile(flow, key=A):
     return menu
 
 
-def test_profile_add_preserves_legacy_mixed_sources_and_uses_what_the_car_reports():
+def test_profile_add_uses_current_vehicle_sources_without_implicit_migration():
     async def run():
         old = {
             "vehicle_soc_entity": "sensor.manual",
@@ -84,14 +83,10 @@ def test_profile_add_preserves_legacy_mixed_sources_and_uses_what_the_car_report
         # The guided setup continues with the new car's charge level.
         assert menu["step_id"] == "vehicle_battery"
         saved = (await flow.async_step_wizard_finish())["data"]
-        assert saved["active_vehicle_profile"] == LEGACY_PROFILE_ID
-        assert "vehicle_profile_selected_at" not in saved
-        assert vehicle_options(saved)["vehicle_soc_entity"] == "sensor.manual"
-        assert vehicle_options(saved)["timed_bavarian_device"] == "car"
-        assert vehicle_options(saved)["charge_loss_bavarian_device"] == "other"
-        added = [
-            item for item in profiles(saved).values() if item.id != LEGACY_PROFILE_ID
-        ]
+        added = list(profiles(saved).values())
+        assert saved["active_vehicle_profile"] == added[0].id
+        assert vehicle_options(saved)["vehicle_soc_use_profile"] is True
+        assert saved["charging_price"] == 0.4
         assert len(added) == 1
         # A newly linked car uses everything it reports.
         assert added[0].options == {
@@ -100,7 +95,7 @@ def test_profile_add_preserves_legacy_mixed_sources_and_uses_what_the_car_report
         }
         assert added[0].detection is None
         assert added[0].provider_id == "bavariandata"
-        assert not {"vehicle_soc_entity", "timed_bavarian_device"} & saved.keys()
+        assert "vehicle_soc_entity" not in saved
         assert saved["charging_price"] == 0.4
 
     asyncio.run(run())
@@ -271,7 +266,7 @@ def test_profile_management_conflicts_with_concurrent_feature_edit_and_back_disc
     asyncio.run(run())
 
 
-def test_existing_sources_name_cannot_collide_with_preserved_legacy_profile():
+def test_profile_add_does_not_invent_an_existing_sources_profile():
     async def run():
         flow = Flow(FakeConfigEntry(options={"vehicle_soc_entity": "sensor.old"}))
         await flow.async_step_vehicle()
@@ -279,8 +274,8 @@ def test_existing_sources_name_cannot_collide_with_preserved_legacy_profile():
             {"vehicle_profile_name": "Existing sources", "vehicle_provider": "none"}
         )
         saved = (await flow.async_step_wizard_finish())["data"]
-        assert len(profiles(saved)) == 2
-        assert profiles(saved)[LEGACY_PROFILE_ID].name == "Existing sources (1)"
+        assert len(profiles(saved)) == 1
+        assert next(iter(profiles(saved).values())).name == "Existing sources"
 
     asyncio.run(run())
 

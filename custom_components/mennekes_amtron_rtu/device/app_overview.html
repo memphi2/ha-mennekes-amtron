@@ -14,8 +14,9 @@
     <p id="overview_notice" class="notice" role="status" aria-live="polite" data-overview="loading">Loading service state…</p>
     <noscript>JavaScript is required to display current service state.</noscript>
     <div id="overview_data" class="cards" hidden>
-      <section id="operation" class="card" aria-labelledby="operation_title" hidden>
-        <h2 id="operation_title" data-overview="op_title">Charging control</h2>
+      <section class="card wide" aria-labelledby="observed_title">
+      <section id="operation" aria-labelledby="operation_title" hidden>
+        <h2 id="operation_title" data-overview="op_title">My charging</h2>
         <p id="op_controller" class="state"></p>
         <dl class="values">
           <div><dt data-overview="op_wait">Why it waits</dt><dd id="op_waiting"></dd></div>
@@ -23,9 +24,11 @@
           <div><dt data-overview="op_target">Target</dt><dd id="op_goal"></dd></div>
           <div><dt data-overview="op_vehicle">Vehicle</dt><dd id="op_car"></dd></div>
         </dl>
-        <p class="hint" data-overview="op_hint">A summary of the service's own controllers. It explains, it does not command.</p>
+        <p id="op_advice" class="hint"></p>
+        <div class="actions"><a href="./jobs" data-overview="jobs_link">Charging job</a><a href="./guest" data-overview="guest_link">Guest charging</a></div>
+        <p class="hint" data-overview="op_hint">A percentage target limits battery charge; a kWh target limits additional wallbox energy.</p>
       </section>
-      <section class="card" aria-labelledby="observed_title">
+      <section aria-labelledby="observed_title">
         <h2 id="observed_title" data-overview="observed">Observed charging state</h2>
         <p id="charge_state" class="state"></p>
         <p id="charge_reason"></p>
@@ -35,6 +38,7 @@
           <div><dt data-overview="energy">Session energy</dt><dd id="energy"></dd></div>
           <div><dt data-overview="limit">Observed current limit</dt><dd id="current_limit"></dd></div>
         </dl>
+      </section>
       </section>
       <section class="card" aria-labelledby="next_title">
         <h2 id="next_title" data-overview="next">Next queued action</h2>
@@ -46,12 +50,12 @@
         </dl>
         <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress. The car's current battery level stays in Home Assistant.</p>
       </section>
-      <section class="card wide" aria-labelledby="commands_title">
-        <h2 id="commands_title" data-overview="commands">Recent command results</h2>
+      <details class="card wide">
+        <summary id="commands_title" data-overview="commands">Recent command results</summary>
         <p class="hint" data-overview="history_hint">Up to 32 results since the service started, newest first. Sequence numbers are not timestamps. This is not a charging-session journal.</p>
         <p id="commands_empty" data-overview="no_commands">No command results yet.</p>
         <ol id="command_results" class="commands"></ol>
-      </section>
+      </details>
     </div>
     <footer data-overview="footer">Local, read-only service overview. Open Home Assistant to change charging.</footer>
   </main>

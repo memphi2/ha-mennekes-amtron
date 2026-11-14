@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import stat
 
@@ -121,3 +122,20 @@ def test_post_rename_failure_invalidates_old_deduplication_cache(tmp_path, monke
     restored = WriteState()
     IntentStore(path, "wallbox").load(restored)
     assert restored.pause_requested is True
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("pause_requested", "yes"), ("charging_release_requested", 1),
+    ("charging_setpoint", 3),
+])
+def test_invalid_current_format_cannot_partially_replace_control_intent(tmp_path, field, value):
+    store = IntentStore(tmp_path / "intent.json", "wallbox")
+    store.save(WriteState(pause_requested=False, charging_setpoint=16))
+    payload = json.loads(store.path.read_text())
+    payload[field] = value
+    store.path.write_text(json.dumps(payload))
+    existing = WriteState(pause_requested=True, charging_release_requested=False, charging_setpoint=8)
+    assert store.load(existing) is False
+    assert existing.pause_requested is True
+    assert existing.charging_release_requested is False
+    assert existing.charging_setpoint == 8

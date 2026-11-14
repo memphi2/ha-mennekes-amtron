@@ -31,6 +31,20 @@ Recorder exclusion leaves enabled sensors available live; sensors disabled in
 the entity registry must first be enabled to expose live readings. Exclusion
 only stops new history and statistics. Existing statistics are retained.
 
+## App departure and charging-order regression check
+
+`tests/test_recorder_service_plans.py` connects the real service controllers
+and Home Assistant integration to SQLite Recorder, with a simulated Modbus
+transport. It measures the three operation-status sensors and the charging-order
+sensor after setup has settled. For 120 unchanged departure-plan updates, and
+then 120 unchanged updates with a charging order as well, it verifies **zero
+additional state rows** for those sensors and **zero additional Modbus reads**.
+
+This checks that repeated status publication does not itself grow history or
+poll the wallbox. It is not a full-day replay or a bound on changing energy,
+forecast, charging-state or price data. Existing tests below cover other
+recording scenarios separately.
+
 ## Historical measured load
 
 Audit: 2026-10-24, Home Assistant 2026.10.0, SQLite, one integration entry.

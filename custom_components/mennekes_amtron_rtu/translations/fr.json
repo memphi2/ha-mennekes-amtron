@@ -1052,6 +1052,21 @@
     "write_rejected": {
       "description": "Une écriture n’a pas été confirmée. Vérifiez la connexion USB ou réseau et la configuration satellite de la borne. Ce problème disparaît dès que la commande concernée réussit. Les échecs précédents restent dans le compteur de diagnostic.",
       "title": "La borne a refusé une écriture"
+    },
+    "service_intent_rejected": {
+      "title": "Recharge bloquée : réglages enregistrés rejetés",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Recharge bloquée : réglages enregistrés rejetés",
+            "description": "L’application ne peut pas lire les réglages enregistrés. Le fichier est conservé et la recharge automatique est bloquée. Confirmez pour le remplacer : pause active, autorisation coupée, courant de reprise de 6 A, aucun objectif. La recharge ne démarre pas. Vérifiez ensuite profils, objectifs et Plug & Charge avant de reprendre. En lecture seule, vérifiez la borne : l’application ne peut pas arrêter la recharge."
+          }
+        },
+        "error": {
+          "entry_unavailable": "L’intégration n’est pas chargée. Rétablissez sa connexion avant de réessayer.",
+          "recovery_failed": "Le rétablissement n’a pas pu être confirmé. Vérifiez la connexion et réessayez."
+        }
+      }
     }
   },
   "options": {
@@ -1108,7 +1123,7 @@
       },
       "vehicle": {
         "title": "Véhicules",
-        "description": "Véhicule sélectionné : **{vehicle}**.\n\nOuvrez un profil pour tout configurer pour cette voiture au même endroit. Sélectionner le véhicule détermine quelle voiture charge maintenant. Pour que les signaux de câble et de présence choisissent la voiture, configurez les Signaux de détection de chaque profil et choisissez **Sélection automatique** dans l’entité **Véhicule actif** sur la page de l’appareil de la wallbox. Ajouter un profil n’active aucune fonction de charge.\n\nSans profils, les réglages du véhicule s’appliquent à toutes les voitures. Le premier profil ajouté les conserve dans un profil nommé « Existing sources ».",
+        "description": "Véhicule sélectionné : **{vehicle}**.\n\nOuvrez un profil pour tout configurer pour cette voiture au même endroit. Sélectionner le véhicule détermine quelle voiture charge maintenant. Pour que les signaux de câble et de présence choisissent la voiture, configurez les Signaux de détection de chaque profil et choisissez **Sélection automatique** dans l’entité **Véhicule actif** sur la page de l’appareil de la wallbox. Ajouter un profil n’active aucune fonction de charge.\n\nSans profils, les réglages du véhicule s’appliquent à toutes les voitures. Le premier profil remplace ces réglages communs. Configurez à nouveau les sources et fonctions souhaitées pour chaque profil ; les anciens réglages ne sont pas importés.",
         "menu_options": {
           "vehicle_profile_add": "Ajouter un profil",
           "vehicle_settings": "Réglages du véhicule sans profil",

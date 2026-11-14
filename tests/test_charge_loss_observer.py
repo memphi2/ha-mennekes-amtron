@@ -19,7 +19,6 @@ from custom_components.mennekes_amtron_rtu import goal_store
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
     CONF_LOSS_AUTO_MATCH,
-    CONF_LOSS_BAVARIAN_DEVICE,
     CONF_VEHICLE_LAST_CHARGE_ENERGY,
 )
 from custom_components.mennekes_amtron_rtu.charge_loss_observer import (
@@ -64,14 +63,15 @@ class Coordinator:
 
 
 def build(hass, mode="sensor", *, auto=False):
-    if mode in ("bavariandata", "vehicle_history"):
+    if mode == "vehicle_history":
         hass.data.setdefault(dr.DATA_REGISTRY, vehicle_registry())
     coordinator = Coordinator()
     entry = SimpleNamespace(
         entry_id="entry", options={
             CONF_CHARGE_LOSS_SOURCE: mode, CONF_LOSS_AUTO_MATCH: auto,
             CONF_VEHICLE_LAST_CHARGE_ENERGY: "sensor.car_energy",
-            CONF_LOSS_BAVARIAN_DEVICE: "car-device",
+            "charge_loss_vehicle_provider": "bavariandata",
+            "charge_loss_vehicle_device": "car-device",
         }, runtime_data=SimpleNamespace(
             coordinator=coordinator, identity=SimpleNamespace(serial_number="123", layout_version=0x0103),
         ),
@@ -175,7 +175,7 @@ def test_auto_only_live_changed_values_and_no_old_session_replay(tmp_path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("mode", ["bavariandata", "vehicle_history"])
+@pytest.mark.parametrize("mode", ["vehicle_history"])
 def test_history_uses_public_adapter_retries_and_does_not_call_on_each_poll(tmp_path, mode):
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -407,7 +407,7 @@ def test_cancelled_assignment_keeps_memory_and_durable_loss_in_sync(tmp_path, mo
 def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_path, failed_attempts):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer, coordinator = build(hass, "bavariandata")
+        observer, coordinator = build(hass, "vehicle_history")
         with patch(
             "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
             new=AsyncMock(return_value=HistoryMatch(8, 1)),
@@ -459,7 +459,7 @@ def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_
 def test_old_history_response_is_discarded_and_inflight_query_cancels_on_unload(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer, coordinator = build(hass, "bavariandata")
+        observer, coordinator = build(hass, "vehicle_history")
         started, release = asyncio.Event(), asyncio.Event()
         async def read(*_args, **_kwargs):
             started.set()
@@ -492,7 +492,7 @@ def test_account_or_rebound_device_is_unavailable_and_never_matches_a_different_
     async def run():
         hass = HomeAssistant(str(tmp_path))
         hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "account-entry")})
-        observer, coordinator = build(hass, "bavariandata")
+        observer, coordinator = build(hass, "vehicle_history")
         with patch("custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history", new=AsyncMock()) as read:
             try:
                 await observer.async_start()
@@ -503,7 +503,7 @@ def test_account_or_rebound_device_is_unavailable_and_never_matches_a_different_
             finally:
                 await observer.async_stop()
         hass.data[dr.DATA_REGISTRY] = vehicle_registry()
-        observer, _coordinator = build(hass, "bavariandata")
+        observer, _coordinator = build(hass, "vehicle_history")
         assert observer.available
         assert VIN not in observer._source
         hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "WBA98765432109876")})
@@ -516,7 +516,7 @@ def test_account_or_rebound_device_is_unavailable_and_never_matches_a_different_
 def test_generic_history_selection_keeps_the_existing_average_after_reload(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        original, coordinator = build(hass, "bavariandata")
+        original, coordinator = build(hass, "vehicle_history")
         replacement = None
         try:
             with patch(
@@ -544,7 +544,7 @@ def test_generic_history_selection_keeps_the_existing_average_after_reload(tmp_p
 def test_temporarily_missing_history_vehicle_preserves_statistics_and_recovers(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        original, coordinator = build(hass, "bavariandata")
+        original, coordinator = build(hass, "vehicle_history")
         replacement = None
         with patch(
             "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
@@ -561,7 +561,7 @@ def test_temporarily_missing_history_vehicle_preserves_statistics_and_recovers(t
 
                 # The selected HA device is temporarily absent/invalid on restart.
                 hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "account-entry")})
-                replacement, replacement_coordinator = build(hass, "bavariandata")
+                replacement, replacement_coordinator = build(hass, "vehicle_history")
                 replacement_coordinator.data = coordinator.data
                 await replacement.async_start()
                 assert not replacement.available
@@ -603,7 +603,7 @@ def test_temporarily_missing_history_vehicle_preserves_statistics_and_recovers(t
 def test_explicitly_disabled_history_provider_cannot_match_a_retained_legacy_vehicle(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        old, coordinator = build(hass, "bavariandata")
+        old, coordinator = build(hass, "vehicle_history")
         old._entry.options["charge_loss_vehicle_provider"] = "none"
         observer = ChargeLossObserver(hass, old._entry)
         try:

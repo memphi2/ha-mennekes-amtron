@@ -43,11 +43,11 @@ class WallboxData:
     # Fixed queue metadata changes only when intent changes, never each second.
     pending_change: str | None = field(default=None, repr=False)
     pending_change_until: datetime | None = field(default=None, repr=False)
-    # Stable communication-quality enum, the failed and the retried
-    # transactions since start; the counts change only on those events.
+    # Only quality transitions notify entities. Cumulative transaction counts
+    # remain fresh for diagnostics without waking every entity on each retry.
     connection_quality: str | None = None
-    connection_failures: int | None = None
-    connection_retries: int | None = None
+    connection_failures: int | None = field(default=None, compare=False)
+    connection_retries: int | None = field(default=None, compare=False)
     # Goal settings/latches change independently of register readback.
     energy_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
     soc_goal: dict[str, float | str | None] | None = field(default=None, repr=False)

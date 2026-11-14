@@ -5,6 +5,38 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0b5 — 2026-11-14
+
+- Keep charging release off after acknowledging rejected state, including
+  when no vehicle is connected; keep enforcing protective gate closure
+  during quarantine while honoring configured read-only mode.
+
+- Keep the rejected-state Repair reachable with existing vehicle options and
+  restart deferred observers after acknowledgement, without starting charging.
+- Recover the live log after a stalled request and discard replies from a page
+  that was hidden or left.
+- Include every app page and script when exporting a local app build.
+- Keep transaction counters in diagnostics instead of sensor attributes, so
+  repeated read retries do not grow Recorder history. Account for reused
+  unavailable-state attributes in the serial/Recorder stress-test budget.
+
+- Quarantine rejected app state and offer an explicit HA Repair; keep the old
+  file until acknowledgement and never start charging through that action.
+- Retry late vehicle limits without overriding a newer manual target.
+- Measure Recorder writes and passive Modbus traffic with app plans and jobs.
+
+- Group the app overview as **My charging**, add guidance for waiting states,
+  move registers and protocol under **Diagnostics**, and collapse command
+  history, reserve and boost controls until needed.
+- Remove expired filtered log rows when the bounded buffer discards them.
+- Remove obsolete beta configuration, restore and service-version fallbacks.
+  The integration requires app **0.9.0b4 or newer**, API 2; the two versions
+  still need not match. Update the app first.
+- Before 1.0, old beta formats are not migrated. Reconfigure affected vehicle
+  profiles and explicitly enable departure planning. Incompatible app control
+  state and departure plans are not restored. Recheck Plug & Charge, pause,
+  release, target and departure after updating.
+
 ## 0.9.0b4 — 2026-11-14
 
 - **The registers are a page below Overview again,** with the complete table,

@@ -129,25 +129,20 @@ class PlugChargeState:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
 
     def durable(self) -> dict[str, Any]:
-        result = {"enabled": self.enabled, "policy": self.policy, "hold": self.hold}
-        # Only a pending release is written: older services refuse
-        # the whole saved state when they find the key.
-        if self.manual:
-            result["manual"] = True
-        return result
+        return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold,
+                "manual": self.manual}
 
     @classmethod
     def restore(cls, raw: object) -> PlugChargeState:
-        # Older saved states have no manual release.
         if (
             not isinstance(raw, dict)
-            or raw.keys() - {"manual"} != {"enabled", "policy", "hold"}
-            or type(raw["hold"]) is not bool or type(raw.get("manual", False)) is not bool
+            or raw.keys() != {"enabled", "policy", "hold", "manual"}
+            or type(raw["hold"]) is not bool or type(raw["manual"]) is not bool
         ):
             raise ValueError("invalid saved Plug & Charge configuration")
         result = cls(hold=raw["hold"])
         result.configure(raw["enabled"], raw["policy"])
-        result.manual = raw.get("manual", False) and result.enabled
+        result.manual = raw["manual"] and result.enabled
         return result
 
 
@@ -194,7 +189,7 @@ class PlugChargeController:
             self._control.charging_release_requested = None
 
     def _schedule_deny(self) -> None:
-        if not self._stopping and not self._control.read_only and (self._task is None or self._task.done()):
+        if not self._stopping and not self._control._options.read_only and (self._task is None or self._task.done()):
             self._task = asyncio.create_task(self._deny(), name="amtron_plug_charge_gate")
 
     async def _deny(self) -> None:
@@ -213,7 +208,9 @@ class PlugChargeController:
 
     async def async_sync_locked(self) -> None:
         """Enforce the hold while the caller already owns the control lock."""
-        if self._stopping or not self.state.blocked or self._control.read_only:
+        # A startup hold forbids starting, but must still close an open gate.
+        # Explicit read-only configuration forbids even protective writes.
+        if self._stopping or not self.state.blocked or self._control._options.read_only:
             return
         current = await self._control._async_read_switch(CHARGING_RELEASE, stopping=True)
         if current != 0:

@@ -9,18 +9,18 @@ order on its own.
 **amd64 and aarch64 · separate integration required**
 
 LAN-to-RS-485 adapters are supported without local USB. See the
-[LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/network-gateway.md)
+[LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP. Supported Waveshare
-models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/lan-adapters.md#service-app).
+models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/lan-adapters.md#service-app).
 
 [First setup](#first-setup) · [Web pages](#web-pages) · [Daily use](#daily-use) ·
 [Updates](#updates) · [Help](#help)
 
 ## First setup
 
-Install the **Mennekes Amtron RTU** integration in the same version as this app
+Install the **Mennekes Amtron RTU** integration and check its minimum app version
 and complete any requested Home Assistant Core restart. See
-[Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/installation.md).
+[Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/installation.md).
 
 1. **Prepare an existing wallbox.** Note its pause, current limit, resume current
    and charging-release settings. Disconnect the vehicle for the first handover.
@@ -86,15 +86,15 @@ resume target.
 
 **Open Web UI** opens the app's pages for Home Assistant administrators. They
 need **Supervisor 2026.10.4 or newer**. See
-[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/app-guide.md)
+[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/app-guide.md)
 for details.
 
 | Page | Purpose |
 |---|---|
 | **Overview** | Which controller decides about the charge, why the car waits and what comes next; observed charging state, heartbeat, power, the next queued action, recent command results. Read-only. |
-| **Registers** | Below Overview: every known register with raw and decoded value and its read quality. Read-only. |
+| **Registers** | Under Diagnostics: every known register with raw and decoded value and its read quality. Read-only. |
 | **Connection** | USB or LAN connection and optional LAN-adapter setup. Changes apply after an app restart. |
-| **Log** | The Modbus traffic as it happens, in memory only. Runs while the page is open. |
+| **Diagnostics → Log** | The Modbus traffic as it happens, in memory only. Runs while the page is open. |
 | **Runtime** | Polling intervals, current cap and waits apply without restart. Preview before saving. |
 | **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve, early start and an estimated finish. |
 | **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
@@ -119,7 +119,7 @@ settings when saving** and save. This selects TCP-server mode and turns off
 storage polling, autonomous preambles and old serial-buffer replay; unknown
 custom payloads are refused. Applying restarts the adapter and closes the app's
 Modbus connection immediately; restart the app afterwards. Reading alone changes
-nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/lan-adapters.md).
+nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/lan-adapters.md).
 The native TCP-login switch changes the app connection only; it does not enable
 login on the adapter.
 
@@ -141,7 +141,7 @@ continues only if the wallbox proves the car stayed plugged in; otherwise it is
 interrupted and HA controls charging again. It never restarts by itself.
 
 See
-[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/app-guide.md#charging-jobs).
+[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/app-guide.md#charging-jobs).
 
 ## Daily use
 
@@ -158,14 +158,14 @@ See
   quality** diagnostic sensor, or the **Overview** page.
 - **Charging targets:** set an **Energy target** in kWh, or configure an optional
   vehicle percentage target through the integration. Targets only limit charging.
-  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/user-guide.md#energy-target).
+  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/user-guide.md#energy-target).
 - **Next departure:** set a charging deadline for one trip in HA. This optional
   plan may resume a pause to meet the time; ordinary kWh or percentage limits
   never do. HA hands the trip and the car's data to the app, which plans start
   and current itself and keeps doing so while HA is offline.
-  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/departure-planning.md).
+  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/departure-planning.md).
 - **Loss and cost estimates:** choose optional vehicle and price sources in the
-  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/charging-estimates.md).
+  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/charging-estimates.md).
 
 Early pause/resume, phase, release and lock changes are queued. HA's **Pending
 change** and its `due` attribute show the request and its scheduled time. The
@@ -206,7 +206,7 @@ fresh cable/home detection in each car's profile in HA, then switch on
 That switch is the only permission: every profile with detection signals takes
 part. Automatic selection is chosen in the **Active vehicle** entity; selecting
 a profile manually does not replace the detection check. See the
-[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/vehicle-setup.md#optional-virtual-plug--charge).
+[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/vehicle-setup.md#optional-virtual-plug--charge).
 
 The app withholds charging release until HA recognizes the selected vehicle
 unambiguously. A grant is valid only for the current physical connection. The
@@ -265,7 +265,7 @@ removed, and keep protection enabled while investigating.
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, confirm discovery again. For an existing connection, HA refreshes access automatically; confirm a remaining prompt in Devices & services. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/troubleshooting.md#renew-service-access). |
+| Token rejected | During setup, confirm discovery again. For an existing connection, HA refreshes access automatically; confirm a remaining prompt in Devices & services. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/troubleshooting.md#renew-service-access). |
 | Service API or version incompatible | Update the app and the integration to the same release, app first. Changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls stay unavailable. |
 | HA reports that a charging job of the app controls charging | A charging job or guest order runs for the plugged-in car. Stop it on **Charging jobs**, or unplug the car; HA controls charging again once the pause is confirmed. |
@@ -280,7 +280,7 @@ Diagnostics include the last 20 failed write/recovery records in RAM, with timin
 and no packet contents or credentials. They add no Recorder rows and are lost
 when the app restarts.
 
-For live troubleshooting, open **Log** (German: **Protokoll**). It starts by
+For live troubleshooting, open **Diagnostics → Log** (German: **Diagnose → Protokoll**). It starts by
 itself and shows the app's own reads, writes, retries and heartbeats with
 register addresses, decoded values, duration and outcome, one line each. A
 failed write shows the requested value, not proof that it was applied. The
@@ -288,9 +288,9 @@ app records only while the page is open and at most **10 minutes** after it
 was closed, and keeps at most **200 transactions in RAM**. It adds no Modbus
 requests, Recorder entries or log files. Serial numbers and text registers are
 hidden; network login traffic and exception messages are never captured. The
-**Registers** page below Overview shows the last value and read quality of every register.
+**Registers** page under Diagnostics shows the last value and read quality of every register.
 
 Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Automated tests do not replace that check.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/modbus-service.md)

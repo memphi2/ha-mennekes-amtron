@@ -19,6 +19,7 @@ ISSUE_UNSUPPORTED_LAYOUT: Final = "unsupported_modbus_layout"
 ISSUE_WRITE_REJECTED: Final = "write_rejected"
 ISSUE_HEARTBEAT_UNAVAILABLE: Final = "heartbeat_unavailable"
 ISSUE_SERVICE_UNAVAILABLE: Final = "service_unavailable"
+ISSUE_SERVICE_INTENT_REJECTED: Final = "service_intent_rejected"
 
 def heartbeat_lost(data: WallboxData) -> bool:
     """Return true while the wallbox reports the missing-heartbeat error."""

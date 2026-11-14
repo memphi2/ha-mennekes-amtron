@@ -173,7 +173,7 @@ class ChargeJobController:
         )
 
     def current_policy(self, owner: str | None, enabling: bool) -> bool | None:
-        """None keeps legacy control unchanged; True names our exact owner.
+        """None leaves direct charging control unchanged; True names our exact owner.
 
         An unready, failed or closing store fences only starts. A pause or a
         lower limit from another owner always runs.

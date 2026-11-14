@@ -164,7 +164,7 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
         hass.config = SimpleNamespace(time_zone="Europe/Berlin")
         hass.data[dr.DATA_REGISTRY] = vehicle_registry()
         observer._entry.options.update({
-            "timed_bavarian_device": "vehicle", "timed_vehicle_time_zone": "Europe/Paris",
+            "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "vehicle", "timed_vehicle_time_zone": "Europe/Paris",
             "timed_timer1_days": ["mon"], "timed_timer2_days": ["tue"],
             "timed_departure_entity": "sensor.trip",
         })

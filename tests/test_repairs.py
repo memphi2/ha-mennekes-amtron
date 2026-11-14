@@ -39,7 +39,7 @@ def test_a_healthy_wallbox_raises_no_issue(monkeypatch: pytest.MonkeyPatch) -> N
         hass, entry, _transport = await build_runtime()
         repairs.async_check_repairs(hass, entry)
         assert registry.created == {}
-        assert len(registry.deleted) == 4
+        assert len(registry.deleted) == 5
 
     asyncio.run(run())
 
@@ -312,4 +312,38 @@ def test_a_different_fault_during_confirmation_is_not_treated_as_recovered():
         assert entry.runtime_data.diagnostics.recoveries == 1
         await entry.runtime_data.client.async_close()
 
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("state", ["missing", "unloaded", "direct", "offline"])
+def test_intent_reset_repair_handles_unavailable_entries(state):
+    from unittest.mock import AsyncMock, Mock
+
+    from homeassistant.exceptions import HomeAssistantError
+
+    async def run():
+        hass, entry, _transport = await build_runtime()
+        entry_id = entry.entry_id
+        if state == "missing":
+            entry_id = "missing"
+        elif state == "unloaded":
+            hass.config_entries.entries[entry_id] = SimpleNamespace()
+        elif state == "offline":
+            client = Mock(spec=repairs.RemoteClient)
+            client.execute = AsyncMock(side_effect=HomeAssistantError("offline"))
+            entry.runtime_data.client = client
+        flow = await repairs.async_create_fix_flow(
+            hass, "reset", {"entry_id": entry_id, "issue": repairs.ISSUE_SERVICE_INTENT_REJECTED},
+        )
+        assert isinstance(flow, repairs.IntentResetRepairFlow)
+        flow.hass = hass
+        flow.async_create_entry = lambda **kwargs: {"type": "create_entry"}
+        flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
+        result = await flow.async_step_confirm({})
+        if state == "missing":
+            assert result["type"] == "create_entry"
+        else:
+            assert result["errors"]["base"] == (
+                "recovery_failed" if state == "offline" else "entry_unavailable"
+            )
     asyncio.run(run())

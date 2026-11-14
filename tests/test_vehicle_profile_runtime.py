@@ -19,7 +19,6 @@ from custom_components.mennekes_amtron_rtu.loss_store import (
 )
 from custom_components.mennekes_amtron_rtu.select import async_setup_entry
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
-    LEGACY_PROFILE_ID,
     activate_profile,
 )
 from custom_components.mennekes_amtron_rtu.vehicle_soc import VehicleSocObserver
@@ -99,17 +98,18 @@ def test_profile_telemetry_preserves_brief_stop_and_requires_first_maximum(tmp_p
     asyncio.run(run())
 
 
-def test_profile_change_resets_target_but_legacy_adoption_preserves_it(tmp_path):
+def test_every_profile_change_resets_the_previous_target(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         control, coordinator = Control(), Coordinator()
         hass.states.async_set("sensor.car", "20", {"unit_of_measurement": "%"})
         control.soc_goal.configure_source("sensor.car|")
         control.soc_goal.set_target(80, 20)
-        legacy = VehicleSocObserver(hass, control, coordinator, "sensor.car", profile_id=LEGACY_PROFILE_ID)
+        legacy = VehicleSocObserver(hass, control, coordinator, "sensor.car", profile_id="0" * 32)
         try:
             await legacy.async_start()
-            assert control.soc_goal.target_percent == 80
+            assert control.soc_goal.target_percent == 0
+            control.soc_goal.set_target(80, 20)
             await legacy.async_stop()
             replacement = VehicleSocObserver(hass, control, coordinator, "sensor.car", profile_id=A)
             await replacement.async_start()
@@ -183,7 +183,7 @@ def test_loss_storage_is_separate_and_prunes_only_deleted_profile_files(tmp_path
     async def run():
         hass = HomeAssistant(str(tmp_path))
         first, second = (LossStore(hass, "entry", "wallbox", profile_id=key) for key in (A, B))
-        legacy = LossStore(hass, "entry", "wallbox", profile_id=LEGACY_PROFILE_ID)
+        legacy = LossStore(hass, "entry", "wallbox")
         other = LossStore(hass, "other", "wallbox", profile_id=B)
         try:
             for store, source in ((first, "first"), (second, "second"), (legacy, "legacy"), (other, "other")):

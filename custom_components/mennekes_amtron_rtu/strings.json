@@ -1052,6 +1052,21 @@
     "write_rejected": {
       "description": "A write was not confirmed. Check the USB or LAN connection and the wallbox satellite configuration. This issue clears after the affected command succeeds. Historical failures remain in the diagnostic counter.",
       "title": "Wallbox refused a write"
+    },
+    "service_intent_rejected": {
+      "title": "Charging blocked: saved settings rejected",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Charging blocked: saved settings rejected",
+            "description": "The app could not read its saved charging settings. The old file is preserved and automatic charging is blocked. Confirm to replace it with safe defaults: paused, charging release off, 6 A resume current, no targets. Charging does not start. Afterwards check your vehicle profiles, targets and Plug & Charge, then deliberately enable release and resume. In read-only mode the app cannot stop a physical charge; check the wallbox first."
+          }
+        },
+        "error": {
+          "entry_unavailable": "The integration is not loaded. Restore its connection before retrying.",
+          "recovery_failed": "The recovery could not be confirmed. Check the connection and retry."
+        }
+      }
     }
   },
   "options": {
@@ -1108,7 +1123,7 @@
       },
       "vehicle": {
         "title": "Vehicles",
-        "description": "Selected vehicle: **{vehicle}**.\n\nOpen a profile to set up everything for that car in one place. Select vehicle decides which car charges now. To let cable and home signals choose the car instead, set up each profile’s Detection signals and choose **Automatic selection** in the **Active vehicle** entity on the wallbox device page. Adding a profile does not enable any charging feature.\n\nWithout profiles, the vehicle settings apply to every car. Adding the first profile keeps them in a profile named “Existing sources”.",
+        "description": "Selected vehicle: **{vehicle}**.\n\nOpen a profile to set up everything for that car in one place. Select vehicle decides which car charges now. To let cable and home signals choose the car instead, set up each profile’s Detection signals and choose **Automatic selection** in the **Active vehicle** entity on the wallbox device page. Adding a profile does not enable any charging feature.\n\nWithout profiles, the vehicle settings apply to every car. The first profile replaces these shared settings. Set up the desired sources and functions again for each profile; old settings are not imported.",
         "menu_options": {
           "vehicle_profile_add": "Add profile",
           "vehicle_settings": "Vehicle settings without a profile",

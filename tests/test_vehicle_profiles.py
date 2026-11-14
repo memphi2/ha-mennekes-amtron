@@ -10,7 +10,6 @@ from custom_components.mennekes_amtron_rtu._options_draft import (
     OptionsDraft,
 )
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
-    LEGACY_PROFILE_ID,
     VehicleProfile,
     activate_profile,
     active_profile,
@@ -103,7 +102,7 @@ def test_profile_catalog_is_bounded_and_names_are_distinct():
         for index in range(9)
     }
     assert profiles(raw) == {}
-    raw["vehicle_profiles"].pop(LEGACY_PROFILE_ID)
+    raw["vehicle_profiles"].pop("0" * 32)
     assert len(profiles(raw)) == 8
 
 

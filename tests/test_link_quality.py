@@ -160,7 +160,7 @@ def test_heartbeat_failure_latches_until_a_fresh_success_after_the_window() -> N
         assert client.link_quality.state == "good"
         retried = await poller.async_poll(first, last_success=True)
         assert (retried.connection_retries, retried.connection_failures) == (1, 0)
-        assert retried != first  # A new count must notify entities.
+        assert retried == first  # Diagnostics counters alone must not notify entities.
         # Any other lost reply is a failure.
         transport.write_exceptions[R.CHARGING_RELEASE.address] = ModbusIOException("lost reply")
         with pytest.raises(AmtronProtocolError, match="lost reply"):

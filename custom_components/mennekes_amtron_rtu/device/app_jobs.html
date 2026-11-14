@@ -25,11 +25,11 @@
       <p id="job_forecast_storage" class="hint"></p>
     </section>
     <div class="actions">
-      <button id="job_stop" type="button" data-text="stop">Stop automation for this connection</button>
+      <button id="job_stop" type="button" data-text="stop">Stop job and pause charging</button>
       <button id="job_clear" type="button" class="secondary" data-text="clear">Clear stopped order without resuming</button>
     </div>
-    <section aria-labelledby="job_boost_title">
-      <h3 id="job_boost_title" data-text="boost_title">Temporary early charging</h3>
+    <details>
+      <summary id="job_boost_title" data-text="boost_title">Temporary early charging</summary>
       <p class="hint" data-text="boost_hint">Charge before the scheduled start, then return to the original plan. Current and energy limits stay unchanged.</p>
       <p id="job_boost_until" role="status"></p>
       <label for="job_boost_minutes" data-text="boost_minutes">Duration in minutes (1–120)</label>
@@ -38,7 +38,7 @@
         <button id="job_boost_preview" type="button" data-text="boost_preview">Preview boost</button>
         <button id="job_cancel_boost" type="button" class="secondary" data-text="boost_cancel">Return to plan now</button>
       </div>
-    </section>
+    </details>
   </section>
   <section class="card">
     <h2 data-text="new">New order</h2>
@@ -53,9 +53,10 @@
           <div><label for="job_energy" data-text="energy">Additional energy, kWh</label><input id="job_energy" type="number" min="0.1" max="1000" step="0.1" value="10" required></div>
           <div><label for="job_current" data-text="current">Current per phase, A</label><input id="job_current" type="number" min="6" max="32" step="0.1" value="6" required></div>
         </div>
+        <details><summary data-text="reserve">Immediate reserve, kWh</summary>
         <label for="job_reserve" data-text="reserve">Immediate reserve, kWh</label>
         <input id="job_reserve" type="number" min="0" max="1000" step="0.1" value="0" aria-describedby="job_reserve_hint" required>
-        <p id="job_reserve_hint" class="hint" data-text="reserve_hint">Charge this portion now, then wait for the planned start. Included in the total energy ceiling, not extra. Zero disables; AC meter energy, not battery percentage.</p>
+        <p id="job_reserve_hint" class="hint" data-text="reserve_hint">Charge this portion now, then wait for the planned start. Included in the total energy ceiling, not extra. Zero disables; AC meter energy, not battery percentage.</p></details>
         <p class="hint" data-text="scope">Applies only to this confirmed physical connection. The order does not identify or authorize the vehicle. After a service restart or a lasting connection loss it continues only if the wallbox proves the same plug-in; otherwise a new order is needed.</p>
         <button type="submit" id="job_preview" data-text="preview">Preview</button>
       </fieldset>

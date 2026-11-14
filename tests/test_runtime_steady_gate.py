@@ -138,7 +138,7 @@ def test_recorder_maintenance_and_backlog_failures_reject_the_run(monkeypatch, t
 
 @pytest.mark.parametrize(("key", "value"), [
     ("recorder_inserted", 10000), ("recorder_inserted", None),
-    ("recorder_attribute_growth", 3), ("serial_recoveries", -1),
+    ("recorder_attribute_growth", 47), ("serial_recoveries", -1),
     ("recorder_states", 0), ("recorded_energy_rows", 0), ("recorded_power_rows", 0),
     ("database_bytes", DATABASE_LIMIT + 1), ("wal_bytes", WAL_LIMIT + 1),
 ])
@@ -186,3 +186,17 @@ def test_real_harness_checkpoints_and_reports_failure(monkeypatch, tmp_path, req
     assert report["samples"] == checkpoint["samples"]
     assert report["stage"] == "running"
     assert not tracemalloc.is_tracing()
+
+
+def test_first_disconnect_attribute_variants_are_bounded_not_per_reconnect(monkeypatch, tmp_path):
+    data = measured_report()
+    for sample in data["samples"]:
+        sample["recorder_attribute_growth"] = 15
+    result, report = runner(monkeypatch, tmp_path, data)
+    assert result == 0
+    # Repeating a reconnect may reuse the same unavailable attribute sets,
+    # but must not buy an unlimited allowance for new per-poll attributes.
+    data["samples"][-1].update(serial_recoveries=20, recorder_attribute_growth=60)
+    result, report = runner(monkeypatch, tmp_path, data)
+    assert result == 1
+    assert "Recorder attributes grew unexpectedly" in report["validation_errors"]

@@ -43,7 +43,7 @@ def test_loss_source_is_independent_and_atomic(source):
             options={
                 "charging_price": 0.3,
                 "scan_interval_seconds": 40,
-                "charge_loss_bavarian_device": "car",
+                "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "car",
                 "charge_loss_auto_match": True,
             }
         )
@@ -84,7 +84,7 @@ def test_loss_source_is_independent_and_atomic(source):
         assert saved["charge_loss_source"] == (
             "sensor" if source == "sensor" else "vehicle_history"
         )
-        assert "charge_loss_bavarian_device" not in saved
+        assert ("charge_loss_vehicle_device" in saved) is (source == "vehicle")
         if source == "sensor":
             assert saved["charge_loss_auto_match"] is False
         entry.options = saved
@@ -158,7 +158,7 @@ def test_loss_provider_and_device_validation(invalid):
     "options",
     [
         {"timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car"},
-        {"charge_loss_bavarian_device": "own", "timed_bavarian_device": "other"},
+        {"charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "own", "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "other"},
     ],
 )
 def test_loss_reuses_other_source_only_when_own_selection_absent(options):
@@ -170,7 +170,7 @@ def test_loss_reuses_other_source_only_when_own_selection_absent(options):
         )
         marker = next(iter(form["data_schema"].schema))
         assert marker.description["suggested_value"] == options.get(
-            "charge_loss_bavarian_device", "car"
+            "charge_loss_vehicle_device", "car"
         )
 
     asyncio.run(run())

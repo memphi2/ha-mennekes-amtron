@@ -27,7 +27,11 @@ from .enums import RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
-from .persistence import StorageCommitUncertainError, StorageStateUnknownError
+from .persistence import (
+    StorageCommitUncertainError,
+    StorageStateUnknownError,
+    finish_goal_save,
+)
 from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
 from .registers import ENERGY_TOTAL, ERROR_CODE, REGISTERS_BY_KEY
@@ -139,11 +143,23 @@ class ModbusService:
             or f"{self.config.connection.port}:{self.config.connection.device_id}",
         )
         self._phase = "loading saved control intent"
-        if not await asyncio.to_thread(store.load, self.client.write_state) and not self._intent_rejected:
-            self._intent_rejected = True
-            _LOGGER.warning(
-                "Saved control intent belongs to another wallbox or is damaged; starting without it"
-            )
+        self._intent_rejected = not await asyncio.to_thread(store.load, self.client.write_state)
+        if self._intent_rejected:
+            # Do not migrate or overwrite rejected data. Hold the physical gate
+            # until an administrator acknowledges a fresh, paused configuration.
+            state = self.client.write_state
+            safe = WriteState(pause_requested=True, charging_release_requested=False, charging_setpoint=6)
+            # Preserve write guards and generations across reconnect attempts.
+            state.pause_requested = safe.pause_requested
+            state.charging_release_requested = safe.charging_release_requested
+            state.charging_setpoint = safe.charging_setpoint
+            state.energy_goal = safe.energy_goal
+            state.soc_goal = safe.soc_goal
+            state.session_history = safe.session_history
+            state.plug_charge = safe.plug_charge
+            state.plug_charge.configure(True, "0" * 64)
+            state.plug_charge.hold = True
+            _LOGGER.warning("Saved control intent rejected; charging blocked until acknowledged in Home Assistant Repairs")
         self._saved_session_history = self.client.write_state.session_history.snapshot()
         self.identity = identity
         self._store = store
@@ -179,7 +195,8 @@ class ModbusService:
         except BaseException:
             await control.async_shutdown()
             raise
-        # With no saved resume limit, a migrated pause must not default to the
+        control.startup_hold = self._intent_rejected
+        # With no saved resume limit, a restored pause must not default to the
         # maximum available current. Only an explicit command may resume it.
         if control.charging_setpoint is None:
             current = self.data.get("charging_current_ems")
@@ -362,7 +379,7 @@ class ModbusService:
             self._attempts = 0
         if (
             self.control is None
-            or self.config.read_only
+            or self.control.read_only
             or self.heartbeat.healthy is not True
             or self.data.get("error_code") != 200
             or self._attempts >= 3
@@ -390,7 +407,7 @@ class ModbusService:
     async def _enforce_current_cap(self) -> None:
         """Never leave a confirmed charging current above a lowered cap."""
         control = self.control
-        if control is None or self.config.read_only or time.monotonic() < self._cap_retry_at:
+        if control is None or control.read_only or time.monotonic() < self._cap_retry_at:
             return
         self._phase = "applying the current cap"
         try:
@@ -408,7 +425,7 @@ class ModbusService:
             _LOGGER.info("Charging current lowered to the %.1f A cap", control.max_charging_current)
 
     async def _persist(self, *, include_session_history: bool = False) -> None:
-        if self._store is not None:
+        if self._store is not None and not self._intent_rejected:
             async with self._store_lock:
                 self._phase = "saving control intent"
                 original = self.client.write_state
@@ -508,7 +525,8 @@ class ModbusService:
                 "soc_goal_revision": self._soc_goal_revision,
                 "soc_goal": control.soc_goal.snapshot() if control else None,
                 "energy_goal": control.energy_goal.snapshot() if control else None,
-                "read_only": self.config.read_only,
+                "read_only": self.config.read_only or self._intent_rejected,
+                "intent_rejected": self._intent_rejected,
                 "supports_cancel_pending": True,
                 "current_cap": self.config.current_cap,
                 "state_change_interval_seconds": self.config.state_change_interval_seconds,
@@ -615,6 +633,28 @@ class ModbusService:
                 or payload["expected_soc_revision"] != self._soc_goal_revision
             ):
                 raise DeviceError("soc_goal_source_changed")
+            if command == "acknowledge_intent_reset":
+                if payload.keys() != {"command", "expected_serial_number"}:
+                    raise ValueError("invalid reset acknowledgement")
+                if self._intent_rejected:
+                    if self._store is None:
+                        raise DeviceError("service_unavailable")
+                    safe = WriteState(pause_requested=True, charging_release_requested=False, charging_setpoint=6)
+                    async with self._store_lock:
+                        await finish_goal_save(asyncio.to_thread(self._store.save, safe))
+                    # Vehicle absence can clear the temporary gate's release
+                    # intent. Restore the durable safe intent without replacing
+                    # the live state and its Modbus write limiter.
+                    state = self.client.write_state
+                    state.pause_requested = safe.pause_requested
+                    state.charging_release_requested = safe.charging_release_requested
+                    state.charging_setpoint = safe.charging_setpoint
+                    state.plug_charge = safe.plug_charge
+                    self._intent_rejected = False
+                    control.startup_hold = False
+                return self.snapshot()
+            if self._intent_rejected:
+                raise DeviceValidationError("read_only_mode")
             initial_revision = self._soc_goal_revision
             value = payload.get("value")
             try:

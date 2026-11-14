@@ -35,7 +35,6 @@ from .device.const import (
 )
 from .remote import CONF_SERVER_URL
 from .timed_goal_const import (
-    CONF_TIMED_BAVARIAN_DEVICE,
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
     CONF_TIMED_CAPACITY_ENTITY,
@@ -100,7 +99,6 @@ DEPARTURE_KEYS = {
     CONF_TIMED_CALENDAR_TITLE,
     CONF_TIMED_DEPARTURE_ENTITY,
     CONF_TIMED_MINIMUM_SOC,
-    CONF_TIMED_BAVARIAN_DEVICE,
     CONF_TIMED_VEHICLE_PROVIDER,
     CONF_TIMED_VEHICLE_DEVICE,
     CONF_TIMED_VEHICLE_TIME_ZONE,
@@ -437,7 +435,6 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 if user_input.get("use_vehicle_timer") is not True:
                     draft.clear(
                         {
-                            CONF_TIMED_BAVARIAN_DEVICE,
                             CONF_TIMED_VEHICLE_DEVICE,
                             CONF_TIMED_VEHICLE_TIME_ZONE,
                             CONF_TIMED_TIMER1_DAYS,
@@ -610,7 +607,6 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             if not errors:
                 draft.clear(
                     {
-                        CONF_TIMED_BAVARIAN_DEVICE,
                         CONF_TIMED_VEHICLE_TIME_ZONE,
                         CONF_TIMED_TIMER1_DAYS,
                         CONF_TIMED_TIMER2_DAYS,

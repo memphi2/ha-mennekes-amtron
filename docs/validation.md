@@ -141,8 +141,10 @@ Every sample includes state inserts, retained state rows, attribute growth,
 database size and WAL size. Queue depth and file-size peaks are also sampled
 every 250 ms, and the queue must drain at the end. The scenario allows at most
 eight state inserts per measurement iteration, plus two availability changes
-per enabled entity and reconnect. Attribute growth is limited to two rows;
-database/WAL peaks to 8/16 MiB and queue depth to 256 items. These are regression
+per enabled entity and reconnect. Attribute growth permits two measurement
+variants plus one unavailable variant per enabled entity after the first
+reconnect; later reconnects do not increase that allowance. Database/WAL peaks
+are limited to 8/16 MiB and queue depth to 256 items. These are regression
 budgets for one synthetic wallbox, not limits imposed on a user's database.
 `scripts/recorder_soak_checks.py` owns these checks and rejects incomplete
 Recorder measurements even when the serial test itself succeeds.

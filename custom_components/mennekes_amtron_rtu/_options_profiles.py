@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from copy import deepcopy
 from typing import Any
 from uuid import uuid4
 
@@ -28,7 +27,6 @@ from .vehicle_profiles import (
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
     CONF_VEHICLE_SOC_USE_PROFILE,
-    LEGACY_PROFILE_ID,
     MAX_VEHICLE_PROFILES,
     PROFILE_OPTION_KEYS,
     RESET_PENDING,
@@ -252,11 +250,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             current = user_input
             name = user_input.get("vehicle_profile_name")
             provider = user_input.get(CONF_VEHICLE_PROVIDER)
-            legacy_count = int(
-                CONF_VEHICLE_PROFILES not in draft.values
-                and any(option in draft.values for option in PROFILE_OPTION_KEYS)
-            )
-            if not edit and len(catalog) + legacy_count >= MAX_VEHICLE_PROFILES:
+            if not edit and len(catalog) >= MAX_VEHICLE_PROFILES:
                 errors["base"] = "vehicle_profile_limit"
             if (
                 not isinstance(name, str)
@@ -329,24 +323,8 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
         if draft is None:
             raise RuntimeError("cannot save an incomplete profile")
         if CONF_VEHICLE_PROFILES not in draft.values:
-            legacy = {
-                key: deepcopy(draft.values[key])
-                for key in PROFILE_OPTION_KEYS
-                if key in draft.values
-            }
             draft.clear(set(PROFILE_OPTION_KEYS))
             draft.values[CONF_VEHICLE_PROFILES] = {}
-            if legacy:
-                draft.values[CONF_VEHICLE_PROFILES][LEGACY_PROFILE_ID] = VehicleProfile(
-                    LEGACY_PROFILE_ID,
-                    "Existing sources (1)"
-                    if self._details["profile_name"].casefold() == "existing sources"
-                    else "Existing sources",
-                    "none",
-                    "",
-                    legacy,
-                ).as_dict()
-                draft.values[CONF_ACTIVE_VEHICLE_PROFILE] = LEGACY_PROFILE_ID
         key = self._details["profile_key"] or uuid4().hex
         # The guided setup continues with this car's settings.
         self._profile_target = key

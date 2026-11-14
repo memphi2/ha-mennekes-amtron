@@ -82,3 +82,19 @@ test("every value of the summary has a text in all five languages", () => {
     assert.ok(words[key].every(value => typeof value === "string" && value), key);
   }
 });
+
+test("waiting guidance follows the current reason and disappears during ordinary charging", async () => {
+  const cases = [
+    ["vehicle_unconfirmed", /Fahrzeug/], ["waiting_for_soc", /Ladestand/],
+    ["paused", /Ladepause/], ["read_only", /App-Konfiguration/],
+    ["wallbox_unavailable", /Verbindung/], ["target_reached", /Ziel/],
+  ];
+  for (const [waiting, expected] of cases) {
+    const h = setup("de", overview(operation({waiting})));
+    await flush();
+    assert.match(put(h, "op_advice"), expected);
+  }
+  const h = setup("de", overview(operation({waiting: "none"})));
+  await flush();
+  assert.equal(put(h, "op_advice"), "");
+});

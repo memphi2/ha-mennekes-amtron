@@ -198,6 +198,8 @@ def test_a_lowering_within_the_write_floor_is_queued_not_dropped():
 def service_with(control, *, read_only=False):
     service = runtime.ModbusService.__new__(runtime.ModbusService)
     service.control = control
+    if control is not None:
+        control.read_only = read_only
     service.config = Mock(read_only=read_only)
     service._cap_retry_at = 0.0
     service._command_lock = asyncio.Lock()

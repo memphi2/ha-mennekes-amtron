@@ -33,14 +33,15 @@ function setup(responses, language = "de") {
   const calls = [], timers = [], events = {};
   const document = {hidden: false, documentElement: {lang: language}, getElementById: id => ids.get(id),
     querySelectorAll: selector => selector === "[data-text]" ? texts : [], createElement: () => new Node(), addEventListener(name, fn) { events[name] = fn; }};
-  const context = {document, Date, Number, String, Math, JSON, Error, Boolean,
+  const context = {document, AbortController, Date, Number, String, Math, JSON, Error, Boolean,
     setTimeout: (fn, delay) => { timers.push({fn, delay}); return timers.length; }, clearTimeout() {},
     addEventListener(name, fn) { events[name] = fn; },
     fetch: async (url, options = {}) => {
-      calls.push({url, method: options.method || "GET", body: options.body ? JSON.parse(options.body) : null, headers: options.headers});
+      calls.push({url, method: options.method || "GET", body: options.body ? JSON.parse(options.body) : null, headers: options.headers, signal: options.signal});
       const item = responses.shift();
       if (item instanceof Error) throw item;
-      return {ok: true, json: async () => item};
+      const data = typeof item === "function" ? await item(options) : item;
+      return {ok: true, json: async () => data};
     }};
   vm.runInNewContext(source, context, {filename: "app_log.js"});
   const tick = async () => { await timers.pop().fn(); await flush(); };
@@ -107,4 +108,65 @@ test("no connection and a silent app are named; a hidden page does not poll", as
   offline.document.hidden = true; offline.timers.length = 0;
   await offline.events.visibilitychange(); await flush();
   assert.equal(offline.calls.length, 1);
+});
+
+test("filtered display evicts records no longer retained", async () => {
+ const h=setup([state([record(1,{operation:"write"})]),state(Array.from({length:2000},(_,i)=>record(i+2)))]);
+ await flush(); h.el("log_filter").value="SCHREIBEN"; h.el("log_filter").emit("input");
+ assert.equal(h.lines().length,1); await h.tick();
+ assert.equal(h.lines().length,0,"old filtered row must leave when buffer evicts it");
+});
+
+test("buffer eviction preserves a reader's scroll position and a paused view", async () => {
+  const h = setup([state([record(1)]), state(Array.from({length: 2000}, (_, i) => record(i + 2))), state([record(2002)])]);
+  await flush();
+  const box = h.el("log_lines");
+  box.scrollHeight = 1000; box.clientHeight = 100; box.scrollTop = 100;
+  h.el("log_pause").emit("click");
+  await h.tick();
+  assert.equal(h.lines().length, 1);
+  h.el("log_pause").emit("click");
+  assert.equal(h.lines().length, 2000);
+  box.scrollTop = 100;
+  await h.tick();
+  assert.equal(box.scrollTop, 100);
+  assert.equal(h.lines().length, 2000);
+});
+
+test("eviction keeps retained DOM rows instead of rebuilding the whole log", async () => {
+  const h = setup([state(Array.from({length: 2000}, (_, i) => record(i + 1))), state([record(2001)])]);
+  await flush();
+  const retained = h.el("log_lines").children[1];
+  await h.tick();
+  assert.equal(h.el("log_lines").children[0], retained);
+  assert.equal(h.lines().length, 2000);
+});
+
+
+test("a stalled log request times out and can recover", async () => {
+  const waiting = options => new Promise((resolve, reject) => {
+    options.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+  });
+  const h = setup([waiting, state([record(1)])], "en");
+  await flush();
+  const timeout = h.timers.find(timer => timer.delay === 8000);
+  assert.ok(timeout, "network request needs a bounded timeout");
+  timeout.fn(); await flush();
+  assert.equal(h.calls[0].signal.aborted, true);
+  assert.match(h.el("log_status").textContent, /^No answer/);
+  await h.tick();
+  assert.equal(h.lines().length, 1);
+});
+
+test("a late hidden-page response cannot renew capture or replace the resumed view", async () => {
+  let finish;
+  const h = setup([() => new Promise(resolve => { finish = resolve; }), state([record(2)])]);
+  await flush();
+  h.document.hidden = true; h.events.visibilitychange();
+  assert.equal(h.calls[0].signal?.aborted, true);
+  h.document.hidden = false; h.events.visibilitychange(); await flush();
+  finish(state([record(1)], {enabled: false})); await flush();
+  assert.equal(h.calls.length, 2, "stale response must not restart capture");
+  assert.equal(h.lines().length, 1);
+  h.events.pagehide();
 });

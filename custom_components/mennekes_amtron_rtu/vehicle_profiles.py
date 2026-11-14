@@ -13,9 +13,6 @@ CONF_VEHICLE_PROFILES: Final = "vehicle_profiles"
 CONF_ACTIVE_VEHICLE_PROFILE: Final = "active_vehicle_profile"
 CONF_VEHICLE_AUTO_SELECTION: Final = "vehicle_auto_selection"
 CONF_VIRTUAL_PLUG_CHARGE: Final = "virtual_plug_charge"
-# A former per-profile Plug & Charge permission. It is ignored, but kept valid
-# so that stored profiles still load.
-CONF_VEHICLE_PLUG_CHARGE: Final = "vehicle_plug_charge"
 CONF_VEHICLE_DETECTION_SOURCE: Final = "vehicle_detection_source"
 CONF_VEHICLE_CONNECTED_ENTITY: Final = "vehicle_connected_entity"
 CONF_VEHICLE_HOME_ENTITY: Final = "vehicle_home_entity"
@@ -28,7 +25,6 @@ CONF_VEHICLE_SOURCE_IDENTITY: Final = "vehicle_source_identity"
 CONF_VEHICLE_SOC_USE_PROFILE: Final = "vehicle_soc_use_profile"
 CONF_VEHICLE_LIMIT_USE_PROFILE: Final = "vehicle_limit_use_profile"
 CONF_TIMED_USE_VEHICLE_CAPACITY: Final = "timed_use_vehicle_capacity"
-LEGACY_PROFILE_ID: Final = "00000000000000000000000000000000"
 MAX_VEHICLE_PROFILES: Final = 8
 MAX_CONNECTED_STATES: Final = 8
 RESET_PENDING: Final = "timed_goal_reset_pending"
@@ -38,7 +34,6 @@ PROFILE_OPTION_KEYS: Final = frozenset(
         "vehicle_charge_limit_entity",
         CONF_VEHICLE_SOC_USE_PROFILE,
         CONF_VEHICLE_LIMIT_USE_PROFILE,
-        CONF_VEHICLE_PLUG_CHARGE,
         "timed_goal_enabled",
         "timed_capacity_entity",
         "timed_capacity_kwh",
@@ -47,7 +42,6 @@ PROFILE_OPTION_KEYS: Final = frozenset(
         "timed_calendar_entity",
         "timed_calendar_title",
         "timed_departure_entity",
-        "timed_bavarian_device",
         "timed_vehicle_provider",
         "timed_vehicle_device",
         "timed_vehicle_time_zone",
@@ -56,7 +50,6 @@ PROFILE_OPTION_KEYS: Final = frozenset(
         "charge_loss_source",
         "vehicle_last_charge_energy_entity",
         "charge_loss_auto_match",
-        "charge_loss_bavarian_device",
         "charge_loss_vehicle_provider",
         "charge_loss_vehicle_device",
     }
@@ -204,10 +197,6 @@ def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
             or (provider != "none" and not device)
             or not isinstance(options, dict)
             or not options.keys() <= PROFILE_OPTION_KEYS
-            or (
-                CONF_VEHICLE_PLUG_CHARGE in options
-                and type(options[CONF_VEHICLE_PLUG_CHARGE]) is not bool
-            )
             or not isinstance(identity, str)
             or len(identity) > 256
             or ("detection" in value and detection is None)

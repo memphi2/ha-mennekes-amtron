@@ -41,19 +41,19 @@ OPTIONS = {
 @pytest.mark.parametrize(("options", "enabled"), [
     ({}, False), ({"vehicle_soc_entity": SOC}, False),
     ({CONF_TIMED_GOAL_ENABLED: True}, True),
-    ({"timed_capacity_kwh": 80}, True),
-    ({"timed_capacity_entity": "sensor.capacity"}, True),
-    ({"timed_departure_entity": "input_datetime.trip"}, True),
-    ({"timed_calendar_entity": "calendar.trip"}, True),
-    ({"timed_bavarian_device": "old-bmw"}, True),
-    ({"timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car"}, True),
+    ({"timed_capacity_kwh": 80}, False),
+    ({"timed_capacity_entity": "sensor.capacity"}, False),
+    ({"timed_departure_entity": "input_datetime.trip"}, False),
+    ({"timed_calendar_entity": "calendar.trip"}, False),
+    ({"timed_bavarian_device": "old-bmw"}, False),
+    ({"timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car"}, False),
     ({"timed_bavarian_device": "old-bmw", "timed_vehicle_provider": "none"}, False),
     ({"timed_vehicle_device": "car"}, False),
     ({"timed_vehicle_provider": "bavariandata"}, False),
     ({CONF_TIMED_GOAL_ENABLED: False, "timed_capacity_kwh": 80}, False),
     ({CONF_TIMED_GOAL_ENABLED: False, "timed_bavarian_device": "old-bmw"}, False),
 ])
-def test_explicit_activation_wins_and_legacy_planning_is_retained(options, enabled):
+def test_planning_requires_explicit_activation(options, enabled):
     assert timed_goal_is_enabled(options) is enabled
 
 
@@ -61,7 +61,7 @@ def test_explicit_activation_wins_and_legacy_planning_is_retained(options, enabl
     ({}, True, False),
     ({CONF_TIMED_GOAL_ENABLED: True}, False, False),
     ({CONF_TIMED_GOAL_ENABLED: True, "timed_calendar_entity": "calendar.trips"}, True, True),
-    ({"timed_capacity_kwh": 80}, True, True),
+    ({"timed_capacity_kwh": 80}, True, False),
     ({CONF_TIMED_GOAL_ENABLED: False, "timed_capacity_kwh": 80}, True, False),
 ])
 def test_real_ha_only_adds_departure_entities_for_enabled_vehicle_planning(tmp_path, extra, soc, enabled):

@@ -54,7 +54,7 @@ def test_only_implemented_capabilities_are_advertised_and_vehicle_bound():
 def test_explicit_generic_selection_never_revives_a_retained_legacy_device(capability, prefix, legacy):
     provider, device = f"{prefix}_vehicle_provider", f"{prefix}_vehicle_device"
     options = {legacy: "old-car"}
-    assert provider_selection(options, capability) == ProviderSelection("bavariandata", "old-car")
+    assert provider_selection(options, capability) == ProviderSelection("none", "")
     assert provider_selection({**options, provider: "none"}, capability) == ProviderSelection("none", "")
     assert provider_selection({**options, provider: "bavariandata"}, capability) == ProviderSelection("bavariandata", "")
     assert provider_selection({**options, device: "new-car"}, capability) == ProviderSelection("none", "new-car")
@@ -65,7 +65,8 @@ def test_explicit_generic_selection_never_revives_a_retained_legacy_device(capab
 
 def test_history_and_departure_keep_independent_devices_and_generic_inputs_need_no_adapter():
     options = {
-        "timed_bavarian_device": "departure-car", "charge_loss_bavarian_device": "history-car",
+        "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "departure-car",
+        "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "history-car",
     }
     assert provider_selection(options, "departure").device_id == "departure-car"
     assert provider_selection(options, "charge_history").device_id == "history-car"
@@ -85,11 +86,11 @@ def test_history_and_departure_keep_independent_devices_and_generic_inputs_need_
 
 
 @pytest.mark.parametrize(("options", "expected"), [
-    ({}, "disabled"), ({"charge_loss_source": "bavariandata"}, "vehicle_history"),
+    ({}, "disabled"), ({"charge_loss_source": "bavariandata"}, "disabled"),
     ({"charge_loss_source": "vehicle_history"}, "vehicle_history"),
     ({"charge_loss_source": "sensor"}, "sensor"), ({"charge_loss_source": 123}, "disabled"),
 ])
-def test_loss_source_normalization_is_compatibility_only(options, expected):
+def test_only_current_loss_source_modes_are_supported(options, expected):
     assert loss_source(options) == expected
 
 
@@ -123,7 +124,7 @@ def test_departure_adapter_binds_local_options_and_cannot_follow_a_rebound_vehic
 
 def test_departure_falls_back_to_home_timezone_only_with_adapter_selected():
     hass = local_hass()
-    source = resolve_departure_source(hass, {"timed_bavarian_device": "car"})
+    source = resolve_departure_source(hass, {"timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car"})
     assert source is not None
     now = datetime(2026, 11, 7, tzinfo=UTC)
     with patch(f"{ADAPTER}.read_bavarian_departure", return_value=None) as read:
@@ -135,7 +136,7 @@ def test_history_adapter_preserves_statistics_identity_and_cleans_up_local_subsc
     async def run():
         hass = HomeAssistant(str(tmp_path))
         hass.data[dr.DATA_REGISTRY] = vehicle_registry()
-        options = {"charge_loss_bavarian_device": "car"}
+        options = {"charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "car"}
         old = resolve_history_source(hass, options)
         source = resolve_history_source(hass, {
             **options, "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "car",
@@ -170,7 +171,7 @@ def test_history_adapter_preserves_statistics_identity_and_cleans_up_local_subsc
 def test_invalid_account_device_does_not_get_a_vehicle_identity():
     hass = local_hass()
     hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "account-entry")})
-    source = resolve_history_source(hass, {"charge_loss_bavarian_device": "account"})
+    source = resolve_history_source(hass, {"charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "account"})
     assert source is not None
     assert not source.available
     assert source.source_key == "bavariandata:account"

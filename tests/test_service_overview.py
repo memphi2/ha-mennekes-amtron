@@ -152,3 +152,12 @@ def test_the_services_summary_is_passed_on_only_when_it_holds_up():
     for broken in ({**summary, "controller": "private-serial"}, {**summary, "source": "x"}, "text"):
         raw["control"]["operation"] = broken
         assert overview_snapshot(raw)["operation"] is None
+
+
+def test_rejected_intent_explains_hold_without_hiding_running_heartbeat():
+    raw = snapshot()
+    raw["control"].update(read_only=True, intent_rejected=True)
+    raw["heartbeat"].update(running=True)
+    result = overview_snapshot(raw)
+    assert result["reason"] == "intent_rejected"
+    assert result["heartbeat"] == "ok"

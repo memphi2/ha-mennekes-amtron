@@ -5,7 +5,6 @@ import asyncio
 import pytest
 
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
-    CONF_VEHICLE_PLUG_CHARGE,
     CONF_VIRTUAL_PLUG_CHARGE,
     profiles,
 )
@@ -32,16 +31,16 @@ def test_profile_offers_detection_but_no_second_permission():
     asyncio.run(run())
 
 
-def test_a_stored_former_permission_stays_valid_and_is_kept():
+def test_a_stored_former_permission_is_not_supported():
     raw = enabled_options()
-    raw["vehicle_profiles"][A]["options"][CONF_VEHICLE_PLUG_CHARGE] = True
-    assert profiles(raw)[A].options == {CONF_VEHICLE_PLUG_CHARGE: True}
+    raw["vehicle_profiles"][A]["options"]["vehicle_plug_charge"] = True
+    assert profiles(raw) == {}
 
 
 @pytest.mark.parametrize("value", [None, 0, 1, "true", [], {}])
 def test_malformed_stored_permission_still_invalidates_the_catalog(value):
     raw = enabled_options()
-    raw["vehicle_profiles"][A]["options"][CONF_VEHICLE_PLUG_CHARGE] = value
+    raw["vehicle_profiles"][A]["options"]["vehicle_plug_charge"] = value
     assert profiles(raw) == {}
 
 

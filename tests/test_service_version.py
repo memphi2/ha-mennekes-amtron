@@ -103,8 +103,8 @@ def test_api_mismatch_is_distinct_from_auth_failure_and_recovers(
 
 
 @pytest.mark.parametrize(("advertised", "minimum", "error"), [
-    ("missing", "0.5.0", None),
-    ("missing", "0.5.1", "service_version_mismatch"),
+    ("missing", "0.5.0", "service_invalid_response"),
+    ("missing", "0.5.1", "service_invalid_response"),
     ("0.5.0", "0.5.0", None),
     ("0.10.0", "0.9.0", None),
     ("0.9.0", "0.10.0", "service_version_mismatch"),
@@ -169,7 +169,7 @@ def test_service_versions_use_numeric_and_prerelease_ordering(
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("advertised", ["0.6.1", "0.10.0", "0.6.2", "0.6.2b1"])
+@pytest.mark.parametrize("advertised", ["0.9.0b4", "0.10.0", "0.9.0", "0.9.0b5"])
 def test_supported_services_work_without_a_matching_integration_version(tmp_path, advertised):
     async def run():
         service, bus, _clock = await service_fixture(tmp_path)
@@ -213,7 +213,7 @@ def test_supported_services_work_without_a_matching_integration_version(tmp_path
 @pytest.mark.parametrize("phase", ["flow", "setup", "poll", "command"])
 @pytest.mark.parametrize(("advertised", "minimum", "expected"), [
     ("0.4.9", "0.5.0", "service_version_mismatch"),
-    ("missing", "0.5.1", "service_version_mismatch"),
+    ("missing", "0.5.1", "service_invalid_response"),
     (None, "0.5.0", "service_invalid_response"),
 ])
 def test_incompatible_service_version_blocks_and_recovers_without_reauth_or_replay(

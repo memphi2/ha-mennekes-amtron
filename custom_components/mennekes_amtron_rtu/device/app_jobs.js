@@ -14,7 +14,7 @@
     jobs:["Charging jobs","Ladeaufträge","Ordres de recharge","Laadopdrachten","Ordini di ricarica"],
     intro:["A local time window with an additional-energy ceiling. Existing release and battery limits remain in force.","Ein lokales Zeitfenster mit zusätzlicher Energieobergrenze. Bestehende Freigabe- und Batteriegrenzen bleiben wirksam.","Une plage horaire locale avec un plafond d’énergie supplémentaire. L’autorisation et les limites de batterie existantes restent en vigueur.","Een lokaal tijdvenster met een bovengrens voor extra energie. Bestaande vrijgave- en accugrenzen blijven gelden.","Una finestra oraria locale con un tetto di energia aggiuntiva. Consenso e limiti della batteria esistenti restano validi."],
     active:["Current order","Aktueller Auftrag","Ordre actuel","Huidige opdracht","Ordine attuale"],
-    stop:["Stop automation for this connection","Automatik für diesen Anschluss stoppen","Arrêter l’automatisme pour cette connexion","Automatisering voor deze verbinding stoppen","Interrompere l’automazione per questo collegamento"],
+    stop:["Stop job and pause charging","Auftrag stoppen und Laden pausieren","Arrêter l’ordre et mettre en pause","Opdracht stoppen en laden pauzeren","Fermare l’ordine e mettere in pausa"],
     clear:["Clear stopped order without resuming","Gestoppten Auftrag löschen – ohne Ladestart","Effacer l’ordre arrêté sans reprendre","Gestopte opdracht wissen zonder te hervatten","Cancellare l’ordine fermato senza riprendere"],
     new:["New order","Neuer Auftrag","Nouvel ordre","Nieuwe opdracht","Nuovo ordine"],
     window:["Local charging window","Lokales Ladezeitfenster","Plage de recharge locale","Lokaal laadvenster","Finestra di ricarica locale"],

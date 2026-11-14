@@ -89,6 +89,8 @@ def overview_snapshot(
         reason = "setup_required"
     elif not ready:
         reason = "service_starting"
+    elif control.get("intent_rejected") is True:
+        reason = "intent_rejected"
     elif not available:
         reason = "wallbox_unavailable"
     elif status in (None, "initializing", "wallbox_error", "service_mode", "no_vehicle"):
@@ -116,7 +118,7 @@ def overview_snapshot(
         "reason": reason,
         "read_only": read_only,
         "heartbeat": (
-            "disabled" if read_only else
+            "disabled" if read_only and heartbeat.get("running") is not True else
             "ok" if healthy is True else "problem" if healthy is False else "unknown"
         ),
         "pending": None if pending is None else {
