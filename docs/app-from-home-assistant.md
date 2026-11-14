@@ -17,7 +17,7 @@ departures, put them in a calendar and let the
 | `sensor.*_charging_job` | State of the app's charging job or guest charge, or **No job**. Attributes: `kind`, `start`, `finish`, `current`, `energy`, `delivered`, `reserve`, `reason`, `boost_until`, `boost_available`. |
 | Action `start_charging_job` | Charge in a time window with a fixed current up to an amount of energy. |
 | Action `start_guest_charging` | Charge a guest's car from now on, limited in time and energy. |
-| Action `stop_charging_job` | Stop the running job or guest charge. Charging pauses and does not resume by itself. |
+| Action `stop_charging_job` | Stop the running job or guest charge and pause charging. The job does not resume; a [departure plan](departure-planning.md) that is due may charge again. |
 | Action `clear_charging_job` | Remove an ended or stopped job so that a new one can start. |
 | Action `start_boost` / `cancel_boost` | Charge right away although the job starts later, then return to the plan. |
 
@@ -43,6 +43,12 @@ out; with several, name the wallbox.
 
 A time without a time zone is taken as local time. A window that ends before it
 starts, starts in the past or ends more than seven days ahead is refused.
+Energy counts in steps of 0.1 kWh; a finer value is rounded. The reserve must
+not exceed the energy.
+
+A stop always acts at once. A start waits for the app's minimum time between
+state changes, so an automation that starts and stops in quick succession
+switches the car on and off at most once per interval.
 
 ## One tap, and what happens behind it
 

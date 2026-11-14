@@ -582,6 +582,42 @@
           "finished": "Finestra oraria terminata",
           "stopped": "Fermato dall’utente",
           "interrupted": "Interrotto; nessun riavvio automatico"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Tipo",
+            "state": {
+              "scheduled": "Ordine di ricarica",
+              "guest": "Ricarica ospite"
+            }
+          },
+          "start": {
+            "name": "Inizio"
+          },
+          "finish": {
+            "name": "Fine"
+          },
+          "current": {
+            "name": "Corrente"
+          },
+          "energy": {
+            "name": "Energia"
+          },
+          "delivered": {
+            "name": "Erogata"
+          },
+          "reserve": {
+            "name": "Riserva immediata"
+          },
+          "reason": {
+            "name": "Motivo"
+          },
+          "boost_until": {
+            "name": "Boost fino a"
+          },
+          "boost_available": {
+            "name": "Boost disponibile"
+          }
         }
       }
     },
@@ -842,7 +878,7 @@
       "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
     },
     "service_job_active": {
-      "message": "Un ordine di ricarica dell’app Modbus controlla ora la ricarica. Interrompilo nella pagina Ordini di ricarica dell’app oppure scollega l’auto. Appena la wallbox conferma la pausa, puoi di nuovo modificare la corrente o riprendere qui."
+      "message": "Un ordine di ricarica dell’app Modbus controlla ora la ricarica. Interrompilo con l’azione «Ferma ordine di ricarica» o nella pagina Ordini di ricarica dell’app, oppure scollega l’auto. Appena la wallbox conferma la pausa, puoi di nuovo modificare la corrente o riprendere qui."
     },
     "energy_goal_state_invalid": {
       "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
@@ -972,6 +1008,9 @@
     },
     "job_window_invalid": {
       "message": "La fine deve essere dopo l’inizio ed entro sette giorni, e l’inizio non deve essere nel passato."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "La riserva immediata non deve superare l’energia dell’ordine."
     }
   },
   "issues": {
@@ -1693,7 +1732,7 @@
     },
     "stop_charging_job": {
       "name": "Ferma ordine di ricarica",
-      "description": "Ferma l’ordine di ricarica o la ricarica ospite in corso. La ricarica va in pausa e non riprende da sola.",
+      "description": "Ferma l’ordine di ricarica o la ricarica ospite in corso e mette in pausa la ricarica. L’ordine non riprende; un piano di partenza in scadenza può ricaricare di nuovo.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

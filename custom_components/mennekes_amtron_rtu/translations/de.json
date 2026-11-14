@@ -582,6 +582,42 @@
           "finished": "Zeitfenster beendet",
           "stopped": "Vom Benutzer gestoppt",
           "interrupted": "Unterbrochen; kein automatischer Neustart"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Art",
+            "state": {
+              "scheduled": "Ladeauftrag",
+              "guest": "Gastladen"
+            }
+          },
+          "start": {
+            "name": "Start"
+          },
+          "finish": {
+            "name": "Ende"
+          },
+          "current": {
+            "name": "Strom"
+          },
+          "energy": {
+            "name": "Energie"
+          },
+          "delivered": {
+            "name": "Geladen"
+          },
+          "reserve": {
+            "name": "Sofortreserve"
+          },
+          "reason": {
+            "name": "Grund"
+          },
+          "boost_until": {
+            "name": "Boost bis"
+          },
+          "boost_available": {
+            "name": "Boost möglich"
+          }
         }
       }
     },
@@ -842,7 +878,7 @@
       "message": "Ein Ladeziel erfordert eine Pause. Prüfe seinen Status. Nach Erreichen des Ziels oder einem Zählerreset kannst du ein neues Ziel setzen oder es mit 0 deaktivieren, bevor du weiterlädst. Eine Zieländerung startet das Laden nicht."
     },
     "service_job_active": {
-      "message": "Ein Ladeauftrag der Modbus-App steuert gerade das Laden. Stoppe ihn auf der Seite Ladeaufträge der App oder stecke das Auto ab. Sobald die Wallbox die Pause bestätigt, kannst du hier wieder den Strom ändern oder weiterladen."
+      "message": "Ein Ladeauftrag der Modbus-App steuert gerade das Laden. Stoppe ihn mit der Aktion „Ladeauftrag stoppen“ oder auf der Seite Ladeaufträge der App, oder stecke das Auto ab. Sobald die Wallbox die Pause bestätigt, kannst du hier wieder den Strom ändern oder weiterladen."
     },
     "energy_goal_state_invalid": {
       "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."
@@ -972,6 +1008,9 @@
     },
     "job_window_invalid": {
       "message": "Das Ende muss nach dem Start und innerhalb von sieben Tagen liegen, und der Start darf nicht in der Vergangenheit liegen."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "Die Sofortreserve darf die Energie des Auftrags nicht überschreiten."
     }
   },
   "issues": {
@@ -1693,7 +1732,7 @@
     },
     "stop_charging_job": {
       "name": "Ladeauftrag stoppen",
-      "description": "Stoppt den laufenden Ladeauftrag oder das Gastladen. Das Laden pausiert und läuft nicht von selbst weiter.",
+      "description": "Stoppt den laufenden Ladeauftrag oder das Gastladen und pausiert das Laden. Der Auftrag läuft nicht weiter; ein fälliger Abfahrtsplan kann wieder laden.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

@@ -200,7 +200,14 @@ def test_every_action_reaches_the_orders_of_an_app_connection(monkeypatch):
                 await act("start_charging_job", start=start.isoformat(), finish=finish.isoformat(),
                           current=6, energy=1)
             assert _key(error) == "job_window_invalid"
+        with pytest.raises(ServiceValidationError) as error:
+            await act("start_charging_job", finish=later.isoformat(), current=6, energy=2, reserve=2.1)
+        assert _key(error) == "job_reserve_exceeds_energy"
         assert orders.calls == []
+        # A computed energy is rounded to the app's tenths.
+        await act("start_charging_job", finish=later.isoformat(), current=6, energy=7.26, reserve=7.26)
+        values = orders.calls.pop()[1]
+        assert (values["energy"], values["reserve"]) == (7.3, 7.3)
         await act("start_guest_charging", duration=90, current=8, energy=6)
         assert orders.calls.pop() == ("async_start_guest", {"minutes": 90, "current": 8.0, "energy": 6.0})
         await act("start_boost", duration=30)
@@ -227,7 +234,7 @@ def test_every_action_reaches_the_orders_of_an_app_connection(monkeypatch):
 
 @pytest.mark.parametrize(("name", "fields"), [
     ("start_charging_job", {"finish": "2026-11-16T08:00:00+00:00", "current": 5.9, "energy": 1}),
-    ("start_charging_job", {"finish": "2026-11-16T08:00:00+00:00", "current": 6, "energy": 0}),
+    ("start_charging_job", {"finish": "2026-11-16T08:00:00+00:00", "current": 6, "energy": 0.04}),
     ("start_charging_job", {"current": 6, "energy": 1}),
     ("start_guest_charging", {"duration": 1441, "current": 6, "energy": 1}),
     ("start_boost", {"duration": 121}),

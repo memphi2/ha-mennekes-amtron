@@ -50,7 +50,14 @@ SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
 # With one wallbox the target may be left out, which keeps dashboards short.
 _DEVICE = {probatio.Optional(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string])}
 _CURRENT = probatio.All(probatio.Coerce(float), probatio.Range(min=6, max=32))
-_ENERGY = probatio.All(probatio.Coerce(float), probatio.Range(min=0.1, max=200))
+
+
+def _tenths(value: float) -> float:
+    """The app counts energy in 0.1 kWh steps; a computed value is rounded to them."""
+    return round(value, 1)
+
+
+_ENERGY = probatio.All(probatio.Coerce(float), _tenths, probatio.Range(min=0.1, max=200))
 
 
 def _aware(value: datetime) -> datetime:
@@ -63,6 +70,8 @@ def _job(orders: ServiceOrders, data: dict[str, Any]) -> Awaitable[None]:
     # What the app would refuse without a reason of its own.
     if not now - timedelta(minutes=1) <= start < finish <= now + timedelta(days=7):
         raise service_validation_error("job_window_invalid")
+    if data.get("reserve", 0) > data["energy"]:
+        raise service_validation_error("job_reserve_exceeds_energy")
     return orders.async_start_job(
         start=start, finish=finish, current=data["current"],
         energy=data["energy"], reserve=data.get("reserve", 0),
@@ -76,7 +85,7 @@ ORDER_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[ServiceOrders, dict[str
         probatio.Required("finish"): cv.datetime,
         probatio.Required("current"): _CURRENT,
         probatio.Required("energy"): _ENERGY,
-        probatio.Optional("reserve"): probatio.All(probatio.Coerce(float), probatio.Range(min=0, max=200)),
+        probatio.Optional("reserve"): probatio.All(probatio.Coerce(float), _tenths, probatio.Range(min=0, max=200)),
     }, _job),
     "start_guest_charging": ({
         probatio.Required("duration"): probatio.All(probatio.Coerce(int), probatio.Range(min=1, max=1440)),

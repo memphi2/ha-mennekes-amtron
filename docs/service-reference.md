@@ -457,7 +457,9 @@ the history, never charging.
 Errors return HTTP 409 with a key such as `job_changed` (stale revision or
 scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
 `job_current_exceeds_cap`, `guest_vehicle_target_active`,
-`job_clear_requires_pause` or `job_storage_unavailable`; malformed input returns
+`job_clear_requires_pause`, `job_stop_unconfirmed` (a stop was asked for and
+has not finished; `manual_stop_pending` is true meanwhile, and a clear after a
+confirmed pause ends it) or `job_storage_unavailable`; malformed input returns
 400 with `invalid_job_request`. `job.state` is the order's intent, not a measured
 vehicle state: `scheduled`, `charging`, `waiting_meter`, `suspended`, or one of
 the final states `reached`, `finished`, `stopped` and `interrupted`; `job.reason`

@@ -582,6 +582,42 @@
           "finished": "Time window ended",
           "stopped": "Stopped by user",
           "interrupted": "Interrupted; no automatic restart"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Kind",
+            "state": {
+              "scheduled": "Charging job",
+              "guest": "Guest charging"
+            }
+          },
+          "start": {
+            "name": "Start"
+          },
+          "finish": {
+            "name": "End"
+          },
+          "current": {
+            "name": "Current"
+          },
+          "energy": {
+            "name": "Energy"
+          },
+          "delivered": {
+            "name": "Delivered"
+          },
+          "reserve": {
+            "name": "Immediate reserve"
+          },
+          "reason": {
+            "name": "Reason"
+          },
+          "boost_until": {
+            "name": "Boost until"
+          },
+          "boost_available": {
+            "name": "Boost available"
+          }
         }
       }
     },
@@ -842,7 +878,7 @@
       "message": "A charging target requires a pause. Check its status. After reaching a target or a meter reset, set a new target or disable it with 0 before resuming. Changing a target does not start charging."
     },
     "service_job_active": {
-      "message": "A charging job of the Modbus app controls charging now. Stop it on the app's Charging jobs page or unplug the car. Once the wallbox confirms the pause, you can change the current or resume here again."
+      "message": "A charging job of the Modbus app controls charging now. Stop it with the Stop charging job action or on the app’s Charging jobs page, or unplug the car. Once the wallbox confirms the pause, you can change the current or resume here again."
     },
     "energy_goal_state_invalid": {
       "message": "The saved energy target could not be restored. Check the logs before allowing charging again."
@@ -972,6 +1008,9 @@
     },
     "job_window_invalid": {
       "message": "The end must be after the start and within seven days, and the start must not lie in the past."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "The immediate reserve must not exceed the job’s energy."
     }
   },
   "issues": {
@@ -1693,7 +1732,7 @@
     },
     "stop_charging_job": {
       "name": "Stop charging job",
-      "description": "Stops the running charging job or guest charge. Charging pauses and does not resume by itself.",
+      "description": "Stops the running charging job or guest charge and pauses charging. The job does not resume; a departure plan that is due may charge again.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

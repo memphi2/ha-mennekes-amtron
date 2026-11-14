@@ -582,6 +582,42 @@
           "finished": "Tijdvenster afgelopen",
           "stopped": "Gestopt door gebruiker",
           "interrupted": "Onderbroken; geen automatische herstart"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Soort",
+            "state": {
+              "scheduled": "Laadopdracht",
+              "guest": "Gastladen"
+            }
+          },
+          "start": {
+            "name": "Start"
+          },
+          "finish": {
+            "name": "Einde"
+          },
+          "current": {
+            "name": "Stroom"
+          },
+          "energy": {
+            "name": "Energie"
+          },
+          "delivered": {
+            "name": "Geladen"
+          },
+          "reserve": {
+            "name": "Directe reserve"
+          },
+          "reason": {
+            "name": "Reden"
+          },
+          "boost_until": {
+            "name": "Boost tot"
+          },
+          "boost_available": {
+            "name": "Boost mogelijk"
+          }
         }
       }
     },
@@ -842,7 +878,7 @@
       "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
     },
     "service_job_active": {
-      "message": "Een laadopdracht van de Modbus-app bestuurt nu het laden. Stop deze op de pagina Laadopdrachten van de app of koppel de auto los. Zodra de wallbox de pauze bevestigt, kun je hier weer de stroom wijzigen of hervatten."
+      "message": "Een laadopdracht van de Modbus-app bestuurt nu het laden. Stop deze met de actie “Laadopdracht stoppen” of op de pagina Laadopdrachten van de app, of koppel de auto los. Zodra de wallbox de pauze bevestigt, kun je hier weer de stroom wijzigen of hervatten."
     },
     "energy_goal_state_invalid": {
       "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
@@ -972,6 +1008,9 @@
     },
     "job_window_invalid": {
       "message": "Het einde moet na de start en binnen zeven dagen liggen, en de start mag niet in het verleden liggen."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "De directe reserve mag de energie van de opdracht niet overschrijden."
     }
   },
   "issues": {
@@ -1693,7 +1732,7 @@
     },
     "stop_charging_job": {
       "name": "Laadopdracht stoppen",
-      "description": "Stopt de lopende laadopdracht of het gastladen. Het laden pauzeert en gaat niet vanzelf verder.",
+      "description": "Stopt de lopende laadopdracht of het gastladen en pauzeert het laden. De opdracht gaat niet verder; een vertrekplan dat aan de beurt is kan weer laden.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

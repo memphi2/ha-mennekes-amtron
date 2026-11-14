@@ -582,6 +582,42 @@
           "finished": "Plage horaire terminée",
           "stopped": "Arrêté par l’utilisateur",
           "interrupted": "Interrompu ; pas de redémarrage automatique"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Type",
+            "state": {
+              "scheduled": "Ordre de recharge",
+              "guest": "Recharge invité"
+            }
+          },
+          "start": {
+            "name": "Début"
+          },
+          "finish": {
+            "name": "Fin"
+          },
+          "current": {
+            "name": "Courant"
+          },
+          "energy": {
+            "name": "Énergie"
+          },
+          "delivered": {
+            "name": "Fournie"
+          },
+          "reserve": {
+            "name": "Réserve immédiate"
+          },
+          "reason": {
+            "name": "Motif"
+          },
+          "boost_until": {
+            "name": "Boost jusqu’à"
+          },
+          "boost_available": {
+            "name": "Boost disponible"
+          }
         }
       }
     },
@@ -842,7 +878,7 @@
       "message": "Un objectif de recharge impose une pause. Vérifiez son état. Une fois l’objectif atteint ou après une remise à zéro du compteur, définissez un nouvel objectif ou désactivez-le avec 0 avant de reprendre. Modifier l’objectif ne démarre pas la recharge."
     },
     "service_job_active": {
-      "message": "Un ordre de recharge de l’app Modbus pilote actuellement la recharge. Arrêtez-le sur la page Ordres de recharge de l’app ou débranchez le véhicule. Dès que la borne confirme la pause, vous pouvez de nouveau modifier le courant ou reprendre ici."
+      "message": "Un ordre de recharge de l’app Modbus pilote actuellement la recharge. Arrêtez-le avec l’action « Arrêter l’ordre de recharge » ou sur la page Ordres de recharge de l’app, ou débranchez le véhicule. Dès que la borne confirme la pause, vous pouvez de nouveau modifier le courant ou reprendre ici."
     },
     "energy_goal_state_invalid": {
       "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
@@ -972,6 +1008,9 @@
     },
     "job_window_invalid": {
       "message": "La fin doit être après le début et sous sept jours, et le début ne doit pas être dans le passé."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "La réserve immédiate ne doit pas dépasser l’énergie de l’ordre."
     }
   },
   "issues": {
@@ -1693,7 +1732,7 @@
     },
     "stop_charging_job": {
       "name": "Arrêter l’ordre de recharge",
-      "description": "Arrête l’ordre de recharge ou la recharge invité en cours. La recharge se met en pause et ne reprend pas d’elle-même.",
+      "description": "Arrête l’ordre de recharge ou la recharge invité en cours et met la recharge en pause. L’ordre ne reprend pas ; un plan de départ arrivé à échéance peut recharger de nouveau.",
       "fields": {
         "device_id": {
           "name": "Borne",

@@ -147,7 +147,7 @@
     el("job_fields").disabled = busy || !good || !state.available || state.present !== true || !state.permitted || !state.meter_fresh || Boolean(state.job?.holding);
     el("job_current").max=String(state?.max_current_a || 6);
     el("job_stop").disabled=busy || !state?.job?.holding || ended(state.job);
-    el("job_clear").disabled=busy || !state || (!state.job && !state.storage_error);
+    el("job_clear").disabled=busy || !state || (!state.job && !state.storage_error && !state.manual_stop_pending);
     el("job_confirm").disabled=busy || !proposal;
     el("job_boost_preview").disabled=busy || state?.boost_available !== true;
     el("job_boost_minutes").disabled=busy || state?.boost_available !== true;

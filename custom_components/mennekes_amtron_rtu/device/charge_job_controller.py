@@ -309,17 +309,21 @@ class ChargeJobController:
     async def stop(self, *, revision: object = None) -> dict[str, Any]:
         if revision is not None:
             self._check_revision(revision)
-        # The stop counts from now on, not from when it obtains the lock.
-        # Cancellation or a failed save must not withdraw it: a completed
-        # stop leaves the terminal job latch, and an explicit clear can also
-        # remove this fence, but only after its pause checks.
+        # The stop counts from now on, not from when it obtains the lock. A
+        # request cut off while it waits must not withdraw it; an explicit
+        # clear then removes this fence, but only after its pause checks.
         self._stop_unconfirmed = True
         async with self._lock:
-            if self.job is not None:
-                self.job.stop()
-                self._changed()
-            await self._tick_locked()
-        self._stop_unconfirmed = False
+            try:
+                if self.job is not None:
+                    self.job.stop()
+                    self._changed()
+                await self._tick_locked()
+            finally:
+                # The stopped job now holds the stop itself. Whatever the
+                # tick did, this fence must not outlive it and block every
+                # later start without a job to show for it.
+                self._stop_unconfirmed = False
         return self.snapshot()
 
     async def clear(self, *, revision: object) -> dict[str, Any]:

@@ -92,3 +92,24 @@ def test_a_stop_with_an_outdated_revision_fences_nothing(tmp_path):
         assert not h.jobs.snapshot()["manual_stop_pending"]
         assert h.jobs.job.state != "stopped"
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("job", [False, True])
+def test_a_stop_that_fails_unexpectedly_leaves_no_fence_behind(tmp_path, job):
+    async def run():
+        h = await _harness(tmp_path, job=job)
+        c = h.jobs
+
+        async def broken():
+            raise RuntimeError("unforeseen")
+
+        c._tick_locked = broken
+        with pytest.raises(RuntimeError):
+            await c.stop()
+        del c._tick_locked
+        # The stopped job keeps the stop; without a job nothing is held back.
+        assert not c.snapshot()["manual_stop_pending"]
+        assert (c.job.state == "stopped") if job else c.current_policy(None, True) is None
+        if job:
+            assert c.stop_requested()
+    asyncio.run(run())
