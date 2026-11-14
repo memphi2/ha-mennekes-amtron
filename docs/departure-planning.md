@@ -234,7 +234,7 @@ the trip there as described above.
   (60% to 100%; a slightly wrong capacity is absorbed as well). Every
   comparison moves the value by a part only, so one late report cannot shift
   the start by much. While the plan charges at full current, it also meters
-  the power the car really draws, per number of phases and per ampere offered,
+  the power the car really draws, as a ceiling per number of phases,
   so it stays valid when the maximum current changes. A car that draws less than the wallbox offers therefore
   gets an earlier start, and the 30-minute reserve stays for the unexpected.
   Initially it uses the offered current and known phases. After at least two

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Model a lower vehicle charging limit as a power ceiling. Reducing the
+  wallbox current no longer incorrectly scales that ceiling down again.
+
 - Remove redundant HTTP wrappers, unused charging-page text and the fallback
   for services without command-event metadata.
 

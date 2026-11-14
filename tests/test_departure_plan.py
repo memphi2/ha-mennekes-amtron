@@ -1008,7 +1008,7 @@ def test_the_power_at_full_current_is_metered_and_corrects_the_forecast(tmp_path
             at = NOW + timedelta(minutes=minutes)
             box.set(now=at, total_kwh=100.0 + 7.0 * minutes / 60, meter_at=at.timestamp())
             await plan.tick()
-        assert plan.model.cars["profile:bmw"].kw_per_a == (None, None, 0.4375)
+        assert plan.model.cars["profile:bmw"].power_kw == (None, None, 7.0)
         assert plan.status == "unreachable"
         # At 7 kW the rest takes about 2.7 h: the target is no longer reachable.
         await plan.tick()

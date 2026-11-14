@@ -25,29 +25,29 @@ def test_efficiency_blends_plausible_charges_only():
     assert CarModel().with_charge(level_gain=10, capacity_kwh=60, metered_kwh=11.0).efficiency == 0.81
 
 
-def test_power_is_kept_per_offered_ampere_and_number_of_phases():
+def test_power_ceiling_is_kept_per_number_of_phases():
     car = CarModel().with_power(3, 10.5, 16).with_power(1, 3.6, 16)
-    assert car.kw_per_a == (0.225, None, 0.6562)
+    assert car.power_kw == (3.6, None, 10.5)
     assert car.with_power(3, 9.5, 16).power(3, 16) == pytest.approx(9.5, abs=0.01)
-    # A lower maximum current expects proportionally less.
-    assert car.power(3, 8) == pytest.approx(5.25, abs=0.01)
+    # A lower maximum is bounded by nominal power, not a scaled vehicle cap.
+    assert car.power(3, 8) == pytest.approx(5.52, abs=0.01)
     assert (car.power(2, 16), car.power(0, 16), car.power(3, 0)) == (None, None, None)
     # A first sample above the nominal power is not trusted beyond it.
-    assert CarModel().with_power(3, 12.0, 16).kw_per_a[2] == 0.69
+    assert CarModel().with_power(3, 12.0, 16).power_kw[2] == 11.04
     for phases, kw, current in ((0, 5.0, 16), (3, 0.5, 16), (3, 60.0, 16), (3, 7.0, 0), (3, 40.0, 32)):
         assert car.with_power(phases, kw, current) is car
 
 
 def test_a_car_model_round_trips_and_rejects_damage():
-    car = CarModel(0.85, (None, 0.45, 0.65))
+    car = CarModel(0.85, (None, 4.5, 6.5))
     assert CarModel.restore(car.snapshot()) == car
     assert CarModel.restore(CarModel().snapshot()) == CarModel()
     for raw in (
-        None, {}, {"efficiency": 0.9, "kw_per_a": [None, None]}, {"efficiency": 0.9, "kw_per_a": "x"},
+        None, {}, {"efficiency": 0.9, "power_kw": [None, None]}, {"efficiency": 0.9, "power_kw": "x"},
         {"efficiency": 0.9, "full_kw": [None, None, None]},
-        {"efficiency": 1.5, "kw_per_a": [None, None, None]}, {"efficiency": True, "kw_per_a": [None, None, None]},
-        {"efficiency": None, "kw_per_a": [None, None, 5]}, {"efficiency": None, "kw_per_a": [None, "7", None]},
-        {"efficiency": float("nan"), "kw_per_a": [None, None, None]},
+        {"efficiency": 1.5, "power_kw": [None, None, None]}, {"efficiency": True, "power_kw": [None, None, None]},
+        {"efficiency": None, "power_kw": [None, None, 51]}, {"efficiency": None, "power_kw": [None, "7", None]},
+        {"efficiency": float("nan"), "power_kw": [None, None, None]},
     ):
         with pytest.raises(ValueError, match="learned"):
             CarModel.restore(raw)
