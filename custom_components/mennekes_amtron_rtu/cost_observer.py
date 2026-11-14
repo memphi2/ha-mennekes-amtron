@@ -34,8 +34,8 @@ from .device.charging_cost import CostAccumulator, CostResult, TariffConfig
 from .device.charging_session import CompletedSession
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
-from .device.registers import ENERGY_TOTAL
-from .device.vehicle import snapshot_vehicle_connected
+from .device.registers import CP_STATE, ENERGY_TOTAL
+from .device.vehicle import metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 
@@ -114,6 +114,7 @@ class ChargingCostObserver:
         self._supported = False
         self._anchored = False
         self._active = False
+        self._final_pending = False
         self._started_at = time.time()
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
@@ -243,13 +244,21 @@ class ChargingCostObserver:
             # gap, and a gap longer than max_gap still marks the cost partial.
             return
         self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
-        present = snapshot_vehicle_connected(data.get, self._entry.runtime_data.identity.layout_version)
+        present = metered_vehicle_present(
+            data.get, cp_supported=self._entry.runtime_data.identity.layout_version >= CP_STATE.min_layout,
+        )
+        at = (data.energy_observed_at or 0.0) if self._remote else now
+        fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         # Plug transitions report CP and EVSE in different polls. Keep the
         # anchor: the final energy must still equal the measured session.
         if present:
+            if self._final_pending:
+                # Plugged in again before the last cycle's final meter read:
+                # that energy must not count for the new connection.
+                self._accumulator.reset()
+                self._accumulator.set_price(min(at, now), self._price())
+                self._anchored = self._final_pending = False
             self._active = True
-        at = (data.energy_observed_at or 0.0) if self._remote else now
-        fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         energy = data.get(ENERGY_TOTAL.key)
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
         if fresh:
@@ -267,18 +276,16 @@ class ChargingCostObserver:
                     candidate.result = CostResult(0.0, latest.wallbox_kwh, latest.wallbox_kwh, False)
             self.last = candidate
             self._dirty = True
-        if present is False:
-            if self._active:
-                # End the previous plug cycle even when the final meter read
-                # failed or the service has not published a fresh sample yet.
-                # A later plug must not inherit its energy as a complete cost.
-                self._accumulator.reset()
-                self._accumulator.set_price(min(at, now), self._price())
-                self._anchored = False
-            self._active = False
-            if fresh and energy is not None and math.isfinite(energy) and energy >= 0:
-                self._accumulator.reset()
-                self._accumulator.set_price(at, self._price())
+        if present is False and not fresh and self._active:
+            # The session may complete only with a later meter read; keep the
+            # accumulator for it, but no running cost while unplugged.
+            self._active, self._final_pending = False, True
+        if present is False and fresh:
+            # Any final match happened above. Start the next anchor now.
+            self._accumulator.reset()
+            self._accumulator.set_price(min(at, now), self._price())
+            self._active = self._final_pending = self._anchored = False
+            if energy is not None and math.isfinite(energy) and energy >= 0:
                 self._accumulator.observe_energy(at, energy)
                 self._anchored = True
         if self._dirty and time.monotonic() >= self._retry_at:

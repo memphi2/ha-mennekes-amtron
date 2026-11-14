@@ -314,3 +314,13 @@ def test_replug_before_a_final_meter_never_merges_two_connections():
     history.observe(reading(CHARGING, 117), now=100)
     history.observe(reading(IDLE, 120), now=110)
     assert history.latest is None
+
+
+def test_one_unknown_poll_with_a_long_scan_interval_still_invalidates():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=0)
+    history.observe(reading(CHARGING, 101), now=300)
+    history.observe(None, now=600)
+    history.observe(reading(CHARGING, 106), now=900)
+    history.observe(reading(IDLE, 110), now=1200)
+    assert history.latest is None

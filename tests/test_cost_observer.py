@@ -470,3 +470,31 @@ def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path, re
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("remote", [False, True])
+def test_final_meter_after_the_unplug_poll_still_prices_the_whole_charge(tmp_path, remote):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=remote)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            for offset, energy, present, fresh, summary in (
+                (0, 100, False, True, None),
+                (25, 102.5, True, True, None),
+                (90, 110, True, True, None),
+                (100, 110, False, False, None),  # Unplugged; meter not read in this poll.
+                (160, 110, False, True, completed(at)),
+            ):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh, session=summary))
+                if offset == 100:
+                    assert observer.current is None
+            assert observer.last.result.complete
+            assert observer.last.result.cost == pytest.approx(3)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

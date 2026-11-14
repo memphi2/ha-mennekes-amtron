@@ -13,8 +13,8 @@ from uuid import UUID, uuid4
 
 from .data import WallboxData
 from .enums import EvseState
-from .registers import CP_STATE, ENERGY_TOTAL, EVSE_STATE
-from .vehicle import CONNECTED_CP_STATES, vehicle_connected
+from .registers import ENERGY_TOTAL, EVSE_STATE
+from .vehicle import metered_vehicle_present
 
 _MAX_EPOCH = 253402300799.0
 _SESSION_KEYS = {
@@ -117,6 +117,7 @@ class SessionHistory:
         self._idle_energy: float | None = None
         self._last_energy: float | None = None
         self._unknown_since: float | None = None
+        self._known_at: float | None = None
         # An unplugged cycle whose final meter is read in a later poll.
         self._closing: tuple[_Cycle, float] | None = None
 
@@ -134,19 +135,13 @@ class SessionHistory:
     def _unknown(self, observed_at: float) -> None:
         if self._unknown_since is None:
             self._unknown_since = observed_at
-        elif observed_at - self._unknown_since > _UNKNOWN_GRACE_SECONDS:
-            self._invalidate()
+        self._check_unknown_span(observed_at)
 
-    def _present(self, data: WallboxData) -> bool | None:
-        """A connected CP proves a car even while the EVSE state still lags."""
-        evse, cp = data.get(EVSE_STATE.key), data.get(CP_STATE.key)
-        if (
-            self._cp_supported and type(cp) is int and cp in CONNECTED_CP_STATES
-            and type(evse) is int and evse in EvseState.__members__.values()
-            and evse != EvseState.NOT_INITIALIZED
-        ):
-            return True
-        return vehicle_connected(evse, cp, cp_supported=self._cp_supported)
+    def _check_unknown_span(self, observed_at: float) -> None:
+        """Measure from the last known poll, so long scan intervals count too."""
+        start = self._known_at if self._known_at is not None else self._unknown_since
+        if start is not None and observed_at - start > _UNKNOWN_GRACE_SECONDS:
+            self._invalidate()
 
     def observe(self, data: WallboxData | None, *, now: float) -> bool:
         """Consume one poll; return true only if durable completed state changes."""
@@ -166,7 +161,7 @@ class SessionHistory:
         if data is None:
             self._unknown(observed_at)
             return False
-        present = self._present(data)
+        present = metered_vehicle_present(data.get, cp_supported=self._cp_supported)
 
         previous_total = self._last_energy
         total: float | None = None
@@ -182,7 +177,10 @@ class SessionHistory:
         if present is None:
             self._unknown(observed_at)
             return False
-        self._unknown_since = None
+        if self._unknown_since is not None:
+            self._check_unknown_span(observed_at)
+            self._unknown_since = None
+        self._known_at = observed_at
 
         if present is False:
             if self._cycle is not None and total is None and self._cycle.valid:
