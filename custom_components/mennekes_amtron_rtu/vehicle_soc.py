@@ -313,11 +313,12 @@ class VehicleSocObserver:
         available = self._coordinator.last_update_success
         recovered = available and not self._was_available
         self._was_available = available
+        if recovered or getattr(self._control, "soc_configuration_required", False) is True:
+            self._configured = False
         if recovered or not self._configured:
             self._last_sent = None
             self._queue_current()
-        else:
-            self._ensure_task()
+        self._ensure_task()
         self._remember_target()
 
     @callback
@@ -425,7 +426,7 @@ class VehicleSocObserver:
     @callback
     def _ensure_task(self) -> None:
         if (
-            not self._stopping and (self._pending is not None or self._resolution_pending()) and self._task is None
+            not self._stopping and (not self._configured or self._pending is not None or self._resolution_pending()) and self._task is None
             and self._control.supports_soc_goal
         ):
             self._task = self._hass.async_create_task(
@@ -434,8 +435,17 @@ class VehicleSocObserver:
 
     async def _run(self) -> None:
         try:
-            while (self._pending is not None or self._resolution_pending()) and not self._stopping:
+            while (not self._configured or self._pending is not None or self._resolution_pending()) and not self._stopping:
                 async with self._command_lock:
+                    if not self._configured:
+                        try:
+                            await self._control.async_configure_soc(self.source, maximum_required=self._limit_entity is not None or self._use_vehicle_limit)
+                        except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
+                            if not self._failure_logged:
+                                _LOGGER.warning("Cannot configure vehicle charge target (%s)", type(err).__name__)
+                                self._failure_logged = True
+                            return
+                        self._source_configured()
                     if self._resolution_pending():
                         transaction = self._transaction_control()
                         if transaction is None:
@@ -467,9 +477,6 @@ class VehicleSocObserver:
                         continue
                     self._inflight = observations
                     try:
-                        if not self._configured:
-                            await self._control.async_configure_soc(self.source, maximum_required=self._limit_entity is not None or self._use_vehicle_limit)
-                            self._source_configured()
                         if self.source is not None:
                             for observation in observations.outgoing():
                                 transaction = self._transaction_control()

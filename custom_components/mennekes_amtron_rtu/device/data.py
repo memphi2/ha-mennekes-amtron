@@ -35,6 +35,7 @@ class WallboxData:
     # A service permission change must notify controls even with identical
     # register values. This is internal metadata, never an entity attribute.
     service_read_only: bool | None = field(default=None, repr=False)
+    service_soc_maximum_required: bool | None = field(default=None, repr=False)
     service_supports_cancel_pending: bool = field(default=False, repr=False)
     # The service can change the slider range or retained paused setpoint
     # without changing a register. Compare these stable control values too.

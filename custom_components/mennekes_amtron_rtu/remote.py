@@ -337,6 +337,10 @@ class RemoteClient(MennekesModbusClient):
                 not is_hex32(revision)
             ):
                 raise ValueError("invalid percentage goal revision")
+            section = "control.soc_maximum_required"
+            maximum_required = control.get("soc_maximum_required")
+            if maximum_required is not None and type(maximum_required) is not bool:
+                raise ValueError("invalid percentage maximum policy")
             section = "control.departure"
             if type(control.get("supports_departure_plan", False)) is not bool:
                 raise ValueError("invalid departure plan capability")
@@ -540,6 +544,7 @@ class RemoteClient(MennekesModbusClient):
             service_supports_cancel_pending=control.get("supports_cancel_pending", False),
             service_max_charging_current=control["max_charging_current"],
             service_charging_setpoint=current,
+            service_soc_maximum_required=maximum_required,
             service_guest_draft=read_snapshot(orders.get("guest_draft") if isinstance(orders, dict) else None),
             pending_change=pending_action,
             pending_change_until=pending_until,
@@ -899,6 +904,11 @@ class RemoteControl(AmtronControl):
         # telemetry must not cause an additional wallbox read or HTTP poll.
         if self._notify_pending is not None:
             self._notify_pending()
+
+    @property
+    def soc_configuration_required(self) -> bool:
+        """A new service boot needs HA's optional-cap policy again."""
+        return self._remote.snapshot.get("control", {}).get("soc_maximum_required") is None
 
     @ha_command
     async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
