@@ -190,6 +190,7 @@ def test_guest_time_stop_keeps_write_floor_without_state_change_delay(tmp_path, 
             assert service.control.pause_requested is True
             assert service.control.pending_action is None
             assert not service.guest_active
+            assert service.snapshot()["control"]["operation"]["waiting"] == "target_reached"
     asyncio.run(run())
 
 

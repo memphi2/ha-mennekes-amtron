@@ -231,8 +231,8 @@ class DepartureModbusService(GuestModbusService):
         return summarize(
             available=snapshot["available"] is True, present=sample.present,
             control=snapshot["control"], departure=snapshot["control"]["departure"],
-            # Energy and percentage goals can report a reached target.
-            goal_stop=control is not None and control.goal_stop_requested,
+            # Shared energy, percentage and guest-time stops report a reached target.
+            goal_stop=control is not None and control.energy_goal_stop_requested,
         )
 
     async def stop(self) -> None:
