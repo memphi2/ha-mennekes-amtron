@@ -40,6 +40,28 @@ Manual**. No helpers, scripts, packages or custom wallbox card are needed.
    with the complete example and save. The root type is `vertical-stack`.
    `masonry` is a dashboard-view layout and does not belong in this card editor.
 
+### Using the compact Mushroom card
+
+The top tile shows charging status, live power and energy for this session.
+Unavailable readings show a dash, never a made-up zero. Tap the tile for details.
+The current slider changes the limit; **0 A removes the limit, it does not pause**.
+
+Tap **Pause** to pause or resume. **Release**, **Plug & Charge** and **Vehicle**
+open their entity controls so you can check the setting before changing it.
+These chips appear only when their entities are available. An active switch
+has a highlighted icon. A waiting reason appears when charging is held up.
+
+The lower section holds the shared charging-job draft: current, energy and
+**Finish by**, followed by short Start, Stop, Clear and Reset buttons. Each
+button asks for confirmation. If the draft entity is missing or unavailable,
+one information tile replaces the job controls. Check both versions, the app
+connection and the entity IDs. A finish time that has not been set yet is normal;
+it does not hide the form.
+
+Leave dashboard edit mode to check visibility: Home Assistant also displays
+conditional cards while editing. The YAML does not change app settings or
+create extra helpers, and it does not include a separate vehicle card.
+
 ### One draft in the app and Home Assistant
 
 Set **Job current**, **Job energy** and **Job latest finish** in the

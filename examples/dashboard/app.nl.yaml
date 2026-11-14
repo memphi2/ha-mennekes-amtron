@@ -1,80 +1,217 @@
-# Check entity IDs before use. No helpers or scripts required.
+# Paste into a Manual card. Check entity IDs first. No helpers or scripts required.
 type: vertical-stack
 cards:
+- type: custom:mushroom-template-card
+  entity: sensor.mennekes_amtron_laadstatus
+  icon: mdi:ev-station
+  primary: >-
+    AMTRON · {{ states('sensor.mennekes_amtron_totaal_vermogen', with_unit=True) if has_value('sensor.mennekes_amtron_totaal_vermogen')
+    else '—' }}
+  secondary: |-
+    {{ state_translated('sensor.mennekes_amtron_laadstatus') if has_value('sensor.mennekes_amtron_laadstatus') else 'Status niet beschikbaar' }}
+    Sessie: {{ states('sensor.mennekes_amtron_energie_laadsessie', with_unit=True) if has_value('sensor.mennekes_amtron_energie_laadsessie') else '—' }}
+  multiline_secondary: true
+  color: >-
+    {{ 'green' if is_state('sensor.mennekes_amtron_laadstatus', 'charging') else 'red' if is_state('sensor.mennekes_amtron_laadstatus',
+    'wallbox_error') or not has_value('sensor.mennekes_amtron_laadstatus') else 'amber' if is_state('sensor.mennekes_amtron_laadstatus',
+    'paused') else 'blue' }}
+  tap_action:
+    action: more-info
+- type: custom:mushroom-number-card
+  entity: number.mennekes_amtron_laadstroomlimiet
+  name: Stroomlimiet
+  icon: mdi:current-ac
+  display_mode: slider
+  layout: horizontal
+- type: custom:mushroom-chips-card
+  alignment: center
+  chips:
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: switch.mennekes_amtron_laden_gepauzeerd
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: switch.mennekes_amtron_laden_gepauzeerd
+      name: Pauze
+      content_info: name
+      icon: mdi:pause-circle
+      tap_action:
+        action: toggle
+      hold_action:
+        action: more-info
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: switch.mennekes_amtron_laadvrijgave
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: switch.mennekes_amtron_laadvrijgave
+      name: Vrijgave
+      content_info: name
+      icon: mdi:ev-plug-type2
+      tap_action:
+        action: more-info
+      hold_action:
+        action: more-info
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: switch.mennekes_amtron_virtuele_plug_charge
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: switch.mennekes_amtron_virtuele_plug_charge
+      name: Plug & Charge
+      content_info: name
+      icon: mdi:car-key
+      tap_action:
+        action: more-info
+      hold_action:
+        action: more-info
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: select.mennekes_amtron_actief_voertuig
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: select.mennekes_amtron_actief_voertuig
+      name: Voertuig
+      content_info: name
+      icon: mdi:car-multiple
+      tap_action:
+        action: more-info
 - type: custom:mushroom-title-card
-  title: Laadpaal
-- type: entities
-  show_header_toggle: false
-  entities:
-  - number.mennekes_amtron_laadstroomlimiet
-  - switch.mennekes_amtron_laden_gepauzeerd
-  - sensor.mennekes_amtron_totaal_vermogen
-  - sensor.mennekes_amtron_totale_energie
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_laadsturing
-  tap_action:
-    action: more-info
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_wachtreden_bij_het_laden
-  tap_action:
-    action: more-info
-- type: custom:mushroom-title-card
-  title: Laadopdracht
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_laadopdracht
-  tap_action:
-    action: more-info
-- type: horizontal-stack
-  cards:
-  - type: custom:mushroom-number-card
-    entity: number.mennekes_amtron_opdrachtstroom
-    display_mode: buttons
-  - type: custom:mushroom-number-card
-    entity: number.mennekes_amtron_opdrachtenergie
-    display_mode: buttons
-- type: entities
-  show_header_toggle: false
-  entities:
-  - datetime.mennekes_amtron_uiterste_eindtijd
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_concept_laadopdracht
-- type: grid
-  columns: 2
-  square: false
-  cards:
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_laadopdracht_starten
+  subtitle: 0 A heft de limiet op · pauzeren via Pauze
+- type: conditional
+  conditions:
+  - condition: state
+    entity: sensor.mennekes_amtron_wachtreden_bij_het_laden
+    state_not:
+    - unknown
+    - unavailable
+  - condition: state
+    entity: sensor.mennekes_amtron_wachtreden_bij_het_laden
+    state_not:
+    - none
+    - no_vehicle
+  card:
+    type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_wachtreden_bij_het_laden
+    name: Laadbesturing
     tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_laadopdracht_starten
-      confirmation:
-        text: Opgeslagen concept starten?
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_laadopdracht_stoppen
+      action: more-info
+    layout: horizontal
+- type: conditional
+  conditions:
+  - condition: state
+    entity: sensor.mennekes_amtron_concept_laadopdracht
+    state_not:
+    - unknown
+    - unavailable
+  card:
+    type: vertical-stack
+    cards:
+    - type: custom:mushroom-entity-card
+      entity: sensor.mennekes_amtron_laadopdracht
+      name: Laadopdracht
+      tap_action:
+        action: more-info
+      layout: horizontal
+    - type: horizontal-stack
+      cards:
+      - type: custom:mushroom-number-card
+        entity: number.mennekes_amtron_opdrachtstroom
+        name: Stroom
+        display_mode: buttons
+      - type: custom:mushroom-number-card
+        entity: number.mennekes_amtron_opdrachtenergie
+        name: Energie
+        display_mode: buttons
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: datetime.mennekes_amtron_uiterste_eindtijd
+        name: Klaar vóór
+    - type: custom:mushroom-entity-card
+      entity: sensor.mennekes_amtron_concept_laadopdracht
+      name: Concept
+      tap_action:
+        action: more-info
+    - type: grid
+      columns: 2
+      square: false
+      cards:
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_laadopdracht_starten
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_laadopdracht_starten
+          confirmation:
+            text: Opgeslagen concept starten?
+        name: Starten
+        secondary_info: none
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_laadopdracht_stoppen
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_laadopdracht_stoppen
+          confirmation:
+            text: Opdracht stoppen en laden pauzeren?
+        name: Stoppen
+        secondary_info: none
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_laadopdracht_wissen
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_laadopdracht_wissen
+          confirmation:
+            text: Beëindigde opdracht wissen zonder het laden te starten?
+        name: Wissen
+        secondary_info: none
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_laadconcept_resetten
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_laadconcept_resetten
+          confirmation:
+            text: Concept resetten? De huidige opdracht blijft ongewijzigd.
+        name: Herstellen
+        secondary_info: none
+- type: conditional
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity: sensor.mennekes_amtron_concept_laadopdracht
+      state:
+      - unknown
+      - unavailable
+  card:
+    type: custom:mushroom-template-card
+    icon: mdi:information-outline
+    color: amber
+    primary: Laadopdracht niet beschikbaar
+    secondary: Werk app en integratie bij naar minimaal 0.9.0b6. Controleer appverbinding en entiteits-ID’s.
+    multiline_secondary: true
     tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_laadopdracht_stoppen
-      confirmation:
-        text: Opdracht stoppen en laden pauzeren?
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_laadopdracht_wissen
-    tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_laadopdracht_wissen
-      confirmation:
-        text: Beëindigde opdracht wissen zonder het laden te starten?
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_laadconcept_resetten
-    tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_laadconcept_resetten
-      confirmation:
-        text: Concept resetten? De huidige opdracht blijft ongewijzigd.
+      action: none

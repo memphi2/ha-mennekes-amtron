@@ -1,80 +1,217 @@
-# Check entity IDs before use. No helpers or scripts required.
+# Paste into a Manual card. Check entity IDs first. No helpers or scripts required.
 type: vertical-stack
 cards:
+- type: custom:mushroom-template-card
+  entity: sensor.mennekes_amtron_stato_di_ricarica
+  icon: mdi:ev-station
+  primary: >-
+    AMTRON · {{ states('sensor.mennekes_amtron_potenza_totale', with_unit=True) if has_value('sensor.mennekes_amtron_potenza_totale')
+    else '—' }}
+  secondary: |-
+    {{ state_translated('sensor.mennekes_amtron_stato_di_ricarica') if has_value('sensor.mennekes_amtron_stato_di_ricarica') else 'Stato non disponibile' }}
+    Sessione: {{ states('sensor.mennekes_amtron_energia_della_sessione', with_unit=True) if has_value('sensor.mennekes_amtron_energia_della_sessione') else '—' }}
+  multiline_secondary: true
+  color: >-
+    {{ 'green' if is_state('sensor.mennekes_amtron_stato_di_ricarica', 'charging') else 'red' if is_state('sensor.mennekes_amtron_stato_di_ricarica',
+    'wallbox_error') or not has_value('sensor.mennekes_amtron_stato_di_ricarica') else 'amber' if is_state('sensor.mennekes_amtron_stato_di_ricarica',
+    'paused') else 'blue' }}
+  tap_action:
+    action: more-info
+- type: custom:mushroom-number-card
+  entity: number.mennekes_amtron_limite_di_corrente_di_ricarica
+  name: Limite corrente
+  icon: mdi:current-ac
+  display_mode: slider
+  layout: horizontal
+- type: custom:mushroom-chips-card
+  alignment: center
+  chips:
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: switch.mennekes_amtron_ricarica_in_pausa
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: switch.mennekes_amtron_ricarica_in_pausa
+      name: Pausa
+      content_info: name
+      icon: mdi:pause-circle
+      tap_action:
+        action: toggle
+      hold_action:
+        action: more-info
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: switch.mennekes_amtron_consenso_alla_ricarica
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: switch.mennekes_amtron_consenso_alla_ricarica
+      name: Abilitazione
+      content_info: name
+      icon: mdi:ev-plug-type2
+      tap_action:
+        action: more-info
+      hold_action:
+        action: more-info
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: switch.mennekes_amtron_plug_charge_virtuale
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: switch.mennekes_amtron_plug_charge_virtuale
+      name: Plug & Charge
+      content_info: name
+      icon: mdi:car-key
+      tap_action:
+        action: more-info
+      hold_action:
+        action: more-info
+  - type: conditional
+    conditions:
+    - condition: state
+      entity: select.mennekes_amtron_veicolo_attivo
+      state_not:
+      - unknown
+      - unavailable
+    chip:
+      type: entity
+      entity: select.mennekes_amtron_veicolo_attivo
+      name: Veicolo
+      content_info: name
+      icon: mdi:car-multiple
+      tap_action:
+        action: more-info
 - type: custom:mushroom-title-card
-  title: Wallbox
-- type: entities
-  show_header_toggle: false
-  entities:
-  - number.mennekes_amtron_limite_di_corrente_di_ricarica
-  - switch.mennekes_amtron_ricarica_in_pausa
-  - sensor.mennekes_amtron_potenza_totale
-  - sensor.mennekes_amtron_energia_totale
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_controllo_della_ricarica
-  tap_action:
-    action: more-info
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_motivo_di_attesa_della_ricarica
-  tap_action:
-    action: more-info
-- type: custom:mushroom-title-card
-  title: Ordine di ricarica
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_ordine_di_ricarica
-  tap_action:
-    action: more-info
-- type: horizontal-stack
-  cards:
-  - type: custom:mushroom-number-card
-    entity: number.mennekes_amtron_corrente_ordine
-    display_mode: buttons
-  - type: custom:mushroom-number-card
-    entity: number.mennekes_amtron_energia_ordine
-    display_mode: buttons
-- type: entities
-  show_header_toggle: false
-  entities:
-  - datetime.mennekes_amtron_fine_entro
-- type: custom:mushroom-entity-card
-  entity: sensor.mennekes_amtron_bozza_di_ricarica
-- type: grid
-  columns: 2
-  square: false
-  cards:
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_avvia_ordine_di_ricarica
+  subtitle: 0 A rimuove il limite · usa Pausa per sospendere
+- type: conditional
+  conditions:
+  - condition: state
+    entity: sensor.mennekes_amtron_motivo_di_attesa_della_ricarica
+    state_not:
+    - unknown
+    - unavailable
+  - condition: state
+    entity: sensor.mennekes_amtron_motivo_di_attesa_della_ricarica
+    state_not:
+    - none
+    - no_vehicle
+  card:
+    type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_motivo_di_attesa_della_ricarica
+    name: Controllo ricarica
     tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_avvia_ordine_di_ricarica
-      confirmation:
-        text: Avviare la bozza salvata?
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_ferma_ordine_di_ricarica
+      action: more-info
+    layout: horizontal
+- type: conditional
+  conditions:
+  - condition: state
+    entity: sensor.mennekes_amtron_bozza_di_ricarica
+    state_not:
+    - unknown
+    - unavailable
+  card:
+    type: vertical-stack
+    cards:
+    - type: custom:mushroom-entity-card
+      entity: sensor.mennekes_amtron_ordine_di_ricarica
+      name: Programma di ricarica
+      tap_action:
+        action: more-info
+      layout: horizontal
+    - type: horizontal-stack
+      cards:
+      - type: custom:mushroom-number-card
+        entity: number.mennekes_amtron_corrente_ordine
+        name: Corrente
+        display_mode: buttons
+      - type: custom:mushroom-number-card
+        entity: number.mennekes_amtron_energia_ordine
+        name: Energia
+        display_mode: buttons
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: datetime.mennekes_amtron_fine_entro
+        name: Termine entro
+    - type: custom:mushroom-entity-card
+      entity: sensor.mennekes_amtron_bozza_di_ricarica
+      name: Bozza
+      tap_action:
+        action: more-info
+    - type: grid
+      columns: 2
+      square: false
+      cards:
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_avvia_ordine_di_ricarica
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_avvia_ordine_di_ricarica
+          confirmation:
+            text: Avviare la bozza salvata?
+        name: Avvia
+        secondary_info: none
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_ferma_ordine_di_ricarica
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_ferma_ordine_di_ricarica
+          confirmation:
+            text: Fermare l’ordine e mettere in pausa?
+        name: Arresta
+        secondary_info: none
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_cancella_ordine_di_ricarica
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_cancella_ordine_di_ricarica
+          confirmation:
+            text: Cancellare l’ordine terminato senza avviare la ricarica?
+        name: Rimuovi
+        secondary_info: none
+      - type: custom:mushroom-entity-card
+        entity: button.mennekes_amtron_reimposta_bozza_di_ricarica
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mennekes_amtron_reimposta_bozza_di_ricarica
+          confirmation:
+            text: Reimpostare la bozza? L’ordine attuale resta invariato.
+        name: Ripristina
+        secondary_info: none
+- type: conditional
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity: sensor.mennekes_amtron_bozza_di_ricarica
+      state:
+      - unknown
+      - unavailable
+  card:
+    type: custom:mushroom-template-card
+    icon: mdi:information-outline
+    color: amber
+    primary: Programma non disponibile
+    secondary: Aggiorna app e integrazione almeno a 0.9.0b6. Verifica connessione e ID delle entità.
+    multiline_secondary: true
     tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_ferma_ordine_di_ricarica
-      confirmation:
-        text: Fermare l’ordine e mettere in pausa?
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_cancella_ordine_di_ricarica
-    tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_cancella_ordine_di_ricarica
-      confirmation:
-        text: Cancellare l’ordine terminato senza avviare la ricarica?
-  - type: custom:mushroom-entity-card
-    entity: button.mennekes_amtron_reimposta_bozza_di_ricarica
-    tap_action:
-      action: perform-action
-      perform_action: button.press
-      target:
-        entity_id: button.mennekes_amtron_reimposta_bozza_di_ricarica
-      confirmation:
-        text: Reimpostare la bozza? L’ordine attuale resta invariato.
+      action: none
