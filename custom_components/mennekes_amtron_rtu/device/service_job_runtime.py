@@ -133,6 +133,10 @@ class JobModbusService(ConsoleModbusService):
             read_only=control is not None and control.read_only,
         )
 
+    def _soc_observation_scope(self) -> str | None:
+        sample = self._job_inputs()
+        return sample.scope if sample.available and sample.present is True else None
+
     def _note_session(self) -> None:
         """Keep the newest wallbox reading of this connection's plug-in."""
         data, reading = self.data, dict(self._job_session or {})
@@ -159,6 +163,8 @@ class JobModbusService(ConsoleModbusService):
             present = snapshot_vehicle_connected(
                 self.data.fresh, self.identity.layout_version,
             ) if self._is_available() else None
+            if present is not True:
+                self._soc_reading = None
             if present is True:
                 self._job_unknown_since = None
                 if self._job_scope is None:

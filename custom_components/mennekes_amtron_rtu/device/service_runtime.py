@@ -99,7 +99,7 @@ class ModbusService:
         # cached command outcome for a goal restored after a service restart.
         self._soc_goal_revision = secrets.token_hex(16)
         self._soc_maximum_required: bool | None = None
-        self._soc_reading: tuple[str, float | None, float] | None = None
+        self._soc_reading: tuple[str, float | None, float, str] | None = None
         self.soc_transactions = SocTransactions(self)
         self._task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -601,6 +601,10 @@ class ModbusService:
         self._published = (time.monotonic(), result)
         return result
 
+    def _soc_observation_scope(self) -> str | None:
+        """Only a service tracking a physical connection may cache its SoC."""
+        return None
+
     @property
     def choice_revision(self) -> str:
         """Fence app edits against explicit selections, not changing telemetry."""
@@ -740,7 +744,7 @@ class ModbusService:
                         reading = self._soc_reading
                         payload = {**payload, "source": control.soc_goal.source,
                             "maximum": control.soc_goal.maximum_percent,
-                            "soc": reading[1] if reading is not None and reading[0] == control.soc_goal.source and time.monotonic() - reading[2] <= 900 else None}
+                            "soc": reading[1] if reading is not None and reading[0] == control.soc_goal.source and reading[3] == self._soc_observation_scope() and time.monotonic() - reading[2] <= 900 else None}
                     source = payload.get("source")
                     if not isinstance(source, str):
                         raise ValueError("source is required")
@@ -765,7 +769,8 @@ class ModbusService:
                             None if maximum is None else number(maximum, 0, 100), source=source,
                         )
                     if command != "soc_goal_choice":
-                        self._soc_reading = (source, None if soc is None else number(soc, 0, 100), time.monotonic())
+                        scope = self._soc_observation_scope()
+                        self._soc_reading = None if scope is None else (source, None if soc is None else number(soc, 0, 100), time.monotonic(), scope)
                 elif command == "resume":
                     await control.async_resume_charging(
                         current_cap=number(

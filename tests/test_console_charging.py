@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
 from custom_components.mennekes_amtron_rtu.device import app_settings
@@ -123,7 +124,6 @@ def test_charging_console_rejects_malformed_and_unavailable_edits(tmp_path, monk
 
 
 def test_service_refuses_missing_cap_policy_and_malformed_handover(tmp_path, monkeypatch):
-    import pytest
 
     from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
     async def body():
@@ -145,4 +145,34 @@ def test_service_refuses_missing_cap_policy_and_malformed_handover(tmp_path, mon
                     await command(command="departure_choice", deadline=None, revision="a")
             finally:
                 service.control = control
+    asyncio.run(body())
+
+
+@pytest.mark.parametrize("replug", [False, True])
+def test_app_soc_choice_uses_only_the_current_plug_in(tmp_path, monkeypatch, replug):
+    from custom_components.mennekes_amtron_rtu.device import registers as registers
+    from tests.fakes import put
+    async def body():
+        monkeypatch.setattr(runtime, "JobModbusService", DepartureModbusService)
+        async with runtime.job_service(tmp_path) as (service, transport, _clock):
+            serial = service.identity.serial_number
+            async def command(**payload):
+                return await service.command({"expected_serial_number": serial, **payload})
+            await command(command="soc_source", source=CAR, maximum_required=False)
+            await command(command="soc_goal", source=CAR, value=90, soc=80, maximum=None)
+            reading = service._soc_reading
+            assert reading is not None
+            if replug:
+                put(transport.bank, registers.EVSE_STATE, 1)
+                put(transport.bank, registers.CP_STATE, 10)
+                await service.refresh()
+                assert service._soc_reading is None
+                put(transport.bank, registers.EVSE_STATE, 2)
+                put(transport.bank, registers.CP_STATE, 11)
+                await service.refresh()
+                assert service._soc_observation_scope() != reading[3]
+                # Even a retained old value cannot pass the scope check.
+                service._soc_reading = reading
+            await command(command="soc_goal_choice", value=70, expected_choice_revision=service.choice_revision)
+            assert service.control.soc_goal.status == ("active" if replug else "reached")
     asyncio.run(body())
