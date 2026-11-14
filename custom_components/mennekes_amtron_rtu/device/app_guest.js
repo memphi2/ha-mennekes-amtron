@@ -5,6 +5,13 @@
   const found=languages.indexOf((document.documentElement.lang||"").slice(0,2).toLowerCase());
   const column=found<0?0:found, locale=languages[column];
   const words={
+    draft_tools:["Saved settings", "Gespeicherte Einstellungen", "Réglages enregistrés", "Opgeslagen instellingen", "Impostazioni salvate"],
+    stop_help: ["Stopping pauses charging. Clearing an ended charge does not restart it.", "Stoppen pausiert die Ladung. Das Entfernen einer beendeten Ladung startet sie nicht erneut.", "Arrêter met en pause. Retirer une recharge terminée ne la redémarre pas.", "Stoppen pauzeert het laden. Verwijderen van een beëindigde laadsessie start deze niet opnieuw.", "Fermare mette in pausa. Rimuovere una ricarica terminata non la riavvia."],
+    energy_progress: ["Energy progress", "Energie-Fortschritt", "Progression de l’énergie", "Energievoortgang", "Avanzamento energia"],
+    ends: ["Ends by", "Spätestes Ende", "Fin au plus tard", "Uiterlijk einde", "Fine entro"],
+    started: ["Started", "Beginn", "Début", "Begin", "Inizio"],
+    delivered: ["Energy delivered / limit", "Geladene Energie / Grenze", "Énergie fournie / limite", "Geladen energie / grens", "Energia erogata / limite"],
+    empty_help: ["No guest charge yet. Enter energy and duration, then review and confirm.", "Noch keine Gastladung. Energie und Dauer eingeben, anschließend prüfen und bestätigen.", "Pas encore de recharge invité. Saisissez l’énergie et la durée, puis vérifiez et confirmez.", "Nog geen gastlaadsessie. Vul energie en duur in, controleer en bevestig.", "Nessuna ricarica ospite. Inserisci energia e durata, poi verifica e conferma."],
     reset_draft:["Reset draft (keeps running order)","Entwurf zurücksetzen (laufender Auftrag bleibt)","Réinitialiser le brouillon (ordre conservé)","Concept resetten (opdracht blijft)","Reimposta bozza (ordine invariato)"],
     draft_storage_error:["Draft could not be read or saved. Reset the draft to recover; the current order is unchanged.","Entwurf konnte nicht gelesen oder gespeichert werden. Entwurf zum Wiederherstellen zurücksetzen; der laufende Auftrag bleibt unverändert.","Lecture ou enregistrement du brouillon impossible. Réinitialisez-le ; l’ordre actuel reste inchangé.","Concept kon niet worden gelezen of opgeslagen. Reset het concept; de huidige opdracht blijft ongewijzigd.","Impossibile leggere o salvare la bozza. Reimpostarla; l’ordine attuale resta invariato."],
     draft_saved:["Draft saved; charging unchanged.","Entwurf gespeichert; Laden unverändert.","Brouillon enregistré ; recharge inchangée.","Concept opgeslagen; laden ongewijzigd.","Bozza salvata; ricarica invariata."],
@@ -12,17 +19,17 @@
     reload_draft:["Reload saved draft","Gespeicherten Entwurf laden","Recharger le brouillon","Opgeslagen concept laden","Ricarica bozza salvata"],
     title:["Guest charging","Gastladen","Recharge invité","Gastladen","Ricarica ospite"],
     intro:["One immediate energy/time order for the connected guest vehicle. No battery data or saved vehicle target is used.","Ein sofortiger Energie-/Zeitauftrag für das angeschlossene Gastfahrzeug. Keine Batteriedaten oder gespeicherten Fahrzeugziele werden übernommen.","Un ordre immédiat d’énergie et de durée pour le véhicule invité connecté. Aucune donnée de batterie ni objectif de véhicule enregistré n’est utilisé.","Eén directe energie-/tijdopdracht voor het aangesloten gastvoertuig. Er worden geen accugegevens of opgeslagen voertuigdoelen gebruikt.","Un ordine immediato di energia e durata per il veicolo ospite collegato. Non vengono usati dati della batteria né obiettivi salvati del veicolo."],
-    status:["Current order","Aktueller Auftrag","Ordre actuel","Huidige opdracht","Ordine attuale"],
-    new:["New guest order","Neuer Gastauftrag","Nouvel ordre invité","Nieuwe gastopdracht","Nuovo ordine ospite"],
+    status: ["Current charge", "Aktuelle Ladung", "Recharge actuelle", "Huidige laadsessie", "Ricarica attuale"],
+    new: ["New charge", "Neue Ladung", "Nouvelle recharge", "Nieuwe laadsessie", "Nuova ricarica"],
     energy:["Additional energy ceiling, kWh","Zusätzliche Energieobergrenze in kWh","Plafond d’énergie supplémentaire, kWh","Bovengrens extra energie, kWh","Tetto di energia aggiuntiva, kWh"],
     duration:["Maximum duration, minutes","Maximale Dauer in Minuten","Durée maximale, minutes","Maximale duur, minuten","Durata massima, minuti"],
     current:["Current per phase, A","Strom je Phase in A","Courant par phase, A","Stroom per fase, A","Corrente per fase, A"],
     permission:["Authorize locally first, for example by RFID. This order cannot unlock the wallbox, grant release or override a battery target.","Zuerst lokal autorisieren, beispielsweise per RFID. Dieser Auftrag kann die Wallbox nicht entsperren, keine Ladefreigabe erteilen und kein Batterieziel übergehen.","Autorisez d’abord localement, par exemple par RFID. Cet ordre ne peut ni déverrouiller la borne, ni accorder l’autorisation, ni passer outre un objectif de batterie.","Autoriseer eerst lokaal, bijvoorbeeld met RFID. Deze opdracht kan de wallbox niet ontgrendelen, geen vrijgave verlenen en geen accudoel negeren.","Autorizzare prima localmente, ad esempio con RFID. Questo ordine non può sbloccare la wallbox, concedere il consenso o ignorare un obiettivo della batteria."],
-    preview:["Preview","Vorschau","Aperçu","Voorbeeld","Anteprima"],
+    preview: ["Review and continue", "Prüfen und weiter", "Vérifier et continuer", "Controleren en doorgaan", "Verifica e continua"],
     confirm_title:["Confirm guest order","Gastauftrag bestätigen","Confirmer l’ordre invité","Gastopdracht bevestigen","Confermare l’ordine ospite"],
-    confirm:["Confirm and start when permitted","Bestätigen und bei gültiger Freigabe starten","Confirmer et démarrer dès que c’est autorisé","Bevestigen en starten zodra toegestaan","Confermare e avviare quando consentito"],
-    stop:["Stop guest order","Gastauftrag stoppen","Arrêter l’ordre invité","Gastopdracht stoppen","Fermare l’ordine ospite"],
-    clear:["Clear stopped order without resuming","Gestoppten Auftrag löschen – ohne Ladestart","Effacer l’ordre arrêté sans reprendre","Gestopte opdracht wissen zonder te hervatten","Cancellare l’ordine fermato senza riprendere"],
+    confirm: ["Start guest charging", "Gastladen starten", "Démarrer la recharge invité", "Gastladen starten", "Avvia ricarica ospite"],
+    stop: ["Stop charging", "Ladung stoppen", "Arrêter la recharge", "Laden stoppen", "Ferma ricarica"],
+    clear: ["Clear ended charge", "Beendete Ladung entfernen", "Retirer la recharge terminée", "Beëindigde laadsessie verwijderen", "Rimuovi ricarica terminata"],
     scope:["Only this physical connection. Stops at the energy ceiling or deadline, subject to polling and hardware timing. Reconnection requires a new order.","Nur für diesen Anschluss. Stopp bei Energieobergrenze oder Zeitende unter Beachtung der Abfrage- und Hardwarezeiten. Nach erneutem Anstecken ist ein neuer Auftrag erforderlich.","Uniquement cette connexion physique. Arrêt au plafond d’énergie ou à l’échéance, selon les délais d’interrogation et du matériel. Une reconnexion exige un nouvel ordre.","Alleen deze fysieke verbinding. Stopt bij de energiegrens of eindtijd, afhankelijk van de uitlees- en hardwaretijden. Opnieuw aansluiten vereist een nieuwe opdracht.","Solo questo collegamento fisico. Si ferma al tetto di energia o alla scadenza, secondo i tempi di lettura e dell’hardware. Un nuovo collegamento richiede un nuovo ordine."],
     footer:["No guaranteed delivered amount. A requested stop is not a confirmed hardware stop. Check the overview and command results.","Keine garantierte Energiemenge. Ein angeforderter Stopp ist kein bestätigter Hardware-Stopp. Übersicht und Befehlsergebnisse beachten.","Aucune quantité livrée garantie. Un arrêt demandé n’est pas un arrêt matériel confirmé. Consultez la vue d’ensemble et les résultats des commandes.","Geen gegarandeerde geleverde hoeveelheid. Een gevraagde stop is geen bevestigde hardwarestop. Controleer het overzicht en de opdrachtresultaten.","Nessuna quantità erogata garantita. Uno stop richiesto non è uno stop hardware confermato. Controllare la panoramica e i risultati dei comandi."],
     ready:["Ready for a guest order.","Bereit für einen Gastauftrag.","Prêt pour un ordre invité.","Gereed voor een gastopdracht.","Pronto per un ordine ospite."],
@@ -85,12 +92,26 @@
     el("guest_reload_draft").disabled=busy||!state;
     el("guest_current").max=String(state?.max_current_a||6);
     el("guest_confirm").disabled=busy||!proposal;
-    el("guest_stop").disabled=busy||!own||!job.holding||ended;
+    el("guest_stop").disabled=busy||state?.read_only||!own||!job.holding||ended;
     el("guest_clear").disabled=busy||!state||state.read_only||(!state.storage_error&&(!own||!ended));
+    el("guest_stop").hidden=!own||ended;
+    el("guest_clear").hidden=!state?.storage_error&&(!own||!ended);
     el("guest_status").hidden=!state;
     el("guest_state").textContent=!job||(!own&&!job.holding)?t("no_job"):own?t(job.state):t("other_job");
-    el("guest_state").className="charging-state "+(state?.action_error||state?.storage_error?"state-error":job?.state==="reached"?"state-good":job?.state==="charging"?"state-active":!job?"state-muted":"state-wait");
-    el("guest_detail").textContent=own?`${date(job.start_at)} → ${date(job.finish_at)} · ${job.current_a} A · ${job.delivered_kwh==null?"—":Number(job.delivered_kwh).toLocaleString(locale,{maximumFractionDigits:2})} / ${job.energy_kwh} kWh${job.scope_ended?` · ${t("scope_ended")}`:!job.holding?` · ${t("released")}`:""}${state.action_error?` · ${t("unconfirmed")}`:""}`:"";
+    el("guest_state").className="state charging-state "+(state?.action_error||state?.storage_error?"state-error":job?.state==="reached"?"state-good":job?.state==="charging"?"state-active":!job?"state-muted":"state-wait");
+    el("guest_empty").hidden=Boolean(job);
+    el("guest_metrics").hidden=!own;
+    const delivered=job?.delivered_kwh, ceiling=job?.energy_kwh;
+    const known=typeof delivered==="number"&&Number.isFinite(delivered)&&delivered>=0;
+    const bounded=typeof ceiling==="number"&&Number.isFinite(ceiling)&&ceiling>0;
+    const amount=v=>Number(v).toLocaleString(locale,{maximumFractionDigits:2});
+    el("guest_delivered").textContent=own?`${known?amount(delivered):"—"} / ${bounded?amount(ceiling):"—"} kWh`:"";
+    el("guest_progress").hidden=!own||!known||!bounded;
+    el("guest_progress").value=known&&bounded?Math.min(100,delivered/ceiling*100):0;
+    el("guest_started").textContent=own?date(job.start_at):"";
+    el("guest_ends").textContent=own?date(job.finish_at):"";
+    el("guest_amperes").textContent=own?`${amount(job.current_a)} A`:"";
+    el("guest_detail").textContent=own?[job.scope_ended?t("scope_ended"):!job.holding?t("released"):"",state.action_error?t("unconfirmed"):""].filter(Boolean).join(" · "):"";
     el("guest_notice").textContent=lastError||(!state?t("loading"):state.guest_draft?.storage_error?t("draft_storage_error"):state.storage_error?t("storage_error"):state.vehicle_target_active?t("vehicle_target"):good?t("ready"):job?t(own?job.state:"other_job"):state.read_only?t("read_only"):t("unavailable"));
   }
   function suspend(){generation++;clearTimeout(timer);timer=null;readAbort?.abort();readAbort=null;}

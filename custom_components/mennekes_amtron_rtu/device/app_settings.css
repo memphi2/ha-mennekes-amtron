@@ -134,3 +134,33 @@ fieldset.plain { margin: 0; padding: 0; border: 0; }
   .state-active { color: #68c8f3; } .state-good { color: #75d194; }
   .state-wait { color: #f2c05d; } .state-error { color: #ff9494; }
 }
+
+/* Charging: first the live situation, then an explicit choice and its result. */
+.charging-hero { border-top: 3px solid var(--primary); }
+.hero-heading { display: flex; justify-content: space-between; align-items: start; gap: 20px; }
+.hero-heading .badges { justify-content: flex-end; }
+.hero-values { padding-top: 18px; border-top: 1px solid var(--divider); }
+.hero-values dd { font-size: 1.8rem; font-variant-numeric: tabular-nums; }
+.charging-choices { display: grid; gap: 12px; }
+.charging-choices a { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--divider); border-radius: 10px; text-decoration: none; color: var(--text); }
+.charging-choices a:hover { background: var(--tint); border-color: var(--primary); }
+.charging-choices a > span:nth-child(2) { flex: 1; }
+.charging-choices small { display: block; color: var(--muted); margin-top: 4px; }
+.choice-symbol { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: 50%; color: var(--primary-text); background: var(--tint); font-size: 1.6rem; }
+.charging-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 20px; margin-top: 20px; }
+.charging-editor { display: grid; gap: 16px; min-width: 0; }
+.draft-tools { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--divider); color: var(--muted); }
+.draft-tools button { font-size: .87rem; padding: 6px 12px; }
+.charging-current { border-top: 3px solid var(--primary); }
+.charging-current .wide-value { grid-column: 1 / -1; }
+.charging-current .wide-value dd { font-size: 1.8rem; font-variant-numeric: tabular-nums; }
+button.danger { color: var(--error); border-color: var(--error); }
+progress { display: block; width: 100%; height: 10px; accent-color: var(--primary); margin: 8px 0 20px; }
+summary { cursor: pointer; font-weight: 500; }
+@media (max-width: 760px) {
+  .charging-layout { grid-template-columns: 1fr; }
+  .hero-heading { flex-direction: column; }
+  .hero-heading .badges { justify-content: flex-start; }
+}
+
+#operation .values { grid-template-columns: repeat(2, minmax(0, 1fr)); }

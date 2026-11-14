@@ -5,6 +5,11 @@
   const language = languages.indexOf(document.documentElement.lang.split("-")[0]);
   const column = language < 0 ? 0 : language;
   const words = {
+    limits_details: ["Saved limits and queued actions", "Gespeicherte Grenzen und vorgemerkte Aktionen", "Limites enregistrées et actions en attente", "Opgeslagen grenzen en geplande acties", "Limiti salvati e azioni in attesa"],
+    guest_help: ["Charge now with an energy and time limit.", "Jetzt laden, begrenzt durch Energie und Dauer.", "Recharger maintenant avec des limites d’énergie et de durée.", "Nu laden met een energie- en tijdslimiet.", "Ricarica ora con limiti di energia e durata."],
+    departure_help: ["Reach your target for the next trip.", "Das Ladeziel zur nächsten Fahrt erreichen.", "Atteindre l’objectif pour le prochain trajet.", "Bereik je doel voor de volgende rit.", "Raggiungi l’obiettivo per il prossimo viaggio."],
+    target_help: ["Limit energy or battery level without starting.", "Energie oder Akkustand begrenzen, ohne die Ladung zu starten.", "Limiter l’énergie ou le niveau de batterie sans démarrer.", "Beperk energie of accuniveau zonder te starten.", "Limita energia o livello batteria senza avviare."],
+    choose: ["Plan your charging", "Laden vorbereiten", "Préparer la recharge", "Laden voorbereiden", "Prepara la ricarica"],
     departure_link: ["Plan departure", "Abfahrt planen", "Planifier le départ", "Vertrek plannen", "Pianifica partenza"],
     advice_connect: ["Connect the vehicle to the wallbox and wait for a fresh reading.", "Fahrzeug an die Wallbox anschließen und auf eine aktuelle Meldung warten.", "Branchez le véhicule et attendez une mesure récente.", "Sluit de auto aan en wacht op een actuele meting.", "Collegare il veicolo e attendere una lettura aggiornata."],
     intent_rejected: ["Saved settings rejected. Open Home Assistant Settings → System → Repairs. Confirmation keeps charging paused and release off.", "Gespeicherte Einstellungen abgelehnt. Öffne in Home Assistant Einstellungen → System → Reparaturen. Nach Bestätigung bleiben Pause aktiv und Ladefreigabe aus.", "Réglages enregistrés rejetés. Ouvrez Paramètres → Système → Réparations dans Home Assistant. La confirmation conserve la pause et coupe l’autorisation.", "Opgeslagen instellingen geweigerd. Open Instellingen → Systeem → Reparaties in Home Assistant. Bevestigen houdt pauze aan en vrijgave uit.", "Impostazioni salvate rifiutate. Apri Impostazioni → Sistema → Riparazioni in Home Assistant. Dopo la conferma pausa attiva e consenso disattivato."],
@@ -19,13 +24,13 @@
     guest_link: ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"],
     jobs_link: ["Charge target", "Ladeziel", "Objectif de charge", "Laaddoel", "Obiettivo di ricarica"],
     title: ["Charging overview", "Ladeübersicht", "Vue de la recharge", "Laadoverzicht", "Panoramica ricarica"],
-    intro: ["Observed state and service decisions. This page does not change charging.", "Messzustand und Entscheidungen des Services. Diese Seite verändert die Ladung nicht.", "État observé et décisions du service. Cette page ne modifie pas la recharge.", "Gemeten toestand en beslissingen van de service. Deze pagina wijzigt het laden niet.", "Stato osservato e decisioni del servizio. Questa pagina non modifica la ricarica."],
+    intro: ["Your charging at a glance. Choose a target, plan your next departure or start guest charging.", "Deine Ladung auf einen Blick. Ladeziel setzen, die nächste Abfahrt planen oder Gastladen starten.", "Votre recharge en un coup d’œil. Choisissez un objectif, planifiez le prochain départ ou lancez une recharge invité.", "Je laadsessie in één oogopslag. Kies een doel, plan het volgende vertrek of start gastladen.", "La ricarica a colpo d’occhio. Scegli un obiettivo, pianifica la prossima partenza o avvia la ricarica ospite."],
     loading: ["Loading service state…", "Service-Zustand wird geladen…", "Chargement de l’état…", "Servicestatus laden…", "Caricamento dello stato…"],
     live: ["Service snapshot · refreshes every 5 seconds", "Service-Zustand · Aktualisierung alle 5 Sekunden", "État du service · actualisation toutes les 5 secondes", "Servicestatus · elke 5 seconden vernieuwd", "Stato del servizio · aggiornamento ogni 5 secondi"],
     offline: ["Service state unavailable. Old readings are hidden; retrying automatically.", "Service-Zustand nicht erreichbar. Alte Werte sind ausgeblendet; erneuter Abruf erfolgt automatisch.", "État indisponible. Les anciennes valeurs sont masquées ; nouvelle tentative automatique.", "Servicestatus niet beschikbaar. Oude waarden zijn verborgen; automatische nieuwe poging.", "Stato non disponibile. I vecchi valori sono nascosti; nuovo tentativo automatico."],
     admin: ["Administrator access is required.", "Administrator-Zugriff erforderlich.", "Accès administrateur requis.", "Beheerderstoegang vereist.", "Accesso amministratore richiesto."],
     supervisor: ["Update Supervisor to a supported version to open this page.", "Für diese Seite Supervisor auf eine unterstützte Version aktualisieren.", "Mettez Supervisor à jour vers une version compatible.", "Werk Supervisor bij naar een ondersteunde versie.", "Aggiornare Supervisor a una versione supportata."],
-    observed: ["Observed charging state", "Beobachteter Ladezustand", "État de recharge observé", "Gemeten laadstatus", "Stato di ricarica osservato"],
+    observed: ["Charging now", "Laden im Moment", "Recharge en cours", "Laden op dit moment", "Ricarica attuale"],
     power: ["Power", "Leistung", "Puissance", "Vermogen", "Potenza"],
     energy: ["Session energy", "Energie dieses Ladevorgangs", "Énergie de la session", "Energie van deze sessie", "Energia della sessione"],
     limit: ["Observed current limit", "Gelesene Stromvorgabe", "Limite de courant lue", "Uitgelezen stroomlimiet", "Limite di corrente letto"],
@@ -44,7 +49,7 @@
     history_hint: ["Up to 32 results since service start, newest first. Sequence numbers are not timestamps. This is not a session journal.", "Bis zu 32 Ergebnisse seit Service-Start, neueste zuerst. Laufende Nummern sind keine Zeitangaben. Dies ist kein Ladejournal.", "Jusqu’à 32 résultats depuis le démarrage, les plus récents d’abord. Les numéros ne sont pas des horaires. Ce n’est pas un journal de sessions.", "Maximaal 32 resultaten sinds servicestart, nieuwste eerst. Volgnummers zijn geen tijdstippen. Dit is geen sessielogboek.", "Fino a 32 risultati dall’avvio, dal più recente. I numeri non sono orari. Non è un registro delle sessioni."],
     no_commands: ["No command results yet.", "Noch keine Befehlsergebnisse.", "Aucun résultat pour le moment.", "Nog geen opdrachtresultaten.", "Nessun risultato disponibile."],
     footer: ["Charging: targets, next departure and guest charging. Vehicle setup and manual switches: Home Assistant.", "Laden: Ziele, nächste Abfahrt und Gastladen. Fahrzeugeinrichtung und manuelle Schalter: Home Assistant.", "Recharge : objectifs, prochain départ et invités. Profils et interrupteurs manuels : Home Assistant.", "Laden: doelen, volgend vertrek en gasten. Voertuigconfiguratie en handmatige schakelaars: Home Assistant.", "Ricarica: obiettivi, prossima partenza e ospiti. Profili e interruttori manuali: Home Assistant."],
-    op_title: ["My charging", "Meine Ladung", "Ma recharge", "Mijn laadsessie", "La mia ricarica"],
+    op_title: ["Current charging plan", "Aktueller Ladeablauf", "Plan de recharge actuel", "Huidig laadplan", "Piano di ricarica attuale"],
     op_wait: ["Why it waits", "Warum es wartet", "Pourquoi elle attend", "Waarom het wacht", "Perché attende"],
     op_next: ["Next step", "Nächster Schritt", "Prochaine étape", "Volgende stap", "Prossimo passo"],
     op_target: ["Target", "Ziel", "Cible", "Doel", "Obiettivo"],
@@ -163,7 +168,9 @@
         || !Array.isArray(data.commands) || data.commands.length > 32
         || (data.operation && !(data.operation.next && data.operation.target))) throw new Error("invalid overview");
     put("charge_state", text(data.state));
+    el("charge_state").className="state charging-state "+(!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle"].includes(data.state)?"state-wait":"state-muted");
     put("charge_reason", text(data.reason));
+    el("charge_reason").hidden=text(data.reason)===text(data.state);
     put("service_mode", text(data.read_only === true ? "readonly" : data.read_only === false ? "writable" : "unknown"));
     put("heartbeat_state", `${text("heartbeat")}: ${text(data.heartbeat)}`);
     const measurement = data.available ? data.measurements : {};
