@@ -23,9 +23,10 @@ integration and app are published together.
   event history.
 - Rebuild installation and everyday-use guides, app instructions and five
   Mushroom dashboard examples.
-- **Breaking since 0.8.2:** remove old charging-job, boost, reserve and guest
-  APIs/entities, and fold selected sensor values into attributes. Update
-  automations and dashboards. Earlier beta data is not migrated; an
+- **Breaking since 0.8.2:** remove charging-job, boost and reserve APIs,
+  plus the separate guest draft, stop and clear controls. Keep **Start guest
+  charging** as the single explicit action. Fold selected sensor values into
+  attributes; update automations and dashboards. Earlier beta data is not migrated; an
   incompatible saved app state needs a safe-reset acknowledgement.
 - Requires service **0.9.0 or newer**, API 2. Update the app first, then the
   integration; recheck pause, charging release, Plug & Charge, limits and
