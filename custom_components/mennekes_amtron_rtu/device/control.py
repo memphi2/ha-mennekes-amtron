@@ -570,7 +570,7 @@ class AmtronControl:
 
     @property
     def read_only(self) -> bool:
-        """Return true while the integration must not write to the bus."""
+        """Block commands; a startup hold still permits protective gate denial."""
 
         return self._options.read_only or self.startup_hold
 

@@ -84,6 +84,36 @@ def test_reset_keeps_release_off_after_vehicle_absence(tmp_path, monkeypatch, in
 
 
 @pytest.mark.parametrize("read_only", [False, True])
+def test_quarantine_recloses_release_unless_configured_read_only(tmp_path, read_only):
+    async def run():
+        path = tmp_path / "intent.json"
+        original = rejected_file(path)
+        service, transport, clock = await service_fixture(tmp_path, read_only=read_only)
+        try:
+            before = len(transport.writes)
+            transport.bank[R.CHARGING_RELEASE.address] = 1
+            clock[0] += 6
+            await service.refresh()
+            task = service.control._plug_charge._task
+            if task is not None:
+                await task
+            assert transport.bank[R.CHARGING_RELEASE.address] == int(read_only)
+            if read_only:
+                assert transport.writes[before:] == []
+            else:
+                assert (R.CHARGING_RELEASE.address, [0]) in transport.writes[before:]
+            assert service.control.read_only
+            with pytest.raises(DeviceValidationError):
+                await service.command({"command": "resume", "expected_serial_number": service.identity.serial_number})
+            await service._persist()
+            assert path.read_bytes() == original
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("read_only", [False, True])
 def test_quarantine_survives_restart_and_never_overwrites_evidence(tmp_path, read_only):
     async def run():
         path = tmp_path / "intent.json"
