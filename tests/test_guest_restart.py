@@ -173,7 +173,7 @@ def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, mo
                     await real_persist(**kwargs)
                 monkeypatch.setattr(service, "_persist", fail_once)
             else:
-                method = "async_cancel_timed_current" if failure == "cancel" else "async_set_charging_release"
+                method = "async_cancel_timed_current" if failure == "cancel" else "async_start_guest_charging"
                 monkeypatch.setattr(service.control, method, AsyncMock(side_effect=DeviceError("guest_start_not_permitted")))
             with pytest.raises((OSError, DeviceError)):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
@@ -185,13 +185,19 @@ def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, mo
     asyncio.run(run())
 
 
-def test_failed_resume_after_accepted_release_keeps_guest_limits(tmp_path, monkeypatch):
+@pytest.mark.parametrize("validation", [False, True])
+def test_failed_resume_after_accepted_release_keeps_guest_limits(tmp_path, monkeypatch, validation):
     from unittest.mock import AsyncMock
+
+    from custom_components.mennekes_amtron_rtu.device.errors import (
+        DeviceValidationError,
+    )
 
     async def run():
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
-            monkeypatch.setattr(service.control, "async_resume_charging", AsyncMock(side_effect=DeviceError("service_unavailable")))
+            error = DeviceValidationError("guest_start_not_permitted") if validation else DeviceError("service_unavailable")
+            monkeypatch.setattr(service.control, "_async_apply_current", AsyncMock(side_effect=error))
             with pytest.raises(DeviceError):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
                                        "expected_guest_revision": service.guest_revision})

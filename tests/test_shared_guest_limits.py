@@ -234,3 +234,57 @@ def test_unknown_stop_readback_is_not_reported_as_confirmed_pause(tmp_path):
             assert service.control.is_paused is True
             assert not service.guest_active
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("pnc", [False, True])
+@pytest.mark.parametrize("cancel", [False, True])
+def test_guest_release_and_resume_remain_one_deferred_request(tmp_path, monkeypatch, pnc, cancel):
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            if pnc:
+                await service.control.async_configure_plug_charge(True, policy="a" * 64)
+            put(transport.bank, R.CHARGING_RELEASE, 0)
+            await service.refresh()
+            service.client.write_state.mode_change_at = clock[0]
+            await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                   "expected_guest_revision": service.guest_revision})
+            assert service.control.pending_action == "resume"
+            assert service.control.pending_guest_start
+            assert service.data.get("charging_release") == 0
+            if cancel:
+                await service.control.async_cancel_pending_change()
+            clock[0] += 301
+            service.control._pending_changed.set()
+            await asyncio.sleep(0.05)
+            await service.refresh()
+            assert service.data.get("charging_release") == (0 if cancel else 1)
+            assert service.control.pending_action is None
+            if not cancel:
+                assert runtime.current_writes(transport)[-1] >= 6
+    asyncio.run(run())
+
+
+def test_queued_guest_start_cannot_release_another_plug_in(tmp_path, monkeypatch):
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            put(transport.bank, R.CHARGING_RELEASE, 0)
+            await service.refresh()
+            service.client.write_state.mode_change_at = clock[0]
+            await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                   "expected_guest_revision": service.guest_revision})
+            assert service.control.pending_guest_start
+            put(transport.bank, R.EVSE_STATE, 1)
+            put(transport.bank, R.CP_STATE, 10)
+            await service.refresh()
+            put(transport.bank, R.EVSE_STATE, 2)
+            put(transport.bank, R.CP_STATE, 20)
+            await service.refresh()
+            clock[0] += 301
+            service.control._pending_changed.set()
+            await asyncio.sleep(0.05)
+            assert not service.guest_mode
+            assert service.control.pending_action is None
+            assert service.data.get("charging_release") == 0
+    asyncio.run(run())

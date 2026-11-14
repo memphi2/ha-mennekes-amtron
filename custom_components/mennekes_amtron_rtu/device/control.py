@@ -111,6 +111,7 @@ class _PendingCommand:
     action: str
     value: float
     energy_goal_stop: bool = False
+    grant_release: bool = False
     recovery_generation: int | None = None
     owner: str | None = None
     deadline: datetime | None = None
@@ -188,6 +189,7 @@ class AmtronControl:
         self._events = CommandEvents()
         self._active_command: _PendingCommand | None = None
         self._command_acknowledged = False
+        self._guest_release_applied = False
         self._command_write_started = False
         self._recovery_deadline: float | None = None
         self._recovery_generation = 0
@@ -420,6 +422,11 @@ class AmtronControl:
         return self._pending.action if self._pending else None
 
     @property
+    def pending_guest_start(self) -> bool:
+        """A queued resume that also owns the required release step."""
+        return self._pending is not None and self._pending.grant_release
+
+    @property
     def pending_owner(self) -> str | None:
         """The owner of the queued command; None for a command by hand."""
         return self._pending.owner if self._pending else None
@@ -636,7 +643,7 @@ class AmtronControl:
             # A manual request can arrive while the caller waits for this lock.
             if self._pending is not None and self._pending.owner != owner:
                 return
-            if reason := self._timed_cancellation_reason(command):
+            if reason := self._command_cancellation_reason(command):
                 # Refused plans must not change remembered current or command
                 # intent, or cancel another goal's automatic recovery.
                 self.events.record("cancelled", command.action, reason)
@@ -670,7 +677,13 @@ class AmtronControl:
 
     async def async_resume_charging(self, *, current_cap: float | None = None) -> None:
         """Resume charging with the setpoint that was active before the pause."""
+        await self._async_resume(current_cap, grant_release=False)
 
+    async def async_start_guest_charging(self, *, current_cap: float | None = None) -> None:
+        """Grant release and resume as one deferred, connection-bound request."""
+        await self._async_resume(current_cap, grant_release=True)
+
+    async def _async_resume(self, current_cap: float | None, *, grant_release: bool) -> None:
         self._require_write_access()
         async with self._current_lock:
             maximum = self._resume_current_maximum(current_cap)
@@ -679,7 +692,7 @@ class AmtronControl:
                 target = maximum
             elif target != CHARGING_CURRENT_UNLIMITED:
                 target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
-            await self._async_submit_locked(_PendingCommand("resume", target))
+            await self._async_submit_locked(_PendingCommand("resume", target, grant_release=grant_release))
 
     async def async_set_charging_release(self, released: bool) -> None:
         """Open or close the charging relay through 0x0D05."""
@@ -1202,6 +1215,8 @@ class AmtronControl:
                 CHARGING_PAUSE_CURRENT, energy_goal_stop=command.energy_goal_stop,
             )
         elif command.action in ("set_current", "resume"):
+            if command.grant_release:
+                await self._async_grant_release_for_start()
             # A configuration change can lower the available current while
             # an accepted request is waiting. Reapply the active limit.
             await self._async_apply_current(min(command.value, self.max_charging_current))
@@ -1214,13 +1229,27 @@ class AmtronControl:
         else:
             await self._async_apply_lock(bool(command.value))
 
+    async def _async_grant_release_for_start(self) -> None:
+        """Keep release and resume in one queued command, under the same lock."""
+        gate = self._plug_charge.state
+        manual, written = gate.manual, self._release_writes
+        if gate.enabled:
+            self._plug_charge.set_manual(True)
+        try:
+            await self._async_apply_release(True)
+        except BaseException as err:
+            if self._release_writes == written and (not self._command_write_started or not self._uncertain(err)):
+                gate.manual = manual
+            raise
+
     async def _async_observe_command(self, command: _PendingCommand, *, deferred: bool = False) -> None:
         """Report the bus outcome independently of status/persistence callbacks."""
         self._active_command = command
         self._command_acknowledged = False
+        self._guest_release_applied = False
         self._command_write_started = False
         try:
-            self._check_timed_command()
+            self._check_command_context()
             if deferred and self._validate_deferred is not None:
                 self._validate_deferred()
             await self._async_apply_command(command)
@@ -1241,7 +1270,7 @@ class AmtronControl:
             if self._command_acknowledged:
                 self.events.record("executed", command.action, "status_refresh_failed")
             else:
-                uncertain = self._command_write_started and self._uncertain(err)
+                uncertain = self._guest_release_applied or (self._command_write_started and self._uncertain(err))
                 self.events.record("uncertain" if uncertain else "failed", command.action, reason)
             raise
         else:
@@ -1350,7 +1379,7 @@ class AmtronControl:
                     command = self._pending
                     if command is None:
                         return
-                    if reason := self._timed_cancellation_reason(command):
+                    if reason := self._command_cancellation_reason(command):
                         self._clear_pending(outcome="cancelled", reason=reason)
                         await self._async_publish_pending()
                         return
@@ -1410,27 +1439,27 @@ class AmtronControl:
     ) -> None:
         if spec == CHARGING_CURRENT_EMS:
             self._goal_pause_confirmed = None
-        self._check_timed_command()
+        self._check_command_context()
         if spec == CHARGING_RELEASE and value == 1:
             self._plug_charge.check_release(recovery=recovery_release)
         if self._active_command is not None:
             self._command_write_started = True
         try:
-            timed = self._active_command is not None and self._active_command.owner is not None
+            bound = self._active_command is not None and (self._active_command.owner is not None or self._active_command.grant_release)
 
             async def check_preconditions(read: LockedRegisterReader) -> None:
-                if timed:
-                    await self._async_check_timed_vehicle(read)
+                if bound:
+                    await self._async_check_command_vehicle(read)
                 if precondition is not None:
                     await precondition(read)
 
-            if self._write_enables_charging(spec, value) or timed or precondition is not None:
+            if self._write_enables_charging(spec, value) or bound or precondition is not None:
                 await self._client.async_write_register(
                     spec, value, min_interval=min_interval,
                     before_write=lambda: self._check_write_allowed(
                         spec, value, recovery_release=recovery_release,
                     ),
-                    precondition=check_preconditions if timed or precondition is not None else None,
+                    precondition=check_preconditions if bound or precondition is not None else None,
                 )
             else:
                 await self._client.async_write_register(
@@ -1461,6 +1490,8 @@ class AmtronControl:
                 else CHARGING_RELEASE if action in ("enable_charging", "disable_charging")
                 else LOCK_EVSE
             )
+            if self._active_command.grant_release and spec == CHARGING_RELEASE:
+                self._guest_release_applied = True
             if spec == expected:
                 self._command_acknowledged = True
         if spec.key in self._diagnostics.write_errors:
@@ -1489,7 +1520,7 @@ class AmtronControl:
             spec == CHARGING_RELEASE and value == 1 and self._plug_charge.authorizing
             and not self.release_stop_requested
         )
-        self._check_timed_command()
+        self._check_command_context()
         if spec == CHARGING_RELEASE and value == 1:
             self._plug_charge.check_release(recovery=recovery_release)
         if (
@@ -1498,12 +1529,14 @@ class AmtronControl:
         ):
             raise self.stop_error()
 
-    async def _async_check_timed_vehicle(self, read: LockedRegisterReader) -> None:
+    async def _async_check_command_vehicle(self, read: LockedRegisterReader) -> None:
         """Cancel a trip's command if live EVSE and CP both prove unplugging."""
         if await self._async_vehicle_absent(read):
             raise _TimedCommandCancelledError("unknown")
 
-    def _timed_cancellation_reason(self, command: _PendingCommand) -> str | None:
+    def _command_cancellation_reason(self, command: _PendingCommand) -> str | None:
+        if command.grant_release and not self.guest_active():
+            return "unknown"
         if command.owner is None:
             return None
         if command.deadline is not None and datetime.now(UTC) >= command.deadline:
@@ -1512,9 +1545,9 @@ class AmtronControl:
             return "energy_goal"
         return None
 
-    def _check_timed_command(self) -> None:
+    def _check_command_context(self) -> None:
         command = self._active_command
-        if command is not None and (reason := self._timed_cancellation_reason(command)):
+        if command is not None and (reason := self._command_cancellation_reason(command)):
             raise _TimedCommandCancelledError(reason)
 
     def _require_write_access(self) -> None:

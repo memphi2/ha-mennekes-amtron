@@ -156,14 +156,13 @@ class GuestModbusService(ConsoleModbusService):
                 # Make the ownership fence durable before any charging write.
                 await self._persist()
                 await control.async_cancel_timed_current("departure")
-                await control.async_set_charging_release(True)
-                accepted = True  # Includes an accepted deferred release.
-                await control.async_resume_charging(current_cap=self.config.current_cap)
+                await control.async_start_guest_charging(current_cap=self.config.current_cap)
+                accepted = True  # Includes the complete deferred guest start.
             except BaseException:
                 # A refused command has no guest grant. An applied/uncertain
                 # write or a queued release keeps its guards; rolling them
                 # back could leave an already charging guest without limits.
-                if not accepted and control.pending_action != "enable_charging":
+                if not accepted and not control.pending_guest_start:
                     (self._guest_scope, self._guest_restore_pending,
                      self.client.write_state.guest_permission) = previous
                 raise
