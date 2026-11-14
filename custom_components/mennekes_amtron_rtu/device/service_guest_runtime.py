@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .client_errors import AmtronBusError
+from .command_events import CommandEvent
 from .control import AmtronControl
 from .enums import GridPhasesConnected, SwitchedPhases
 from .errors import DeviceError
@@ -136,17 +137,35 @@ class GuestModbusService(ConsoleModbusService):
             deadline = self.guest_deadline
             if deadline is not None and deadline <= sample.now:
                 raise DeviceError("guest_deadline_expired")
+            previous = (self._guest_scope, self._guest_restore_pending, self.client.write_state.guest_permission)
+            accepted = False
+
+            def outcome(event: CommandEvent) -> None:
+                nonlocal accepted
+                if event.action in ("enable_charging", "resume") and event.outcome in ("executed", "uncertain"):
+                    accepted = True
+
+            unlisten = control.events.listen(outcome)
             self._guest_scope = sample.scope
             self._guest_restore_pending = False
             self.client.write_state.guest_permission = GuestPermission(sample.session, deadline)
-            # Make the ownership fence durable before any charging write.
-            await self._persist()
             try:
+                # Make the ownership fence durable before any charging write.
+                await self._persist()
                 await control.async_cancel_timed_current("departure")
                 await control.async_set_charging_release(True)
+                accepted = True  # Includes an accepted deferred release.
                 await control.async_resume_charging(current_cap=self.config.current_cap)
+            except BaseException:
+                # A refused command has no guest grant. An applied/uncertain
+                # write or a queued release keeps its guards; rolling them
+                # back could leave an already charging guest without limits.
+                if not accepted and control.pending_action != "enable_charging":
+                    (self._guest_scope, self._guest_restore_pending,
+                     self.client.write_state.guest_permission) = previous
+                raise
             finally:
-                # No separate guest order or limits are stored.
+                unlisten()
                 await self._persist()
             await self.refresh()
             return self._publish()

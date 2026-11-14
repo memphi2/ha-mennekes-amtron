@@ -152,3 +152,66 @@ def test_guest_evidence_storage_is_strict_and_bounded(tmp_path):
     raw["guest_permission"] = {"unexpected": True}
     store.path.write_text(json.dumps(raw))
     assert not store.load(restored)
+
+
+@pytest.mark.parametrize("failure", ["store", "cancel", "release"])
+def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, monkeypatch, failure):
+    from unittest.mock import AsyncMock
+
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, transport, _clock):
+            if failure == "store":
+                real_persist = service._persist
+                calls = 0
+
+                async def fail_once(**kwargs):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 1:
+                        raise OSError("disk full")
+                    await real_persist(**kwargs)
+                monkeypatch.setattr(service, "_persist", fail_once)
+            else:
+                method = "async_cancel_timed_current" if failure == "cancel" else "async_set_charging_release"
+                monkeypatch.setattr(service.control, method, AsyncMock(side_effect=DeviceError("guest_start_not_permitted")))
+            with pytest.raises((OSError, DeviceError)):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": service.guest_revision})
+            assert not transport.writes
+            assert not service.guest_mode
+            assert service.client.write_state.guest_permission is None
+            assert json.loads((tmp_path / "intent.json").read_text())["guest_permission"] is None
+    asyncio.run(run())
+
+
+def test_failed_resume_after_accepted_release_keeps_guest_limits(tmp_path, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            monkeypatch.setattr(service.control, "async_resume_charging", AsyncMock(side_effect=DeviceError("service_unavailable")))
+            with pytest.raises(DeviceError):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": service.guest_revision})
+            assert service.guest_mode
+            assert service.client.write_state.guest_permission is not None
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("uncertain", [False, True])
+def test_release_reply_failure_keeps_permission_only_when_write_may_have_happened(tmp_path, monkeypatch, uncertain):
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            put(transport.bank, R.CHARGING_RELEASE, 0)
+            await service.refresh()
+            transport.write_exceptions[R.CHARGING_RELEASE.address] = TimeoutError() if uncertain else 3
+            clock[0] += 1000
+            with pytest.raises((DeviceError, TimeoutError)):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": service.guest_revision})
+            assert service.guest_mode is uncertain
+            assert (service.client.write_state.guest_permission is not None) is uncertain
+    asyncio.run(run())

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Roll back a guest start rejected before acceptance; retain its guards after
+  an accepted or uncertain release so a partial start cannot lose its limits.
+
 - Enforce the guest time limit without the long state-change delay, retaining
   the five-second register guard and retrying transient bus failures.
 
