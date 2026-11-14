@@ -46,6 +46,9 @@ def test_the_dump_carries_no_port_path_and_no_serial_number() -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
         entry.runtime_data.diagnostics.timeline.record(EventType.CONNECTION_LOST)
+        data = entry.runtime_data.coordinator.current_data()
+        data.connection_quality = "degraded"
+        data.connection_failures, data.connection_retries = 2, 100
         dump = await async_get_config_entry_diagnostics(hass, entry)
         assert dump["runtime_events"][0]["event"] == "connection_lost"
         assert dump["runtime_events"][0]["register_address"] is None
@@ -56,6 +59,9 @@ def test_the_dump_carries_no_port_path_and_no_serial_number() -> None:
         assert dump["bus"]["device_id"] == 50
         assert dump["bus"]["response_timeout_seconds"] == 1.0
         assert dump["bus"]["write_retries"] == 0
+        assert dump["connection_quality"] == {
+            "state": "degraded", "failed_transactions": 2, "retried_transactions": 100,
+        }
         assert dump["write_transactions"] == []
         assert dump["device"]["layout_version"] == "v01.03"
         assert dump["device"]["serial_number_hash"]

@@ -195,8 +195,6 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             healthy = heartbeat.healthy if heartbeat is not None else None
             attributes = {
                 "heartbeat": None if healthy is None else "ok" if healthy else "problem",
-                "failed_transactions": self.wallbox_data.connection_failures,
-                "retried_transactions": self.wallbox_data.connection_retries,
             }
         elif key == "pending_change":
             attributes = {"due": self.runtime_data.control.pending_until}

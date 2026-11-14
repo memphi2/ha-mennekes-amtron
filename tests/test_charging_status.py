@@ -136,15 +136,15 @@ def test_derived_entities_are_available_without_control_and_record_no_counters(l
         assert status.unique_id.endswith("_charging_status")
         assert quality.entity_category is EntityCategory.DIAGNOSTIC
         assert quality.state_class is None
-        assert quality.extra_state_attributes == {"failed_transactions": 0, "retried_transactions": 0}
+        assert quality.extra_state_attributes is None
         assert quality.unique_id.endswith("_connection_quality")
         for value in (None, "good", "degraded", "good"):
             coordinator.data.connection_quality = value
             assert quality.native_value == value
         coordinator.data.connection_failures = 4
-        assert quality.extra_state_attributes == {"failed_transactions": 4, "retried_transactions": 0}
+        assert quality.extra_state_attributes is None
         coordinator.data.connection_retries = None
-        assert quality.extra_state_attributes == {"failed_transactions": 4}
+        assert quality.extra_state_attributes is None
         coordinator.data.connection_failures = None
         assert quality.extra_state_attributes is None
         coordinator.last_update_success = False

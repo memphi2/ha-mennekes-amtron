@@ -9,6 +9,8 @@ DATABASE_LIMIT = 8 * 1024**2
 WAL_LIMIT = 16 * 1024**2
 QUEUE_LIMIT = 256
 ATTRIBUTE_GROWTH_LIMIT = 2
+# Each entity may acquire one unavailable attribute set after its first
+# reconnect. These are reused, not another allowance on every reconnect.
 # Five changed sensor/binary states per iteration, with room for a status
 # transition. Each reconnect can additionally record unavailable + restored
 # state once for every enabled entity. Unchanged polls must stay quiet.
@@ -50,7 +52,8 @@ def recorder_errors(data: dict[str, Any]) -> list[str]:
         budget = ROWS_PER_ITERATION * (index + 1) + 2 * entities * recoveries
         if recoveries < 0 or not 0 < integer(sample, "recorder_inserted") <= budget:
             errors.append("Recorder state inserts exceeded the scenario budget or were not measured")
-        if not 0 <= integer(sample, "recorder_attribute_growth") <= ATTRIBUTE_GROWTH_LIMIT:
+        attribute_budget = ATTRIBUTE_GROWTH_LIMIT + (entities if recoveries > 0 else 0)
+        if not 0 <= integer(sample, "recorder_attribute_growth") <= attribute_budget:
             errors.append("Recorder attributes grew unexpectedly")
         if any(integer(sample, key) <= 0 for key in ("recorder_states", "recorded_energy_rows", "recorded_power_rows")):
             errors.append("Recorder lost energy or power history")
