@@ -18,11 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   connection; **Configure → Wallbox** shows the app's current cap and waits,
   and they are changed in the app.
 - **The app's orders can be used from Home Assistant.** New actions start,
-  stop and clear a charging job, start guest charging, start and end a boost
-  and activate or deactivate a weekly plan, in one step and without a device
-  ID when there is one wallbox. The new sensors **Charging job** and **Weekly
-  plan** show their state. `docs/app-from-home-assistant.md` has a ready
-  dashboard view with Mushroom cards.
+  stop and clear a charging job, start guest charging and start and end a
+  boost, in one step and without a device ID when there is one wallbox. The
+  new sensor **Charging job** shows the state.
+  `docs/app-from-home-assistant.md` has a ready dashboard view with Mushroom
+  cards.
+- **Weekly plans are removed.** The app has no Weekly plans page and no weekly
+  API any more, and **Charging control**, **Charging wait reason** and **Next
+  charging step** lose their weekly states. Recurring departures come from a
+  calendar: the calendar blueprint sets **Next departure**.
 
 ## 0.9.0b3 — 2026-11-14
 

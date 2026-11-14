@@ -48,10 +48,6 @@ class DepartureModbusService(ForecastModbusService):
             self._end_departure_pause,
         )
 
-    def _confirmed_vehicle(self) -> tuple[str, str] | None:
-        departure = self.departure
-        return None if departure is None else departure.confirmed_vehicle(self._departure_sample())
-
     async def _initialize(self) -> None:
         await super()._initialize()
         if self.departure is None:
@@ -196,14 +192,13 @@ class DepartureModbusService(ForecastModbusService):
     def _operation(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         """Who controls the charge, why it waits and what comes next."""
         control = self.control
-        jobs, weekly = self.jobs, self.weekly
+        jobs = self.jobs
         ready = jobs is not None and jobs.ready
         sample = self._job_inputs()
         return summarize(
             available=snapshot["available"] is True, present=sample.present,
             control=snapshot["control"], departure=snapshot["control"]["departure"],
             job=jobs.snapshot()["job"] if jobs is not None and ready else None,
-            weekly=weekly.waiting() if weekly is not None and weekly.ready else None,
             # Only a charge target's stop is a reached target; an order names its own.
             goal_stop=control is not None and control.goal_stop_requested,
         )

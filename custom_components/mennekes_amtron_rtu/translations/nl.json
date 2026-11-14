@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Wallbox niet bereikbaar",
           "guest_order": "Gastopdracht",
-          "weekly_plan": "Weekplan",
           "charging_job": "Laadopdracht",
           "departure_plan": "Vertrekplanning",
           "direct": "Directe bediening"
@@ -541,7 +540,6 @@
           "meter_unavailable": "Wacht op de energiemeter",
           "job_suspended": "Opdracht wacht op bewijs van dezelfde aansluiting",
           "job_ended": "Opdracht beëindigd, gepauzeerd tot loskoppelen",
-          "until_weekly_window": "Wacht op het venster van het weekplan",
           "vehicle_unconfirmed": "Voertuig niet bevestigd",
           "until_planned_start": "Gepauzeerd tot de geplande start",
           "estimated_target_reached": "Geladen tot het berekende doel",
@@ -562,7 +560,6 @@
           "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
           "job_start": "Opdracht start",
           "job_end": "Opdracht eindigt",
-          "weekly_window": "Venster van het weekplan opent",
           "plan_start": "Gepland laden start",
           "target_reached": "Doel verwacht",
           "departure": "Vertrek"
@@ -585,13 +582,6 @@
           "finished": "Tijdvenster afgelopen",
           "stopped": "Gestopt door gebruiker",
           "interrupted": "Onderbroken; geen automatische herstart"
-        }
-      },
-      "weekly_plan": {
-        "name": "Weekplan",
-        "state": {
-          "inactive": "Niet actief",
-          "active": "Actief"
         }
       }
     },
@@ -938,9 +928,6 @@
     "invalid_job_request": {
       "message": "De app heeft deze waarden niet geaccepteerd. Controleer tijd, stroom en energie."
     },
-    "invalid_weekly_request": {
-      "message": "De app heeft deze waarden niet geaccepteerd. Controleer tijd, stroom en energie."
-    },
     "job_boost_unavailable": {
       "message": "Boost vereist een actieve opdracht vóór de geplande start en een actuele vrijgave."
     },
@@ -971,50 +958,11 @@
     "job_storage_unavailable": {
       "message": "Opslag niet beschikbaar; geen automatische start."
     },
-    "weekly_already_active": {
-      "message": "Er is al een weekplan actief voor deze verbinding. Stop dit eerst."
-    },
-    "weekly_changed": {
-      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
-    },
-    "weekly_confirmation_expired": {
-      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
-    },
-    "weekly_inactive": {
-      "message": "Geen weekplan actief."
-    },
-    "weekly_invalid_confirmation": {
-      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
-    },
-    "weekly_manual_stop": {
-      "message": "Intussen handmatig gestopt; activeer het plan opnieuw."
-    },
-    "weekly_no_occurrence": {
-      "message": "Geen ongebruikt geldig vertrek binnen zeven dagen."
-    },
-    "weekly_service_starting": {
-      "message": "De service start nog. Probeer het zo opnieuw."
-    },
-    "weekly_stop_unconfirmed": {
-      "message": "De stop van het weekplan is nog niet bevestigd. Probeer het zo opnieuw."
-    },
-    "weekly_storage_unavailable": {
-      "message": "De opslag van weekplannen is niet beschikbaar of onbevestigd. Herstart en controleer de opslag voordat u activeert."
-    },
-    "weekly_successor_not_permitted": {
-      "message": "De volgende keer kan nu niet starten. Controleer verbinding, meter en vrijgave."
-    },
-    "weekly_vehicle_not_confirmed": {
-      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
-    },
     "service_order_failed": {
       "message": "De app heeft dit niet uitgevoerd. Controleer of ze bereikbaar en actueel is en of tijden en waarden geldig zijn."
     },
     "app_required": {
       "message": "Deze actie vereist de Modbus-app; deze wallbox is rechtstreeks verbonden."
-    },
-    "weekly_plan_unknown": {
-      "message": "De app heeft geen weekplan “{plan}”."
     },
     "wallbox_target_required": {
       "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."
@@ -1774,30 +1722,6 @@
     "cancel_boost": {
       "name": "Boost beëindigen",
       "description": "Beëindigt het vervroegd laden; de laadopdracht loopt verder zoals gepland.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
-        }
-      }
-    },
-    "activate_weekly_plan": {
-      "name": "Weekplan activeren",
-      "description": "Activeert een weekplan van de app voor de aangesloten auto, voor maximaal zeven dagen of tot de auto wordt losgekoppeld. Plannen maak je in de app.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
-        },
-        "plan": {
-          "name": "Plan",
-          "description": "De voertuignaam van het plan, zoals in de app getoond."
-        }
-      }
-    },
-    "deactivate_weekly_plan": {
-      "name": "Weekplan deactiveren",
-      "description": "Beëindigt het actieve weekplan en stopt de bijbehorende laadopdracht.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

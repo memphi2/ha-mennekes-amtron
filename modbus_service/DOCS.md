@@ -98,7 +98,6 @@ for details.
 | **Runtime** | Polling intervals, current cap and waits apply without restart. Preview before saving. |
 | **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve, early start and an estimated finish. |
 | **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
-| **Weekly plans** | Recurring departures for one car, activated for the plugged-in car for up to seven days. |
 
 Every page is available in English, German, French, Dutch and Italian and has
 the same navigation bar.
@@ -141,14 +140,8 @@ wallbox that was unreadable for more than a minute, the order stays paused and
 continues only if the wallbox proves the car stayed plugged in; otherwise it is
 interrupted and HA controls charging again. It never restarts by itself.
 
-A weekly plan creates one such job per departure, each when its window opens.
-Between departures HA controls charging, for example for PV surplus. An
-activation ends at unplugging, an app restart or after seven days at the latest.
-A plan activated while HA had detected the car at the plug-in remembers it and
-then activates itself whenever HA detects that car again, until you stop the
-plan. It then waits for the next departure's window.
 See
-[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b3/docs/app-guide.md#weekly-plans).
+[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b3/docs/app-guide.md#charging-jobs).
 
 ## Daily use
 
@@ -202,7 +195,7 @@ Switching the app to read-only also stops the heartbeat.
 
 To give the bus to another master, stop the app. Disabling the HA entry or
 selecting read-only does not release it. Include the app data in backups: it
-contains the saved charging state, a charging job, weekly plans, learned
+contains the saved charging state, a charging job, learned
 charging power and the private access token.
 
 ### Virtual Plug & Charge

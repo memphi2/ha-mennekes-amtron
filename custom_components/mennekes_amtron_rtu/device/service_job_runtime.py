@@ -34,6 +34,7 @@ class JobModbusService(ConsoleModbusService):
     """Keep jobs local across HA disconnects; continuity needs wallbox proof."""
 
     jobs: ChargeJobController | None = None
+    job_controller_type: type[ChargeJobController] = ChargeJobController
     _job_scope: str | None = None
     # Since when the plug state is unreadable; a short gap keeps the scope.
     _job_unknown_since: float | None = None
@@ -46,7 +47,7 @@ class JobModbusService(ConsoleModbusService):
 
     def _configure_control(self, control: AmtronControl) -> None:
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
-        self.jobs = ChargeJobController(
+        self.jobs = self.job_controller_type(
             ChargeJobStore(self.state_path.with_name("charge-job.json"), identity),
             self._job_inputs, self._apply_job_current,
         )

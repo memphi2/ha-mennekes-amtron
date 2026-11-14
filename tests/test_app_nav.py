@@ -16,12 +16,12 @@ from custom_components.mennekes_amtron_rtu.device.console_http import CONSOLE_AS
 from tests.test_app_settings import HEADERS, FixtureSettings
 
 DEVICE = Path(ui.__file__).parent
-ALL = {"/", "/registers", "/jobs", "/guest", "/weekly", "/connection", "/runtime", "/log"}
+ALL = {"/", "/registers", "/jobs", "/guest", "/connection", "/runtime", "/log"}
 
 
 def test_groups_are_tabs_and_their_pages_a_second_row():
     nav = render_nav("/guest", "de", ALL).decode()
-    assert nav.count("<a ") == 7
+    assert nav.count("<a ") == 6
     assert '<a href="./jobs" aria-current="true">Laden</a>' in nav
     assert '<nav class="app-pages" aria-label="Laden">' in nav
     assert '<a href="./guest" aria-current="page">Gastladen</a>' in nav

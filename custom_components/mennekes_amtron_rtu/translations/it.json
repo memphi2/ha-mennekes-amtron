@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Wallbox non raggiungibile",
           "guest_order": "Ordine ospite",
-          "weekly_plan": "Piano settimanale",
           "charging_job": "Ordine di ricarica",
           "departure_plan": "Pianificazione della partenza",
           "direct": "Controllo diretto"
@@ -541,7 +540,6 @@
           "meter_unavailable": "In attesa del contatore di energia",
           "job_suspended": "L’ordine attende la prova dello stesso collegamento",
           "job_ended": "Ordine terminato, in pausa fino allo scollegamento",
-          "until_weekly_window": "In attesa della finestra del piano settimanale",
           "vehicle_unconfirmed": "Veicolo non confermato",
           "until_planned_start": "In pausa fino all’avvio pianificato",
           "estimated_target_reached": "Caricato fino all’obiettivo stimato",
@@ -562,7 +560,6 @@
           "queued_command": "La modifica in coda viene eseguita",
           "job_start": "L’ordine inizia",
           "job_end": "L’ordine termina",
-          "weekly_window": "Si apre la finestra del piano settimanale",
           "plan_start": "Inizia la ricarica pianificata",
           "target_reached": "Obiettivo previsto",
           "departure": "Partenza"
@@ -585,13 +582,6 @@
           "finished": "Finestra oraria terminata",
           "stopped": "Fermato dall’utente",
           "interrupted": "Interrotto; nessun riavvio automatico"
-        }
-      },
-      "weekly_plan": {
-        "name": "Piano settimanale",
-        "state": {
-          "inactive": "Non attivo",
-          "active": "Attivo"
         }
       }
     },
@@ -938,9 +928,6 @@
     "invalid_job_request": {
       "message": "L’app non ha accettato questi valori. Controlla orario, corrente ed energia."
     },
-    "invalid_weekly_request": {
-      "message": "L’app non ha accettato questi valori. Controlla orario, corrente ed energia."
-    },
     "job_boost_unavailable": {
       "message": "Il boost richiede un ordine attivo prima del suo inizio previsto e un consenso attuale."
     },
@@ -971,50 +958,11 @@
     "job_storage_unavailable": {
       "message": "Memoria non disponibile; nessun avvio automatico."
     },
-    "weekly_already_active": {
-      "message": "Un piano settimanale è già attivo per questo collegamento. Fermarlo prima."
-    },
-    "weekly_changed": {
-      "message": "Nel frattempo lo stato è cambiato. Riprova."
-    },
-    "weekly_confirmation_expired": {
-      "message": "Nel frattempo lo stato è cambiato. Riprova."
-    },
-    "weekly_inactive": {
-      "message": "Nessun piano settimanale attivo."
-    },
-    "weekly_invalid_confirmation": {
-      "message": "Nel frattempo lo stato è cambiato. Riprova."
-    },
-    "weekly_manual_stop": {
-      "message": "Fermato a mano nel frattempo; riattivare il piano."
-    },
-    "weekly_no_occurrence": {
-      "message": "Nessuna partenza valida non usata entro sette giorni."
-    },
-    "weekly_service_starting": {
-      "message": "Il servizio si sta ancora avviando. Riprova tra poco."
-    },
-    "weekly_stop_unconfirmed": {
-      "message": "Lo stop del piano settimanale non è ancora confermato. Riprova tra poco."
-    },
-    "weekly_storage_unavailable": {
-      "message": "La memoria dei piani settimanali non è disponibile o non è confermata. Riavviare e verificare la memoria prima di attivare."
-    },
-    "weekly_successor_not_permitted": {
-      "message": "La prossima occorrenza non può partire ora. Verificare collegamento, contatore e consenso."
-    },
-    "weekly_vehicle_not_confirmed": {
-      "message": "Nel frattempo lo stato è cambiato. Riprova."
-    },
     "service_order_failed": {
       "message": "L’app non lo ha eseguito. Verifica che sia raggiungibile e aggiornata e che orari e valori siano validi."
     },
     "app_required": {
       "message": "Questa azione richiede l’app Modbus; questa wallbox è collegata direttamente."
-    },
-    "weekly_plan_unknown": {
-      "message": "L’app non ha un piano settimanale «{plan}»."
     },
     "wallbox_target_required": {
       "message": "Sono configurate più wallbox; indica la wallbox interessata."
@@ -1774,30 +1722,6 @@
     "cancel_boost": {
       "name": "Annulla boost",
       "description": "Termina la ricarica anticipata; l’ordine prosegue come previsto.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
-        }
-      }
-    },
-    "activate_weekly_plan": {
-      "name": "Attiva piano settimanale",
-      "description": "Attiva un piano settimanale dell’app per l’auto collegata, per al massimo sette giorni o finché non viene scollegata. I piani si creano nell’app.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
-        },
-        "plan": {
-          "name": "Piano",
-          "description": "Il nome del veicolo del piano, come mostrato nell’app."
-        }
-      }
-    },
-    "deactivate_weekly_plan": {
-      "name": "Disattiva piano settimanale",
-      "description": "Termina il piano settimanale attivo e ferma il relativo ordine di ricarica.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

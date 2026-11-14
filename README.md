@@ -76,7 +76,7 @@ setting belongs and why a requested change may wait.
 
 **Current beta: 0.9.0b3.** The app's web pages look like Home Assistant, with
 the registers on the overview and a log that runs by itself; the app runs
-charging jobs, weekly plans, early boosts and guest charging on its own. Total
+charging jobs, early boosts and guest charging on its own. Total
 power carries the values of all three phases. Optional features
 stay off until you configure them. See the [release notes](CHANGELOG.md).
 

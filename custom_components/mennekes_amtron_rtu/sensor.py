@@ -133,7 +133,7 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         orders = self.runtime_data.orders
         if orders is None:
             return None
-        return orders.jobs if self.entity_description.key == "charging_job" else orders.weekly
+        return orders.jobs
 
     @property
     def native_value(self) -> str | None:
@@ -149,8 +149,6 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             status = self._orders
             if status is None:
                 return None
-            if key == "weekly_plan":
-                return "active" if isinstance(status.get("active"), dict) else "inactive"
             job = status.get("job")
             state = job.get("state") if isinstance(job, dict) else "none"
             return state if state in (self.options or ()) else None
@@ -221,14 +219,6 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
                     "reason": job.get("reason"),
                     "boost_until": _moment(job.get("boost_until")),
                 }
-        elif key == "weekly_plan" and (status := self._orders) is not None:
-            active, plans = status.get("active"), status.get("plans")
-            attributes = {"plans": [
-                item["plan"].get("vehicle_profile") for item in plans
-                if isinstance(item, dict) and isinstance(item.get("plan"), dict)
-            ] if isinstance(plans, list) else None}
-            if isinstance(active, dict):
-                attributes |= {"plan": active.get("vehicle_profile"), "until": _moment(active.get("until"))}
         elif key == "operation_controller" and (operation := self.runtime_data.control.operation) is not None:
             attributes = {
                 "vehicle": operation.vehicle,

@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Borne injoignable",
           "guest_order": "Ordre invité",
-          "weekly_plan": "Plan hebdomadaire",
           "charging_job": "Ordre de recharge",
           "departure_plan": "Planification du départ",
           "direct": "Commande directe"
@@ -541,7 +540,6 @@
           "meter_unavailable": "En attente du compteur d’énergie",
           "job_suspended": "L’ordre attend la preuve du même branchement",
           "job_ended": "Ordre terminé, en pause jusqu’au débranchement",
-          "until_weekly_window": "En attente de la fenêtre du plan hebdomadaire",
           "vehicle_unconfirmed": "Véhicule non confirmé",
           "until_planned_start": "En pause jusqu’au démarrage prévu",
           "estimated_target_reached": "Chargé jusqu’à l’objectif estimé",
@@ -562,7 +560,6 @@
           "queued_command": "La modification en attente s’exécute",
           "job_start": "L’ordre démarre",
           "job_end": "L’ordre se termine",
-          "weekly_window": "La fenêtre du plan hebdomadaire s’ouvre",
           "plan_start": "La recharge planifiée démarre",
           "target_reached": "Cible attendue",
           "departure": "Départ"
@@ -585,13 +582,6 @@
           "finished": "Plage horaire terminée",
           "stopped": "Arrêté par l’utilisateur",
           "interrupted": "Interrompu ; pas de redémarrage automatique"
-        }
-      },
-      "weekly_plan": {
-        "name": "Plan hebdomadaire",
-        "state": {
-          "inactive": "Inactif",
-          "active": "Actif"
         }
       }
     },
@@ -938,9 +928,6 @@
     "invalid_job_request": {
       "message": "L’application n’a pas accepté ces valeurs. Vérifiez l’heure, le courant et l’énergie."
     },
-    "invalid_weekly_request": {
-      "message": "L’application n’a pas accepté ces valeurs. Vérifiez l’heure, le courant et l’énergie."
-    },
     "job_boost_unavailable": {
       "message": "Le boost exige un ordre actif avant son début prévu et une autorisation actuelle."
     },
@@ -971,50 +958,11 @@
     "job_storage_unavailable": {
       "message": "Stockage indisponible ; aucun démarrage automatique."
     },
-    "weekly_already_active": {
-      "message": "Un plan hebdomadaire est déjà actif pour cette connexion. Arrêtez-le d’abord."
-    },
-    "weekly_changed": {
-      "message": "L’état a changé entre-temps. Réessayez."
-    },
-    "weekly_confirmation_expired": {
-      "message": "L’état a changé entre-temps. Réessayez."
-    },
-    "weekly_inactive": {
-      "message": "Aucun plan hebdomadaire actif."
-    },
-    "weekly_invalid_confirmation": {
-      "message": "L’état a changé entre-temps. Réessayez."
-    },
-    "weekly_manual_stop": {
-      "message": "Arrêté manuellement entre-temps ; réactivez le plan."
-    },
-    "weekly_no_occurrence": {
-      "message": "Aucun départ valide non utilisé dans les sept jours."
-    },
-    "weekly_service_starting": {
-      "message": "Le service démarre encore. Réessayez dans un instant."
-    },
-    "weekly_stop_unconfirmed": {
-      "message": "L’arrêt du plan hebdomadaire n’est pas encore confirmé. Réessayez dans un instant."
-    },
-    "weekly_storage_unavailable": {
-      "message": "Le stockage des plans hebdomadaires est indisponible ou non confirmé. Redémarrez et vérifiez le stockage avant d’activer."
-    },
-    "weekly_successor_not_permitted": {
-      "message": "La prochaine occurrence ne peut pas démarrer maintenant. Vérifiez la connexion, le compteur et l’autorisation."
-    },
-    "weekly_vehicle_not_confirmed": {
-      "message": "L’état a changé entre-temps. Réessayez."
-    },
     "service_order_failed": {
       "message": "L’application ne l’a pas exécuté. Vérifiez qu’elle est joignable et à jour, et que les heures et valeurs sont valides."
     },
     "app_required": {
       "message": "Cette action nécessite l’application Modbus ; cette borne est connectée directement."
-    },
-    "weekly_plan_unknown": {
-      "message": "L’application n’a pas de plan hebdomadaire « {plan} »."
     },
     "wallbox_target_required": {
       "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."
@@ -1774,30 +1722,6 @@
     "cancel_boost": {
       "name": "Annuler le boost",
       "description": "Met fin à la recharge anticipée ; l’ordre se poursuit comme prévu.",
-      "fields": {
-        "device_id": {
-          "name": "Borne",
-          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
-        }
-      }
-    },
-    "activate_weekly_plan": {
-      "name": "Activer le plan hebdomadaire",
-      "description": "Active un plan hebdomadaire de l’application pour la voiture branchée, pendant sept jours au plus ou jusqu’au débranchement. Les plans se créent dans l’application.",
-      "fields": {
-        "device_id": {
-          "name": "Borne",
-          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
-        },
-        "plan": {
-          "name": "Plan",
-          "description": "Le nom de véhicule du plan, tel qu’affiché dans l’application."
-        }
-      }
-    },
-    "deactivate_weekly_plan": {
-      "name": "Désactiver le plan hebdomadaire",
-      "description": "Met fin au plan hebdomadaire actif et arrête son ordre de recharge.",
       "fields": {
         "device_id": {
           "name": "Borne",

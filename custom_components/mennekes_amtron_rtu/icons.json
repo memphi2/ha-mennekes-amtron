@@ -156,7 +156,6 @@
         "state": {
           "unavailable": "mdi:lan-disconnect",
           "guest_order": "mdi:account-clock-outline",
-          "weekly_plan": "mdi:calendar-week",
           "charging_job": "mdi:clipboard-clock-outline",
           "departure_plan": "mdi:car-clock",
           "direct": "mdi:gesture-tap"
@@ -188,12 +187,6 @@
           "finished": "mdi:clipboard-check-outline",
           "stopped": "mdi:stop-circle-outline",
           "interrupted": "mdi:alert-circle-outline"
-        }
-      },
-      "weekly_plan": {
-        "default": "mdi:calendar-week",
-        "state": {
-          "inactive": "mdi:calendar-blank-outline"
         }
       }
     },
@@ -326,8 +319,6 @@
     "stop_charging_job": "mdi:stop-circle-outline",
     "clear_charging_job": "mdi:clipboard-remove-outline",
     "start_boost": "mdi:rocket-launch-outline",
-    "cancel_boost": "mdi:rocket-outline",
-    "activate_weekly_plan": "mdi:calendar-check",
-    "deactivate_weekly_plan": "mdi:calendar-remove"
+    "cancel_boost": "mdi:rocket-outline"
   }
 }

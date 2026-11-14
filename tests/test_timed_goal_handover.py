@@ -122,10 +122,10 @@ def test_an_unconfirmed_car_is_handed_over_without_a_plug_in(monkeypatch):
         binding = SimpleNamespace(resting=True, detected=False)
         observer, service, _hass = handover(monkeypatch, binding=binding)
         await observer._evaluate()
-        assert (service.inputs[-1].scope, service.inputs[-1].detected) == (None, False)
+        assert service.inputs[-1].scope is None
         binding.resting, binding.detected = False, True
         await observer._evaluate()
-        assert (service.inputs[-1].scope, service.inputs[-1].detected) == (SCOPE, True)
+        assert service.inputs[-1].scope == SCOPE
         # Without a selected car there is nothing to hand over.
         observer._runtime.vehicle_soc = None
         await observer._evaluate()

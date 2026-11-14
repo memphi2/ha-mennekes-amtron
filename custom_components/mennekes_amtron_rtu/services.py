@@ -89,10 +89,6 @@ ORDER_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[ServiceOrders, dict[str
         ),
     }, lambda orders, data: orders.async_start_boost(minutes=data["duration"])),
     "cancel_boost": ({}, lambda orders, _data: orders.async_cancel_boost()),
-    "activate_weekly_plan": ({
-        probatio.Required("plan"): probatio.All(cv.string, probatio.Length(min=1, max=64)),
-    }, lambda orders, data: orders.async_activate_weekly(plan=data["plan"])),
-    "deactivate_weekly_plan": ({}, lambda orders, _data: orders.async_deactivate_weekly()),
 }
 
 

@@ -55,7 +55,7 @@ def _goal(status: str = "active", target: float = 80.0) -> dict[str, Any]:
 def _sum(**changes: Any) -> dict[str, Any]:
     values: dict[str, Any] = {
         "available": True, "present": True, "control": _control(), "departure": None,
-        "job": None, "weekly": None,
+        "job": None,
     }
     return summarize(**{**values, **changes})
 
@@ -103,32 +103,12 @@ def test_a_holding_order_controls(state: str, waiting: str, event: str, at: str 
 
 def test_order_kinds() -> None:
     assert _sum(job=_job(kind="guest"))["controller"] == "guest_order"
-    weekly = {"plan_id": "p", "job_id": "job-1", "start_at": START}
-    assert _sum(job=_job(), weekly=weekly)["controller"] == "weekly_plan"
-    assert _sum(job=_job(), weekly={**weekly, "job_id": "other"})["controller"] == "charging_job"
+    assert _sum(job=_job())["controller"] == "charging_job"
 
 
 def test_an_order_that_let_go_no_longer_controls() -> None:
     result = _sum(job=_job("reached", holding=False))
     assert (result["controller"], result["waiting"]) == ("direct", "none")
-
-
-def test_weekly_plan_between_departures_still_controls() -> None:
-    # The plan's ended order no longer holds the wallbox, but its id stays.
-    done = _job("reached", holding=False)
-    result = _sum(job=done, weekly={"plan_id": "p", "job_id": "job-1", "start_at": START})
-    assert (result["controller"], result["waiting"]) == ("weekly_plan", "until_weekly_window")
-    assert result["next"] == {"event": "weekly_window", "at": START}
-
-
-def test_weekly_plan_waits_for_its_window() -> None:
-    result = _sum(weekly={"plan_id": "p", "job_id": None, "start_at": START})
-    assert result["controller"] == "weekly_plan"
-    assert result["waiting"] == "until_weekly_window"
-    assert result["next"] == {"event": "weekly_window", "at": START}
-    # Without a coming window there is no event to announce.
-    result = _sum(weekly={"plan_id": "p", "job_id": None, "start_at": None})
-    assert result["next"] == {"event": "none", "at": None}
 
 
 @pytest.mark.parametrize(("status", "waiting", "event", "at"), [

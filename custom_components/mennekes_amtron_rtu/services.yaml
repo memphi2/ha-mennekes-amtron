@@ -120,13 +120,3 @@ start_boost:
 cancel_boost:
   fields:
     device_id: *wallbox
-activate_weekly_plan:
-  fields:
-    device_id: *wallbox
-    plan:
-      required: true
-      selector:
-        text:
-deactivate_weekly_plan:
-  fields:
-    device_id: *wallbox

@@ -7,6 +7,10 @@
   unformatted page for a moment.
 - A page appears once its texts are in your language, so the English
   fallback is not visible for a moment after a click.
+- Weekly plans are removed: the page, its API and its saved file. Recurring
+  departures come from a Home Assistant calendar instead.
+- Home Assistant can start and stop charging jobs, boost and guest charging
+  through the app's API.
 
 ## 0.9.0b3
 

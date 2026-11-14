@@ -253,7 +253,7 @@ the trip there as described above.
 - **Manual and PV commands act at once.** The plan sets its current again five
   minutes after its last change at the earliest, and only when it differs by
   at least 1 A.
-- **An order from the app has priority.** While a charging job, weekly plan or
+- **An order from the app has priority.** While a charging job or
   guest order holds the wallbox, the status is **An order from the app has
   priority** and the plan writes nothing.
 

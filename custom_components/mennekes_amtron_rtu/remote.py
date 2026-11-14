@@ -679,7 +679,7 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
         if isinstance(self._client, RemoteClient):
             self._client.on_auth_error = self._publish_auth_error
         self._pending_refresh: CALLBACK_TYPE | None = None
-        # Reads the app's charging jobs and weekly plans along with each poll.
+        # Reads the app's charging job along with each poll.
         self.refresh_orders: Callable[[], Awaitable[None]] | None = None
 
     def _follow_pending(self, until: datetime | None) -> None:

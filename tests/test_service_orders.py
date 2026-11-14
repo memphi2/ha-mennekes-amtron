@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -13,27 +14,49 @@ from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu import services
-from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
-from custom_components.mennekes_amtron_rtu.device.service_weekly_http import (
-    create_weekly_app,
+from custom_components.mennekes_amtron_rtu.device.charge_job_controller import (
+    ChargeJobController,
+    JobInputs,
 )
+from custom_components.mennekes_amtron_rtu.device.charge_job_store import ChargeJobStore
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device.service_job_http import create_job_app
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.sensor import async_setup_entry
 from custom_components.mennekes_amtron_rtu.service_orders import ServiceOrders
 from tests.ha_fakes import FakeConfigEntry, build_runtime, collect
 from tests.test_services import _patch_registry
-from tests.test_weekly_controller import NOW, Harness
 
 TOKEN = "orders-api-private-test-credential"  # noqa: S105 - fixture
+NOW = datetime(2026, 11, 16, 5, tzinfo=UTC)
+SCOPE = "b" * 64
+
+
+class Harness:
+    """The app's real job controller over a wallbox that only exists here."""
+
+    def __init__(self, path):
+        self.sample = JobInputs(NOW, True, True, SCOPE, 100.0, True, True, False, 8.0, 16.0)
+        self.calls = []
+        self.jobs = ChargeJobController(
+            ChargeJobStore(path / "charge-job.json", "fixture"), lambda: self.sample, self.apply,
+        )
+
+    def change(self, **changes):
+        self.sample = replace(self.sample, **changes)
+
+    async def apply(self, value, owner, deadline):
+        self.calls.append((value, owner, deadline))
+        self.change(current_a=1 if value is None else value)
 
 
 async def _with_app(tmp_path, body, *, app=None):
     """Run ``body`` with the orders of a real app behind a real HTTP client."""
     h = Harness(tmp_path)
-    await h.initialize()
-    service = SimpleNamespace(weekly=h.weekly, jobs=h.jobs, config=SimpleNamespace(token=TOKEN))
+    await h.jobs.initialize()
+    service = SimpleNamespace(jobs=h.jobs, config=SimpleNamespace(token=TOKEN))
     notified = []
-    async with TestServer(app or create_weekly_app(service)) as server, ClientSession() as session:
+    async with TestServer(app or create_job_app(service)) as server, ClientSession() as session:
         client = RemoteClient(session, str(server.make_url("/")), TOKEN)
         await body(h, ServiceOrders(client, lambda: notified.append(True)), notified)
 
@@ -104,35 +127,12 @@ def test_guest_charging_starts_now_for_a_limited_time(tmp_path):
     asyncio.run(_with_app(tmp_path, body))
 
 
-def test_a_weekly_plan_is_activated_by_its_name_and_deactivated(tmp_path):
-    async def body(h, orders, _notified):
-        await h.save()
-        with pytest.raises(ServiceValidationError) as error:
-            await orders.async_activate_weekly(plan="other car")
-        assert _key(error) == "weekly_plan_unknown"
-        assert error.value.translation_placeholders == {"plan": "other car"}
-        await orders.async_activate_weekly(plan=" Fixture ")
-        assert orders.weekly["active"]["vehicle_profile"] == "fixture"
-        assert orders.weekly["job"] is not None
-        with pytest.raises(HomeAssistantError) as error:
-            await orders.async_activate_weekly(plan="fixture")
-        assert _key(error) == "weekly_already_active"
-        await orders.async_deactivate_weekly()
-        assert orders.weekly["active"] is None
-        # Deactivating again changes nothing and is no failure.
-        await orders.async_deactivate_weekly()
-        assert orders.weekly["active"] is None
-
-    asyncio.run(_with_app(tmp_path, body))
-
-
 def test_an_app_without_orders_leaves_the_status_unknown_and_names_the_failure(tmp_path):
     async def body(_h, orders, _notified):
-        orders.jobs = orders.weekly = {"stale": True}
+        orders.jobs = {"stale": True}
         await orders.async_refresh()
         assert orders.jobs is None
-        assert orders.weekly is None
-        for call in (orders.async_stop_job(), orders.async_deactivate_weekly(),
+        for call in (orders.async_stop_job(), orders.async_cancel_boost(),
                      orders.async_start_guest(minutes=5, current=6, energy=1)):
             with pytest.raises(HomeAssistantError) as error:
                 await call
@@ -147,7 +147,6 @@ class _Orders:
     def __init__(self):
         self.calls = []
         self.jobs = None
-        self.weekly = None
 
     def __getattr__(self, name):
         async def call(**values):
@@ -186,11 +185,8 @@ def test_every_action_reaches_the_orders_of_an_app_connection(monkeypatch):
         assert orders.calls.pop() == ("async_start_guest", {"minutes": 90, "current": 8.0, "energy": 6.0})
         await act("start_boost", duration=30)
         assert orders.calls.pop() == ("async_start_boost", {"minutes": 30})
-        await act("activate_weekly_plan", plan="Family car")
-        assert orders.calls.pop() == ("async_activate_weekly", {"plan": "Family car"})
         for name, method in (("stop_charging_job", "async_stop_job"), ("clear_charging_job", "async_clear_job"),
-                             ("cancel_boost", "async_cancel_boost"),
-                             ("deactivate_weekly_plan", "async_deactivate_weekly")):
+                             ("cancel_boost", "async_cancel_boost")):
             await act(name)
             assert orders.calls.pop() == (method, {})
 
@@ -215,7 +211,6 @@ def test_every_action_reaches_the_orders_of_an_app_connection(monkeypatch):
     ("start_charging_job", {"current": 6, "energy": 1}),
     ("start_guest_charging", {"duration": 1441, "current": 6, "energy": 1}),
     ("start_boost", {"duration": 121}),
-    ("activate_weekly_plan", {"plan": ""}),
     ("stop_charging_job", {"force": True}),
 ])
 def test_actions_refuse_values_the_app_would_refuse(name, fields):
@@ -229,37 +224,32 @@ def test_actions_refuse_values_the_app_would_refuse(name, fields):
     asyncio.run(run())
 
 
-def test_the_order_sensors_exist_only_with_the_app_and_show_its_status():
+def test_the_job_sensor_exists_only_with_the_app_and_shows_its_status():
     async def run():
         hass, entry, _transport = await build_runtime()
         direct: dict[str, object] = {}
         await async_setup_entry(hass, entry, lambda entities: direct.update(collect(entities)))
-        assert not {"charging_job", "weekly_plan"} & set(direct)
+        assert "charging_job" not in direct
 
         orders = entry.runtime_data.orders = _Orders()
         added: dict[str, object] = {}
         await async_setup_entry(hass, entry, lambda entities: added.update(collect(entities)))
-        job, weekly = added["charging_job"], added["weekly_plan"]
+        job = added["charging_job"]
         # Before the first status, or with an app that has no orders.
         assert not job.available
-        assert not weekly.available
         assert job.native_value is None
         assert job.extra_state_attributes is None
 
         orders.jobs = {"job": None, "boost_available": False}
-        orders.weekly = {"active": None, "plans": [{"plan": {"vehicle_profile": "Family car"}}, "damaged"]}
         assert job.available
         assert job.native_value == "none"
         assert job.extra_state_attributes == {"boost_available": False}
-        assert weekly.native_value == "inactive"
-        assert weekly.extra_state_attributes == {"plans": ["Family car"]}
 
         orders.jobs = {"boost_available": True, "job": {
             "state": "scheduled", "reason": "scheduled", "kind": "guest",
             "start_at": "2026-11-16T06:00:00+00:00", "finish_at": "not a time",
             "current_a": 10.0, "energy_kwh": 7.5, "delivered_kwh": 0.0, "boost_until": None,
         }}
-        orders.weekly = {"plans": None, "active": {"vehicle_profile": "Family car", "until": "2026-11-23T05:00:00+00:00"}}
         assert job.native_value == "scheduled"
         attributes = job.extra_state_attributes
         assert attributes["start"].isoformat() == "2026-11-16T06:00:00+00:00"
@@ -267,9 +257,6 @@ def test_the_order_sensors_exist_only_with_the_app_and_show_its_status():
             "boost_available": True, "kind": "guest", "start": None, "current": 10.0,
             "energy": 7.5, "delivered": 0.0, "reason": "scheduled",
         }
-        assert weekly.native_value == "active"
-        assert weekly.extra_state_attributes["plan"] == "Family car"
-        assert weekly.extra_state_attributes["until"].year == 2026
         # A state this version does not know is no state.
         orders.jobs = {"job": {"state": "invented"}}
         assert job.native_value is None

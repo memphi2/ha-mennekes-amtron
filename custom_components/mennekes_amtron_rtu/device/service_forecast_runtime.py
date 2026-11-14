@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .charge_job import ChargeJob
+from .charge_job_controller import ChargeJobController
 from .charge_rate import ChargeRateLearner, RateHistory, charging_forecast, context
 from .charge_rate_store import RateStore
 from .client import MennekesModbusClient
@@ -18,14 +19,13 @@ from .control import AmtronControl
 from .enums import EvseState, GridPhasesConnected, SwitchedPhases
 from .persistence import finish_goal_save
 from .service_config import ServerConfig
-from .service_weekly_runtime import WeeklyModbusService
-from .weekly_jobs import WeeklyChargeJobs
+from .service_job_runtime import JobModbusService
 
 _LOGGER = logging.getLogger(__name__)
 _SAVE_INTERVAL = 600.0
 
 
-class ForecastJobs(WeeklyChargeJobs):
+class ForecastJobs(ChargeJobController):
     """Attach advisory presentation without changing the existing command owner."""
 
     forecast: Callable[[ChargeJob | None], dict[str, Any]] | None = None
@@ -35,7 +35,7 @@ class ForecastJobs(WeeklyChargeJobs):
         return {**ordinary, **({"forecast": self.forecast(self.job)} if self.forecast is not None else {})}
 
 
-class ForecastModbusService(WeeklyModbusService):
+class ForecastModbusService(JobModbusService):
     """Optional telemetry cannot grant commands or become a second bus owner."""
 
     jobs: ForecastJobs | None = None
@@ -77,12 +77,8 @@ class ForecastModbusService(WeeklyModbusService):
     def _rate_profile(self, job: ChargeJob | None, scope: str | None) -> str | None:
         if job is None or job.kind == "guest" or job.scope_ended or job.binding != scope:
             return None
-        consent = self.weekly.consent if self.weekly is not None else None
         source = self.control.soc_goal.source if self.control is not None else None
-        reference = (
-            f"weekly:{consent.profile}" if consent is not None and consent.job_id == job.identifier
-            else f"source:{source}" if isinstance(source, str) and source else None
-        )
+        reference = f"source:{source}" if isinstance(source, str) and source else None
         return hashlib.sha256(reference.encode()).hexdigest() if reference is not None else None
 
     def _rate_phases(self) -> int:

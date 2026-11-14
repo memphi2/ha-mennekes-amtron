@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Wallbox nicht erreichbar",
           "guest_order": "Gastauftrag",
-          "weekly_plan": "Wochenplan",
           "charging_job": "Ladeauftrag",
           "departure_plan": "Abfahrtsplanung",
           "direct": "Direkte Steuerung"
@@ -541,7 +540,6 @@
           "meter_unavailable": "Wartet auf den Energiezähler",
           "job_suspended": "Auftrag wartet auf den Nachweis desselben Steckvorgangs",
           "job_ended": "Auftrag beendet, pausiert bis zum Abstecken",
-          "until_weekly_window": "Wartet auf das Fenster des Wochenplans",
           "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
           "until_planned_start": "Pausiert bis zum geplanten Start",
           "estimated_target_reached": "Bis zum errechneten Ziel geladen",
@@ -562,7 +560,6 @@
           "queued_command": "Vorgemerkte Änderung wird ausgeführt",
           "job_start": "Auftrag startet",
           "job_end": "Auftrag endet",
-          "weekly_window": "Fenster des Wochenplans öffnet",
           "plan_start": "Geplantes Laden startet",
           "target_reached": "Ziel voraussichtlich erreicht",
           "departure": "Abfahrt"
@@ -585,13 +582,6 @@
           "finished": "Zeitfenster beendet",
           "stopped": "Vom Benutzer gestoppt",
           "interrupted": "Unterbrochen; kein automatischer Neustart"
-        }
-      },
-      "weekly_plan": {
-        "name": "Wochenplan",
-        "state": {
-          "inactive": "Nicht aktiv",
-          "active": "Aktiv"
         }
       }
     },
@@ -938,9 +928,6 @@
     "invalid_job_request": {
       "message": "Die App hat diese Werte nicht angenommen. Zeit, Strom und Energie prüfen."
     },
-    "invalid_weekly_request": {
-      "message": "Die App hat diese Werte nicht angenommen. Zeit, Strom und Energie prüfen."
-    },
     "job_boost_unavailable": {
       "message": "Boost erfordert einen aktiven Auftrag vor dessen geplantem Start und eine aktuelle Freigabe."
     },
@@ -971,50 +958,11 @@
     "job_storage_unavailable": {
       "message": "Speicher nicht verfügbar; kein automatischer Start."
     },
-    "weekly_already_active": {
-      "message": "Für diesen Steckvorgang ist bereits ein Wochenplan aktiv. Zuerst diesen stoppen."
-    },
-    "weekly_changed": {
-      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
-    },
-    "weekly_confirmation_expired": {
-      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
-    },
-    "weekly_inactive": {
-      "message": "Kein Wochenplan aktiv."
-    },
-    "weekly_invalid_confirmation": {
-      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
-    },
-    "weekly_manual_stop": {
-      "message": "Zwischenzeitlich von Hand gestoppt; Plan erneut aktivieren."
-    },
-    "weekly_no_occurrence": {
-      "message": "Keine unverbrauchte gültige Abfahrt innerhalb von sieben Tagen."
-    },
-    "weekly_service_starting": {
-      "message": "Der Service startet noch. Gleich noch einmal versuchen."
-    },
-    "weekly_stop_unconfirmed": {
-      "message": "Der Stopp des Wochenplans ist noch nicht bestätigt. Gleich noch einmal versuchen."
-    },
-    "weekly_storage_unavailable": {
-      "message": "Wochenplan-Speicher nicht verfügbar oder unbestätigt. Vor Aktivierung neu starten und Speicher prüfen."
-    },
-    "weekly_successor_not_permitted": {
-      "message": "Der nächste Termin kann jetzt nicht starten. Anschluss, Zähler und Freigabe prüfen."
-    },
-    "weekly_vehicle_not_confirmed": {
-      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
-    },
     "service_order_failed": {
       "message": "Die App hat das nicht ausgeführt. Prüfe, ob sie erreichbar und aktuell ist und ob Zeiten und Werte gültig sind."
     },
     "app_required": {
       "message": "Diese Aktion braucht die Modbus-App; diese Wallbox ist direkt verbunden."
-    },
-    "weekly_plan_unknown": {
-      "message": "Die App kennt keinen Wochenplan „{plan}“."
     },
     "wallbox_target_required": {
       "message": "Es sind mehrere Wallboxen eingerichtet; gib die Wallbox an, für die das gilt."
@@ -1774,30 +1722,6 @@
     "cancel_boost": {
       "name": "Boost beenden",
       "description": "Beendet das vorzeitige Laden; der Ladeauftrag läuft wie geplant weiter.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
-        }
-      }
-    },
-    "activate_weekly_plan": {
-      "name": "Wochenplan aktivieren",
-      "description": "Aktiviert einen Wochenplan der App für das angesteckte Auto, für bis zu sieben Tage oder bis es abgezogen wird. Pläne werden in der App angelegt.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
-        },
-        "plan": {
-          "name": "Plan",
-          "description": "Der Fahrzeugname des Plans, wie in der App angezeigt."
-        }
-      }
-    },
-    "deactivate_weekly_plan": {
-      "name": "Wochenplan deaktivieren",
-      "description": "Beendet den aktiven Wochenplan und stoppt dessen Ladeauftrag.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

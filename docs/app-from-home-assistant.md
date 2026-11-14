@@ -1,33 +1,29 @@
 # Use the app from Home Assistant
 
-With the [Modbus service app](modbus-service.md), charging jobs, boost, guest
-charging and weekly plans can be started and stopped from Home Assistant:
+With the [Modbus service app](modbus-service.md), charging jobs, boost and guest
+charging can be started and stopped from Home Assistant:
 from a dashboard with one tap, or from an automation. The app's
 [web pages](app-guide.md) keep working beside it and show the same state.
 
 Departure planning needs nothing from this page; it already lives in Home
-Assistant, see [Departure planning](departure-planning.md).
+Assistant, see [Departure planning](departure-planning.md). For recurring
+departures, put them in a calendar and let the
+[calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) set the next departure.
 
 ## What you get
 
 | In Home Assistant | What it does |
 |---|---|
 | `sensor.*_charging_job` | State of the app's charging job or guest charge, or **No job**. Attributes: `kind`, `start`, `finish`, `current`, `energy`, `delivered`, `reserve`, `reason`, `boost_until`, `boost_available`. |
-| `sensor.*_weekly_plan` | **Active** or **Not active**. Attributes: `plan` and `until` while active, and `plans` with the names of the plans saved in the app. |
 | Action `start_charging_job` | Charge in a time window with a fixed current up to an amount of energy. |
 | Action `start_guest_charging` | Charge a guest's car from now on, limited in time and energy. |
 | Action `stop_charging_job` | Stop the running job or guest charge. Charging pauses and does not resume by itself. |
 | Action `clear_charging_job` | Remove an ended or stopped job so that a new one can start. |
 | Action `start_boost` / `cancel_boost` | Charge right away although the job starts later, then return to the plan. |
-| Action `activate_weekly_plan` / `deactivate_weekly_plan` | Switch a weekly plan of the app on for the plugged-in car, or off. |
 
-All actions are named `mennekes_amtron_rtu.<action>`. Both sensors exist only
+All actions are named `mennekes_amtron_rtu.<action>`. The sensor exists only
 with the app; with a direct USB or LAN connection the actions answer that they
 need the app.
-
-Weekly plans themselves — weekdays, departure time, current and energy — are
-created and changed on the app's **Weekly plans** page. Home Assistant
-activates a saved plan by its vehicle name.
 
 ## Action fields
 
@@ -44,7 +40,6 @@ out; with several, name the wallbox.
 | `start_guest_charging` | `duration` | Minutes from now, up to 1440. Required. |
 | | `current`, `energy` | As above. Required. |
 | `start_boost` | `duration` | Minutes to charge early, up to 120. Required. |
-| `activate_weekly_plan` | `plan` | The plan's vehicle name as the app shows it. Required. |
 
 A time without a time zone is taken as local time.
 
@@ -187,39 +182,6 @@ cards:
             text: Charge the guest's car for up to 6 hours and 30 kWh?
 
   - type: custom:mushroom-title-card
-    subtitle: Weekly plan
-  - type: custom:mushroom-template-card
-    entity: sensor.amtron_weekly_plan
-    icon: mdi:calendar-week
-    icon_color: "{{ 'green' if is_state('sensor.amtron_weekly_plan', 'active') else 'grey' }}"
-    primary: "{{ state_translated('sensor.amtron_weekly_plan') }}"
-    secondary: >-
-      {{ state_attr('sensor.amtron_weekly_plan', 'plan')
-         or (state_attr('sensor.amtron_weekly_plan', 'plans') or []) | join(', ') }}
-    tap_action:
-      action: more-info
-  - type: custom:mushroom-chips-card
-    chips:
-      - type: template
-        icon: mdi:calendar-check
-        content: Activate
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.activate_weekly_plan
-          data:
-            plan: Family car
-          confirmation:
-            text: Activate the weekly plan for the plugged-in car?
-      - type: template
-        icon: mdi:calendar-remove
-        content: Deactivate
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.deactivate_weekly_plan
-          confirmation:
-            text: Deactivate the weekly plan and stop its charging job?
-
-  - type: custom:mushroom-title-card
     subtitle: Departure
   - type: entities
     entities:
@@ -228,8 +190,7 @@ cards:
       - entity: button.amtron_clear_departure_time
 ```
 
-Replace `Family car` with the vehicle name of your weekly plan, and change the
-guest presets to what suits you. The departure card needs
+Change the guest presets to what suits you. The departure card needs
 [departure planning](departure-planning.md); leave it out otherwise.
 
 ### Helpers and script for the Start button

@@ -58,7 +58,7 @@ class MennekesAmtronRuntimeData:
     vehicle_profile_id: str | None = None
     vehicle_switching: bool = False
     heartbeat: HeartbeatTask | None = None
-    # Charging jobs and weekly plans of the app; None with a direct connection.
+    # Charging jobs of the app; None with a direct connection.
     orders: ServiceOrders | None = None
     recovery: HeartbeatRecovery | None = None
     goal: EnergyGoalController | None = None

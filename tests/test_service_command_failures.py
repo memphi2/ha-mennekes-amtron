@@ -66,7 +66,8 @@ def test_rejected_command_immediately_invalidates_cached_availability(tmp_path, 
                 assert runtime.coordinator.last_update_success
                 assert hass.states.get(POWER).state != "unavailable"
                 assert (hass.states.get(NUMBER).state == "unavailable") is (reason == "read_only")
-                assert requests == [("POST", "/v2/command"), ("GET", "/v2/state")]
+                # The app's charging job is read along with its state.
+                assert requests == [("POST", "/v2/command"), ("GET", "/v2/state"), ("GET", "/v2/jobs")]
                 assert not current_writes(bus)
                 if reason == "read_only":
                     service.config = replace(service.config, read_only=False)
