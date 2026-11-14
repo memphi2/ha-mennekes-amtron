@@ -213,6 +213,10 @@
     for (const [id,key] of [["start","start_at"],["finish","finish_at"],["current","current_a"],["energy","energy_kwh"],["reserve","reserve_kwh"]]) {
       const value=el(`job_${id}`).value;
       if (key.endsWith("_at")) {
+        // datetime-local hides seconds and the UTC offset. Keep an unchanged
+        // instant, especially the second occurrence of an autumn clock hour.
+        const saved=state.draft?.values?.[key] ?? null;
+        if (value===(saved ? local(new Date(saved)) : "")) {changes[key]=saved;continue;}
         const parsed=value ? new Date(value) : null;
         if (parsed && !Number.isFinite(parsed.getTime())) {notice(t("invalid_job_request"));return false;}
         changes[key]=parsed ? parsed.toISOString() : null;

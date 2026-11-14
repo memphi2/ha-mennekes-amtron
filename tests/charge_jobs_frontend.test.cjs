@@ -162,3 +162,29 @@ test("invalid draft edits never multiply the polling timers",async()=>{
  assert.equal(h.calls.filter(c=>c.options.method).length,0);
  assert.equal(h.timers.size,1);
 });
+
+test("saving other draft fields preserves exact HA timestamps, including the repeated autumn hour",async()=>{
+ const oldZone=process.env.TZ;process.env.TZ="Europe/Berlin";
+ try {
+  const h=harness();await flush();
+  const start="2027-10-31T01:30:45.123+00:00",finish="2027-10-31T04:30:25.456+00:00";
+  h.setState({draft:{revision:"ha-draft",storage_error:false,values:{start_at:start,finish_at:finish,current_a:8,energy_kwh:10,reserve_kwh:0}}});
+  for(const callback of [...h.timers.values()])callback();await flush();
+  h.el("job_energy").value="15";h.el("job_form").events.input();
+  await h.click("job_save_draft");
+  const changes=JSON.parse(h.calls.find(c=>c.options.method==="POST").options.body).changes;
+  assert.equal(changes.start_at,start);assert.equal(changes.finish_at,finish);
+  assert.equal(changes.energy_kwh,15);
+ } finally {if(oldZone===undefined)delete process.env.TZ;else process.env.TZ=oldZone;}
+});
+
+test("editing or clearing a draft time still updates that field",async()=>{
+ const h=harness();await flush();
+ h.el("job_finish").value="2027-01-14T08:30";h.el("job_form").events.input();
+ await h.click("job_save_draft");
+ let posts=h.calls.filter(c=>c.options.method==="POST");
+ assert.equal(JSON.parse(posts.at(-1).options.body).changes.finish_at,new Date("2027-01-14T08:30").toISOString());
+ h.el("job_finish").value="";h.el("job_form").events.input();await h.click("job_save_draft");
+ posts=h.calls.filter(c=>c.options.method==="POST");
+ assert.equal(JSON.parse(posts.at(-1).options.body).changes.finish_at,null);
+});
