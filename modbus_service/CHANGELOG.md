@@ -1,5 +1,14 @@
 # Changes
 
+## 0.9.0
+
+- Promote the tested 0.9.0b8 service to stable without changing charging
+  behavior. Offer the stable app in both stable and beta app catalogs.
+- Use one charging page for shared kWh/time limits and an explicit guest-start
+  button. Resume proven same-plug guest permission and accepted departure plans
+  across HA Core restarts.
+- Old beta control state is not migrated; acknowledge a safe reset if requested.
+
 ## 0.9.0b8
 
 - Replace guest orders with ordinary controls and shared limits.

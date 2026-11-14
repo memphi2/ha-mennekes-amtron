@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.9.0 — 2026-11-14
+
+Stable release of the 0.9 charging and app changes since 0.8.2. No control
+behavior changes were made after 0.9.0b8; the integration and app are promoted
+together.
+
+- Simplify charging to shared kWh and target-time limits, an optional vehicle
+  percentage target and one explicit guest-start action. The first reached
+  guest limit stops charging; there are no saved guest orders or drafts.
+- Keep intelligent departure planning in HA and let the service execute an
+  accepted plan through an HA Core restart. Learn from actual metered vehicle
+  power without adding Modbus reads.
+- Add the app overview, decoded diagnostics and wallbox event entity. Reduce
+  Recorder load by folding detailed readings into attributes and bounding
+  event history.
+- Rebuild installation and everyday-use guides, app instructions and five
+  Mushroom dashboard examples.
+- **Breaking since 0.8.2:** remove old charging-job, boost, reserve and guest
+  APIs/entities, and fold selected sensor values into attributes. Update
+  automations and dashboards. Earlier beta data is not migrated; an
+  incompatible saved app state needs a safe-reset acknowledgement.
+- Requires service **0.9.0 or newer**, API 2. Update the app first, then the
+  integration; recheck pause, charging release, Plug & Charge, limits and
+  vehicle planning before use.
+
 ## 0.9.0b8 — 2026-11-14
 
 - Simplify charging in HA and the app: shared kWh and time limits, an optional
