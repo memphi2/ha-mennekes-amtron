@@ -30,7 +30,6 @@ from .device.client_errors import AmtronBusError
 from .device.errors import DeviceError
 from .device.soc_goal import SocGoal
 from .exceptions import service_validation_error
-from .vehicle_profiles import LEGACY_PROFILE_ID
 from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
@@ -190,7 +189,7 @@ class VehicleSocObserver:
         # A profile keeps its target even if its source description changes,
         # for example once a vehicle's identity resolves after a restart.
         self._memory_key = self.source
-        if self.source is not None and profile_id and profile_id != LEGACY_PROFILE_ID:
+        if self.source is not None and profile_id:
             self.source = f"profile:{profile_id}:{self.source}"
             self._memory_key = f"profile:{profile_id}"
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -205,6 +204,7 @@ class VehicleSocObserver:
         self._command_lock = asyncio.Lock()
         self._configured = False
         self._stopping = False
+        self._target_choice_generation = 0
         self._failure_logged = False
         self._was_available = coordinator.last_update_success
 
@@ -345,7 +345,7 @@ class VehicleSocObserver:
             return
         stopped = goal.stop_requested
         try:
-            await self.async_set_target(goal.target_percent)
+            await self.async_set_target(goal.target_percent, automatic=True)
             resume = getattr(self._control, "async_resume_charging", None)
             if stopped and resume is not None and getattr(self._control, "pause_requested", None) is True:
                 await resume()
@@ -370,7 +370,7 @@ class VehicleSocObserver:
             if remembered and not self._stopping and goal.status == "disabled":
                 maximum = self.maximum or goal.maximum_percent
                 try:
-                    await self.async_set_target(min(remembered, maximum) if maximum else remembered)
+                    await self.async_set_target(min(remembered, maximum) if maximum else remembered, automatic=True)
                 except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
                     _LOGGER.debug("Remembered vehicle charge target not restored: %s", err)
         finally:
@@ -498,13 +498,23 @@ class VehicleSocObserver:
             self._task = None
             self._remember_target()
 
-    async def async_set_target(self, value: float) -> None:
+    @property
+    def target_choice_generation(self) -> int:
+        return self._target_choice_generation
+
+    async def async_set_target(
+        self, value: float, *, automatic: bool = False, expected_choice: int | None = None,
+    ) -> None:
         """Use the current sources atomically when the user chooses a target."""
+        if not automatic:
+            self._target_choice_generation = self.target_choice_generation + 1
         if self._stopping or self.source is None:
             raise service_validation_error("soc_goal_unavailable")
         if self._task is not None:
             await asyncio.shield(self._task)
         async with self._command_lock:
+            if self._stopping or (expected_choice is not None and expected_choice != self.target_choice_generation):
+                raise service_validation_error("soc_goal_unavailable")
             if self._resolution_pending():
                 transaction = self._transaction_control()
                 if transaction is None or not transaction.soc_goal_resolution_fenced:

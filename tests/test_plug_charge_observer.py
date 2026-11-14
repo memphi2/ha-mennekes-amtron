@@ -360,9 +360,10 @@ def test_policy_tracks_permissions_and_identity_without_binding_cosmetic_or_sele
         if key == "provider":
             changed["vehicle_profiles"][A]["device_id"] = "car"
         assert m.plug_charge_policy(changed) != original
-    # A stored former per-profile permission no longer changes the policy.
+    # An obsolete profile format invalidates the catalog and its grants.
     modified["vehicle_profiles"][A]["options"]["vehicle_plug_charge"] = True
-    assert m.plug_charge_policy(modified) == original
+    assert m.plug_charge_policy(modified) == m.plug_charge_policy({})
+    assert m.plug_charge_policy(modified) != original
 
 
 def arm_plan(h, status):
@@ -498,7 +499,7 @@ def test_each_recognized_connection_starts_at_the_car_limit(tmp_path, monkeypatc
         async with observer_harness(tmp_path, monkeypatch) as h:
             observer = vehicle_limit(h, 80)
             await report(h)
-            observer.async_set_target.assert_awaited_once_with(80)
+            observer.async_set_target.assert_awaited_once_with(80, automatic=True, expected_choice=0)
             h.coordinator.async_update_listeners()
             await h.hass.async_block_till_done()
             observer.async_set_target.assert_awaited_once()
@@ -615,4 +616,37 @@ def test_a_manual_release_that_never_opened_the_gate_leaves_the_grant_to_the_car
             h.coordinator.values["charging_release"] = 0
             await report(h)
             assert h.observer.status == "waiting_release"
+    asyncio.run(run())
+
+
+def test_late_vehicle_limit_is_adopted_after_grant(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            observer = vehicle_limit(h, None)
+            await report(h)
+            h.control.plug_charge["authorized"] = True
+            observer.maximum = 80
+            h.coordinator.async_update_listeners()
+            await h.hass.async_block_till_done()
+            observer.async_set_target.assert_awaited_once_with(80, automatic=True, expected_choice=0)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("manual", [False, True])
+def test_failed_target_adoption_retries_unless_user_chose_a_target(tmp_path, monkeypatch, manual):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            observer = vehicle_limit(h, 80)
+            observer.async_set_target.side_effect = DeviceValidationError("soc_goal_unavailable")
+            await report(h)
+            observer.async_set_target.side_effect = None
+            h.coordinator.async_update_listeners()
+            await h.hass.async_block_till_done()
+            assert observer.async_set_target.await_count == 1
+            h.observer._target_retry_at = 0
+            if manual:
+                observer.target_choice_generation = 1
+            h.coordinator.async_update_listeners()
+            await h.hass.async_block_till_done()
+            assert observer.async_set_target.await_count == (1 if manual else 2)
     asyncio.run(run())

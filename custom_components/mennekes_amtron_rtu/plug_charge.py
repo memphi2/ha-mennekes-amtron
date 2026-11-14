@@ -83,6 +83,8 @@ class PlugChargeObserver:
         self._task: asyncio.Task[None] | None = None
         self._target_task: asyncio.Task[None] | None = None
         self._target_session: str | None = None
+        self._target_watch: tuple[str, object, int] | None = None
+        self._target_retry_at = 0.0
         self._unsubs: list[CALLBACK_TYPE] = []
         self._evidence_unsubscribe: CALLBACK_TYPE | None = None
         self._stopped = False
@@ -228,6 +230,8 @@ class PlugChargeObserver:
         # Once accepted, stale cloud data cannot interrupt this physical cycle.
         # A policy change or lost physical connection is revoked by the owner.
         if gate.get("authorized"):
+            if self._target_watch is not None and self._target_watch[0] == session:
+                self._adopt_vehicle_target(session)
             self._last_grant_error = None
             self._set_status("authorized")
             return None
@@ -326,19 +330,35 @@ class PlugChargeObserver:
         """
         if session != self._fresh_session or session == self._target_session:
             return
-        self._target_session = session
         observer = self._entry.runtime_data.vehicle_soc
-        if observer is None or self._control.read_only or not self._control.supports_soc_goal:
+        if observer is None:
+            return
+        revision = getattr(observer, "target_choice_generation", 0)
+        if self._target_watch is None or self._target_watch[0] != session:
+            self._target_watch = (session, observer, revision)
+            self._target_retry_at = 0.0
+        elif self._target_watch != (session, observer, revision):
+            self._target_session = session
+            return
+        if self._control.read_only or not self._control.supports_soc_goal:
+            return
+        if (self._target_task is not None and not self._target_task.done()) or time.monotonic() < self._target_retry_at:
             return
         limit, goal = observer.maximum, self._control.soc_goal
-        if limit is None or (limit == goal.target_percent and goal.status != "reached"):
+        if limit is None:
+            return
+        if limit == goal.target_percent and goal.status != "reached":
+            self._target_session = session
             return
 
         async def adopt() -> None:
             try:
-                await observer.async_set_target(limit)
-            except (HomeAssistantError, DeviceError, OSError) as err:
-                _LOGGER.debug("Vehicle charge limit not adopted: %s", err)
+                await observer.async_set_target(limit, automatic=True, expected_choice=revision)
+            except (HomeAssistantError, DeviceError, OSError):
+                self._target_retry_at = time.monotonic() + 5
+                _LOGGER.debug("Vehicle charge limit adoption deferred")
+            else:
+                self._target_session = session
 
         self._target_task = self._hass.async_create_task(adopt())
 
