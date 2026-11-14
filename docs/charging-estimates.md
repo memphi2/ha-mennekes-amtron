@@ -17,7 +17,11 @@ A completed charge here means **one connection cycle, ending when you unplug**.
 Pauses remain part of that cycle. Observe the wallbox while unplugged before
 starting the first charge. Starting observation halfway through charging,
 missing connection transitions or an unreliable counter cannot produce a
-complete estimate. The last result becomes unknown when the newest completed
+complete estimate. Short gaps keep the cycle: a failed poll, an adapter
+reconnect, or plug and wallbox state changing in separate polls while you plug
+in or unplug. Vehicle presence unknown for more than two minutes still makes
+the cycle incomplete. The final meter reading may follow a little after the
+unplug; the result appears then. The last result becomes unknown when the newest completed
 cycle cannot be matched; a previous result is not passed off as the new one.
 
 [Charging losses](#charging-losses-choose-the-available-data) · [Fixed or dynamic price](#charging-costs-fixed-or-dynamic-price) · [German network tariffs](#optional-14a-enwg-network-tariffs) · [Restarts](#storage-and-restarts)

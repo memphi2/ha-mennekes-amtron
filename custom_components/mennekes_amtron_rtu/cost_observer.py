@@ -239,14 +239,14 @@ class ChargingCostObserver:
             return
         now = time.time()
         if data is None:
-            self._accumulator.observe_energy(now, None)
-            self._anchored = False
+            # One failed poll is no meter evidence: the next reading spans the
+            # gap, and a gap longer than max_gap still marks the cost partial.
             return
         self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
         present = snapshot_vehicle_connected(data.get, self._entry.runtime_data.identity.layout_version)
-        if present is None:
-            self._anchored = False
-        elif present:
+        # Plug transitions report CP and EVSE in different polls. Keep the
+        # anchor: the final energy must still equal the measured session.
+        if present:
             self._active = True
         at = (data.energy_observed_at or 0.0) if self._remote else now
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at

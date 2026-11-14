@@ -88,8 +88,11 @@ def test_cached_meter_progress_does_not_change_storage_or_prove_a_final_value():
     history.observe(reading(CONNECTED, 110, fresh=False), now=80)
     history.observe(reading(CHARGING, 110, fresh=False), now=90)
     assert history.snapshot() == saved
-    assert history.observe(reading(IDLE, 110, fresh=False), now=100)
-    assert history.latest is None
+    assert not history.observe(reading(IDLE, 110, fresh=False), now=100)
+    assert history.snapshot() == saved  # The final meter must be read, not cached.
+    assert history.observe(reading(IDLE, 113), now=160)
+    assert history.latest.wallbox_kwh == 3
+    assert history.latest.disconnected_at == 100
 
 
 def test_failed_final_meter_cannot_reuse_the_previous_sessions_start_as_a_new_anchor():
@@ -103,11 +106,20 @@ def test_failed_final_meter_cannot_reuse_the_previous_sessions_start_as_a_new_an
     assert complete(history, offset=50, baseline=120).latest.wallbox_kwh == 10
 
 
+@pytest.mark.parametrize("interrupt", [None, WallboxData(values={"evse_state": IDLE})])
+def test_one_failed_poll_or_unknown_state_keeps_the_cycle(interrupt):
+    history = complete()
+    history.observe(reading(CONNECTED, 110), now=70)
+    history.observe(reading(CHARGING, 112), now=80)
+    assert not history.observe(interrupt, now=90)
+    history.observe(reading(CHARGING, 118), now=100)
+    assert history.observe(reading(IDLE, 120), now=110)
+    assert history.latest.wallbox_kwh == 10
+
+
 @pytest.mark.parametrize("interrupt", [
-    None,
     reading(EvseState.NOT_INITIALIZED),
     reading(IDLE, cp=CpState.C2),
-    WallboxData(values={"evse_state": IDLE}),
     reading(CHARGING, -1),
     reading(CHARGING, float("nan")),
     reading(CHARGING, True),
@@ -173,7 +185,7 @@ def test_energy_increase_during_idle_poll_outage_does_not_keep_an_older_latest_c
     assert history.latest is None
 
 
-@pytest.mark.parametrize("final", [reading(IDLE, None), reading(IDLE, 0), reading(IDLE, 110, fresh=False)])
+@pytest.mark.parametrize("final", [reading(IDLE, None), reading(IDLE, 0)])
 def test_failed_reset_or_cached_final_meter_does_not_reuse_last_good_sample(final):
     history = complete()
     history.observe(reading(CHARGING, 115), now=70)
@@ -253,3 +265,52 @@ def test_same_instant_positive_energy_is_not_a_completed_charge():
     }
     with pytest.raises(ValueError, match="duration"):
         CompletedSession.parse(raw)
+
+
+def _real_poll_cycle(history, *, cp_first_on_unplug):
+    """Real polls: the meter is fresh only on an EVSE change or a slow read."""
+    b1, a1 = CpState.B1, CpState.A1
+    history.observe(reading(IDLE, 100), now=0)
+    history.observe(reading(IDLE, 100, fresh=False, cp=b1), now=5)  # CP leads the EVSE
+    history.observe(reading(CONNECTED, 100), now=10)
+    history.observe(reading(CHARGING, 100), now=15)
+    history.observe(reading(CHARGING, 101, fresh=False), now=20)
+    history.observe(reading(CHARGING, 108), now=75)
+    history.observe(reading(READY, 110), now=200)
+    if cp_first_on_unplug:
+        history.observe(reading(READY, 110, fresh=False, cp=a1), now=205)
+        return history.observe(reading(IDLE, 110), now=210)
+    history.observe(reading(IDLE, 110, cp=b1), now=205)  # EVSE leads the CP
+    history.observe(reading(IDLE, 110, fresh=False), now=210)
+    return history.observe(reading(IDLE, 110), now=270)
+
+
+@pytest.mark.parametrize("cp_first_on_unplug", [True, False])
+def test_transitional_plug_states_and_a_later_final_meter_still_complete(cp_first_on_unplug):
+    history = SessionHistory()
+    assert _real_poll_cycle(history, cp_first_on_unplug=cp_first_on_unplug)
+    session = history.latest
+    assert session is not None
+    assert session.wallbox_kwh == 10
+    assert session.disconnected_at == 210
+
+
+def test_unknown_presence_longer_than_two_minutes_still_invalidates():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=0)
+    history.observe(reading(CHARGING, 101), now=10)
+    for now in range(20, 180, 20):
+        history.observe(reading(EvseState.NOT_INITIALIZED, 105), now=now)
+    history.observe(reading(CHARGING, 106), now=160)
+    history.observe(reading(IDLE, 110), now=170)
+    assert history.latest is None
+
+
+def test_replug_before_a_final_meter_never_merges_two_connections():
+    history = complete()
+    history.observe(reading(CONNECTED, 110), now=70)
+    history.observe(reading(CHARGING, 115), now=80)
+    history.observe(reading(IDLE, 115, fresh=False), now=90)
+    history.observe(reading(CHARGING, 117), now=100)
+    history.observe(reading(IDLE, 120), now=110)
+    assert history.latest is None

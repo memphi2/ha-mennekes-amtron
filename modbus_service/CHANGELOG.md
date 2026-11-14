@@ -6,6 +6,8 @@
 - Use one charging page for shared kWh/time limits and an explicit guest-start
   button. Resume proven same-plug guest permission and accepted departure plans
   across HA Core restarts.
+- Completed charges for loss and cost estimates survive a failed poll and
+  the plug-in and unplug transitions.
 - A refused guest start or limit change names what to do, e.g. plug in the
   car or raise the reached limit, instead of an unconfirmed save.
 - Old beta control state is not migrated; acknowledge a safe reset if requested.

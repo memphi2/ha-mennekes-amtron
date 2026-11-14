@@ -118,7 +118,7 @@ def test_disabled_or_unsupported_session_capture_never_touches_storage(tmp_path,
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("interruption", ["poll_failure", "startup", "meter_failure", "invalid_cp"])
+@pytest.mark.parametrize("interruption", ["startup", "meter_failure"])
 def test_incomplete_direct_session_is_never_reported_as_complete(tmp_path, interruption):
     async def run():
         observer, clock = observer_at(tmp_path)
@@ -126,16 +126,31 @@ def test_incomplete_direct_session_is_never_reported_as_complete(tmp_path, inter
         if interruption != "startup":
             await observe(observer, clock, 1000)
         await observe(observer, clock, 1010, EvseState.CHARGING, 101)
-        if interruption == "poll_failure":
-            await observer.async_observe(None)
-        elif interruption == "meter_failure":
+        if interruption == "meter_failure":
             await observe(observer, clock, 1020, EvseState.CHARGING, None)
-        elif interruption == "invalid_cp":
-            await observe(observer, clock, 1020, EvseState.CHARGING, 105, cp=CpState.A1)
         data = await observe(observer, clock, 1030, total=110)
         assert data.session_summary_supported
         assert data.charging_session is None
         assert not await asyncio.to_thread(observer._store.path.exists)
+        await observer.async_close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("interruption", ["poll_failure", "unplug_transition"])
+def test_one_failed_poll_or_plug_transition_keeps_the_direct_session(tmp_path, interruption):
+    async def run():
+        observer, clock = observer_at(tmp_path)
+        await observer.async_setup()
+        await observe(observer, clock, 1000)
+        await observe(observer, clock, 1010, EvseState.CHARGING, 101)
+        if interruption == "poll_failure":
+            await observer.async_observe(None)
+        else:
+            await observe(observer, clock, 1020, EvseState.CHARGING, 105, cp=CpState.A1)
+        data = await observe(observer, clock, 1030, total=110)
+        assert data.charging_session is not None
+        assert data.charging_session["wallbox_kwh"] > 0
         await observer.async_close()
 
     asyncio.run(run())

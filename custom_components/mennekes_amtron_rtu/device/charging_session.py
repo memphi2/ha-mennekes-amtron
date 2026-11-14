@@ -14,13 +14,17 @@ from uuid import UUID, uuid4
 from .data import WallboxData
 from .enums import EvseState
 from .registers import CP_STATE, ENERGY_TOTAL, EVSE_STATE
-from .vehicle import vehicle_connected
+from .vehicle import CONNECTED_CP_STATES, vehicle_connected
 
 _MAX_EPOCH = 253402300799.0
 _SESSION_KEYS = {
     "session_id", "connected_at", "disconnected_at", "started_after",
     "started_before", "ended_after", "ended_before", "wallbox_kwh",
 }
+# Plug-in and unplug change CP and EVSE state in separate polls, and a poll
+# can fail. Such short unknown spans keep the cycle; a longer one could hide
+# an unplug and a different car, so it still invalidates.
+_UNKNOWN_GRACE_SECONDS = 120.0
 _NONCHARGING_STATES = frozenset({
     EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID, EvseState.READY_TO_CHARGE,
 })
@@ -112,6 +116,9 @@ class SessionHistory:
         self._absent_at: float | None = None
         self._idle_energy: float | None = None
         self._last_energy: float | None = None
+        self._unknown_since: float | None = None
+        # An unplugged cycle whose final meter is read in a later poll.
+        self._closing: tuple[_Cycle, float] | None = None
 
     @property
     def latest(self) -> CompletedSession | None:
@@ -120,7 +127,26 @@ class SessionHistory:
     def _invalidate(self) -> None:
         if self._cycle is not None:
             self._cycle.valid = False
+        if self._closing is not None:
+            self._closing[0].valid = False
         self._absent_at = self._idle_energy = None
+
+    def _unknown(self, observed_at: float) -> None:
+        if self._unknown_since is None:
+            self._unknown_since = observed_at
+        elif observed_at - self._unknown_since > _UNKNOWN_GRACE_SECONDS:
+            self._invalidate()
+
+    def _present(self, data: WallboxData) -> bool | None:
+        """A connected CP proves a car even while the EVSE state still lags."""
+        evse, cp = data.get(EVSE_STATE.key), data.get(CP_STATE.key)
+        if (
+            self._cp_supported and type(cp) is int and cp in CONNECTED_CP_STATES
+            and type(evse) is int and evse in EvseState.__members__.values()
+            and evse != EvseState.NOT_INITIALIZED
+        ):
+            return True
+        return vehicle_connected(evse, cp, cp_supported=self._cp_supported)
 
     def observe(self, data: WallboxData | None, *, now: float) -> bool:
         """Consume one poll; return true only if durable completed state changes."""
@@ -138,14 +164,9 @@ class SessionHistory:
             return False
         self._last_at = observed_at
         if data is None:
-            self._invalidate()
+            self._unknown(observed_at)
             return False
-        present = vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key), cp_supported=self._cp_supported,
-        )
-        if present is None:
-            self._invalidate()
-            return False
+        present = self._present(data)
 
         previous_total = self._last_energy
         total: float | None = None
@@ -158,12 +179,26 @@ class SessionHistory:
                 if self._last_energy is not None and total < self._last_energy:
                     self._invalidate()
                 self._last_energy = total
+        if present is None:
+            self._unknown(observed_at)
+            return False
+        self._unknown_since = None
 
         if present is False:
-            if self._cycle is not None:
+            if self._cycle is not None and total is None and self._cycle.valid:
+                # The meter is read on the next EVSE change or slow poll; no
+                # energy flows meanwhile, so that later value is still final.
+                self._closing = (self._cycle, observed_at)
+                self._cycle = None
+                self._idle_energy = None
+            elif self._cycle is not None:
                 self._latest = self._complete(self._cycle, total, observed_at)
                 self._cycle = None
                 self._idle_energy = None
+            elif self._closing is not None and total is not None:
+                cycle, unplugged_at = self._closing
+                self._closing = None
+                self._latest = self._complete(cycle, total, unplugged_at)
             elif total is not None and previous_total is not None and total > previous_total:
                 # Energy accrued without an observed connection cycle. The
                 # old completed record cannot represent the newest charge.
@@ -173,6 +208,10 @@ class SessionHistory:
                 self._idle_energy = total
             return self._latest != previous
 
+        if self._closing is not None:
+            # Plugged in again before the final meter: the charge stays unmeasured.
+            self._closing = None
+            self._latest = None
         if self._cycle is None:
             anchored = self._absent_at is not None and self._idle_energy is not None
             self._cycle = _Cycle(
@@ -203,7 +242,7 @@ class SessionHistory:
                     cycle.baseline_kwh = total
         # Error/service states with confirmed presence neither close the cycle
         # nor claim that charging stopped. A later known state bounds its end.
-        return False
+        return self._latest != previous
 
     @staticmethod
     def _complete(cycle: _Cycle, total: float | None, now: float) -> CompletedSession | None:

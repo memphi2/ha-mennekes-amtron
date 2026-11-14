@@ -106,7 +106,7 @@ def test_service_publishes_and_persists_one_complete_session_without_extra_reads
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("interruption", ["cold_start", "poll_failure", "meter_failure"])
+@pytest.mark.parametrize("interruption", ["cold_start", "meter_failure"])
 def test_incomplete_observation_never_becomes_a_complete_session(tmp_path, interruption):
     async def run():
         clock = [1000.0]
@@ -116,13 +116,7 @@ def test_incomplete_observation_never_becomes_a_complete_session(tmp_path, inter
             )
             try:
                 await observe(service, transport, clock, 1010, EvseState.CHARGING, 100)
-                if interruption == "poll_failure":
-                    real_poll = service._poller.async_poll
-                    service._poller.async_poll = AsyncMock(side_effect=AmtronConnectionError("offline"))
-                    with pytest.raises(AmtronConnectionError, match="offline"):
-                        await service.refresh()
-                    service._poller.async_poll = real_poll
-                elif interruption == "meter_failure":
+                if interruption == "meter_failure":
                     transport.read_exceptions[R.ENERGY_TOTAL.address] = 4
                 await observe(service, transport, clock, 1110, EvseState.IDLE, 112)
                 assert service.snapshot()["charging_session"] == {"supported": True, "latest": None}
@@ -406,6 +400,27 @@ def test_cancelled_session_save_finishes_before_control_saves_can_replace_it(tmp
             finally:
                 release.set()
                 service._store.save = real_save
+                await service.stop()
+
+    asyncio.run(run())
+
+
+def test_one_failed_poll_keeps_the_session_measurable(tmp_path):
+    async def run():
+        clock = [1000.0]
+        with patch("custom_components.mennekes_amtron_rtu.device.service_runtime.wall_clock", side_effect=lambda: clock[0]):
+            service, transport = await owner(tmp_path, state=EvseState.IDLE)
+            try:
+                await observe(service, transport, clock, 1010, EvseState.CHARGING, 100)
+                real_poll = service._poller.async_poll
+                service._poller.async_poll = AsyncMock(side_effect=AmtronConnectionError("offline"))
+                with pytest.raises(AmtronConnectionError, match="offline"):
+                    await service.refresh()
+                service._poller.async_poll = real_poll
+                await observe(service, transport, clock, 1110, EvseState.IDLE, 112)
+                assert service.snapshot()["charging_session"]["latest"]["wallbox_kwh"] == pytest.approx(12)
+                assert not transport.writes
+            finally:
                 await service.stop()
 
     asyncio.run(run())

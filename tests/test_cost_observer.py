@@ -442,3 +442,31 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("remote", [False, True])
+def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path, remote):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=remote)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            with patch(clock, return_value=at):
+                await observer.async_observe(data(at, 100))
+            with patch(clock, return_value=at+5):
+                transition = data(at+5, 100, fresh=False)
+                transition.values[CP_STATE.key] = CpState.B1  # CP leads the EVSE state
+                await observer.async_observe(transition)
+            with patch(clock, return_value=at+25):
+                await observer.async_observe(data(at+25, 102.5, present=True))
+                await observer.async_observe(None)
+            with patch(clock, return_value=at+100):
+                await observer.async_observe(data(at+100, 110, session=completed(at)))
+            assert observer.last.result.cost == pytest.approx(3)
+            assert observer.last.result.complete
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
