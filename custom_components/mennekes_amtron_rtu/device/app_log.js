@@ -40,7 +40,8 @@
   const el = id => document.getElementById(id);
   const KEEP = 2000, RENEW_BELOW = 240;
   let lines = [], sequence = 0, generation = null, csrf = "", paused = false, stopped = false;
-  let timer = null, busy = false, problem = "", drawn = 0;
+  let timer = null, busy = false, problem = "", drawn = 0, evicted = 0;
+  let requestGeneration = 0, controller = null;
 
   const clock = stamp => { const d = new Date(stamp), p = (n, w = 2) => String(n).padStart(w, "0"); return Number.isFinite(d.getTime()) ? `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}` : "--:--:--.---"; };
   function line(record) {
@@ -69,8 +70,10 @@
   // The view follows the newest line unless the reader scrolled up.
   function draw(all = false) {
     const box = el("log_lines"), follow = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-    if (all) { box.replaceChildren(...lines.filter(matches).map(node)); drawn = lines.length; }
+    if (all) { box.replaceChildren(...lines.filter(matches).map(node)); drawn = lines.length; evicted = 0; }
     else if (!paused) {
+      while (evicted > 0 && box.firstElementChild) { box.firstElementChild.remove(); evicted--; }
+      evicted = 0;
       for (const row of lines.slice(drawn)) if (matches(row)) box.appendChild(node(row));
       drawn = lines.length;
       while (box.childElementCount > KEEP) box.firstElementChild.remove();
@@ -87,30 +90,46 @@
     sequence = data.latest_sequence;
     if (!fresh.length) return;
     const dropped = Math.max(0, lines.length + fresh.length - KEEP);
+    evicted += lines.slice(0, Math.min(dropped, drawn)).filter(matches).length;
     lines = lines.concat(fresh).slice(-KEEP);
     drawn = Math.max(0, drawn - dropped);
   }
-  const post = payload => fetch("./api/modbus-debug", {method: "POST", cache: "no-store", headers: {"Content-Type": "application/json", "X-Amtron-CSRF": csrf}, body: JSON.stringify(payload)});
+  const post = (payload, signal) => fetch("./api/modbus-debug", {method: "POST", cache: "no-store", headers: {"Content-Type": "application/json", "X-Amtron-CSRF": csrf}, body: JSON.stringify(payload), signal});
+  function suspend() {
+    requestGeneration++;
+    clearTimeout(timer); timer = null;
+    controller?.abort(); controller = null;
+    busy = false;
+  }
   async function poll() {
     clearTimeout(timer); timer = null;
     if (busy || stopped || document.hidden) return;
     busy = true;
+    const own = requestGeneration, abort = new AbortController();
+    controller = abort;
+    const timeout = setTimeout(() => abort.abort(), 8000);
+    const current = () => own === requestGeneration && !stopped && !document.hidden;
     try {
-      let response = await fetch(`./api/modbus-debug?after=${sequence}`, {cache: "no-store"}), data = await response.json();
+      let response = await fetch(`./api/modbus-debug?after=${sequence}`, {cache: "no-store", signal: abort.signal}), data = await response.json();
+      if (!current()) return;
       if (!response.ok) throw new Error("refused");
       if (!data.available) { problem = t("unavailable"); return; }
       take(data);
       // Start the capture, and keep it while the page is open.
       if ((!data.enabled || data.expires_in < RENEW_BELOW) && csrf) {
-        response = await post({enabled: true}); data = await response.json();
+        response = await post({enabled: true}, abort.signal); data = await response.json();
+        if (!current()) return;
         if (!response.ok) throw new Error("refused");
         take(data);
       }
       problem = "";
-    } catch (_) { problem = t("offline"); }
+    } catch (_) { if (current()) problem = t("offline"); }
     finally {
-      busy = false; draw();
-      if (!stopped && !document.hidden) timer = setTimeout(poll, problem ? 5000 : 1000);
+      clearTimeout(timeout);
+      if (own === requestGeneration) {
+        busy = false; controller = null; draw();
+        if (current()) timer = setTimeout(poll, problem ? 5000 : 1000);
+      }
     }
   }
   el("log_filter").addEventListener("input", () => draw(true));
@@ -121,8 +140,8 @@
     link.href = url; link.download = `amtron-log-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.txt`;
     link.click(); URL.revokeObjectURL(url);
   });
-  document.addEventListener("visibilitychange", () => void poll());
-  addEventListener("pagehide", () => { stopped = true; clearTimeout(timer); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) suspend(); else void poll(); });
+  addEventListener("pagehide", () => { stopped = true; suspend(); });
   addEventListener("pageshow", () => { stopped = false; void poll(); });
   status(); void poll();
 })();
