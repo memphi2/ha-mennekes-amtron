@@ -1,5 +1,7 @@
 # Safety and Limitations
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 **This integration is not a safety device.** It is a convenience layer on top
 of a Modbus interface. Nothing in it may be relied on for electrical safety,
 for grid compliance or for protecting a vehicle.

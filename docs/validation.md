@@ -1,8 +1,15 @@
 # Maintenance validation
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 Run the normal suite with `.venv/bin/python scripts/check_validate.py`.
 The minimum HA environment uses `--skip-typing`; latest stable HA
 also runs strict typing. These checks do not access a physical wallbox.
+
+[Run checks](#maintenance-validation) · [Coverage](#coverage-requirements) · [Resources](#resource-measurements) · [Release verification](#published-release-verification)
 
 ## Fault regressions
 

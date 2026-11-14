@@ -1,30 +1,9 @@
-# Choose your optional functions
+# Optional charging features
 
-[Documentation](README.md) › Optional functions
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
-A working wallbox needs no vehicle integration, calendar or price sensor.
-Start with ordinary current control and pause/resume, then add one function at
-a time. Each configuration section saves independently and shows the inputs
-needed for your choice.
-
-## Four everyday tasks
-
-- **Charge now:** choose the current in Home Assistant and turn off **Charging
-  paused**. Setting a percentage or energy target only limits charging; it does
-  not start a deliberately paused charge.
-- **Ready for the next trip:** enable [departure planning](departure-planning.md),
-  then choose the target and the next departure. A target in percent describes
-  battery charge; a kWh ceiling describes additional energy at the wallbox.
-- **Charge a guest car:** open **Charging → Guest charging** in the app and set
-  its limit. Follow the local authorization steps shown there.
-- **Understand why it waits:** open **Overview → My charging** in the app, or
-  the [charging-control sensors](entities.md#charging-control-at-a-glance) in HA.
-  Check the reason and next step before changing a target. **Diagnostics** is
-  for investigating communication, not for daily charging.
-
-A pause temporarily blocks charging. Stopping an app job ends that automation
-and pauses charging; removing the stopped job clears its record and does not
-resume charging. See [app actions](app-from-home-assistant.md) for automation.
+Basic charging needs only the current slider and pause switch. Add a feature
+when you need it; you do not need to configure every option.
 
 ## Choose what you want to achieve
 
@@ -48,47 +27,6 @@ resume charging. See [app actions](app-from-home-assistant.md) for automation.
 | Get notified when the car is unplugged or the wallbox faults | Nothing extra; the **Wallbox event** entity | [React to wallbox events](automations.md#react-to-wallbox-events) |
 | Reduce database growth | Recorder exclusions and retention choices | [Recorder guide](recorder.md) |
 
-## Example: one car, no vehicle integration
-
-Use **Charging current limit** to choose the current and **Charging paused** for
-everyday pauses. If you want to supply a limited amount of energy, set **Energy
-target** to 12 kWh and start charging normally. The target only limits charging;
-setting it does not lift a pause. Actual delivered energy can overshoot slightly
-because readings and commands take time.
-
-## Example: one car with a SoC sensor
-
-In that car's profile under **Configure → Vehicles**, select its charge-level entity and enable
-only the percentage target. Set **Vehicle charge target** to 80%. Add the car's
-maximum-limit sensor only if you want its value to bound the selectable target.
-No departure time or capacity estimate is needed for a simple percentage limit.
-If SoC reports disappear, charging continues; the car's own charge limit remains
-useful independently of HA.
-
-## Example: several cars at the same wallbox
-
-Create a profile for each car, select one and configure its optional features.
-Repeat for the other car. Select a manual profile **before charging**; the
-active selection determines which SoC, departure and loss sources are used.
-Manual selection is the simplest default. Enable automatic selection only when
-your available cable and home signals are reliable enough for that purpose.
-An uncertain automatic match selects no car instead of borrowing another car's
-target. Profile changes never start charging.
-
-To also control charging permission, enable **Virtual Plug & Charge** separately
-and configure detection signals for each intended profile. It waits for fresh detection after plugging in;
-selecting a profile by hand is not enough. Automatic selection can remain off.
-Existing pauses, locks and reached targets remain effective.
-
-## Example: ready for tomorrow, with climate
-
-Set a positive percentage target and choose tomorrow's departure date/time.
-Supply usable battery capacity, then check the selected trip. You can instead
-copy the time from a calendar event or the next available BMW climate timer.
-Use the climate blueprint for your chosen action and lead time.
-**A timed plan may resume a manual pause.** Clear the departure time to cancel
-that plan; the ordinary percentage limit remains independent.
-
 ## Which function may start or stop charging?
 
 | Function | Starts or resumes charging? | Stops or limits charging? |
@@ -99,18 +37,13 @@ that plan; the ordinary percentage limit remains independent.
 | Percentage target | Never starts by itself | Pauses at the reported percentage; at the car's own limit the car stops by itself; missing SoC does not pause |
 | Timed departure plan | May resume, including a manual pause | May pause until its late start, then charges at full current and finishes at 6 A; completed targets still apply |
 | Vehicle selection/detection | Never starts or resumes | Changes the data used by optional features and clears the previous car's percentage target/trip |
-| Virtual Plug & Charge | Can release charging for a freshly recognized car; does not lift an existing pause, lock or reached target | Keeps charging disabled until permission is granted; disabling the feature does not resume |
+| Virtual Plug & Charge | Can release a freshly recognized plug-in and lift a previous manual pause; a restart grant preserves the pause. Locks and reached targets still apply | Keeps charging disabled until permission is granted; disabling the feature does not resume |
 | Cost/loss estimates | No | No; these are estimates, not charging controls |
 
 Wallbox authorization, hardware limits, locking, charging release and read-only
 permission still apply. A grid-operator downgrade cannot be overridden by an
 HA automation. [Safety and limitations](safety.md) explains the operating limits.
 
-## Add features without losing track
-
-Use one change at a time, then check its new entity or status before adding the
-next feature. Cancel an unfinished configuration section to keep its existing
-settings. A later automation can change a manual choice, so avoid running two
-independent current controllers against the same wallbox.
-
-[Everyday use](user-guide.md) · [Vehicle setup](vehicle-setup.md) · [Departure planning](departure-planning.md) · [Troubleshooting](troubleshooting.md)
+Start with one feature and check its status before enabling another. Avoid
+running independent current controllers against the same wallbox. For a ready
+control panel, use the [dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards).

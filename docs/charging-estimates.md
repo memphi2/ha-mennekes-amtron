@@ -1,10 +1,12 @@
 # Charging losses and costs
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure**, then **Charging costs**. Charging losses belong to a
 car: open its profile under **Vehicles**, then **Charging losses**.
-Choose a source to see only its relevant inputs; confirming the last form saves
-the section directly. They work with a
+Choose a source to see only its relevant inputs. Costs save on the last form;
+profile changes save at **Save and finish** or the final wizard area. They work with a
 direct USB/LAN connection and with the Modbus app/service. No extra Modbus
 polling, vehicle commands or electricity-provider login is needed.
 
@@ -18,12 +20,14 @@ missing connection transitions or an unreliable counter cannot produce a
 complete estimate. The last result becomes unknown when the newest completed
 cycle cannot be matched; a previous result is not passed off as the new one.
 
+[Charging losses](#charging-losses-choose-the-available-data) · [Fixed or dynamic price](#charging-costs-fixed-or-dynamic-price) · [German network tariffs](#optional-14a-enwg-network-tariffs) · [Restarts](#storage-and-restarts)
+
 ## Charging losses: choose the available data
 
 | Source | What you select | How the charge is matched |
 |---|---|---|
 | Disabled | Nothing | No charging-loss entities or vehicle subscriptions. |
-| Vehicle charging history | The active vehicle profile, or a retained separate vehicle selection | Complete local charging history with matching start/end times; currently implemented for BavarianData. |
+| Vehicle charging history | The selected vehicle profile | Complete local charging history with matching start/end times; currently implemented for BavarianData. |
 | Vehicle energy sensor | An existing sensor for battery energy from the last charge | Explicit assignment, or an optional new-value heuristic. |
 
 The two sensors are **Estimated charging loss, last charge** and **Average
@@ -33,8 +37,7 @@ For example, 10 kWh at the wallbox and 9 kWh reaching the battery gives 10%.
 Correcting the latest assignment replaces that sample instead of adding it twice.
 Vehicle profiles retain their own averages when you switch between cars.
 Changing a profile's selected vehicle or energy source starts a new average for
-that source. Existing configurations without profiles keep their original
-single-source average.
+that source.
 
 For manual selection, choose the correct profile **before charging begins**.
 Automatic cable/home recognition may arrive after the wallbox detects charging;
@@ -59,8 +62,7 @@ Configure the BavarianData car once under **Vehicle**, select its profile, then
 choose **Use the selected vehicle's charging history** in **Charging losses**.
 This selection saves immediately and enables history matching for that profile.
 The history belongs
-to the same active car used by the profile's other features. Existing setups
-without profiles retain their separately configured history vehicle. The integration reads
+to the same active car used by the profile's other features.  The integration reads
 BavarianData's existing local history through its public
 [`get_charging_sessions` action](https://justchr.github.io/BavarianData/docs/services/).
 It never requests a BMW history refresh or spends the BMW API quota.

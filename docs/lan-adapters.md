@@ -1,5 +1,7 @@
 # Set up a compatible LAN adapter
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 You can optionally configure a supported Waveshare adapter from the integration
 or the service app. The setup reads the adapter you specify, shows its identity
 and settings, and applies changes only when you confirm them.

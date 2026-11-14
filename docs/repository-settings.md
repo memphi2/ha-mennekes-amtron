@@ -1,5 +1,10 @@
 # Repository Settings
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 Branch protection, secret scanning and the repository toggles live on GitHub,
 not in the repository, so they never show up in a diff and are easy to lose.
 `scripts/apply_repo_settings.py` declares them instead.

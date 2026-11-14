@@ -1,5 +1,8 @@
 # Privacy
 
+[User guide](docs/README.md) · [Support](SUPPORT.md)
+
+
 ## What this integration collects
 
 Wallbox control has no cloud dependency or telemetry. The optional German
@@ -66,7 +69,7 @@ replaced when that durable state changes, with no growing history. Heartbeats,
 ordinary polls and progress within a running cycle are not persisted. Protect
 service data and backups.
 
-The app's **connection page**, available from 0.6.0b1, displays locally mapped adapter
+The app's **connection page**, displays locally mapped adapter
 names and paths to an authenticated administrator through Supervisor Ingress.
 Those names can contain the adapter's serial number. Connection changes are
 saved in the app's Supervisor options. The page does not send the service token
@@ -75,7 +78,7 @@ is present; a blank password field reuses it only for the same gateway host
 and TCP port. A newly entered password is sent locally to the app for the
 explicitly requested configuration.
 
-The optional live Modbus view in this branch retains at most 200 decoded
+The optional live Modbus view in the app retains at most 200 decoded
 transaction records in RAM for ten minutes. It is off by default, adds no
 Recorder entries or log files, and erases records when disabled or expired.
 Serial numbers, text registers, network-login traffic and exception-message
@@ -149,3 +152,8 @@ Annual refresh may be enabled after manual tariff entry as well as after an
 initial import. It can replace saved manual prices and time windows. Disable
 yearly refresh to stop background imports; manually choosing Import for HA Home
 still performs that one requested lookup.
+
+The optional service stores one shared charging-job draft in `job-draft.json`
+(current, energy, reserve and optional start/finish times), bound to its wallbox
+identity. Only explicit edits write this file. Resetting the draft replaces
+those values; it does not remove or change an accepted charging order.

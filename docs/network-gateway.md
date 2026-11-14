@@ -1,5 +1,7 @@
 # Connect through a LAN adapter
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 A LAN-to-RS-485 adapter lets the supported RTU wallbox connect without a USB
 adapter on your HA or service host. The wallbox still uses the same RS-485
 register interface; only the connection to its bus changes.

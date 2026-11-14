@@ -1,5 +1,7 @@
 # Automations
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 Start with the [bundled blueprints](blueprints.md) for PV charging and
 downgrade notifications. They appear in Home Assistant
 after you add the wallbox and need no YAML editing.
@@ -34,52 +36,19 @@ The wallbox's static limit does not account for other household loads.
 ## Charge during a fixed tariff window
 
 This example requests 10 A at 22:00 and pauses at 06:00. Choose a current that
-suits your installation. Limited-current commands respect the HA entry cap and,
-in service mode, the app or standalone service cap; the lower applicable cap
-wins. A current command can resume a paused charge after the waiting interval.
+suits your installation. Limited-current commands respect the current cap of the connection owner:
+HA in direct mode, the app in service mode. A current command can resume a paused charge after the waiting interval.
 
 Create an empty automation, open its **Edit in YAML** editor and paste the
-following. Replace both entity IDs with your own. The IDs shown assume the
-default device name and English entities.
+YAML file for your language below. Check both entity IDs against your
+wallbox; the examples use the default **mennekes_amtron** prefix and translated
+entity names. Later language changes do not rename existing IDs.
 
-```yaml
-alias: Wallbox night charging
-triggers:
-  - trigger: time
-    at: "22:00:00"
-    id: start
-  - trigger: time
-    at: "06:00:00"
-    id: stop
-conditions: []
-actions:
-  - choose:
-      - conditions:
-          - condition: trigger
-            id: start
-        sequence:
-          - action: number.set_value
-            target:
-              entity_id: number.mennekes_amtron_charging_current_limit
-            data:
-              value: 10
-      - conditions:
-          - condition: trigger
-            id: stop
-          - condition: state
-            entity_id: switch.mennekes_amtron_charging_paused
-            state: "off"
-        sequence:
-          - action: switch.turn_on
-            target:
-              entity_id: switch.mennekes_amtron_charging_paused
-mode: single
-```
+[Deutsch](../examples/automations/night-charging.de.yaml) · [English](../examples/automations/night-charging.en.yaml) · [Français](../examples/automations/night-charging.fr.yaml) · [Nederlands](../examples/automations/night-charging.nl.yaml) · [Italiano](../examples/automations/night-charging.it.yaml)
 
 A fixed time trigger is missed if Home Assistant is stopped at that time.
 It does not restore the schedule when HA starts later. A recent
-pause can delay an accepted start: inspect **Pending change** and **Pending
-change due**, as well as the **automation trace**. A running service can execute an already queued
+pause can delay an accepted start: inspect **Pending change**, its `due` attribute and the **automation trace**. A running service can execute an already queued
 command while HA is offline. Check the current state after a restart rather
 than assuming the schedule ran.
 

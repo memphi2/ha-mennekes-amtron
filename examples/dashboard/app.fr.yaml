@@ -1,0 +1,87 @@
+# Check entity IDs before use. No helpers or scripts required.
+title: Borne
+icon: mdi:ev-station
+type: masonry
+cards:
+- type: vertical-stack
+  cards:
+  - type: custom:mushroom-title-card
+    title: Borne
+  - type: entities
+    title: Borne
+    show_header_toggle: false
+    entities:
+    - number.mennekes_amtron_limite_du_courant_de_charge
+    - switch.mennekes_amtron_charge_en_pause
+    - sensor.mennekes_amtron_puissance_totale
+    - sensor.mennekes_amtron_energie_totale
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_pilotage_de_la_recharge
+    tap_action:
+      action: more-info
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_motif_dattente_de_la_recharge
+    tap_action:
+      action: more-info
+- type: vertical-stack
+  cards:
+  - type: custom:mushroom-title-card
+    title: Ordre de recharge
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_ordre_de_recharge
+    tap_action:
+      action: more-info
+  - type: horizontal-stack
+    cards:
+    - type: custom:mushroom-number-card
+      entity: number.mennekes_amtron_courant_de_la_recharge
+      display_mode: buttons
+    - type: custom:mushroom-number-card
+      entity: number.mennekes_amtron_energie_de_la_recharge
+      display_mode: buttons
+  - type: entities
+    show_header_toggle: false
+    entities:
+    - datetime.mennekes_amtron_fin_au_plus_tard
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_brouillon_de_recharge
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_demarrer_la_recharge
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_demarrer_la_recharge
+        confirmation:
+          text: Démarrer le brouillon enregistré ?
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_arreter_la_recharge
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_arreter_la_recharge
+        confirmation:
+          text: Arrêter l’ordre et mettre en pause ?
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_effacer_la_recharge
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_effacer_la_recharge
+        confirmation:
+          text: Effacer l’ordre terminé ? La recharge reste en pause.
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_reinitialiser_le_brouillon
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_reinitialiser_le_brouillon
+        confirmation:
+          text: Réinitialiser le brouillon ? L’ordre actuel reste inchangé.

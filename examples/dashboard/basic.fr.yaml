@@ -1,0 +1,13 @@
+# Vérifiez les identifiants des entités avant utilisation.
+title: Borne
+icon: mdi:ev-station
+type: masonry
+cards:
+  - type: entities
+    title: Borne
+    show_header_toggle: false
+    entities:
+      - number.mennekes_amtron_limite_du_courant_de_charge
+      - switch.mennekes_amtron_charge_en_pause
+      - sensor.mennekes_amtron_puissance_totale
+      - sensor.mennekes_amtron_energie_totale

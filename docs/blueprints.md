@@ -1,5 +1,7 @@
 # Ready-made automations
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 The integration includes five blueprints. Adding the wallbox installs them
 under **Settings → Automations & scenes → Blueprints**. Choose a blueprint,
 select **Create automation**, then choose the entities for the same wallbox.

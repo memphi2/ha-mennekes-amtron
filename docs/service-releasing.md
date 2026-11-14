@@ -1,5 +1,10 @@
 # Service and integration publication
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 One source repository produces the HACS integration and the independently running
 Modbus service. A release keeps one HACS ZIP plus its verification assets. Container
 images live in GHCR, and generated app metadata lives on `apps-beta` or `apps` in

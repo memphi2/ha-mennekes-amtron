@@ -1,0 +1,87 @@
+# Check entity IDs before use. No helpers or scripts required.
+title: Wallbox
+icon: mdi:ev-station
+type: masonry
+cards:
+- type: vertical-stack
+  cards:
+  - type: custom:mushroom-title-card
+    title: Wallbox
+  - type: entities
+    title: Wallbox
+    show_header_toggle: false
+    entities:
+    - number.mennekes_amtron_charging_current_limit
+    - switch.mennekes_amtron_charging_paused
+    - sensor.mennekes_amtron_total_power
+    - sensor.mennekes_amtron_total_energy
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_charging_control
+    tap_action:
+      action: more-info
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_charging_wait_reason
+    tap_action:
+      action: more-info
+- type: vertical-stack
+  cards:
+  - type: custom:mushroom-title-card
+    title: Charging job
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_charging_job
+    tap_action:
+      action: more-info
+  - type: horizontal-stack
+    cards:
+    - type: custom:mushroom-number-card
+      entity: number.mennekes_amtron_job_current
+      display_mode: buttons
+    - type: custom:mushroom-number-card
+      entity: number.mennekes_amtron_job_energy
+      display_mode: buttons
+  - type: entities
+    show_header_toggle: false
+    entities:
+    - datetime.mennekes_amtron_job_latest_finish
+  - type: custom:mushroom-entity-card
+    entity: sensor.mennekes_amtron_charging_job_draft
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_start_charging_job
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_start_charging_job
+        confirmation:
+          text: Start the saved draft?
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_stop_charging_job
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_stop_charging_job
+        confirmation:
+          text: Stop the job and pause charging?
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_clear_charging_job
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_clear_charging_job
+        confirmation:
+          text: Clear the ended job? Charging stays paused.
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_reset_job_draft
+      tap_action:
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_reset_job_draft
+        confirmation:
+          text: Reset draft values? The current job is unchanged.

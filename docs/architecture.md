@@ -1,5 +1,12 @@
 # Architecture
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
+[Service](#independent-service) · [Code layout](#shape) · [Design](#design-decisions) · [Data flow](#data-flow) · [Tests](#testing)
+
 ## Independent service
 
 The `device/` package has no Home Assistant imports. It contains the shared
@@ -300,13 +307,14 @@ unobserved vehicle change occurred between reads.
 
 The gate's enabled setting is durable; connection tokens and grants stay in RAM.
 A token belongs to the current observation cycle and cannot authorize a later
-one. A disconnect or unknown physical connection invalidates it. The service
+one. A confirmed vehicle disconnect invalidates it. Unknown physical state
+withdraws a grant after 60 seconds, retaining the cycle for renewed permission. The service
 continues enforcing the gate and retains an existing grant while HA restarts;
 the service itself restarting loses that grant. Direct mode loses the grant
 when its physical client closes. A controlled options/profile reload hands over
 the same open client when connection settings match; normal unload, failed
-setup and a changed connection close it. Transport disconnect callbacks still
-invalidate the token immediately.
+setup and a changed connection close it. Transport interruption marks the connection suspect; explicit client closure
+and owner shutdown invalidate it.
 The policy digest includes vehicle identities and detection sources, but not
 the active-profile label. Changing those sources invalidates grants. Profiles
 have no separate permission; the wallbox switch is the only one. A manual selection change or an automatic selection
@@ -317,8 +325,10 @@ the bus write. Cancelling its HA HTTP task is not a remote revocation of a
 request already accepted by the service.
 
 Charging permission composes with existing current, pause, lock and goal
-guards. It does not erase a manual pause or an already reached target, and error
-recovery does not provide another path around it. A cloud-data interruption
+guards. HA can lift a manual pause for a fresh observed plug-in before granting
+release. Restored grants preserve the pause; an armed plan decides its own
+start. Reached targets remain effective, and error recovery does not bypass
+the gate. A cloud-data interruption
 alone does not revoke an already granted physical connection. Enabling the gate
 requests release closure; disabling it does not restore charging release.
 Configuration and the hold until an explicit manual release are durable;

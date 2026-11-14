@@ -1,53 +1,32 @@
-# Quick start
+# First connection and first charge
 
-Use this checklist after [installing the integration](installation.md). First
-make ordinary charging work; add vehicle and scheduling features afterwards.
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
-Choose how Home Assistant should reach the wallbox:
-
-| Connection | When to use it |
-|---|---|
-| **Independent Modbus service** | Recommended on Home Assistant OS: its app keeps the heartbeat running through HA Core restarts. A standalone service is also available for other installations. |
-| **Direct serial connection** | Supported without an additional service. Home Assistant owns the adapter; a Core restart interrupts the heartbeat. |
-
-Either connection owner can also use a [LAN-to-RS-485 adapter](network-gateway.md)
-instead of USB. No USB device is needed on the HA or service host.
-
-The service is optional. If your wallbox is already configured, keep its entry.
-For a change to the service, follow the [handover guide](modbus-service.md#move-an-existing-wallbox)
-instead of adding it again.
+Use this checklist after [Installation](installation.md). For HA OS with the
+recommended app, follow [App setup](modbus-service.md) instead; return here for
+[the first-charge check](#7-first-charge).
 
 ## 1. Prepare the hardware
 
-Have a qualified electrician prepare the wallbox and RS-485 connection using
-its installation manual and the [hardware guide](hardware.md). Modbus satellite
-mode is required. Check the [single-master rule](safety.md#modbus-rtu-uses-a-single-master)
-before connecting software to the bus.
+Have an electrician prepare the [wallbox and RS-485 wiring](hardware.md).
+Only one Modbus master may use the bus, including in read-only mode.
 
 ## 2. Install the integration
 
-Follow [Installation](installation.md) for the Marketplace or HACS, including
-the release channel and any required Home Assistant restart. The service app
-is installed separately; its steps are in the [service guide](modbus-service.md).
-For an existing installation, see [Updates](installation.md#updates).
+Follow [Installation](installation.md#2-install-the-integration), then return
+here. Do not delete an existing wallbox entry to change connection methods.
 
 ## 3. Make the adapter available
 
-Give the USB RS-485 adapter to the selected connection owner: the service app
-or standalone service, or Home Assistant for direct serial mode. Prefer a stable
-`/dev/serial/by-id/...` path. If the adapter is missing, check
-[USB passthrough and permissions](hardware.md#making-the-adapter-visible-to-home-assistant).
-
-For LAN, make the gateway reachable from that host and match its operating mode,
-TCP port and wallbox serial settings. Follow [LAN setup](network-gateway.md);
-USB passthrough does not apply.
+USB: give the adapter to the chosen owner and use its stable
+`/dev/serial/by-id/...` path. [USB help](hardware.md#making-the-adapter-visible-to-home-assistant).
+LAN: configure the adapter's protocol, host, TCP port and serial settings.
+[LAN setup](network-gateway.md) explains the fields; no local USB is needed.
 
 ## 4. Check fallback behavior
 
-Configure the wallbox's intended [energy-manager fallback](safety.md#the-heartbeat-and-what-happens-without-it)
-before enabling writes. The service protects against HA Core restarts; stopping
-the service, restarting its host or losing the USB/LAN connection can still
-interrupt the heartbeat. Keep the vehicle disconnected during initial control setup.
+Prepare the wallbox's [fallback](safety.md#the-heartbeat-and-what-happens-without-it)
+and keep the vehicle disconnected during the first control setup.
 
 ## 5. Add the wallbox
 

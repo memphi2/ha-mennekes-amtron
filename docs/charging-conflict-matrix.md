@@ -1,5 +1,10 @@
 # Charging conflict regression matrix
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 `tests/test_charging_conflict_matrix.py` adds cross-feature sequences, not a new
 priority policy. The same input sequence runs directly and through the actual
 authenticated HTTP service with a fake Modbus transport. No real wallbox is used.

@@ -1,5 +1,7 @@
 # Device compatibility
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 The integration implements the manufacturer's **Modbus RTU over RS-485**
 interface for Amtron 4You 300, Compact 2.0s and Start 2.0s. The common
 [RTU specification, revision 2.5](https://www.mennekes.de/fileadmin/MEN-Deutschland/emobility/01_documents/04_installer/Modbus_RTU_Specification_AMTRON_4You300_Compact_2.0s_Start_2.0s-v2.5.pdf)

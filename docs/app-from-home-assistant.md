@@ -1,14 +1,71 @@
-# Use the app from Home Assistant
+# Dashboard cards and app actions
 
-With the [Modbus service app](modbus-service.md), charging jobs, boost and guest
-charging can be started and stopped from Home Assistant:
-from a dashboard with one tap, or from an automation. The app's
-[web pages](app-guide.md) keep working beside it and show the same state.
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
-Departure planning needs nothing from this page; it already lives in Home
-Assistant, see [Departure planning](departure-planning.md). For recurring
-departures, put them in a calendar and let the
-[calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) set the next departure.
+Choose a linked YAML template to put charging controls on your Home Assistant
+home screen. Start with the basic card; the charging-job, guest and boost controls
+require the optional [Modbus service app](modbus-service.md).
+
+The [app's own web interface](app-guide.md) remains available alongside the
+dashboard. Action fields and automation examples are at the bottom of this page.
+
+## Dashboard with Mushroom cards
+
+The **basic** example uses built-in HA cards and works with direct USB, LAN or
+the app. The **app dashboard** uses [Mushroom](https://github.com/piitaya/lovelace-mushroom)
+and native integration entities. Install Mushroom through HACS first.
+No helpers, scripts, packages or custom wallbox card are needed.
+
+| Language | Basic controls | Mushroom app dashboard |
+|---|---|---|
+| Deutsch | [YAML](../examples/dashboard/basic.de.yaml) | [YAML](../examples/dashboard/app.de.yaml) |
+| English | [YAML](../examples/dashboard/basic.en.yaml) | [YAML](../examples/dashboard/app.en.yaml) |
+| Français | [YAML](../examples/dashboard/basic.fr.yaml) | [YAML](../examples/dashboard/app.fr.yaml) |
+| Nederlands | [YAML](../examples/dashboard/basic.nl.yaml) | [YAML](../examples/dashboard/app.nl.yaml) |
+| Italiano | [YAML](../examples/dashboard/basic.it.yaml) | [YAML](../examples/dashboard/app.it.yaml) |
+
+### Add the dashboard
+
+1. Connect the integration to the service app and enable write access. Both
+   integration and app must include the shared charging-job draft feature.
+2. Copy the YAML for your language (GitHub's **Raw** button shows plain text).
+3. Check entity IDs under **Settings → Devices & services → Entities**. The
+   examples use `mennekes_amtron` and the translated entity names. HA uses the
+   language at entity creation; later language changes do not rename IDs.
+   Replace IDs if you renamed the device, use another language or have several
+   wallboxes. Every button targets its wallbox's entity explicitly.
+4. Create a dashboard view, open its YAML editor and paste the complete example.
+   These are view files, not single-card configurations.
+
+### One draft in the app and Home Assistant
+
+Set **Job current**, **Job energy** and **Job latest finish** in the
+card. Each edit saves to the app and appears in its charging-jobs page after
+refresh. In the app, use **Save draft** to publish your edits to HA. A draft
+survives restarting HA or the app, but never starts charging by itself.
+
+**Start charging job** checks the saved values and creates the order for the
+currently connected car. The YAML asks for confirmation first. The **Charging
+job draft** status explains whether a finish time, connected car or permission
+is missing. Editing the draft does not change a running order.
+
+**Stop charging job** pauses the order. **Clear charging job** removes
+its record without resuming. **Reset job draft** restores empty times,
+6 A and 10 kWh; it leaves the current order unchanged and can also recover an
+unreadable draft file.
+
+For advanced scheduling, enable **Job earliest start** and **Job immediate
+reserve** in the entity settings and add them to your view. They are disabled
+by default. An empty start means now when confirmed; reset the draft to clear
+a previously set start. The reserve is part of the energy ceiling, not extra.
+
+If someone edits the draft in another window, an older edit or preview is
+rejected. Reload the saved draft, check it and retry. This prevents silently
+overwriting another person's settings. The app can also edit a draft while
+an order runs, or before a car is connected.
+
+Boost and guest charging remain available in the app and through the actions
+below. Departure planning has its own entities; it is separate from this draft.
 
 ## What you get
 
@@ -60,189 +117,8 @@ An action from Home Assistant asks for the same preview and confirms it at
 once. Nothing is skipped: if the car was unplugged, another order is running
 or a value is not allowed, the action fails with the app's reason and nothing
 is started. For the question "are you sure?", give the dashboard button a
-confirmation, as in the examples below. Automations call the same actions
+confirmation, as in the linked dashboard examples. Automations call the same actions
 without a question.
-
-## Dashboard with Mushroom cards
-
-The view below uses the third-party
-[Mushroom](https://github.com/piitaya/lovelace-mushroom) cards. Replace
-`amtron` with your device's entity prefix. Add it under **Edit dashboard →
-Add view → Edit in YAML**, or copy single cards.
-
-```yaml
-title: Wallbox
-icon: mdi:ev-station
-cards:
-  - type: custom:mushroom-title-card
-    title: Wallbox
-  - type: custom:mushroom-template-card
-    entity: sensor.amtron_charging_control
-    icon: mdi:ev-station
-    icon_color: >-
-      {{ 'green' if is_state('sensor.amtron_charging_wait_reason', 'none')
-         else 'red' if is_state('sensor.amtron_charging_control', 'unavailable')
-         else 'orange' }}
-    primary: "{{ state_translated('sensor.amtron_charging_control') }}"
-    secondary: "{{ state_translated('sensor.amtron_charging_wait_reason') }}"
-    multiline_secondary: true
-    tap_action:
-      action: more-info
-
-  - type: custom:mushroom-title-card
-    subtitle: Charging job
-  - type: custom:mushroom-template-card
-    entity: sensor.amtron_charging_job
-    icon: mdi:clipboard-clock-outline
-    icon_color: >-
-      {{ 'green' if is_state('sensor.amtron_charging_job', 'charging')
-         else 'blue' if is_state('sensor.amtron_charging_job', 'scheduled')
-         else 'grey' }}
-    primary: "{{ state_translated('sensor.amtron_charging_job') }}"
-    secondary: >-
-      {%- set s = 'sensor.amtron_charging_job' -%}
-      {%- if not is_state(s, 'none') and state_attr(s, 'finish') -%}
-      {{ state_attr(s, 'current') }} A · {{ state_attr(s, 'delivered') | float(0) | round(1) }}
-      / {{ state_attr(s, 'energy') }} kWh · until
-      {{ state_attr(s, 'finish') | as_datetime | as_local | as_timestamp | timestamp_custom('%a %H:%M') }}
-      {%- endif -%}
-    multiline_secondary: true
-    tap_action:
-      action: more-info
-  - type: custom:mushroom-chips-card
-    chips:
-      - type: template
-        icon: mdi:play
-        content: Start
-        tap_action:
-          action: perform-action
-          perform_action: script.amtron_start_charging_job
-          confirmation:
-            text: Start the charging job with the values below?
-      - type: template
-        icon: mdi:rocket-launch-outline
-        content: Boost 30 min
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.start_boost
-          data:
-            duration: 30
-          confirmation:
-            text: Charge now for 30 minutes, then return to the plan?
-      - type: template
-        icon: mdi:rocket-outline
-        content: End boost
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.cancel_boost
-      - type: template
-        icon: mdi:stop-circle-outline
-        content: Stop
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.stop_charging_job
-          confirmation:
-            text: Stop the charging job? Charging pauses.
-      - type: template
-        icon: mdi:clipboard-remove-outline
-        content: Clear
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.clear_charging_job
-  - type: custom:mushroom-number-card
-    entity: input_number.amtron_job_current
-    display_mode: buttons
-  - type: custom:mushroom-number-card
-    entity: input_number.amtron_job_energy
-    display_mode: buttons
-  - type: entities
-    entities:
-      - entity: input_datetime.amtron_job_finish
-
-  - type: custom:mushroom-title-card
-    subtitle: Guest charging
-  - type: custom:mushroom-chips-card
-    chips:
-      - type: template
-        icon: mdi:account-clock-outline
-        content: 2 h · 10 kWh
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.start_guest_charging
-          data:
-            duration: 120
-            current: 11
-            energy: 10
-          confirmation:
-            text: Charge the guest's car for up to 2 hours and 10 kWh?
-      - type: template
-        icon: mdi:account-clock-outline
-        content: 6 h · 30 kWh
-        tap_action:
-          action: perform-action
-          perform_action: mennekes_amtron_rtu.start_guest_charging
-          data:
-            duration: 360
-            current: 11
-            energy: 30
-          confirmation:
-            text: Charge the guest's car for up to 6 hours and 30 kWh?
-
-  - type: custom:mushroom-title-card
-    subtitle: Departure
-  - type: entities
-    entities:
-      - entity: datetime.amtron_next_departure
-      - entity: sensor.amtron_timed_charging_status
-      - entity: button.amtron_clear_departure_time
-```
-
-Change the guest presets to what suits you. The departure card needs
-[departure planning](departure-planning.md); leave it out otherwise.
-
-### Helpers and script for the Start button
-
-A dashboard button cannot read values from other cards, so **Start** calls a
-small script that takes the end time, current and energy from three helpers.
-Add this to `configuration.yaml`, or create the same helpers and script under
-**Settings → Devices & services → Helpers** and **Settings → Automations &
-scenes → Scripts**:
-
-```yaml
-input_number:
-  amtron_job_current:
-    name: Job current
-    min: 6
-    max: 16
-    step: 1
-    unit_of_measurement: A
-    icon: mdi:current-ac
-  amtron_job_energy:
-    name: Job energy
-    min: 1
-    max: 80
-    step: 1
-    unit_of_measurement: kWh
-    icon: mdi:battery-charging-medium
-
-input_datetime:
-  amtron_job_finish:
-    name: Job end
-    has_date: true
-    has_time: true
-
-script:
-  amtron_start_charging_job:
-    alias: Wallbox start charging job
-    sequence:
-      - action: mennekes_amtron_rtu.start_charging_job
-        data:
-          finish: "{{ states('input_datetime.amtron_job_finish') }}"
-          current: "{{ states('input_number.amtron_job_current') | float }}"
-          energy: "{{ states('input_number.amtron_job_energy') | float }}"
-```
-
-Set `max` of the current helper to your app's current cap.
 
 ## In automations
 

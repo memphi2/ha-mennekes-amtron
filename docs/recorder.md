@@ -1,5 +1,7 @@
 # Recorder and database growth
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 For a smaller history, keep the default measurement interval and use the
 **Energy and power statistics only** profile below. All readings remain available
 live, and total energy remains available for the Energy dashboard.
@@ -55,7 +57,11 @@ series.
 | Connection | Where to set the intervals |
 |---|---|
 | Direct USB or LAN | Integration entry options: **Status polling interval** and **Measurement interval**. |
-| Service | App or standalone service configuration: status and measurement intervals. HA entry options only control how often HA fetches the service's cached status. |
+| Service | App or standalone service configuration: status and measurement intervals. HA reads the app’s cached status; configure bus polling in the app’s Runtime page. |
+
+Transaction/retry counters are in the diagnostics download, not sensor
+attributes. Repeated retries alone therefore do not add Recorder state rows.
+A changed connection-health state still does.
 
 Heartbeat health is the `heartbeat` attribute of **Connection quality**. It
 changes only between `ok` and `problem`, without a per-heartbeat timestamp or
@@ -144,3 +150,10 @@ repeated checks replace it. Check the sensor's unit and test the notification.
 Replay results, retention checks and compatibility evidence are in
 [Recorder validation and measurements](recorder-validation.md). These are
 controlled test results with stated limits, not storage guarantees.
+
+### Charging-job draft
+
+Draft controls change only when edited. The draft status records readiness
+changes without revision tokens or a ticking countdown. Polling does not save
+the draft file. Optional earliest-start and reserve entities are disabled by
+default.

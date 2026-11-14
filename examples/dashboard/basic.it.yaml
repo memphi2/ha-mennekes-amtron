@@ -1,0 +1,13 @@
+# Verificare gli ID delle entità prima dell’uso.
+title: Wallbox
+icon: mdi:ev-station
+type: masonry
+cards:
+  - type: entities
+    title: Wallbox
+    show_header_toggle: false
+    entities:
+      - number.mennekes_amtron_limite_di_corrente_di_ricarica
+      - switch.mennekes_amtron_ricarica_in_pausa
+      - sensor.mennekes_amtron_potenza_totale
+      - sensor.mennekes_amtron_energia_totale

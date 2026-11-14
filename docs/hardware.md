@@ -1,4 +1,6 @@
-# Hardware Installation
+# Prepare the wallbox and RS-485 connection
+
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
 Wiring, DIP switches and connecting a USB or LAN adapter.
 

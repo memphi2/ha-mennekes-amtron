@@ -10,7 +10,7 @@ last charging state, including a deliberate pause, independently of HA.
 commands. Further pages set up the USB or LAN connection, show every register,
 change polling intervals without a restart and record the Modbus traffic for ten
 minutes. They need a Home Assistant administrator and Supervisor **2026.10.4 or
-newer**. See [Web pages](DOCS.md#web-pages).
+newer**. See [Web pages](DOCS.md#daily-use).
 
 **Charging jobs** run in the app itself, also while Home Assistant is offline:
 one order for the plugged-in car with a time window, a current and a maximum
@@ -21,9 +21,10 @@ the charging release on, unlocks the wallbox or overrides a battery target.
 Optional **Virtual Plug & Charge** lets HA grant charging for a recognized
 vehicle after fresh cable/home detection. The app keeps an accepted grant
 through HA Core restarts for the same physical connection; new connections need
-fresh recognition. Deliberate pauses, locks and reached charging targets remain
-effective. This is a convenience feature, not ISO 15118 vehicle authentication.
-See [charging permission](DOCS.md#virtual-plug--charge).
+fresh recognition. A fresh recognized plug-in may lift a previous manual
+pause; a restored grant after restart preserves it. Locks and reached targets
+remain effective. This is a convenience feature, not ISO 15118 vehicle authentication.
+See [charging permission](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/vehicle-setup.md#optional-virtual-plug--charge).
 
 The app also provides optional Waveshare adapter setup and TCP login,
 configurable charging waits, vehicle-aware phase switching and AppArmor

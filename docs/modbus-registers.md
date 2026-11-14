@@ -1,5 +1,10 @@
 # Modbus Register Map
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 This is the project's own description of the register map the integration
 implements. It is **not** a copy of the manufacturer's document.
 
