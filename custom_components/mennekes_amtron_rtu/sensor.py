@@ -28,6 +28,7 @@ from .entity import MennekesAmtronEntity
 from .entity_attributes import read_attributes
 from .entry_types import MennekesAmtronConfigEntry
 from .estimate_sensor import AmtronEstimateSensor
+from .job_entities import JobDraftStatus
 from .sensor_descriptions import (
     CONTROL_SENSOR_DESCRIPTIONS,
     ESTIMATE_SENSOR_DESCRIPTIONS,
@@ -48,6 +49,8 @@ async def async_setup_entry(
 ) -> None:
     """Add the sensors this device supports."""
 
+    if entry.runtime_data.orders is not None:
+        async_add_entities([JobDraftStatus(entry)])
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
     features = vehicle_features(hass, entry)

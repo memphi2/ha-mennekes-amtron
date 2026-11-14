@@ -241,6 +241,18 @@
       },
       "timed_vehicle_departure": {
         "name": "Use vehicle departure"
+      },
+      "job_start": {
+        "name": "Start charging job"
+      },
+      "job_stop": {
+        "name": "Stop charging job"
+      },
+      "job_clear": {
+        "name": "Clear charging job"
+      },
+      "job_reset_draft": {
+        "name": "Reset job draft"
       }
     },
     "number": {
@@ -252,6 +264,15 @@
       },
       "soc_goal": {
         "name": "Vehicle charge target"
+      },
+      "job_current_a": {
+        "name": "Job current"
+      },
+      "job_energy_kwh": {
+        "name": "Job energy"
+      },
+      "job_reserve_kwh": {
+        "name": "Job immediate reserve"
       }
     },
     "select": {
@@ -619,6 +640,20 @@
             "name": "Boost available"
           }
         }
+      },
+      "job_draft_status": {
+        "name": "Charging job draft",
+        "state": {
+          "needs_finish": "Choose an end time",
+          "ready": "Ready to start",
+          "job_exists": "An order is already running",
+          "job_not_permitted": "Check vehicle, release, meter and pending changes",
+          "job_current_exceeds_cap": "Current exceeds the app limit",
+          "job_preview_expired": "Start time has passed; choose a new time",
+          "job_storage_unavailable": "Draft storage unavailable",
+          "invalid_job_request": "Check start, end and energy values",
+          "job_stop_unconfirmed": "Waiting for confirmed stop"
+        }
       }
     },
     "switch": {
@@ -801,6 +836,12 @@
     "datetime": {
       "timed_departure": {
         "name": "Next departure"
+      },
+      "job_start_at": {
+        "name": "Job earliest start"
+      },
+      "job_finish_at": {
+        "name": "Job latest finish"
       }
     }
   },

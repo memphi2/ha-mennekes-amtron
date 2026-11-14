@@ -241,6 +241,18 @@
       },
       "timed_vehicle_departure": {
         "name": "Usa la partenza del veicolo"
+      },
+      "job_start": {
+        "name": "Avvia ordine di ricarica"
+      },
+      "job_stop": {
+        "name": "Ferma ordine di ricarica"
+      },
+      "job_clear": {
+        "name": "Cancella ordine di ricarica"
+      },
+      "job_reset_draft": {
+        "name": "Reimposta bozza di ricarica"
       }
     },
     "number": {
@@ -252,6 +264,15 @@
       },
       "soc_goal": {
         "name": "Obiettivo di carica del veicolo"
+      },
+      "job_current_a": {
+        "name": "Corrente ordine"
+      },
+      "job_energy_kwh": {
+        "name": "Energia ordine"
+      },
+      "job_reserve_kwh": {
+        "name": "Riserva immediata"
       }
     },
     "select": {
@@ -619,6 +640,20 @@
             "name": "Boost disponibile"
           }
         }
+      },
+      "job_draft_status": {
+        "name": "Bozza di ricarica",
+        "state": {
+          "needs_finish": "Scegliere l’ora di fine",
+          "ready": "Pronto per avviare",
+          "job_exists": "Un ordine è già in corso",
+          "job_not_permitted": "Controllare veicolo, consenso, contatore e modifiche in attesa",
+          "job_current_exceeds_cap": "Corrente oltre il limite",
+          "job_preview_expired": "Ora di avvio trascorsa",
+          "job_storage_unavailable": "Archivio bozza non disponibile",
+          "invalid_job_request": "Controllare inizio, fine ed energia",
+          "job_stop_unconfirmed": "Attesa della conferma di arresto"
+        }
       }
     },
     "switch": {
@@ -801,6 +836,12 @@
     "datetime": {
       "timed_departure": {
         "name": "Prossima partenza"
+      },
+      "job_start_at": {
+        "name": "Primo avvio consentito"
+      },
+      "job_finish_at": {
+        "name": "Fine entro"
       }
     }
   },

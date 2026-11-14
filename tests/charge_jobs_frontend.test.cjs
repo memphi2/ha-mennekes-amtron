@@ -13,19 +13,23 @@ function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPr
     return elements.get(id);
   };
   el("job_energy").value="10";el("job_current").value="12";el("job_boost_minutes").value="30";
-  let state={schema:1,revision:"revision-1",csrf:"test-csrf",scope:"scope-1",ready:true,storage_error:false,available:true,present:true,permitted:true,meter_fresh:true,max_current_a:16,job:null};
+  let state={schema:1,revision:"revision-1",csrf:"test-csrf",scope:"scope-1",ready:true,storage_error:false,available:true,present:true,permitted:true,meter_fresh:true,max_current_a:16,job:null,draft:{revision:"draft-1",storage_error:false,values:{start_at:null,finish_at:new Date(Date.now()+3600000).toISOString(),current_a:12,energy_kwh:10,reserve_kwh:0}}};
   const document={hidden:false,documentElement:{lang:language},getElementById:el,querySelectorAll:()=>[],addEventListener:(k,f)=>{docEvents[k]=f;}};
   const fetch=async(url,options={})=>{
     calls.push({url,options});
     if(!options.method){if(failRead)throw new Error("offline");return {ok:true,json:async()=>structuredClone(state)};}
     const body=JSON.parse(options.body);
-    if(body.action==="preview")return {ok:true,json:async()=>({schema:1,revision:state.revision,scope:state.scope,request:body.request})};
+    if(body.action==="edit_draft"){
+      if(body.draft_revision!==state.draft.revision)return {ok:false,json:async()=>({error:"job_changed"})};
+      state={...state,draft:{...state.draft,revision:state.draft.revision+"x",values:body.changes}};
+    }
+    if(body.action==="preview_draft")return {ok:true,json:async()=>({schema:1,revision:state.revision,scope:state.scope,draft_revision:state.draft.revision,request:{id:"job-1",...state.draft.values,start_at:state.draft.values.start_at||new Date().toISOString()}})};
     if(body.action==="preview_boost"){
       const response={ok:true,json:async()=>({schema:1,revision:state.revision,scope:state.scope,until:new Date(Date.now()+body.minutes*60000).toISOString(),current_a:12,energy_kwh:10})};
       if(holdBoostPreview)return new Promise(resolve=>{finishBoostPreview=()=>resolve(response);});
       return response;
     }
-    if(body.action==="create"){
+    if(body.action==="create_draft"){
       state={...state,revision:"revision-2",job:{...body.request,state:"charging",reason:"charging",delivered_kwh:0,scope_ended:false,holding:true}};
       if(lostCreate)throw new Error("reply lost");
     }else if(body.action==="boost"){
@@ -37,7 +41,7 @@ function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPr
     else if(body.action==="clear")state={...state,revision:"revision-4",job:null};
     return {ok:true,json:async()=>structuredClone(state)};
   };
-  vm.runInNewContext(source,{document,crypto:{randomUUID:()=>"12345678-1234-1234-1234-123456789012"},Date,Number,String,JSON,Error,AbortController,fetch,setTimeout:(fn)=>{const id=++next;timers.set(id,()=>{timers.delete(id);return fn();});return id;},clearTimeout:id=>timers.delete(id),addEventListener:(k,f)=>{winEvents[k]=f;}});
+  vm.runInNewContext(source,{document,crypto:{randomUUID:()=>"12345678-1234-1234-1234-123456789012"},Date,Number,Math,String,JSON,Error,AbortController,fetch,setTimeout:(fn)=>{const id=++next;timers.set(id,()=>{timers.delete(id);return fn();});return id;},clearTimeout:id=>timers.delete(id),addEventListener:(k,f)=>{winEvents[k]=f;}});
   return {el,calls,document,docEvents,winEvents,timers,setState:nextState=>{state={...state,...nextState};},submit:()=>el("job_form").events.submit({preventDefault(){}}),click:id=>el(id).events.click(),finishBoostPreview:()=>finishBoostPreview()};
 }
 
@@ -45,17 +49,17 @@ test("initial rendering is passive and never sends a command",async()=>{
   const h=harness();await flush();assert.match(h.el("job_notice").textContent,/^Bereit/);assert.equal(h.el("job_fields").disabled,false);assert.equal(h.calls.length,1);assert.equal(h.calls[0].options.method,undefined);
 });
 test("a preview and a separate confirmation precede creation; stop and clear do not resume",async()=>{
-  const h=harness();await flush();await h.submit();assert.equal(h.el("job_confirmation").hidden,false);assert.equal(h.calls.filter(c=>c.options.method==="POST").length,1);
-  await h.click("job_confirm");await flush();assert.equal(h.el("job_fields").disabled,true);assert.match(h.el("job_state").textContent,/Laden angefordert/);
+  const h=harness();await flush();await h.submit();assert.equal(h.el("job_confirmation").hidden,false);assert.equal(h.calls.filter(c=>c.options.method==="POST").length,2);
+  await h.click("job_confirm");await flush();assert.equal(h.el("job_fields").disabled,false);assert.match(h.el("job_state").textContent,/Laden angefordert/);
   await h.click("job_stop");await flush();assert.match(h.el("job_state").textContent,/gestoppt/);
   await h.click("job_clear");await flush();assert.equal(h.el("job_state").textContent,"Kein Auftrag");
-  const posts=h.calls.filter(c=>c.options.method==="POST");assert.deepEqual(posts.map(c=>JSON.parse(c.options.body).action),["preview","create","stop","clear"]);assert.ok(posts.every(c=>c.options.headers["X-Amtron-CSRF"]==="test-csrf"));
+  const posts=h.calls.filter(c=>c.options.method==="POST");assert.deepEqual(posts.map(c=>JSON.parse(c.options.body).action),["edit_draft","preview_draft","create_draft","stop","clear"]);assert.ok(posts.every(c=>c.options.headers["X-Amtron-CSRF"]==="test-csrf"));
 });
 test("editing invalidates a previously confirmed preview",async()=>{
-  const h=harness();await flush();await h.submit();h.el("job_form").events.input();await h.click("job_confirm");assert.equal(h.el("job_confirmation").hidden,true);assert.equal(h.calls.filter(c=>c.options.method==="POST").length,1);
+  const h=harness();await flush();await h.submit();h.el("job_form").events.input();await h.click("job_confirm");assert.equal(h.el("job_confirmation").hidden,true);assert.equal(h.calls.filter(c=>c.options.method==="POST").length,2);
 });
 test("lost create response is resolved by reading state, never by repeating a POST",async()=>{
-  const h=harness({lostCreate:true});await flush();await h.submit();await h.click("job_confirm");await flush();assert.equal(h.calls.filter(c=>c.options.method==="POST").length,2);assert.match(h.el("job_state").textContent,/Laden angefordert/);
+  const h=harness({lostCreate:true});await flush();await h.submit();await h.click("job_confirm");await flush();assert.equal(h.calls.filter(c=>c.options.method==="POST").length,3);assert.match(h.el("job_state").textContent,/Laden angefordert/);
 });
 test("failed reads disable all mutations and hide stale status",async()=>{
   const h=harness({failRead:true});await flush();assert.equal(h.el("job_fields").disabled,true);assert.equal(h.el("job_stop").disabled,true);assert.equal(h.el("job_status").hidden,true);assert.match(h.el("job_notice").textContent,/Keine aktuelle/);await h.submit();assert.equal(h.calls.length,1);
@@ -121,7 +125,7 @@ test("a finished order whose pause was confirmed allows a new order but no stop"
   assert.match(h.el("job_detail").textContent,/Home Assistant steuert/);
   h.setState({job:{id:"job-1",state:"reached",reason:"energy_reached",start_at:new Date().toISOString(),finish_at:new Date(Date.now()+3600000).toISOString(),current_a:12,energy_kwh:10,delivered_kwh:10,scope_ended:false,holding:true,boost_until:null}});
   for(const callback of [...h.timers.values()])callback();await flush();
-  assert.equal(h.el("job_fields").disabled,true);assert.equal(h.el("job_stop").disabled,true);
+  assert.equal(h.el("job_fields").disabled,false);assert.equal(h.el("job_stop").disabled,true);
   assert.doesNotMatch(h.el("job_detail").textContent,/Home Assistant/);
 });
 
@@ -135,4 +139,18 @@ test("a refusal stays visible after the state is read again, until the next acti
 });
 test("read-only mode names the configuration instead of a missing release",async()=>{
   const h=harness();h.setState({read_only:true,permitted:false});await flush();assert.match(h.el("job_notice").textContent,/^Nur-Lesen-Modus/);
+});
+
+test("saving a draft sends no create and polling never overwrites unsaved edits",async()=>{
+ const h=harness();await flush();h.el("job_energy").value="25";h.el("job_form").events.input();
+ for(const cb of [...h.timers.values()])cb();await flush();assert.equal(h.el("job_energy").value,"25");
+ await h.click("job_save_draft");assert.deepEqual(h.calls.filter(c=>c.options.method).map(c=>JSON.parse(c.options.body).action),["edit_draft"]);
+ assert.match(h.el("job_notice").textContent,/Entwurf gespeichert/);
+});
+test("a conflicting edit is refused and reloading adopts the other surface's values",async()=>{
+ const h=harness();await flush();h.el("job_energy").value="25";h.el("job_form").events.input();
+ h.setState({draft:{revision:"other",storage_error:false,values:{start_at:null,finish_at:null,current_a:8,energy_kwh:15,reserve_kwh:0}}});
+ for(const cb of [...h.timers.values()])cb();await flush();assert.equal(h.el("job_energy").value,"25");
+ await h.click("job_save_draft");assert.equal(h.calls.filter(c=>c.options.method).length,1);
+ await h.click("job_reload_draft");await flush();assert.equal(h.el("job_energy").value,"15");
 });

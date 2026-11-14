@@ -241,6 +241,18 @@
       },
       "timed_vehicle_departure": {
         "name": "Vertrektijd van voertuig overnemen"
+      },
+      "job_start": {
+        "name": "Laadopdracht starten"
+      },
+      "job_stop": {
+        "name": "Laadopdracht stoppen"
+      },
+      "job_clear": {
+        "name": "Laadopdracht wissen"
+      },
+      "job_reset_draft": {
+        "name": "Laadconcept resetten"
       }
     },
     "number": {
@@ -252,6 +264,15 @@
       },
       "soc_goal": {
         "name": "Laaddoel van voertuig"
+      },
+      "job_current_a": {
+        "name": "Opdrachtstroom"
+      },
+      "job_energy_kwh": {
+        "name": "Opdrachtenergie"
+      },
+      "job_reserve_kwh": {
+        "name": "Directe reserve"
       }
     },
     "select": {
@@ -619,6 +640,20 @@
             "name": "Boost mogelijk"
           }
         }
+      },
+      "job_draft_status": {
+        "name": "Concept laadopdracht",
+        "state": {
+          "needs_finish": "Kies een eindtijd",
+          "ready": "Klaar om te starten",
+          "job_exists": "Er loopt al een opdracht",
+          "job_not_permitted": "Controleer auto, vrijgave, meter en wachtende wijzigingen",
+          "job_current_exceeds_cap": "Stroom boven de app-limiet",
+          "job_preview_expired": "Starttijd verstreken",
+          "job_storage_unavailable": "Conceptopslag niet beschikbaar",
+          "invalid_job_request": "Controleer start, einde en energie",
+          "job_stop_unconfirmed": "Wachten op bevestigde stop"
+        }
       }
     },
     "switch": {
@@ -801,6 +836,12 @@
     "datetime": {
       "timed_departure": {
         "name": "Volgend vertrek"
+      },
+      "job_start_at": {
+        "name": "Vroegste start"
+      },
+      "job_finish_at": {
+        "name": "Uiterste eindtijd"
       }
     }
   },

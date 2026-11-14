@@ -5,6 +5,12 @@
   const found = languages.indexOf((document.documentElement.lang || "").slice(0, 2).toLowerCase());
   const column = found < 0 ? 0 : found, locale = languages[column];
   const words = {
+    reset_draft:["Reset draft (keeps running order)","Entwurf zurücksetzen (laufender Auftrag bleibt)","Réinitialiser le brouillon (ordre conservé)","Concept resetten (opdracht blijft)","Reimposta bozza (ordine invariato)"],
+    draft_storage_error:["Draft could not be read or saved. Reset the draft to recover; the current order is unchanged.","Entwurf konnte nicht gelesen oder gespeichert werden. Entwurf zum Wiederherstellen zurücksetzen; der laufende Auftrag bleibt unverändert.","Lecture ou enregistrement du brouillon impossible. Réinitialisez-le ; l’ordre actuel reste inchangé.","Concept kon niet worden gelezen of opgeslagen. Reset het concept; de huidige opdracht blijft ongewijzigd.","Impossibile leggere o salvare la bozza. Reimpostarla; l’ordine attuale resta invariato."],
+    draft_saved:["Draft saved; charging unchanged.","Entwurf gespeichert; Laden unverändert.","Brouillon enregistré ; recharge inchangée.","Concept opgeslagen; laden ongewijzigd.","Bozza salvata; ricarica invariata."],
+    save_draft:["Save draft","Entwurf speichern","Enregistrer le brouillon","Concept opslaan","Salva bozza"],
+    reload_draft:["Reload saved draft","Gespeicherten Entwurf laden","Recharger le brouillon","Opgeslagen concept laden","Ricarica bozza salvata"],
+    draft_hint:["Shared with Home Assistant. Saving never starts charging. Leave Start empty to start when confirmed.","Gemeinsam mit Home Assistant. Speichern startet keine Ladung. Start leer lassen, um bei Bestätigung zu starten.","Partagé avec Home Assistant. Enregistrer ne démarre pas la recharge. Début vide : démarrage à la confirmation.","Gedeeld met Home Assistant. Opslaan start geen laadbeurt. Lege starttijd: starten na bevestiging.","Condivisa con Home Assistant. Salvare non avvia la ricarica. Inizio vuoto: avvio alla conferma."],
     forecast_title:["Estimated time to the AC-energy ceiling","Schätzung bis zur AC-Energieobergrenze","Estimation jusqu’au plafond d’énergie AC","Schatting tot de AC-energiegrens","Stima fino al tetto di energia AC"],
     forecast_hint:["Conditional on similar charging conditions. Not a battery percentage or a guaranteed finish; other limits may stop earlier.","Ähnliche Ladebedingungen vorausgesetzt. Kein Batterie-Prozentwert und keine garantierte Endzeit; andere Grenzen können früher stoppen.","Sous réserve de conditions de recharge similaires. Ni un pourcentage de batterie ni une fin garantie ; d’autres limites peuvent arrêter plus tôt.","Onder vergelijkbare laadomstandigheden. Geen accupercentage en geen gegarandeerd einde; andere grenzen kunnen eerder stoppen.","A condizioni di ricarica simili. Non è una percentuale della batteria né una fine garantita; altri limiti possono fermare prima."],
     reserve:["Immediate reserve, kWh","Sofortreserve in kWh","Réserve immédiate, kWh","Directe reserve, kWh","Riserva immediata, kWh"],
@@ -94,8 +100,7 @@
   const date = value => new Date(value).toLocaleString(locale, {timeZoneName:"short"});
   const local = d => { const p = n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
   let state = null, proposal = null, busy = false, timer = null, readAbort = null, generation = 0, hidden = false, lastError = "";
-  el("job_start").value = local(new Date(Date.now()+60000));
-  el("job_finish").value = local(new Date(Date.now()+8*3600000));
+  let draftRevision = null, draftDirty = false;
   const ended = job => ["reached","finished","stopped","interrupted"].includes(job.state);
   const reserveText = job => job?.reserve_kwh ? ` · ${t("reserve")}: ${job.reserve_kwh}${typeof job.reserve_reached === "boolean" ? ` (${t(job.reserve_reached ? "reserve_done" : "reserve_pending")})` : ""}` : "";
   const forecastWords = {
@@ -142,9 +147,11 @@
   }
   function invalidate() { proposal=null; el("job_confirmation").hidden=true; }
   function render() {
-    const good = state?.schema === 1 && state.ready && !state.storage_error;
+    const good = state?.schema === 1 && state.ready;
     el("job_status").hidden = !state;
-    el("job_fields").disabled = busy || !good || !state.available || state.present !== true || !state.permitted || !state.meter_fresh || Boolean(state.job?.holding);
+    el("job_fields").disabled = busy || !good || state.read_only || !state.draft || state.draft.storage_error;
+    el("job_reset_draft").disabled=busy || !state?.draft || state.read_only;
+    el("job_reload_draft").disabled=busy || !state;
     el("job_current").max=String(state?.max_current_a || 6);
     el("job_stop").disabled=busy || !state?.job?.holding || ended(state.job);
     el("job_clear").disabled=busy || !state || (!state.job && !state.storage_error && !state.manual_stop_pending);
@@ -169,9 +176,16 @@
       const data=await response.json();
       if (!response.ok || data.schema!==1 || typeof data.revision!=="string" || typeof data.csrf!=="string") throw new Error("invalid");
       if (own!==generation || busy) return;
-      if (proposal && proposal.revision!==data.revision) invalidate();
+      if (proposal && (proposal.revision!==data.revision || (proposal.draft_revision && proposal.draft_revision!==data.draft?.revision))) invalidate();
+      if (!draftDirty && data.draft?.values) {
+        draftRevision=data.draft.revision;
+        for (const [id,key] of [["start","start_at"],["finish","finish_at"],["current","current_a"],["energy","energy_kwh"],["reserve","reserve_kwh"]]) {
+          const value=data.draft.values[key];
+          el(`job_${id}`).value=key.endsWith("_at") ? (value ? local(new Date(value)) : "") : String(value);
+        }
+      } else if (draftDirty && draftRevision!==data.draft?.revision) lastError=t("job_changed");
       // A refusal stays visible until the next action.
-      state=data;render();notice(lastError || (data.storage_error ? t("storage_error") : data.job ? t(data.job.state) : data.read_only ? t("read_only") : data.available && data.permitted && data.meter_fresh ? t("ready") : t("unavailable")));
+      state=data;render();notice(lastError || (data.draft?.storage_error ? t("draft_storage_error") : data.storage_error ? t("storage_error") : data.job ? t(data.job.state) : data.read_only ? t("read_only") : data.available && data.permitted && data.meter_fresh ? t("ready") : t("unavailable")));
     } catch (_) { if(own===generation){ state=null;invalidate();render();notice(t("offline")); } }
     finally {clearTimeout(timeout);if(own===generation){readAbort=null;if(!hidden&&!document.hidden)timer=setTimeout(read,5000);}}
   }
@@ -188,18 +202,44 @@
     } catch (_) { lastError=t("uncertain");notice(lastError);return null; }
     finally {clearTimeout(timeout);busy=false;render();}
   }
-  el("job_form").addEventListener("input",invalidate);
+  el("job_form").addEventListener("input",()=>{draftDirty=true;invalidate();});
+  async function saveDraft() {
+    if (!state || !draftRevision || busy) return false;
+    const changes={};
+    for (const [id,key] of [["start","start_at"],["finish","finish_at"],["current","current_a"],["energy","energy_kwh"],["reserve","reserve_kwh"]]) {
+      const value=el(`job_${id}`).value;
+      if (key.endsWith("_at")) {
+        const parsed=value ? new Date(value) : null;
+        if (parsed && !Number.isFinite(parsed.getTime())) {notice(t("invalid_job_request"));return false;}
+        changes[key]=parsed ? parsed.toISOString() : null;
+      } else changes[key]=Number(value);
+    }
+    for (const [key,min,max] of [["current_a",6,state.max_current_a],["energy_kwh",0.1,1000],["reserve_kwh",0,changes.energy_kwh]]) {
+      const value=changes[key];
+      if (!Number.isFinite(value) || value<min || value>max || Math.abs(value*10-Math.round(value*10))>1e-8) {
+        notice(t("invalid_job_request"));return false;
+      }
+    }
+    const csrf=state.csrf;
+    const result=await post({action:"edit_draft",draft_revision:draftRevision,changes});
+    if (!result?.draft) return false;
+    state={...result,csrf};draftRevision=result.draft.revision;draftDirty=false;render();return true;
+  }
+  el("job_save_draft").addEventListener("click",async()=>{invalidate();if(await saveDraft())notice(t("draft_saved"));timer=setTimeout(read,5000);});
+  el("job_reset_draft").addEventListener("click",async()=>{
+    if(!state||busy)return;
+    invalidate();
+    const result=await post({action:"reset_draft",draft_revision:draftRevision,confirm:true});
+    if(result){draftDirty=false;notice(t("draft_saved"));}
+    void read();
+  });
+  el("job_reload_draft").addEventListener("click",()=>{if(busy)return;draftDirty=false;lastError="";invalidate();suspend();void read();});
   el("job_boost_minutes").addEventListener("input",invalidate);
   el("job_form").addEventListener("submit",async event=>{
     event.preventDefault();if(!state||busy||!el("job_form").reportValidity())return;
     invalidate();
-    const start=new Date(el("job_start").value), finish=new Date(el("job_finish").value);
-    if(!Number.isFinite(start.getTime())||!Number.isFinite(finish.getTime())||finish<=start){notice(t("invalid_job_request"));return;}
-    const request={id:crypto.randomUUID().replaceAll("-",""),start_at:start.toISOString(),finish_at:finish.toISOString(),current_a:Number(el("job_current").value),energy_kwh:Number(el("job_energy").value)};
-    const reserve=Number(el("job_reserve")?.value || 0);
-    if(!Number.isFinite(reserve)||reserve<0||reserve>request.energy_kwh||Math.abs(reserve*10-Math.round(reserve*10))>1e-8){notice(t("invalid_job_request"));return;}
-    if(reserve>0)request.reserve_kwh=reserve;
-    const result=await post({action:"preview",revision:state.revision,scope:state.scope,request});
+    if(!await saveDraft()){timer=setTimeout(read,5000);return;}
+    const result=await post({action:"preview_draft",draft_revision:draftRevision,revision:state.revision,scope:state.scope});
     if(result?.schema===1&&result.request){proposal={...result,kind:"create"};el("job_summary").textContent=`${date(result.request.start_at)} → ${date(result.request.finish_at)} · ${result.request.current_a} A · ${result.request.energy_kwh} kWh${reserveText(result.request)}`;el("job_confirmation").hidden=false;render();}else{state=null;render();}
     timer=setTimeout(read,5000);
   });
@@ -218,7 +258,7 @@
   });
   el("job_confirm").addEventListener("click",async()=>{
     if(!proposal||busy)return;const p=proposal;invalidate();
-    const payload=p.kind==="boost" ? {action:"boost",revision:p.revision,scope:p.scope,until:p.until} : {action:"create",revision:p.revision,scope:p.scope,request:p.request};
+    const payload=p.kind==="boost" ? {action:"boost",revision:p.revision,scope:p.scope,until:p.until} : {action:"create_draft",draft_revision:p.draft_revision,revision:p.revision,scope:p.scope,request:p.request};
     const result=await post(payload);
     if(result)notice(t("saved"));state=null;render();void read();
   });

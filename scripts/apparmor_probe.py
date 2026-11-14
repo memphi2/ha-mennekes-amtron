@@ -29,6 +29,7 @@ from amtron_device.charge_job_store import ChargeJobStore
 from amtron_device.charge_rate_store import RateStore
 from amtron_device.decode import encode_register
 from amtron_device.departure_store import DepartureStore
+from amtron_device.job_draft import JobDraft
 from pymodbus import FramerType
 from pymodbus.server import ModbusSerialServer, ModbusTcpServer
 from pymodbus.simulator import SimData, SimDevice
@@ -183,6 +184,7 @@ def check_environment(profile: str) -> None:
     require(Path("/proc/self/attr/current").read_text().strip() == f"{profile} (enforce)", "probe is not enforcing the expected profile")
     require(not (DATA / "service-token").exists(), "token fixture must start empty")
     require(not (DATA / "intent.json").exists(), "intent fixture must start empty")
+    require(not (DATA / "job-draft.json").exists(), "draft fixture must start empty")
     require(not (DATA / "charge-job.json").exists(), "charge job fixture must start empty")
     require(not (DATA / "charge-rates.json").exists(), "rate history fixture must start empty")
     require(not (DATA / "departure-plan.json").exists(), "departure plan fixture must start empty")
@@ -192,7 +194,7 @@ def check_temporary_files() -> None:
     require(
         not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*"))
         and not list(DATA.glob(".job-*")) and not list(DATA.glob(".rates-*"))
-        and not list(DATA.glob(".departure-*")),
+        and not list(DATA.glob(".departure-*")) and not list(DATA.glob(".draft-*")),
         "atomic save left temporary files",
     )
 
@@ -210,6 +212,12 @@ def check_charge_job_storage() -> None:
     }, binding="a" * 64, total_kwh=100, now=now)
     path = DATA / "charge-job.json"
     try:
+        draft = JobDraft(DATA / "job-draft.json", SERIAL)
+        draft.save(draft.values)
+        restored_draft = JobDraft(draft.path, SERIAL)
+        restored_draft.load()
+        require(restored_draft.values == draft.values, "draft could not be read back")
+        require(stat.S_IMODE(draft.path.stat().st_mode) == 0o600, "draft file is not private")
         ChargeJobStore(path, SERIAL).save(job)
         restored = ChargeJobStore(path, SERIAL).load()
         require(restored is not None and restored.identifier == job.identifier, "saved charge job could not be read back")

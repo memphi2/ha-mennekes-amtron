@@ -42,11 +42,15 @@
   </section>
   <section class="card">
     <h2 data-text="new">New order</h2>
+    <p class="hint" data-text="draft_hint">Shared with Home Assistant. Saving never starts charging.</p>
+    <button id="job_reload_draft" type="button" data-text="reload_draft">Reload saved draft</button>
+    <button id="job_reset_draft" type="button" data-text="reset_draft">Reset draft</button>
     <form id="job_form">
       <fieldset id="job_fields" disabled>
         <legend data-text="window">Local charging window</legend>
+        <button id="job_save_draft" type="button" data-text="save_draft">Save draft</button>
         <label for="job_start" data-text="start">Start</label>
-        <input id="job_start" type="datetime-local" required>
+        <input id="job_start" type="datetime-local">
         <label for="job_finish" data-text="finish">Finish no later than</label>
         <input id="job_finish" type="datetime-local" required>
         <div class="columns">

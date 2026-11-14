@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import Awaitable, Callable
-from copy import copy
+from copy import copy, deepcopy
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -530,6 +530,8 @@ class RemoteClient(MennekesModbusClient):
             # Meter value and timestamp form one observation. Never attach a
             # sample timestamp to an independently carried-forward raw value.
             values = {**values, "energy_total": observed_energy}
+        orders = control.get("orders")
+        draft = orders.get("draft") if isinstance(orders, dict) else None
         return WallboxData(
             values=values,
             failed_blocks=tuple(failed),
@@ -538,6 +540,7 @@ class RemoteClient(MennekesModbusClient):
             service_supports_cancel_pending=control.get("supports_cancel_pending", False),
             service_max_charging_current=control["max_charging_current"],
             service_charging_setpoint=current,
+            service_job_draft=deepcopy(draft) if isinstance(draft, dict) else None,
             pending_change=pending_action,
             pending_change_until=pending_until,
             connection_quality=quality,

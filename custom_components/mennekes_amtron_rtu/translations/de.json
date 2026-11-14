@@ -241,6 +241,18 @@
       },
       "timed_vehicle_departure": {
         "name": "Abfahrt vom Fahrzeug übernehmen"
+      },
+      "job_start": {
+        "name": "Ladeauftrag starten"
+      },
+      "job_stop": {
+        "name": "Ladeauftrag stoppen"
+      },
+      "job_clear": {
+        "name": "Ladeauftrag entfernen"
+      },
+      "job_reset_draft": {
+        "name": "Ladeauftragsentwurf zurücksetzen"
       }
     },
     "number": {
@@ -252,6 +264,15 @@
       },
       "soc_goal": {
         "name": "Fahrzeug-Ladeziel"
+      },
+      "job_current_a": {
+        "name": "Auftragsladestrom"
+      },
+      "job_energy_kwh": {
+        "name": "Auftragsenergie"
+      },
+      "job_reserve_kwh": {
+        "name": "Auftrags-Sofortreserve"
       }
     },
     "select": {
@@ -619,6 +640,20 @@
             "name": "Boost möglich"
           }
         }
+      },
+      "job_draft_status": {
+        "name": "Ladeauftragsentwurf",
+        "state": {
+          "needs_finish": "Endzeit auswählen",
+          "ready": "Bereit zum Starten",
+          "job_exists": "Es läuft bereits ein Auftrag",
+          "job_not_permitted": "Fahrzeug, Ladefreigabe, Zähler und ausstehende Änderungen prüfen",
+          "job_current_exceeds_cap": "Strom überschreitet das App-Limit",
+          "job_preview_expired": "Startzeit abgelaufen; neue Zeit wählen",
+          "job_storage_unavailable": "Entwurfsspeicher nicht verfügbar",
+          "invalid_job_request": "Start, Ende und Energiemenge prüfen",
+          "job_stop_unconfirmed": "Wartet auf bestätigten Stopp"
+        }
       }
     },
     "switch": {
@@ -801,6 +836,12 @@
     "datetime": {
       "timed_departure": {
         "name": "Nächste Abfahrt"
+      },
+      "job_start_at": {
+        "name": "Frühester Auftragsstart"
+      },
+      "job_finish_at": {
+        "name": "Spätestes Auftragsende"
       }
     }
   },
