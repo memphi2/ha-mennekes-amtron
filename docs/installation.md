@@ -129,8 +129,8 @@ required just to use the wallbox.
 
 ## Updates
 
-Before version 1.0, beta updates may deliberately change configuration, stored
-state and the service API without migration. Read the release notes first.
+Before version 1.0, releases may change configuration, stored state and the
+service API without migration. Read the release notes first.
 After an incompatible update, reconfigure the affected profiles or planning
 options and verify Plug & Charge, pause, release, charging target and departure
 before use. An incompatible saved app state is preserved and charging control is blocked.
@@ -139,7 +139,7 @@ on, charging release off, resume current 6 A and no targets. This does not start
 charging. Reconfigure the desired policies before explicitly enabling release
 and resuming. In read-only mode the app cannot stop a physical charge.
 This does not change the supported wallbox families or minimum Home Assistant
-version. The current integration requires service **0.9.0b8 or newer**, API 2;
+version. The current integration requires service **0.9.0 or newer**, API 2;
 app and integration versions do not otherwise have to match.
 
 1. Back up HA and read the release notes, especially the changes marked
