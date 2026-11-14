@@ -217,3 +217,19 @@ def test_time_stop_retains_five_second_floor_and_clearing_does_not_leave_a_pause
             await service._guest_tick()
             assert transport.writes == before
     asyncio.run(run())
+
+
+def test_unknown_stop_readback_is_not_reported_as_confirmed_pause(tmp_path):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                   "expected_guest_revision": service.guest_revision})
+            service.control.pause_requested = True
+            service.client.write_state.confirmed_current = None
+            service.data.values["charging_current_ems"] = None
+            assert service.control.is_paused is None
+            assert service.guest_active
+            service.data.values["charging_current_ems"] = 1.0
+            assert service.control.is_paused is True
+            assert not service.guest_active
+    asyncio.run(run())

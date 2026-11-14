@@ -107,7 +107,7 @@ class GuestModbusService(ConsoleModbusService):
     @property
     def guest_active(self) -> bool:
         return (self.guest_mode and self.control is not None
-                and (self.control.pause_requested is not True or self.control.is_paused is False))
+                and (self.control.pause_requested is not True or self.control.is_paused is not True))
 
     @property
     def target_time_revision(self) -> str | None:
