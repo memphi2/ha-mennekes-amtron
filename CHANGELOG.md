@@ -24,9 +24,10 @@ integration and app are published together.
 - A refused guest start names what to do, in the app and in Home Assistant:
   plug in the car, unlock the wallbox or raise the reached limit.
 - Charging losses and costs now find completed charges in practice. A failed
-  poll, an adapter reconnect, or plug and wallbox state changing in separate
-  polls while plugging in or unplugging discarded the whole charge; the final
-  meter reading may now follow the unplug.
+  poll or meter read, an adapter reconnect, or plug and wallbox state changing
+  in separate polls while plugging in or unplugging discarded the whole charge;
+  the final meter reading may now follow the unplug. Plugging in a full car no
+  longer clears the last result.
 - Rebuild installation and everyday-use guides, app instructions and five
   Mushroom dashboard examples.
 - **Breaking since 0.8.2:** remove charging-job, boost and reserve APIs,
