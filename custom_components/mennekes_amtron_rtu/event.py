@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from homeassistant.components.event import EventEntity
 from homeassistant.components.logbook import async_log_entry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .coordinator import MennekesAmtronCoordinator
 from .data import WallboxData
@@ -88,7 +91,16 @@ class AmtronWallboxEvent(CoordinatorEntity[MennekesAmtronCoordinator], EventEnti
             value = f" ({self._activity_label("requested_value", "0")})"
         source = self._activity_label("source", event.source)
         reason = "" if event.reason == "completed" else f". {self._activity_label("reason", event.reason)}"
-        async_log_entry(self.hass, "Mennekes Amtron", f"{source}: {action}{value}{reason}.", domain=DOMAIN, entity_id=self.entity_id)
+        occurred = ""
+        if event.occurred_at is not None:
+            label = self._activity_translations.get(
+                f"component.{DOMAIN}.entity.event.control_result.state_attributes.occurred_at.name", "Occurred at",
+            )
+            timestamp = dt_util.as_local(datetime.fromisoformat(event.occurred_at))
+            # The logbook row is received now. Preserve the service's original
+            # time in its text, including the offset for repeated DST hours.
+            occurred = f" {label}: {timestamp.isoformat(sep=' ', timespec='seconds')}."
+        async_log_entry(self.hass, "Mennekes Amtron", f"{source}: {action}{value}{reason}.{occurred}", domain=DOMAIN, entity_id=self.entity_id)
 
 
 class AmtronControlResultEvent(CoordinatorEntity[MennekesAmtronCoordinator], EventEntity):
