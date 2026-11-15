@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
-from aiohttp import ClientError, ClientSession, ClientTimeout
+from aiohttp import ClientError, ClientSession
 from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_call_later
@@ -47,6 +47,7 @@ from .device.registers import ERROR_CODE, RegisterSpec
 from .device.soc_goal import SocGoal
 from .remote_compat import SUPPORTED_API_VERSION, validate_service_version
 from .remote_errors import ServiceConnectionError, ServiceFailure
+from .service_transport import HttpTransport, ServiceTransport
 
 CONF_SERVER_URL = "server_url"
 CONF_SERVER_TOKEN = "server_token"  # noqa: S105 - configuration key, not a credential
@@ -93,11 +94,16 @@ def server_url(value: str) -> str:
 class RemoteClient(MennekesModbusClient):
     """Read service snapshots; no local serial connection or write tunnel."""
 
-    def __init__(self, session: ClientSession, url: str, token: str) -> None:
+    def __init__(
+        self, session: ClientSession | None = None, url: str = "", token: str = "",
+        *, transport: ServiceTransport | None = None,
+    ) -> None:
         super().__init__(SerialConfig(port="remote-service"))
-        self._session = session
-        self._url = server_url(url)
-        self._token = token
+        if transport is None:
+            if session is None:
+                raise ValueError("a session or a transport is required")
+            transport = HttpTransport(session, server_url(url), token)
+        self._transport = transport
         self._connected = False
         self.snapshot: dict[str, Any] = {}
         self.identity = DeviceIdentity()
@@ -153,67 +159,43 @@ class RemoteClient(MennekesModbusClient):
         *, update_connection: bool = True,
     ) -> dict[str, Any]:
         try:
-            async with self._session.request(
-                method,
-                self._url + path,
-                headers={"Authorization": f"Bearer {self._token}"},
-                json=payload,
-                timeout=ClientTimeout(total=15),
-                allow_redirects=False,
-            ) as response:
-                if response.status in (401, 403):
-                    raise ServiceConnectionError("service_auth_failed", "service authentication failed")
-                if response.status == 404 and path == "/v2/state":
-                    raise ServiceConnectionError("service_version_mismatch", "service API version differs")
-                raw = bytearray()
-                async for chunk in response.content.iter_chunked(16384):
-                    raw.extend(chunk)
-                    if len(raw) > 131072:
-                        raise ServiceConnectionError("service_invalid_response", "service response too large")
-                import json
-
-                try:
-                    data = json.loads(raw)
-                except (ValueError, RecursionError) as err:
-                    raise ServiceConnectionError("service_invalid_response", "service response is not JSON") from err
-                if not isinstance(data, dict):
-                    raise ServiceConnectionError("service_invalid_response", "service response is not an object")
-                if response.status == 409:
-                    key = data.get("error")
-                    if key == "device_identity_changed":
-                        raise ServiceConnectionError(
-                            "service_identity_changed", "service identity differs from the configured wallbox"
-                        )
-                    if key == "service_unavailable":
-                        raise ServiceConnectionError(
-                            "service_not_ready", "wallbox is unavailable at the service"
-                        )
-                    placeholders = data.get("placeholders")
-                    if not isinstance(key, str) or (
-                        placeholders is not None
-                        and (
-                            not isinstance(placeholders, dict)
-                            or not all(
-                                isinstance(k, str) and isinstance(v, str)
-                                for k, v in placeholders.items()
-                            )
-                        )
-                    ):
-                        raise ValueError("invalid command error")
-                    error = (
-                        DeviceValidationError
-                        if data.get("validation") is True
-                        else DeviceError
+            status, data = await self._transport.call(method, path, payload)
+            if status == 409:
+                key = data.get("error")
+                if key == "device_identity_changed":
+                    raise ServiceConnectionError(
+                        "service_identity_changed", "service identity differs from the configured wallbox"
                     )
-                    if key == "read_only_mode":
-                        # The service changed policy after our last snapshot.
-                        # Block cached controls until the next normal poll;
-                        # never retry the command or fetch in its error path.
-                        self._mark_unavailable("service_not_ready")
-                    raise error(key, placeholders)
-                if response.status != 200:
-                    raise AmtronConnectionError("service request failed")
-                return data
+                if key == "service_unavailable":
+                    raise ServiceConnectionError(
+                        "service_not_ready", "wallbox is unavailable at the service"
+                    )
+                placeholders = data.get("placeholders")
+                if not isinstance(key, str) or (
+                    placeholders is not None
+                    and (
+                        not isinstance(placeholders, dict)
+                        or not all(
+                            isinstance(k, str) and isinstance(v, str)
+                            for k, v in placeholders.items()
+                        )
+                    )
+                ):
+                    raise ValueError("invalid command error")
+                error = (
+                    DeviceValidationError
+                    if data.get("validation") is True
+                    else DeviceError
+                )
+                if key == "read_only_mode":
+                    # The service changed policy after our last snapshot.
+                    # Block cached controls until the next normal poll;
+                    # never retry the command or fetch in its error path.
+                    self._mark_unavailable("service_not_ready")
+                raise error(key, placeholders)
+            if status != 200:
+                raise AmtronConnectionError("service request failed")
+            return data
         except (ClientError, TimeoutError, ValueError, AmtronConnectionError) as err:
             authentication_failed = (
                 isinstance(err, ServiceConnectionError)
