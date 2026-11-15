@@ -580,6 +580,20 @@ class AmtronControl:
             return None
         return CHARGING_CURRENT_UNLIMITED < float(value) < CHARGING_CURRENT_MINIMUM
 
+    @property
+    def observed_pause(self) -> bool | None:
+        """Fresh current evidence for automatic starts, never a held UI value."""
+        snapshot = self._state()
+        if (
+            snapshot.current_write_generation != self._write_state.current_write_generation
+            or "current_limits" in snapshot.failed_blocks
+        ):
+            return None
+        value = snapshot.fresh(CHARGING_CURRENT_EMS.key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            return None
+        return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
+
     async def async_set_charging_current(
         self,
         value: float,

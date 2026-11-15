@@ -291,7 +291,7 @@ class PlugChargeObserver:
             self._control.pause_requested is True
             and self._plan_status() is None
             and self._control.pending_action is None
-            and self._control.is_paused is None
+            and self._control.observed_pause is None
         ):
             # Do not open the gate while the actual pause register is unknown:
             # a stale saved intent cannot tell us which current is active.
@@ -432,7 +432,7 @@ class PlugChargeObserver:
                 if (
                     candidate[1] == self._fresh_session
                     and self._control.pause_requested is True and self._control.pending_action is None
-                    and self._plan_status() is None and self._control.is_paused is True
+                    and self._plan_status() is None and self._control.observed_pause is True
                 ):
                     # The gate keeps the release off until the grant below, so
                     # this resume switches no charge and starts no long guard.

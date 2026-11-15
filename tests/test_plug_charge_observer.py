@@ -55,7 +55,7 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True
     options["active_vehicle_profile"] = selected
     coordinator, timers = Coordinator(), []
     control = SimpleNamespace(
-        read_only=False, pause_requested=False, is_paused=False,
+        read_only=False, pause_requested=False, is_paused=False, observed_pause=False,
         charging_release_requested=None,
         energy_goal_stop_requested=False, pending_action=None, supports_soc_goal=True,
         soc_goal=SimpleNamespace(target_percent=0.0, stop_requested=False),
@@ -376,6 +376,7 @@ def arm_plan(h, status):
 async def plug_in_paused(h, *, pending=None, plan=None, goal_stop=False, paused=True):
     h.control.pause_requested = paused
     h.control.is_paused = paused
+    h.control.observed_pause = paused
     h.control.pending_action = pending
     h.control.energy_goal_stop_requested = goal_stop
     if plan is not None:
@@ -415,6 +416,7 @@ def test_stale_pause_intent_does_not_lower_a_confirmed_running_current(tmp_path,
             # second resume write that could restore an older 6 A setpoint.
             await plug_in_paused(h)
             h.control.is_paused = False
+            h.control.observed_pause = False
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()
             h.control.async_resume_charging.assert_not_awaited()
@@ -428,6 +430,7 @@ def test_unknown_pause_readback_defers_the_grant(tmp_path, monkeypatch):
         async with observer_harness(tmp_path, monkeypatch) as h:
             await plug_in_paused(h)
             h.control.is_paused = None
+            h.control.observed_pause = None
             h.coordinator.async_update_listeners()
             assert h.observer.status == "blocked"
             assert h.observer.blocked_reason == "register_unavailable"
