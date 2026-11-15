@@ -224,7 +224,7 @@ def test_delayed_command_times_remain_distinct_in_ha_local_time(monkeypatch: pyt
         entity.entity_id = "event.test_wallbox"
         entity._activity_translations[
             "component.mennekes_amtron_rtu.entity.event.control_result.state_attributes.occurred_at.name"
-        ] = "Ausgeführt um"
+        ] = "Ereigniszeit"
         monkeypatch.setattr(dt_util, "DEFAULT_TIME_ZONE", ZoneInfo("Europe/Berlin"))
         activity = []
         monkeypatch.setattr(
@@ -238,8 +238,8 @@ def test_delayed_command_times_remain_distinct_in_ha_local_time(monkeypatch: pyt
                 sequence, "pause", "executed", "completed", "energy_goal", occurred_at,
             ))
         assert [message for message, _metadata in activity] == [
-            "energy_goal: pause_executed. Ausgeführt um: 2026-10-25 02:30:00+02:00.",
-            "energy_goal: pause_executed. Ausgeführt um: 2026-10-25 02:30:00+01:00.",
+            "energy_goal: pause_executed. Ereigniszeit: 2026-10-25 02:30:00+02:00.",
+            "energy_goal: pause_executed. Ereigniszeit: 2026-10-25 02:30:00+01:00.",
             "energy_goal: pause_executed.",
         ]
         # Three commands produce exactly three receipt-time logbook entries;

@@ -740,7 +740,7 @@
             }
           },
           "occurred_at": {
-            "name": "Ausgeführt um"
+            "name": "Ereigniszeit"
           }
         }
       },
