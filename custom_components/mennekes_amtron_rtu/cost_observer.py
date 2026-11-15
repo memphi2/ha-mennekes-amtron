@@ -37,7 +37,7 @@ from .device.charging_cost import (
     CostResult,
     TariffConfig,
 )
-from .device.charging_session import CompletedSession
+from .device.charging_session import CompletedSession, PresenceGap
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
 from .device.registers import ENERGY_TOTAL
@@ -50,8 +50,6 @@ PRICE_VALID_SECONDS = 90 * 60
 # Meter runs kept to price a completed session: one per distinct reading,
 # about three days of charging at the slow one-minute meter cadence.
 _MAX_METER_RUNS = 4096
-# Sessions complete within a few polls of their final reading.
-_END_SEARCH = 16
 
 
 class _MeterRun:
@@ -142,6 +140,7 @@ class ChargingCostObserver:
         self._cycle_start: CostCheckpoint | None = None
         # The running cost started without an idle reading: never complete.
         self._cycle_partial = False
+        self._gap = PresenceGap()
         self._started_at = time.time()
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
@@ -199,8 +198,10 @@ class ChargingCostObserver:
             return False
         if tariff != self._tariff:
             # A meter interval spanning two tariff definitions cannot be
-            # priced with either definition alone.
-            self._accumulator.observe_energy(time.time(), None)
+            # priced with either definition alone; older samples arriving
+            # later are not fresh either.
+            self._price_at = max(self._price_at, time.time())
+            self._accumulator.observe_energy(self._price_at, None)
             self._tariff = tariff
             self._accumulator.tariff = tariff
         self._configured_options = current
@@ -272,10 +273,12 @@ class ChargingCostObserver:
         now = time.time()
         if data is None:
             # One failed poll is no meter evidence: the next reading spans the
-            # gap, and a gap longer than max_gap still marks the cost partial.
+            # gap. A long gap may hide another car for the running estimate.
+            self._presence(now, known=False)
             return
         self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
         present = snapshot_metered_vehicle_present(data.get, self._entry.runtime_data.identity.layout_version)
+        self._presence(now, known=present is not None)
         at = (data.energy_observed_at or 0.0) if self._remote else now
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         energy = data.get(ENERGY_TOTAL.key)
@@ -304,6 +307,10 @@ class ChargingCostObserver:
         if self._dirty and time.monotonic() >= self._retry_at:
             await self._save()
 
+    def _presence(self, now: float, *, known: bool) -> None:
+        if self._gap.observe(now, known=known):
+            self._cycle_start, self._cycle_partial = None, False
+
     def _record(self, checkpoint: CostCheckpoint | None) -> None:
         if checkpoint is None:
             return
@@ -313,16 +320,20 @@ class ChargingCostObserver:
             self._runs.append(_MeterRun(checkpoint))
 
     def _session_cost(self, kwh: float) -> CostResult:
-        """Price the latest observed interval whose meter rose by the session's energy."""
-        runs = list(self._runs)
-        for end_index in range(len(runs) - 1, max(-1, len(runs) - 1 - _END_SEARCH), -1):
-            end = runs[end_index]
-            target = end.first.meter_kwh - kwh
-            for start in reversed(runs[:end_index]):
-                if math.isclose(start.last.meter_kwh, target, rel_tol=1e-9, abs_tol=1e-6):
-                    return end.first.since(start.last, energy_kwh=kwh)
-                if start.last.meter_kwh < target:
-                    break
+        """Price the interval from the last baseline reading to the newest one.
+
+        Only the newest reading may end it: the session completes with its
+        final meter value, and an older end could match another interval.
+        """
+        if not self._runs:
+            return CostResult(0.0, kwh, kwh, False)
+        end = self._runs[-1]
+        target = end.first.meter_kwh - kwh
+        for start in reversed(list(self._runs)[:-1]):
+            if math.isclose(start.last.meter_kwh, target, rel_tol=1e-9, abs_tol=1e-6):
+                return end.first.since(start.last, energy_kwh=kwh)
+            if start.last.meter_kwh < target:
+                break
         return CostResult(0.0, kwh, kwh, False)
 
     async def _save(self) -> None:

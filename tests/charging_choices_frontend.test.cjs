@@ -93,7 +93,7 @@ test('unsaved limits do not block pausing an active guest',async()=>{
  assert.equal(h.elements.get('energy_value').value,'25');
 });
 test('a definite refusal names the fix; anything else stays uncertain',async()=>{
- for(const [code,text] of [['guest_start_not_permitted',/Fahrzeug anstecken/],['guest_deadline_expired',/Zielzeitpunkt ist vorbei/],['energy_goal_stop_active',/Ladegrenze ist bereits erreicht/],['write_rate_limited',/In einigen Sekunden/],['charging_save_uncertain',/nicht bestätigt/],['toString',/nicht bestätigt/]]){
+ for(const [code,text] of [['guest_start_not_permitted',/Fahrzeug anstecken/],['guest_deadline_expired',/Zielzeitpunkt ist vorbei/],['energy_goal_stop_active',/Ladegrenze ist bereits erreicht/],['charging_save_uncertain',/nicht bestätigt/],['toString',/nicht bestätigt/]]){
   const h=setup('targets',[initial(),{error:code}]);await flush();await h.emit('guest_start','click');
   assert.match(h.elements.get('notice').textContent,text,code);
  }

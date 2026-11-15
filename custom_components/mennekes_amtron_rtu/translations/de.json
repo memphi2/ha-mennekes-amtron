@@ -930,8 +930,11 @@
     "wallbox_target_required": {
       "message": "Es sind mehrere Wallboxen eingerichtet; gib die Wallbox an, für die das gilt."
     },
+    "guest_confirmation_required": {
+      "message": "Das Gastladen wurde unterbrochen und braucht einen neuen Start. Gastladen erneut starten; bis dahin bleibt das Laden pausiert."
+    },
     "guest_start_not_permitted": {
-      "message": "Gastladen startet nicht: Fahrzeug anstecken, Wallbox entsperren und einen Wallbox-Fehler beheben. Im Nur-Lesen-Modus zuerst Schreiben in der App einschalten."
+      "message": "Gastladen startet nicht: Fahrzeug anstecken, Wallbox entsperren, Wallbox-Fehler beheben und auf einen aktuellen Status warten. Im Nur-Lesen-Modus zuerst Schreiben einschalten."
     },
     "guest_deadline_expired": {
       "message": "Der gespeicherte Zeitpunkt ist abgelaufen. Einen zukünftigen Zeitpunkt wählen oder löschen."

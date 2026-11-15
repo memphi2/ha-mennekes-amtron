@@ -595,3 +595,44 @@ def test_app_reading_before_the_unplug_still_prices_the_later_session(tmp_path):
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+def test_only_the_newest_reading_may_end_a_priced_session(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            for offset, energy, present in ((0, 100, False), (25, 105, True), (50, 110, True), (60, 112, True)):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present))
+            # 100 -> 110 also has 10 kWh, but the newest reading is 112.
+            with patch(clock, return_value=at + 70):
+                await observer.async_observe(data(at + 70, 112, present=True, fresh=False, session=completed(at)))
+            assert not observer.last.result.complete
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_long_outage_restarts_the_running_cost_without_claiming_completeness(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            for offset, value in ((0, data(at, 100)), (10, data(at+10, 101, present=True)), (60, None), (200, None),
+                                  (210, data(at+210, 105, present=True)), (270, data(at+270, 106, present=True))):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(value)
+            assert not observer.current.complete
+            assert observer.current.energy_kwh == 1
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

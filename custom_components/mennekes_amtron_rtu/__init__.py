@@ -408,8 +408,8 @@ async def async_setup_entry(
                     entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
                     await entry.runtime_data.charging_cost.async_start()
 
-            # A reconnect is like a failed poll: the session bridges a short
-            # gap, and costs follow the completed session.
+            # Failed polls arrive as None. A reconnect re-checks the wallbox
+            # identity; the session judges continuity, costs follow it.
             async def observe_estimates(data: WallboxData | None) -> None:
                 if entry.runtime_data.sessions is not None:
                     await entry.runtime_data.sessions.async_observe(data)

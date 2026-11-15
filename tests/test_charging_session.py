@@ -366,12 +366,15 @@ def test_energy_during_unknown_presence_still_hides_an_older_latest():
     assert history.latest is None
 
 
-def test_meter_read_in_the_unplug_transition_is_the_final_value():
+def test_unplug_transition_read_then_final_idle_read_keeps_the_session():
     history = SessionHistory()
     history.observe(reading(IDLE, 100), now=0)
     history.observe(reading(CHARGING, 101), now=10)
     history.observe(reading(CHARGING, 110, cp=CpState.A1), now=20)  # CP gone, EVSE lags; meter read
-    assert history.observe(reading(IDLE, 110, fresh=False), now=25)
+    assert not history.observe(reading(IDLE, 110, fresh=False), now=25)
+    assert history.observe(reading(IDLE, 110), now=85)  # next slow meter read
+    assert history.latest.wallbox_kwh == 10
+    assert not history.observe(reading(IDLE, 110), now=145)
     assert history.latest.wallbox_kwh == 10
 
 

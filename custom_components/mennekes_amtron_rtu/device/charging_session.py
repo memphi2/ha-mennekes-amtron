@@ -108,7 +108,7 @@ class _Cycle:
 
 
 class PresenceGap:
-    """Bridge short unknown vehicle presence, shared by session and cost.
+    """Bridge short unknown vehicle presence, for the session and running cost.
 
     The span runs from the last known poll. The allowance is two minutes, or
     two and a half observed poll intervals for a slow scan, so one unknown poll
@@ -158,9 +158,6 @@ class SessionHistory:
         self._gap = PresenceGap()
         # An unplugged cycle whose final meter is read in a later poll.
         self._closing: tuple[_Cycle, float] | None = None
-        # A meter read in an unknown-presence poll after the last confirmed
-        # connection, e.g. CP unplugged while the EVSE still reports charging.
-        self._transition_total: float | None = None
 
     @property
     def latest(self) -> CompletedSession | None:
@@ -212,17 +209,10 @@ class SessionHistory:
                     # Energy seen while presence is unknown must still count
                     # as accrued at the next unplugged reading.
                     self._last_energy = total
-                else:
-                    self._transition_total = total
         self._presence(observed_at, known=present is not None)
         if present is None:
             return False
 
-        transition_total, self._transition_total = self._transition_total, None
-        if present is False and total is None and data.energy_read is False:
-            # No energy flows once the CP shows the car gone; the meter read
-            # in that transitional poll is the cycle's final value.
-            total = transition_total
         if present is False:
             if self._cycle is not None and total is None and self._cycle.valid:
                 # The meter is read on the next EVSE change or slow poll; no

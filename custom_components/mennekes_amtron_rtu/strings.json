@@ -930,8 +930,11 @@
     "wallbox_target_required": {
       "message": "Several wallboxes are set up; name the wallbox this applies to."
     },
+    "guest_confirmation_required": {
+      "message": "Guest charging was interrupted and needs a new start. Press Start guest charging again; until then charging stays paused."
+    },
     "guest_start_not_permitted": {
-      "message": "Guest charging cannot start: plug in the car, unlock the wallbox and clear any wallbox error. In read-only mode, enable writes in the app first."
+      "message": "Guest charging cannot start: plug in the car, unlock the wallbox, clear any wallbox error and wait for a current status. In read-only mode, enable writing first."
     },
     "guest_deadline_expired": {
       "message": "The saved time limit has expired. Choose a future time or clear it."

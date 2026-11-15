@@ -930,8 +930,11 @@
     "wallbox_target_required": {
       "message": "Sono configurate più wallbox; indica la wallbox interessata."
     },
+    "guest_confirmation_required": {
+      "message": "La ricarica ospite è stata interrotta e va riavviata. Premere di nuovo Avvia ricarica ospite; fino ad allora la ricarica resta in pausa."
+    },
     "guest_start_not_permitted": {
-      "message": "La ricarica ospite non parte: collegare il veicolo, sbloccare la wallbox ed eliminare eventuali errori della wallbox. In sola lettura, abilitare prima le scritture nell’app."
+      "message": "La ricarica ospite non parte: collegare il veicolo, sbloccare la wallbox, eliminare gli errori e attendere uno stato attuale. In sola lettura, abilitare prima la scrittura."
     },
     "guest_deadline_expired": {
       "message": "Il limite orario è scaduto. Scegliere un orario futuro o cancellarlo."

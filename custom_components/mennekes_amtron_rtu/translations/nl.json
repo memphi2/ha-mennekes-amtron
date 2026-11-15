@@ -930,8 +930,11 @@
     "wallbox_target_required": {
       "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."
     },
+    "guest_confirmation_required": {
+      "message": "Gastladen is onderbroken en moet opnieuw worden gestart. Start gastladen opnieuw; tot dan blijft het laden gepauzeerd."
+    },
     "guest_start_not_permitted": {
-      "message": "Gastladen start niet: sluit het voertuig aan, ontgrendel de laadpaal en verhelp een eventuele laadpaalfout. In alleen-lezenmodus eerst schrijven in de app inschakelen."
+      "message": "Gastladen start niet: sluit het voertuig aan, ontgrendel de laadpaal, verhelp fouten en wacht op een actuele status. In alleen-lezenmodus eerst schrijven inschakelen."
     },
     "guest_deadline_expired": {
       "message": "Het opgeslagen tijdstip is verstreken. Kies een toekomstig tijdstip of wis het."

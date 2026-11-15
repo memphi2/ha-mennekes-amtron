@@ -15,8 +15,8 @@ from .errors import DeviceError
 _REFUSALS = frozenset({
     "soc_goal_source_changed", "soc_goal_limit_unavailable", "read_only_mode",
     "guest_start_not_permitted", "guest_deadline_expired", "time_limit_reached",
-    "energy_goal_stop_active", "write_rate_limited",
-    "control_state_unknown", "energy_goal_invalid", "soc_goal_invalid",
+    "energy_goal_stop_active", "guest_confirmation_required",
+    "energy_goal_invalid", "soc_goal_invalid",
     "energy_goal_unavailable",
 })
 

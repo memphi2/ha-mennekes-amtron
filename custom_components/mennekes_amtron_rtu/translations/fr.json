@@ -930,8 +930,11 @@
     "wallbox_target_required": {
       "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."
     },
+    "guest_confirmation_required": {
+      "message": "La recharge invité a été interrompue et doit être redémarrée. Appuyez à nouveau sur Démarrer la recharge invité ; d’ici là, la recharge reste en pause."
+    },
     "guest_start_not_permitted": {
-      "message": "La recharge invité ne démarre pas : branchez le véhicule, déverrouillez la borne et corrigez toute erreur de la borne. En lecture seule, activez d’abord les écritures dans l’app."
+      "message": "La recharge invité ne démarre pas : branchez le véhicule, déverrouillez la borne, corrigez toute erreur et attendez un état actuel. En lecture seule, activez d’abord l’écriture."
     },
     "guest_deadline_expired": {
       "message": "L’heure limite est dépassée. Choisissez une heure future ou effacez-la."
