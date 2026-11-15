@@ -243,7 +243,12 @@ class AmtronControl:
         return (
             self.goal_controller.stop_requested if self.goal_controller is not None
             else self.energy_goal.stop_requested
-        ) or (
+        ) or self._soc_stop_requested
+
+    @property
+    def _soc_stop_requested(self) -> bool:
+        """The active SoC fence, including pending evidence and storage faults."""
+        return (
             self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
             else (not self.guest_active() and self.soc_goal.stop_requested)
         )
@@ -334,7 +339,7 @@ class AmtronControl:
             reason = self._stop_reason()
             source = (
                 "guest" if reason in ("time_limit", "guest_confirmation") else
-                "soc_goal" if self.soc_goal.stop_requested else "energy_goal"
+                "soc_goal" if self._soc_stop_requested else "energy_goal"
             )
             await self._async_observe_command(_PendingCommand(
                 "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True,

@@ -71,3 +71,39 @@ def test_queued_energy_resume_keeps_its_origin_after_a_new_soc_stop():
             await energy.async_stop()
             await control.async_shutdown()
     asyncio.run(run())
+
+
+def test_guest_kwh_stop_does_not_claim_the_excluded_vehicle_soc_limit():
+    async def run():
+        h = Harness(values={"evse_state": EvseState.EV_CONNECTED, "charging_current_ems": 16.0})
+        control = await h.connect()
+        put(h.transport.bank, R.CP_STATE, CpState.B2)
+        control.soc_goal.configure_source(SOURCE)
+        control.soc_goal.set_target(70, soc=80)
+        control.guest_active = lambda: True
+        control.energy_goal.set_target(1, 100)
+        control.energy_goal.observe(101)
+        try:
+            await control.async_pause_for_energy_goal()
+            event = control.events.snapshot()["events"][-1]
+            assert (event["source"], event["reason"]) == ("energy_goal", "energy_goal")
+        finally:
+            await control.async_shutdown()
+    asyncio.run(run())
+
+
+def test_soc_storage_fault_remains_a_stop_trigger_even_for_a_guest():
+    async def run():
+        _h, control, energy, soc, _ = await _soc_runner()
+        try:
+            control.guest_active = lambda: True
+            soc._storage_unknown = True
+            assert control.goal_stop_requested
+            await control.async_pause_for_energy_goal()
+            event = control.events.snapshot()["events"][-1]
+            assert (event["source"], event["reason"]) == ("soc_goal", "energy_goal")
+        finally:
+            await soc.async_stop()
+            await energy.async_stop()
+            await control.async_shutdown()
+    asyncio.run(run())
