@@ -847,7 +847,7 @@
       "message": "Für ein Ladeziel wird ein unterstützter Gesamtenergiezähler mit einem aktuellen gültigen Messwert benötigt. Prüfe die Verbindung und versuche es erneut."
     },
     "energy_goal_stop_active": {
-      "message": "Ein Ladeziel erfordert eine Pause. Prüfe seinen Status. Nach Erreichen des Ziels oder einem Zählerreset kannst du ein neues Ziel setzen oder es mit 0 deaktivieren, bevor du weiterlädst. Eine Zieländerung startet das Laden nicht."
+      "message": "Eine Ladegrenze ist erreicht, deshalb bleibt das Laden pausiert. Zum Weiterladen kWh-Grenze oder Fahrzeug-Prozentziel erhöhen oder auf 0 setzen; nach einem Zählerreset die Grenze neu speichern. Eine Änderung allein startet das Laden nicht."
     },
     "energy_goal_state_invalid": {
       "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."
@@ -930,8 +930,14 @@
     "wallbox_target_required": {
       "message": "Es sind mehrere Wallboxen eingerichtet; gib die Wallbox an, für die das gilt."
     },
+    "guest_confirmation_required": {
+      "message": "Das Gastladen wurde unterbrochen und braucht einen neuen Start. Gastladen erneut starten; bis dahin bleibt das Laden pausiert."
+    },
+    "guest_start_uncertain": {
+      "message": "Start des Gastladens nicht bestätigt: Eine Ladeänderung wurde möglicherweise schon übernommen. Den Ladezustand prüfen."
+    },
     "guest_start_not_permitted": {
-      "message": "Gastladen kann nicht starten: Verbindung, Schreibzugriff, Wallbox-Sperre und Fehlerstatus prüfen."
+      "message": "Gastladen startet nicht: Fahrzeug anstecken, Wallbox entsperren, Wallbox-Fehler beheben und auf einen aktuellen Status warten. Im Nur-Lesen-Modus zuerst Schreiben einschalten."
     },
     "guest_deadline_expired": {
       "message": "Der gespeicherte Zeitpunkt ist abgelaufen. Einen zukünftigen Zeitpunkt wählen oder löschen."

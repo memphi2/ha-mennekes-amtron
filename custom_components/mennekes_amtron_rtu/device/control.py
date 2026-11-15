@@ -264,7 +264,7 @@ class AmtronControl:
 
     def stop_error(self) -> DeviceValidationError:
         if self.guest_confirmation_required():
-            return validation_error("guest_start_not_permitted")
+            return validation_error("guest_confirmation_required")
         return validation_error(
             "time_limit_reached" if self._stop_reason() == "time_limit" else "energy_goal_stop_active"
         )

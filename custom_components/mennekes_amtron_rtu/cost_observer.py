@@ -5,7 +5,10 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections import deque
 from copy import deepcopy
+from dataclasses import dataclass
+from itertools import islice
 from typing import Any
 
 from homeassistant.core import (
@@ -30,17 +33,36 @@ from .charging_cost_const import (
     CONF_CHARGING_PRICE_ENTITY,
     COST_SOURCE_FIXED,
 )
-from .device.charging_cost import CostAccumulator, CostResult, TariffConfig
-from .device.charging_session import CompletedSession
+from .device.charging_cost import (
+    CostAccumulator,
+    CostCheckpoint,
+    CostResult,
+    TariffConfig,
+)
+from .device.charging_session import CompletedSession, PresenceGap
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
-from .device.registers import ENERGY_TOTAL
-from .device.vehicle import snapshot_vehicle_connected
+from .device.enums import EvseState
+from .device.registers import ENERGY_TOTAL, EVSE_STATE
+from .device.vehicle import snapshot_metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60
+# Possible session baselines: one run per distinct meter value read while not
+# charging, so even many long charges fit.
+_MAX_METER_RUNS = 4096
+
+
+@dataclass(frozen=True, slots=True)
+class _MeterRun:
+    """Consecutive non-charging readings with one meter value."""
+
+    first: CostCheckpoint
+    last: CostCheckpoint
+
+
 _PRICE_UNITS = {"EUR/kWh": 1.0, "€/kWh": 1.0, "ct/kWh": 0.01, "EUR/MWh": 0.001, "€/MWh": 0.001}
 _RETAINED_OPTIONS = (
     CONF_CHARGING_COST_SOURCE, CONF_CHARGING_PRICE, CONF_CHARGING_PRICE_ENTITY,
@@ -112,8 +134,17 @@ class ChargingCostObserver:
         )
         self.last = LastChargingCost()
         self._supported = False
-        self._anchored = False
-        self._active = False
+        # The session decides which plug cycle is complete; costs only find
+        # the observed meter interval with exactly its energy. No plug-cycle
+        # state is duplicated here.
+        self._runs: deque[_MeterRun] = deque(maxlen=_MAX_METER_RUNS)
+        self._newest: CostCheckpoint | None = None
+        self._active = False  # A car is plugged in: show the running cost.
+        self._unplugged = False  # The last known poll saw no car.
+        self._cycle_start: CostCheckpoint | None = None
+        # The running cost started without an idle reading: never complete.
+        self._cycle_partial = False
+        self._gap = PresenceGap()
         self._started_at = time.time()
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
@@ -129,7 +160,7 @@ class ChargingCostObserver:
     def retain_for_reload(self, entry: MennekesAmtronConfigEntry, *, remote: bool) -> bool:
         """Keep observed prices and energy only across an unchanged live source.
 
-        The owner additionally proves continuity of the wallbox connection.
+        Continuity across a reconnect is judged by the presence-gap rule.
         Vehicle-profile changes do not change this wallbox-wide calculation.
         """
         return (
@@ -170,10 +201,11 @@ class ChargingCostObserver:
         except ValueError:
             return False
         if tariff != self._tariff:
-            if self._active:
-                # A meter interval spanning two tariff definitions cannot be
-                # priced with either definition alone.
-                self._accumulator.observe_energy(time.time(), None)
+            # A meter interval spanning two tariff definitions cannot be
+            # priced with either definition alone; older samples arriving
+            # later are not fresh either.
+            self._price_at = max(self._price_at, time.time())
+            self._accumulator.observe_energy(self._price_at, None)
             self._tariff = tariff
             self._accumulator.tariff = tariff
         self._configured_options = current
@@ -183,10 +215,13 @@ class ChargingCostObserver:
     def current(self) -> CostResult | None:
         if not self._active:
             return None
-        result = self._accumulator.result
-        if self._anchored:
-            return result
-        return CostResult(result.known_cost, result.unpriced_kwh, result.energy_kwh, False)
+        now = self._accumulator.checkpoint()
+        if now is None or self._cycle_start is None:
+            return CostResult(0.0, 0.0, 0.0, False)
+        result = now.since(self._cycle_start)
+        if self._cycle_partial and result.complete:
+            return CostResult(result.known_cost, 0.0, result.energy_kwh, False)
+        return result
 
     @property
     def available(self) -> bool:
@@ -203,6 +238,8 @@ class ChargingCostObserver:
         except (ValueError, OSError):
             self._storage_corrupt = True
             _LOGGER.warning("Charging-cost storage cannot be read; optional cost estimates are unavailable")
+        if self._fixed:
+            self._accumulator.set_price(self._started_at, self._price())
         if not self._fixed and self._entity:
             self._unsubscribe = async_track_state_change_event(self._hass, [self._entity], self._price_changed)
             self._unsubscribe_report = async_track_state_report_event(self._hass, [self._entity], self._price_changed)
@@ -239,50 +276,94 @@ class ChargingCostObserver:
             return
         now = time.time()
         if data is None:
-            self._accumulator.observe_energy(now, None)
-            self._anchored = False
+            # One failed poll is no meter evidence: the next reading spans the
+            # gap. A long gap may hide another car for the running estimate.
+            self._presence(now, known=False)
             return
         self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
-        present = snapshot_vehicle_connected(data.get, self._entry.runtime_data.identity.layout_version)
-        if present is None:
-            self._anchored = False
-        elif present:
-            self._active = True
+        present = snapshot_metered_vehicle_present(data.get, self._entry.runtime_data.identity.layout_version)
+        self._presence(now, known=present is not None)
         at = (data.energy_observed_at or 0.0) if self._remote else now
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         energy = data.get(ENERGY_TOTAL.key)
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
-        if fresh:
-            self._accumulator.observe_energy(at, energy)
+        charging = data.get(EVSE_STATE.key) == EvseState.CHARGING
+        checkpoint = None
+        # A failed or rejected read leaves the previous value, which must not
+        # pass for a new reading.
+        if fresh and energy is not None and self._accumulator.observe_energy(at, energy):
+            checkpoint = self._accumulator.checkpoint()
+            self._record(checkpoint, charging=charging)
+        fresh = checkpoint is not None
+        if present is True:
+            replugged, self._unplugged, self._active = self._unplugged, False, True
+            if self._cycle_start is None and fresh:
+                # Right after an unplug and before charging, no energy has
+                # flowed since; the session takes this reading as baseline too.
+                self._cycle_start, self._cycle_partial = checkpoint, not (replugged and not charging)
+            elif (checkpoint is not None and self._cycle_start is not None and not charging
+                  and checkpoint.meter_kwh == self._cycle_start.meter_kwh):
+                # Waiting plugged in: start where the session's baseline does.
+                self._cycle_start = checkpoint
+        elif present is False:
+            # Only a reading while unplugged starts the next running cost; an
+            # unplug without one must not carry this charge into the next.
+            if fresh:
+                self._cycle_start, self._cycle_partial = checkpoint, False
+            elif self._active:
+                self._cycle_start, self._cycle_partial = None, False
+            self._active, self._unplugged = False, True
         latest = CompletedSession.parse(data.charging_session) if data.charging_session else None
-        previous = self.last.session
-        if data.session_summary_supported and latest != previous:
+        if data.session_summary_supported and latest != self.last.session:
             candidate = LastChargingCost()
             candidate.session = latest
             if latest is not None:
-                result = self._accumulator.result
-                if self._anchored and fresh and math.isclose(result.energy_kwh, latest.wallbox_kwh, rel_tol=1e-9):
-                    candidate.result = result
-                else:
-                    candidate.result = CostResult(0.0, latest.wallbox_kwh, latest.wallbox_kwh, False)
+                candidate.result = self._session_cost(latest.wallbox_kwh)
             self.last = candidate
             self._dirty = True
-        if present is False:
-            if self._active:
-                # End the previous plug cycle even when the final meter read
-                # failed or the service has not published a fresh sample yet.
-                # A later plug must not inherit its energy as a complete cost.
-                self._accumulator.reset()
-                self._accumulator.set_price(min(at, now), self._price())
-                self._anchored = False
-            self._active = False
-            if fresh and energy is not None and math.isfinite(energy) and energy >= 0:
-                self._accumulator.reset()
-                self._accumulator.set_price(at, self._price())
-                self._accumulator.observe_energy(at, energy)
-                self._anchored = True
         if self._dirty and time.monotonic() >= self._retry_at:
             await self._save()
+
+    def _presence(self, now: float, *, known: bool) -> None:
+        if self._gap.observe(now, known=known):
+            self._cycle_start, self._cycle_partial, self._unplugged = None, False, False
+
+    def _record(self, checkpoint: CostCheckpoint | None, *, charging: bool) -> None:
+        if checkpoint is None:
+            return
+        self._newest = checkpoint
+        tail = self._runs[-1] if self._runs else None
+        # A charging reading at the idle value still marks the baseline, e.g.
+        # an app sample taken just before charging started.
+        if charging and (tail is None or tail.last.meter_kwh != checkpoint.meter_kwh):
+            return
+        if self._runs and self._runs[-1].last.meter_kwh == checkpoint.meter_kwh:
+            self._runs[-1] = _MeterRun(self._runs[-1].first, checkpoint)
+        else:
+            self._runs.append(_MeterRun(checkpoint, checkpoint))
+
+    def _session_cost(self, kwh: float) -> CostResult:
+        """Price the interval from the last baseline reading to the newest one.
+
+        Only the newest reading may end it: the session completes with its
+        final meter value, and an older end could match another interval.
+        """
+        newest = self._newest
+        if newest is None or not self._runs:
+            return CostResult(0.0, kwh, kwh, False)
+        # The earliest reading of the final value, before later idle gaps.
+        tail = self._runs[-1]
+        if tail.last.meter_kwh != newest.meter_kwh:
+            # The newest reading was taken while charging; it is not final.
+            return CostResult(0.0, kwh, kwh, False)
+        end = tail.first
+        target = end.meter_kwh - kwh
+        for start in islice(reversed(self._runs), 1, None):
+            if math.isclose(start.last.meter_kwh, target, rel_tol=1e-9, abs_tol=1e-6):
+                return end.since(start.last, energy_kwh=kwh)
+            if start.last.meter_kwh < target:
+                break
+        return CostResult(0.0, kwh, kwh, False)
 
     async def _save(self) -> None:
         try:

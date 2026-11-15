@@ -122,8 +122,9 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
             else:
                 await integration.async_reload_entry(hass, entry)
             assert not hass.data.get("mennekes_amtron_rtu_reload_clients")
-            assert old.charging_cost._closed
-            assert old.sessions._closed is (outcome != "cost_changed")
+            # A reconnect is only a gap: a plain reload keeps both observers.
+            assert old.charging_cost._closed is (outcome != "reconnected")
+            assert old.sessions._closed is (outcome not in {"cost_changed", "reconnected"})
             if outcome in {"skipped", "failed", "connection_changed", "identity_changed"}:
                 assert not old.client.connected
             if outcome in {"skipped", "failed", "identity_changed"}:
@@ -135,7 +136,7 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
     asyncio.run(run())
 
 
-def test_transport_reconnect_during_a_poll_invalidates_estimate_continuity(tmp_path, monkeypatch):
+def test_short_transport_reconnect_keeps_estimate_continuity(tmp_path, monkeypatch):
     async def run():
         hass, entry, _transport = setup_owners(tmp_path, monkeypatch)
         assert await integration.async_setup_entry(hass, entry)
@@ -146,8 +147,8 @@ def test_transport_reconnect_during_a_poll_invalidates_estimate_continuity(tmp_p
             runtime.client._trace_connect(True)
             finished = reading(EvseState.IDLE, 110)
             await runtime.coordinator.observe_session(finished)
-            assert finished.charging_session is None
-            assert runtime.charging_cost.last.result is None
+            # The same wallbox and meter answer again: a short reconnect is a gap.
+            assert finished.charging_session is not None
             await runtime.coordinator.observe_session(reading(EvseState.CHARGING, 115))
             finished = reading(EvseState.IDLE, 120)
             await runtime.coordinator.observe_session(finished)

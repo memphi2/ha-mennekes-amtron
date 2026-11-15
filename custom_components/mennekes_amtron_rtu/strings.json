@@ -847,7 +847,7 @@
       "message": "An energy target needs a supported total-energy meter and a fresh valid reading. Check the connection and try again."
     },
     "energy_goal_stop_active": {
-      "message": "A charging target requires a pause. Check its status. After reaching a target or a meter reset, set a new target or disable it with 0 before resuming. Changing a target does not start charging."
+      "message": "A charging limit is reached, so charging stays paused. To continue, raise the kWh limit or vehicle percentage target, or set it to 0; after a meter reset, save the limit again. Changing a limit does not start charging by itself."
     },
     "energy_goal_state_invalid": {
       "message": "The saved energy target could not be restored. Check the logs before allowing charging again."
@@ -930,8 +930,14 @@
     "wallbox_target_required": {
       "message": "Several wallboxes are set up; name the wallbox this applies to."
     },
+    "guest_confirmation_required": {
+      "message": "Guest charging was interrupted and needs a new start. Press Start guest charging again; until then charging stays paused."
+    },
+    "guest_start_uncertain": {
+      "message": "Guest charging start not confirmed: a charging change may already have been applied. Check the charging state."
+    },
     "guest_start_not_permitted": {
-      "message": "Guest charging cannot start: check the connection, write access, wallbox lock and fault status."
+      "message": "Guest charging cannot start: plug in the car, unlock the wallbox, clear any wallbox error and wait for a current status. In read-only mode, enable writing first."
     },
     "guest_deadline_expired": {
       "message": "The saved time limit has expired. Choose a future time or clear it."

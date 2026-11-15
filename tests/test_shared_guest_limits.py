@@ -291,3 +291,56 @@ def test_queued_guest_start_cannot_release_another_plug_in(tmp_path, monkeypatch
             assert service.control.pending_action is None
             assert service.data.get("charging_release") == 0
     asyncio.run(run())
+
+
+def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.errors import (
+        DeviceError,
+        DeviceValidationError,
+        validation_error,
+    )
+
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            control = service.control
+
+            async def release_then_stop(**_kwargs):
+                control.events.record("executed", "enable_charging")
+                raise validation_error("energy_goal_stop_active")
+
+            monkeypatch.setattr(control, "async_start_guest_charging", release_then_stop)
+            with pytest.raises(DeviceError) as caught:
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": service.guest_revision})
+            # Every caller, e.g. HA over HTTP, must see a change, not a refusal.
+            assert not isinstance(caught.value, DeviceValidationError)
+            assert caught.value.translation_key == "guest_start_uncertain"
+            assert service._guest_scope is not None
+            # A later start refused before any write is a definite refusal again.
+            with pytest.raises(DeviceError, match="soc_goal_source_changed"):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": "stale"})
+    asyncio.run(run())
+
+
+def test_guest_refusal_after_cancelling_a_queued_departure_is_uncertain(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.errors import (
+        DeviceError,
+        validation_error,
+    )
+
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            control = service.control
+            monkeypatch.setattr(type(control), "pending_owner", property(lambda _self: "departure"))
+
+            async def refused(**_kwargs):
+                raise validation_error("energy_goal_stop_active")
+
+            monkeypatch.setattr(control, "async_start_guest_charging", refused)
+            with pytest.raises(DeviceError, match="guest_start_uncertain"):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": service.guest_revision})
+    asyncio.run(run())

@@ -47,7 +47,7 @@ from vehicle planning until unplugging.
 
 For guests, the **first reached kWh or time limit** stops charging. With neither
 set, no automatic limit is added. Set a kWh or percentage target to **0** to disable
-it. Clear the time separately; in the Mushroom example, hold the time tile.
+it. Clear the time separately; in the Mushroom example, hold the time chip.
 
 Saving a positive kWh value starts a fresh baseline. Guest start uses that
 baseline, including energy already delivered since it was set. It does not

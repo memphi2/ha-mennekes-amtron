@@ -92,3 +92,17 @@ test('unsaved limits do not block pausing an active guest',async()=>{
  assert.equal(JSON.parse(h.calls[1].body).action,'pause');
  assert.equal(h.elements.get('energy_value').value,'25');
 });
+test('a definite refusal names the fix; anything else stays uncertain',async()=>{
+ for(const [code,text] of [['guest_start_not_permitted',/Fahrzeug anstecken/],['guest_deadline_expired',/Zielzeitpunkt ist vorbei/],['energy_goal_stop_active',/Ladegrenze ist bereits erreicht/],['charging_save_uncertain',/nicht bestätigt/],['toString',/nicht bestätigt/]]){
+  const h=setup('targets',[initial(),{error:code}]);await flush();await h.emit('guest_start','click');
+  assert.match(h.elements.get('notice').textContent,text,code);
+ }
+});
+test('an incomplete departure time asks for a full date instead of setup',async()=>{
+ const h=setup('departure',[initial()]);await flush();h.elements.get('departure_value').value='2026-11-16';await h.emit('departure_form','submit');
+ assert.equal(h.calls.length,1);assert.match(h.elements.get('notice').textContent,/Vollständiges Datum/);
+});
+test('read-only targets say read only instead of asking for setup',async()=>{
+ const h=setup('targets',[{...initial(),read_only:true}]);await flush();
+ assert.equal(h.elements.get('energy_status').textContent,'Nur lesen');
+});

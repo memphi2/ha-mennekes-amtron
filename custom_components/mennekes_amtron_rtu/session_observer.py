@@ -40,7 +40,9 @@ class SessionObserver:
 
     The owner calls ``async_setup`` before polling, assigns ``async_observe`` to
     the coordinator callback, and awaits ``async_close`` during unload. Failed
-    polls must call ``async_observe(None)`` to invalidate partial measurements.
+    polls call ``async_observe(None)``: an unknown span longer than two
+    minutes, or two and a half poll intervals, invalidates the measurement.
+    A reconnect re-checks the wallbox identity and the meter stays continuous.
     No background task or extra bus request is needed. Storage failures are
     retried at most once per minute and never interrupt charging or polling.
     """

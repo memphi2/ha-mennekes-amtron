@@ -53,10 +53,22 @@
     configure:["Configure the vehicle source/planning in Home Assistant first.","Zuerst Fahrzeugquelle bzw. Abfahrtsplanung in Home Assistant einrichten.","Configurez d’abord la source/planification du véhicule dans Home Assistant.","Configureer eerst voertuigbron/planning in Home Assistant.","Configurare prima fonte/pianificazione del veicolo in Home Assistant."],
     read_only:["Read-only mode: enable writes in the app configuration.","Nur lesen: Schreiben in der App-Konfiguration einschalten.","Lecture seule : activez les écritures dans la configuration.","Alleen lezen: schakel schrijven in bij de appconfiguratie.","Sola lettura: abilitare le scritture nella configurazione."],
     limit_missing:["Vehicle maximum unavailable. Wait for the vehicle integration.","Fahrzeug-Obergrenze fehlt. Auf die Fahrzeug-Integration warten.","Maximum du véhicule indisponible. Attendez l’intégration du véhicule.","Voertuigmaximum ontbreekt. Wacht op de voertuigintegratie.","Massimo del veicolo non disponibile. Attendere l’integrazione veicolo."],
+    not_permitted:["Guest charging cannot start: plug in the car, unlock the wallbox, clear any wallbox error and wait for a current wallbox status.","Gastladen startet nicht: Fahrzeug anstecken, Wallbox entsperren, Wallbox-Fehler beheben und auf einen aktuellen Wallbox-Status warten.","La recharge invité ne démarre pas : branchez le véhicule, déverrouillez la borne, corrigez toute erreur et attendez un état actuel de la borne.","Gastladen start niet: sluit het voertuig aan, ontgrendel de laadpaal, verhelp fouten en wacht op een actuele laadpaalstatus.","La ricarica ospite non parte: collegare il veicolo, sbloccare la wallbox, eliminare gli errori e attendere uno stato attuale della wallbox."],
+    confirm_guest:["Guest charging was interrupted. Start it again; until then charging stays paused.","Gastladen wurde unterbrochen. Erneut starten; bis dahin bleibt das Laden pausiert.","La recharge invité a été interrompue. Redémarrez-la ; d’ici là, la recharge reste en pause.","Gastladen is onderbroken. Start opnieuw; tot dan blijft het laden gepauzeerd.","La ricarica ospite è stata interrotta. Riavviarla; fino ad allora la ricarica resta in pausa."],
+    time_passed:["The saved target time has passed. Change or clear it first.","Der gespeicherte Zielzeitpunkt ist vorbei. Zuerst ändern oder löschen.","L’heure cible enregistrée est passée. Modifiez-la ou effacez-la d’abord.","De opgeslagen doeltijd is verstreken. Wijzig of wis deze eerst.","L’orario obiettivo salvato è passato. Modificarlo o cancellarlo prima."],
+    limit_reached:["A charging limit is already reached. Raise it or set it to 0 first.","Eine Ladegrenze ist bereits erreicht. Zuerst erhöhen oder mit 0 deaktivieren.","Une limite de recharge est déjà atteinte. Augmentez-la ou mettez-la à 0 d’abord.","Een laadgrens is al bereikt. Verhoog deze of zet deze eerst op 0.","Un limite di ricarica è già raggiunto. Aumentarlo o impostarlo a 0 prima."],
+    invalid:["Enter 0 or 0.1–1000 kWh.","0 oder 0,1–1000 kWh eingeben.","Saisissez 0 ou 0,1–1000 kWh.","Voer 0 of 0,1–1000 kWh in.","Inserire 0 o 0,1–1000 kWh."],
+    invalid_soc:["Enter 0–100 %, at most the vehicle's charge limit.","0–100 % eingeben, höchstens das Ladelimit des Fahrzeugs.","Saisissez 0–100 %, au plus la limite de charge du véhicule.","Voer 0–100 % in, hoogstens de laadlimiet van het voertuig.","Inserire 0–100 %, al massimo il limite di carica del veicolo."],
+    invalid_time:["Enter a complete date and time.","Vollständiges Datum mit Uhrzeit eingeben.","Saisissez une date et une heure complètes.","Voer een volledige datum en tijd in.","Inserire data e ora complete."],
+    meter_missing:["The energy limit cannot be changed right now. Wait for a current wallbox reading and try again.","Die Energiegrenze kann gerade nicht geändert werden. Auf einen aktuellen Wallbox-Wert warten und erneut versuchen.","La limite d’énergie ne peut pas être modifiée maintenant. Attendez une mesure actuelle de la borne et réessayez.","De energiegrens kan nu niet worden gewijzigd. Wacht op een actuele laadpaalwaarde en probeer opnieuw.","Il limite di energia non può essere modificato ora. Attendere un valore attuale della wallbox e riprovare."],
     active:["Active","Aktiv","Actif","Actief","Attivo"],disabled:["Disabled","Deaktiviert","Désactivé","Uitgeschakeld","Disattivato"],reached:["Target reached","Ziel erreicht","Objectif atteint","Doel bereikt","Obiettivo raggiunto"],
     meter_unavailable:["Energy reading missing","Energiemessung fehlt","Mesure d’énergie absente","Energiemeting ontbreekt","Misura energia mancante"],meter_reset:["Energy meter reset","Energiezähler zurückgesetzt","Compteur réinitialisé","Energiemeter gereset","Contatore azzerato"],
   };
   const t=k=>words[k]?.[lang]||words.configure[lang], el=id=>document.getElementById(id);
+  const refusals={soc_goal_source_changed:"changed",soc_goal_limit_unavailable:"limit_missing",read_only_mode:"read_only",
+    guest_start_not_permitted:"not_permitted",guest_deadline_expired:"time_passed",time_limit_reached:"time_passed",
+    energy_goal_stop_active:"limit_reached",guest_confirmation_required:"confirm_guest",
+    energy_goal_invalid:"invalid",soc_goal_invalid:"invalid_soc",energy_goal_unavailable:"meter_missing"};
   document.querySelectorAll("[data-text]").forEach(n=>{n.textContent=t(n.dataset.text);});
   document.documentElement.classList?.add("ready");
   const keys=["energy","departure","soc"];
@@ -71,7 +83,7 @@
     for(const key of keys){
       const info=state?.[key], input=el(key+"_value");
       input.disabled=busy||!editable(key);el(key+"_save").disabled=input.disabled;
-      el(key+"_status").textContent=!info?"—":key==="departure"?(info.deadline?new Date(info.deadline).toLocaleString(langs[lang]):t("disabled")):!editable(key)?t("configure"):`${info.target} ${key==="energy"?"kWh":"%"} · ${t(info.status)}`;
+      el(key+"_status").textContent=!info?"—":key==="departure"?(info.deadline?new Date(info.deadline).toLocaleString(langs[lang]):t("disabled")):!editable(key)?t(state?.read_only?"plan_read_only":"configure"):`${info.target} ${key==="energy"?"kWh":"%"} · ${t(info.status)}`;
       el(key+"_status").className="charging-state "+(!editable(key)?"state-muted":["reached","estimated_reached"].includes(info?.status)?"state-good":["active","charging","minimum_level","finishing"].includes(info?.status)?"state-active":["error","meter_reset"].includes(info?.status)?"state-error":info?.status==="disabled"?"state-muted":"state-wait");
       if(key==="soc"&&info){input.max=String(info.maximum??100);if(info.maximum_required&&info.maximum===null)el(key+"_status").textContent=t("limit_missing");}
       if(key==="departure"){
@@ -121,12 +133,12 @@
     if(busy||(key==="guest"?(!state||state.read_only||(!state.guest_active&&dirty.size>0)||!state.guest_revision):(!editable(key)||(!clear&&!el(key+"_form").reportValidity()))))return;
     let value=key==="guest"?true:clear?null:el(key+"_value").value;
     if(key==="departure"&&!clear){const original=originalDates[key];if(original&&localDate(original)===value)value=original;
-      else {const date=new Date(value);if(!value||!Number.isFinite(date.getTime())||localDate(date.toISOString())!==value){error=t("configure");render();return;}value=date.toISOString();}}
+      else {const date=new Date(value);if(!value||!Number.isFinite(date.getTime())||localDate(date.toISOString())!==value){error=t("invalid_time");render();return;}value=date.toISOString();}}
     else if(key!=="departure"&&key!=="guest")value=Number(value);
     const action=key==="guest"&&state.guest_active?"pause":key;
     const csrf=state.csrf,rev=action==="pause"?state.revision:key==="guest"?state.guest_revision:revisions[key];busy=true;suspend();error="";render();
     const own=generation,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
-    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(data.error==="soc_goal_source_changed"?"changed":data.error==="soc_goal_limit_unavailable"?"limit_missing":"uncertain");return;}validate(data);dirty.delete(key);error=t(action==="guest"?"guest_started":"saved");apply(data);}
+    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(Object.prototype.hasOwnProperty.call(refusals,data?.error)?refusals[data.error]:"uncertain");return;}validate(data);dirty.delete(key);error=t(action==="guest"?"guest_started":"saved");apply(data);}
     catch(_){if(own===generation&&live())error=t("uncertain");}
     finally{clearTimeout(timeout);busy=false;render();schedule();}
   }

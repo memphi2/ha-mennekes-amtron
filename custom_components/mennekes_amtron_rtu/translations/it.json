@@ -847,7 +847,7 @@
       "message": "Un obiettivo energetico richiede un contatore di energia totale supportato e una lettura recente valida. Controlla la connessione e riprova."
     },
     "energy_goal_stop_active": {
-      "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
+      "message": "Un limite di ricarica è raggiunto, quindi la ricarica resta in pausa. Per continuare, aumentare il limite kWh o l’obiettivo percentuale, oppure impostarlo a 0; dopo un azzeramento del contatore, salvare di nuovo il limite. Modificare un limite non avvia la ricarica."
     },
     "energy_goal_state_invalid": {
       "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
@@ -930,8 +930,14 @@
     "wallbox_target_required": {
       "message": "Sono configurate più wallbox; indica la wallbox interessata."
     },
+    "guest_confirmation_required": {
+      "message": "La ricarica ospite è stata interrotta e va riavviata. Premere di nuovo Avvia ricarica ospite; fino ad allora la ricarica resta in pausa."
+    },
+    "guest_start_uncertain": {
+      "message": "Avvio della ricarica ospite non confermato: una modifica della ricarica potrebbe essere già stata applicata. Controllare lo stato di ricarica."
+    },
     "guest_start_not_permitted": {
-      "message": "Impossibile avviare: controllare connessione, accesso in scrittura, blocco ed errori."
+      "message": "La ricarica ospite non parte: collegare il veicolo, sbloccare la wallbox, eliminare gli errori e attendere uno stato attuale. In sola lettura, abilitare prima la scrittura."
     },
     "guest_deadline_expired": {
       "message": "Il limite orario è scaduto. Scegliere un orario futuro o cancellarlo."

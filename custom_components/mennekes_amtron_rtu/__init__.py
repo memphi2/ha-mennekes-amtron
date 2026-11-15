@@ -357,9 +357,8 @@ async def async_setup_entry(
             # The new runtime now owns the connection, including failed-setup
             # cleanup. Transient estimates must never cross a changed wallbox.
             handoff.client = None
-            if handoff.identity != identity or (
-                not remote and handoff.connection_generation != client.connection_generation
-            ):
+            # A reconnect is only a gap; the session's presence rule judges it.
+            if handoff.identity != identity:
                 await handoff.async_close()
                 forget_loss_attribution(hass, entry.entry_id)
         if profiles(entry.options):
@@ -408,16 +407,9 @@ async def async_setup_entry(
                     entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
                     await entry.runtime_data.charging_cost.async_start()
 
-            estimates_generation = client.connection_generation if not remote else None
-
+            # Failed polls arrive as None. A reconnect re-checks the wallbox
+            # identity; the session judges continuity, costs follow it.
             async def observe_estimates(data: WallboxData | None) -> None:
-                nonlocal estimates_generation
-                if not remote and estimates_generation != client.connection_generation:
-                    estimates_generation = client.connection_generation
-                    if entry.runtime_data.sessions is not None:
-                        await entry.runtime_data.sessions.async_observe(None)
-                    if entry.runtime_data.charging_cost is not None:
-                        await entry.runtime_data.charging_cost.async_observe(None)
                 if entry.runtime_data.sessions is not None:
                     await entry.runtime_data.sessions.async_observe(data)
                 if entry.runtime_data.charging_cost is not None:
@@ -972,12 +964,7 @@ async def _async_reload_entry_locked(
         runtime.retain_cost_on_unload = retain_cost
         runtime.retain_attribution_on_unload = retain_attribution
     if runtime is not None and (retain or retain_cost or retain_attribution):
-        handoff = RuntimeHandoff(
-            identity=runtime.identity,
-            connection_generation=runtime.client.connection_generation if retain else None,
-        )
-        # Store the pre-unload transport generation. Unload may await storage
-        # while a library-managed reconnect changes observation continuity.
+        handoff = RuntimeHandoff(identity=runtime.identity)
         hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = handoff
     try:
         await hass.config_entries.async_reload(entry.entry_id)

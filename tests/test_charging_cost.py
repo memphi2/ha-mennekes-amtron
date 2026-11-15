@@ -344,12 +344,8 @@ def test_invalid_maximum_gap_is_rejected(gap):
         CostAccumulator(max_gap=gap)
 
 
-def test_reset_drops_prior_prices_sums_and_invalid_state():
+def test_negative_prices_are_priced():
     accumulator = CostAccumulator()
-    accumulator.sample(0, 100, None)
-    accumulator.observe_energy(100, 110)
-    accumulator.reset()
-    assert accumulator.result == CostResult(0, 0, 0, False)
     accumulator.sample(0, 100, -0.1)
     accumulator.observe_energy(100, 110)
     assert accumulator.result == CostResult(-1, 0, 10, True)
@@ -371,7 +367,7 @@ def test_finite_input_arithmetic_overflow_never_emits_infinite_money_or_energy()
     accumulator.observe_energy(10, 1)
     accumulator.observe_energy(20, 2)
     assert accumulator.result == CostResult(1e308, 1, 2, False)
-    accumulator.reset()
+    accumulator = CostAccumulator()
     accumulator.sample(0, 0, 1e308)
     accumulator.observe_energy(10, 1e308)
     assert accumulator.result == CostResult(0, 1e308, 1e308, False)

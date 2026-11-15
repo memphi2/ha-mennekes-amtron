@@ -847,7 +847,7 @@
       "message": "Een energiedoel vereist een ondersteunde meter voor totale energie en een recente geldige meting. Controleer de verbinding en probeer het opnieuw."
     },
     "energy_goal_stop_active": {
-      "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
+      "message": "Een laadgrens is bereikt, daarom blijft het laden gepauzeerd. Verhoog om verder te laden de kWh-grens of het procentdoel, of zet deze op 0; sla na een meterreset de grens opnieuw op. Een wijziging alleen start het laden niet."
     },
     "energy_goal_state_invalid": {
       "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
@@ -930,8 +930,14 @@
     "wallbox_target_required": {
       "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."
     },
+    "guest_confirmation_required": {
+      "message": "Gastladen is onderbroken en moet opnieuw worden gestart. Start gastladen opnieuw; tot dan blijft het laden gepauzeerd."
+    },
+    "guest_start_uncertain": {
+      "message": "Start van gastladen niet bevestigd: een laadwijziging is mogelijk al toegepast. Controleer de laadstatus."
+    },
     "guest_start_not_permitted": {
-      "message": "Kan niet starten: controleer verbinding, schrijftoegang, vergrendeling en storingen."
+      "message": "Gastladen start niet: sluit het voertuig aan, ontgrendel de laadpaal, verhelp fouten en wacht op een actuele status. In alleen-lezenmodus eerst schrijven inschakelen."
     },
     "guest_deadline_expired": {
       "message": "Het opgeslagen tijdstip is verstreken. Kies een toekomstig tijdstip of wis het."

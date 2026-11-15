@@ -36,6 +36,28 @@ def vehicle_connected(
     return True if connected else None
 
 
+def metered_vehicle_present(
+    get: Callable[[str], RegisterValue], *, cp_supported: bool,
+) -> bool | None:
+    """Presence for energy estimates: a connected CP proves a car while the
+    EVSE state still lags at plug-in. Control and safety keep the stricter
+    ``vehicle_connected``."""
+    evse, cp = get(EVSE_STATE.key), get(CP_STATE.key)
+    if (
+        cp_supported and evse == EvseState.IDLE and not isinstance(evse, bool)
+        and isinstance(cp, int) and not isinstance(cp, bool) and cp in CONNECTED_CP_STATES
+    ):
+        return True
+    return vehicle_connected(evse, cp, cp_supported=cp_supported)
+
+
+def snapshot_metered_vehicle_present(
+    get: Callable[[str], RegisterValue], layout_version: int,
+) -> bool | None:
+    """Metering presence from one snapshot's ``get``, on this register layout."""
+    return metered_vehicle_present(get, cp_supported=layout_version >= CP_STATE.min_layout)
+
+
 def snapshot_vehicle_connected(
     get: Callable[[str], RegisterValue], layout_version: int,
 ) -> bool | None:

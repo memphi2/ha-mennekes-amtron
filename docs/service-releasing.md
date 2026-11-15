@@ -26,10 +26,12 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 2 and service 0.9.0b8 or newer**,
-which supplies the shared limits used by the native HA controls. Raise the
-minimum only when the integration needs a newer service feature; a published
-or planned service release must satisfy that requirement.
+separately. The current requirement is **API 2 and service 0.9.0 or newer**,
+which supplies the shared limits used by the native HA controls. The stable
+0.9.0 promotion raises the minimum from 0.9.0b8 so this stable integration
+requires the stable app. Outside a stable promotion, raise the minimum only
+when a newer service feature is required. The published or planned service
+release must satisfy the declared minimum.
 
 PR checks run minimum/latest stable HA and native amd64/aarch64 container tests.
 Automatic code and security reviews remain enabled; assess their findings and

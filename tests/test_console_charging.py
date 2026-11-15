@@ -205,3 +205,67 @@ def test_guest_console_requires_csrf_and_uses_one_shared_start(tmp_path, monkeyp
             assert service.control.pause_requested is True or service.control.pending_action is not None
             assert service._guest_scope == scope
     asyncio.run(run())
+
+
+def test_console_names_definite_guest_refusals_only(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device import registers as R
+    from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+    from tests.fakes import put
+
+    async def body():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with (
+            runtime.guest_service(tmp_path) as (service, transport, _clock),
+            TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+        ):
+            put(transport.bank, R.LOCK_EVSE, 1)
+            await service.refresh()
+            state = await (await client.get("/api/charging", headers=HEADERS)).json()
+            headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
+            guest = {"action": "guest", "value": True, "revision": state["guest_revision"], "confirm": True}
+            refused = await client.post("/api/charging", headers=headers, json=guest)
+            assert refused.status == 409
+            assert (await refused.json())["error"] == "guest_start_not_permitted"
+
+            async def lost(_payload):
+                raise DeviceError("service_unavailable")
+
+            monkeypatch.setattr(service, "command", lost)
+            unknown = await client.post("/api/charging", headers=headers, json=guest)
+            assert (await unknown.json())["error"] == "charging_save_uncertain"
+    asyncio.run(body())
+
+
+def test_console_reports_a_guest_failure_after_a_write_as_uncertain(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.errors import device_error
+
+    async def body():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with (
+            runtime.guest_service(tmp_path) as (service, _transport, _clock),
+            TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+        ):
+            state = await (await client.get("/api/charging", headers=HEADERS)).json()
+            headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
+
+            async def released_then_stopped(_payload):
+                raise device_error("guest_start_uncertain")  # The release write already applied.
+
+            monkeypatch.setattr(service, "command", released_then_stopped)
+            guest = {"action": "guest", "value": True, "revision": state["guest_revision"], "confirm": True}
+            response = await client.post("/api/charging", headers=headers, json=guest)
+            assert (await response.json())["error"] == "charging_save_uncertain"
+    asyncio.run(body())
+
+
+def test_app_names_a_hint_for_exactly_the_definite_refusals():
+    import re
+    from pathlib import Path
+
+    from custom_components.mennekes_amtron_rtu.device import console_charging
+
+    source = Path(console_charging.__file__).with_name("app_charging.js").read_text(encoding="utf-8")
+    mapping = re.search(r"const refusals=\{(.*?)\};", source, re.DOTALL).group(1)
+    assert set(re.findall(r"(\w+):\"\w+\"", mapping)) == console_charging._REFUSALS
