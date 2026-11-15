@@ -24,7 +24,7 @@ from .coordinator import MennekesAmtronCoordinator
 from .device.charging_session import CompletedSession
 from .device.client import MennekesModbusClient, SerialConfig, WritePrecondition
 from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
-from .device.command_events import CommandEvents
+from .device.command_events import CommandEvents, command_source
 from .device.const import (
     DOMAIN,
     MAX_PHASE_SWITCH_GRACE_SECONDS,
@@ -588,7 +588,7 @@ class RemoteClient(MennekesModbusClient):
                 self.apply_snapshot(
                     await self.request(
                         "POST", "/v2/command", {
-                            "command": command, **values,
+                            "command": command, **values, "origin": command_source.get(),
                             "expected_serial_number": self.bound_serial,
                         }
                     ),

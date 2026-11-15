@@ -5,6 +5,20 @@
   const language = languages.indexOf(document.documentElement.lang.split("-")[0]);
   const column = language < 0 ? 0 : language;
   const words = {
+    requested_current: ["Requested", "Angefordert", "Demandé", "Gevraagd", "Richiesto"],
+    vehicle_authorized: ["Recognized vehicle released for this connection", "Erkanntes Fahrzeug für diesen Steckvorgang freigegeben", "Véhicule reconnu autorisé pour ce branchement", "Herkend voertuig vrijgegeven voor deze aansluiting", "Veicolo riconosciuto autorizzato per questo collegamento"],
+    vehicle_waiting: ["Waiting for an authorized vehicle", "Warten auf ein freigegebenes Fahrzeug", "En attente d’un véhicule autorisé", "Wachten op een toegestaan voertuig", "In attesa di un veicolo autorizzato"],
+
+    source_unknown: ["Source not reported", "Quelle nicht übermittelt", "Source non transmise", "Bron niet gemeld", "Origine non comunicata"],
+    source_home_assistant: ["Home Assistant (control or automation)", "Home Assistant (Bedienung oder Automation)", "Home Assistant (commande ou automatisation)", "Home Assistant (bediening of automatisering)", "Home Assistant (comando o automazione)"],
+    source_app: ["App interface", "App-Oberfläche", "Interface de l’application", "Appinterface", "Interfaccia app"],
+    source_plug_charge: ["Virtual Plug & Charge", "Virtuelles Plug & Charge", "Plug & Charge virtuel", "Virtuele Plug & Charge", "Plug & Charge virtuale"],
+    source_departure_plan: ["Departure plan", "Abfahrtsplanung", "Plan de départ", "Vertrekplanning", "Pianificazione partenza"],
+    source_energy_goal: ["Energy target protection", "Schutz des Energieziels", "Protection de l’objectif énergétique", "Bescherming energiedoel", "Protezione obiettivo energetico"],
+    source_soc_goal: ["Vehicle percentage target", "Fahrzeug-Prozentziel", "Objectif de charge du véhicule", "Laadniveau voertuig", "Obiettivo percentuale veicolo"],
+    source_recovery: ["Error recovery", "Fehlerbehebung", "Récupération automatique", "Automatisch foutherstel", "Ripristino automatico"],
+    source_guest: ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"],
+
     limits_details: ["Saved limits and queued actions", "Gespeicherte Grenzen und vorgemerkte Aktionen", "Limites enregistrées et actions en attente", "Opgeslagen grenzen en geplande acties", "Limiti salvati e azioni in attesa"],
     guest_help: ["Start now; optional energy and target-time limits apply.", "Jetzt starten; optionale Energie- und Zeitpunktgrenzen gelten.", "Démarrer maintenant ; limites d’énergie et heure cible facultatives.", "Start nu; optionele energiegrens en eindtijd gelden.", "Avvia ora; valgono i limiti facoltativi di energia e orario."],
     departure_help: ["Vehicle departure or guest stop time.", "Fahrzeugabfahrt oder Stoppzeit für Gäste.", "Départ du véhicule ou heure d’arrêt pour l’invité.", "Vertrektijd van het voertuig of stoptijd voor gasten.", "Partenza del veicolo o orario di arresto ospite."],
@@ -120,7 +134,7 @@
     lock: ["Lock wallbox", "Wallbox sperren", "Verrouiller la borne", "Wallbox vergrendelen", "Bloccare wallbox"],
     unlock: ["Unlock wallbox", "Wallbox entsperren", "Déverrouiller la borne", "Wallbox ontgrendelen", "Sbloccare wallbox"],
     recover: ["Recover connection state", "Zustand wiederherstellen", "Restaurer l’état", "Toestand herstellen", "Ripristinare stato"],
-    executed: ["Executed", "Ausgeführt", "Exécuté", "Uitgevoerd", "Eseguito"],
+    executed: ["Command completed", "Befehl abgeschlossen", "Commande terminée", "Opdracht voltooid", "Comando completato"],
     replaced: ["Replaced", "Ersetzt", "Remplacé", "Vervangen", "Sostituito"],
     cancelled: ["Cancelled", "Verworfen", "Annulé", "Geannuleerd", "Annullato"],
     failed: ["Failed", "Fehlgeschlagen", "Échec", "Mislukt", "Fallito"],
@@ -199,13 +213,13 @@
     }
     put("energy_target", data.targets.energy_kwh === 0 ? text("disabled") : format(data.targets.energy_kwh, "kWh", 2));
     put("soc_target", data.targets.soc_percent === 0 ? text("disabled") : format(data.targets.soc_percent, "%"));
-    const rows = data.commands.map(command => {
+    const rows = data.commands.filter(command => !(command.action === "set_current" && command.outcome === "replaced")).map(command => {
       if (!Number.isSafeInteger(command.sequence) || command.sequence <= 0) throw new Error("invalid sequence");
       const item = document.createElement("li");
       const title = document.createElement("strong");
-      title.textContent = `#${command.sequence} · ${text(command.action)} — ${text(command.outcome)}`;
+      title.textContent = `${moment(command.occurred_at) || "—"} · ${text(command.action)}${["resume", "set_current"].includes(command.action) && command.requested_value != null ? ` (${text("requested_current")}: ${command.requested_value === 0 ? text("unlimited") : format(command.requested_value, "A")})` : ""} — ${text(command.outcome)}`;
       const reason = document.createElement("small");
-      reason.textContent = text(command.reason);
+      reason.textContent = `${text(`source_${command.source || "unknown"}`)}${command.reason === "completed" ? "" : ` · ${text(command.reason)}`}`;
       item.appendChild(title); item.appendChild(reason);
       return item;
     });

@@ -90,6 +90,13 @@ In service mode, HA follows the app's permission; there is no second write
 switch. Read-only disables commands and heartbeat, but still polls the bus.
 Only one owner may use the adapter. Check readings before enabling writes.
 
+## Understand the activity
+
+In Home Assistant **Activity**, filter by **Wallbox event** to follow control
+commands and physical charging changes together. The trigger explains why a
+command ran; the subsequent wallbox event tells you whether charging started
+or stopped. See [activity details](troubleshooting.md#understand-the-activity-timeline).
+
 ## Understand the readings
 
 **Total power** is actual charging power; **Signaled current** is what the wallbox

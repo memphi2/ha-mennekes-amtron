@@ -616,47 +616,47 @@
           "event_type": {
             "name": "Comando ed esito",
             "state": {
-              "pause_executed": "Metti in pausa la ricarica: Comando accettato",
+              "pause_executed": "Metti in pausa la ricarica: Comando completato",
               "pause_replaced": "Metti in pausa la ricarica: Sostituito",
               "pause_cancelled": "Metti in pausa la ricarica: Annullato",
               "pause_failed": "Metti in pausa la ricarica: Non riuscito",
               "pause_uncertain": "Metti in pausa la ricarica: Esito non confermato",
-              "resume_executed": "Riprendere la ricarica: Comando accettato",
+              "resume_executed": "Riprendere la ricarica: Comando completato",
               "resume_replaced": "Riprendere la ricarica: Sostituito",
               "resume_cancelled": "Riprendere la ricarica: Annullato",
               "resume_failed": "Riprendere la ricarica: Non riuscito",
               "resume_uncertain": "Riprendere la ricarica: Esito non confermato",
-              "set_current_executed": "Impostare la corrente di ricarica: Comando accettato",
+              "set_current_executed": "Impostare la corrente di ricarica: Comando completato",
               "set_current_replaced": "Impostare la corrente di ricarica: Sostituito",
               "set_current_cancelled": "Impostare la corrente di ricarica: Annullato",
               "set_current_failed": "Impostare la corrente di ricarica: Non riuscito",
               "set_current_uncertain": "Impostare la corrente di ricarica: Esito non confermato",
-              "single_phase_executed": "Usare una fase: Comando accettato",
+              "single_phase_executed": "Usare una fase: Comando completato",
               "single_phase_replaced": "Usare una fase: Sostituito",
               "single_phase_cancelled": "Usare una fase: Annullato",
               "single_phase_failed": "Usare una fase: Non riuscito",
               "single_phase_uncertain": "Usare una fase: Esito non confermato",
-              "all_phases_executed": "Usare tutte le fasi disponibili: Comando accettato",
+              "all_phases_executed": "Usare tutte le fasi disponibili: Comando completato",
               "all_phases_replaced": "Usare tutte le fasi disponibili: Sostituito",
               "all_phases_cancelled": "Usare tutte le fasi disponibili: Annullato",
               "all_phases_failed": "Usare tutte le fasi disponibili: Non riuscito",
               "all_phases_uncertain": "Usare tutte le fasi disponibili: Esito non confermato",
-              "disable_charging_executed": "Disabilita il consenso alla ricarica: Comando accettato",
+              "disable_charging_executed": "Disabilita il consenso alla ricarica: Comando completato",
               "disable_charging_replaced": "Disabilita il consenso alla ricarica: Sostituito",
               "disable_charging_cancelled": "Disabilita il consenso alla ricarica: Annullato",
               "disable_charging_failed": "Disabilita il consenso alla ricarica: Non riuscito",
               "disable_charging_uncertain": "Disabilita il consenso alla ricarica: Esito non confermato",
-              "enable_charging_executed": "Autorizzare la ricarica: Comando accettato",
+              "enable_charging_executed": "Autorizzare la ricarica: Comando completato",
               "enable_charging_replaced": "Autorizzare la ricarica: Sostituito",
               "enable_charging_cancelled": "Autorizzare la ricarica: Annullato",
               "enable_charging_failed": "Autorizzare la ricarica: Non riuscito",
               "enable_charging_uncertain": "Autorizzare la ricarica: Esito non confermato",
-              "lock_executed": "Blocca la wallbox: Comando accettato",
+              "lock_executed": "Blocca la wallbox: Comando completato",
               "lock_replaced": "Blocca la wallbox: Sostituito",
               "lock_cancelled": "Blocca la wallbox: Annullato",
               "lock_failed": "Blocca la wallbox: Non riuscito",
               "lock_uncertain": "Blocca la wallbox: Esito non confermato",
-              "unlock_executed": "Sbloccare la wallbox: Comando accettato",
+              "unlock_executed": "Sbloccare la wallbox: Comando completato",
               "unlock_replaced": "Sbloccare la wallbox: Sostituito",
               "unlock_cancelled": "Sbloccare la wallbox: Annullato",
               "unlock_failed": "Sbloccare la wallbox: Non riuscito",
@@ -669,7 +669,7 @@
           "result": {
             "name": "Esito",
             "state": {
-              "executed": "Comando accettato",
+              "executed": "Comando completato",
               "replaced": "Sostituito",
               "cancelled": "Annullato",
               "failed": "Non riuscito",
@@ -711,8 +711,33 @@
               "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
               "deadline_expired": "Ora di partenza trascorsa",
               "time_limit": "Limite orario raggiunto",
-              "guest_confirmation": "Conferma avvio ospite"
+              "guest_confirmation": "Conferma avvio ospite",
+              "vehicle_authorized": "Veicolo riconosciuto autorizzato per questo collegamento",
+              "vehicle_waiting": "In attesa di un veicolo autorizzato"
             }
+          },
+          "source": {
+            "name": "Origine",
+            "state": {
+              "unknown": "Origine non comunicata",
+              "home_assistant": "Home Assistant (comando o automazione)",
+              "app": "Interfaccia app",
+              "plug_charge": "Plug & Charge virtuale",
+              "departure_plan": "Pianificazione partenza",
+              "energy_goal": "Protezione obiettivo energetico",
+              "soc_goal": "Obiettivo percentuale veicolo",
+              "recovery": "Ripristino dopo errore",
+              "guest": "Ricarica ospite"
+            }
+          },
+          "requested_value": {
+            "name": "Valore registro richiesto",
+            "state": {
+              "0": "Nessun limite software di corrente"
+            }
+          },
+          "occurred_at": {
+            "name": "Ora evento"
           }
         }
       },

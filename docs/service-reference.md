@@ -464,3 +464,18 @@ Local apps and published-catalog apps are different installations. Stop the
 current serial owner before switching. Automated HA, virtual serial and HTTP
 tests exercise the process boundary; they do not replace physical wallbox and
 Supervisor acceptance tests.
+
+
+### Command activity metadata
+
+Service 0.9.1 adds `origin` to command requests. It is an allowlisted diagnostic
+source, not an authenticated user identity. The service validates and removes it
+before dispatching the command. A queued command retains its origin even if a
+later request or background task executes it.
+
+Each command event includes `source`, `occurred_at` (timezone-aware UTC), and
+`requested_value` (nullable, not physical current readback), as well as the existing
+sequence/action/outcome/reason fields. The bounded feed retains 32 terminal
+outcomes. P&C gate writes appear only when a release is actually written; polls
+and heartbeat writes do not enter this feed. Consumers must distinguish command
+acknowledgement from the independently observed charging state.

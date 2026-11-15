@@ -616,47 +616,47 @@
           "event_type": {
             "name": "Opdracht en resultaat",
             "state": {
-              "pause_executed": "Laden pauzeren: Opdracht geaccepteerd",
+              "pause_executed": "Laden pauzeren: Opdracht voltooid",
               "pause_replaced": "Laden pauzeren: Vervangen",
               "pause_cancelled": "Laden pauzeren: Geannuleerd",
               "pause_failed": "Laden pauzeren: Mislukt",
               "pause_uncertain": "Laden pauzeren: Resultaat niet bevestigd",
-              "resume_executed": "Laden hervatten: Opdracht geaccepteerd",
+              "resume_executed": "Laden hervatten: Opdracht voltooid",
               "resume_replaced": "Laden hervatten: Vervangen",
               "resume_cancelled": "Laden hervatten: Geannuleerd",
               "resume_failed": "Laden hervatten: Mislukt",
               "resume_uncertain": "Laden hervatten: Resultaat niet bevestigd",
-              "set_current_executed": "Laadstroom instellen: Opdracht geaccepteerd",
+              "set_current_executed": "Laadstroom instellen: Opdracht voltooid",
               "set_current_replaced": "Laadstroom instellen: Vervangen",
               "set_current_cancelled": "Laadstroom instellen: Geannuleerd",
               "set_current_failed": "Laadstroom instellen: Mislukt",
               "set_current_uncertain": "Laadstroom instellen: Resultaat niet bevestigd",
-              "single_phase_executed": "Eén fase gebruiken: Opdracht geaccepteerd",
+              "single_phase_executed": "Eén fase gebruiken: Opdracht voltooid",
               "single_phase_replaced": "Eén fase gebruiken: Vervangen",
               "single_phase_cancelled": "Eén fase gebruiken: Geannuleerd",
               "single_phase_failed": "Eén fase gebruiken: Mislukt",
               "single_phase_uncertain": "Eén fase gebruiken: Resultaat niet bevestigd",
-              "all_phases_executed": "Alle beschikbare fasen gebruiken: Opdracht geaccepteerd",
+              "all_phases_executed": "Alle beschikbare fasen gebruiken: Opdracht voltooid",
               "all_phases_replaced": "Alle beschikbare fasen gebruiken: Vervangen",
               "all_phases_cancelled": "Alle beschikbare fasen gebruiken: Geannuleerd",
               "all_phases_failed": "Alle beschikbare fasen gebruiken: Mislukt",
               "all_phases_uncertain": "Alle beschikbare fasen gebruiken: Resultaat niet bevestigd",
-              "disable_charging_executed": "Laadtoestemming uitschakelen: Opdracht geaccepteerd",
+              "disable_charging_executed": "Laadtoestemming uitschakelen: Opdracht voltooid",
               "disable_charging_replaced": "Laadtoestemming uitschakelen: Vervangen",
               "disable_charging_cancelled": "Laadtoestemming uitschakelen: Geannuleerd",
               "disable_charging_failed": "Laadtoestemming uitschakelen: Mislukt",
               "disable_charging_uncertain": "Laadtoestemming uitschakelen: Resultaat niet bevestigd",
-              "enable_charging_executed": "Laden toestaan: Opdracht geaccepteerd",
+              "enable_charging_executed": "Laden toestaan: Opdracht voltooid",
               "enable_charging_replaced": "Laden toestaan: Vervangen",
               "enable_charging_cancelled": "Laden toestaan: Geannuleerd",
               "enable_charging_failed": "Laden toestaan: Mislukt",
               "enable_charging_uncertain": "Laden toestaan: Resultaat niet bevestigd",
-              "lock_executed": "Wallbox vergrendelen: Opdracht geaccepteerd",
+              "lock_executed": "Wallbox vergrendelen: Opdracht voltooid",
               "lock_replaced": "Wallbox vergrendelen: Vervangen",
               "lock_cancelled": "Wallbox vergrendelen: Geannuleerd",
               "lock_failed": "Wallbox vergrendelen: Mislukt",
               "lock_uncertain": "Wallbox vergrendelen: Resultaat niet bevestigd",
-              "unlock_executed": "Wallbox ontgrendelen: Opdracht geaccepteerd",
+              "unlock_executed": "Wallbox ontgrendelen: Opdracht voltooid",
               "unlock_replaced": "Wallbox ontgrendelen: Vervangen",
               "unlock_cancelled": "Wallbox ontgrendelen: Geannuleerd",
               "unlock_failed": "Wallbox ontgrendelen: Mislukt",
@@ -669,7 +669,7 @@
           "result": {
             "name": "Resultaat",
             "state": {
-              "executed": "Opdracht geaccepteerd",
+              "executed": "Opdracht voltooid",
               "replaced": "Vervangen",
               "cancelled": "Geannuleerd",
               "failed": "Mislukt",
@@ -711,8 +711,33 @@
               "energy_goal": "Stop door een laaddoel",
               "deadline_expired": "Vertrektijd verstreken",
               "time_limit": "Tijdslimiet bereikt",
-              "guest_confirmation": "Bevestig het starten voor de gast"
+              "guest_confirmation": "Bevestig het starten voor de gast",
+              "vehicle_authorized": "Herkend voertuig vrijgegeven voor deze aansluiting",
+              "vehicle_waiting": "Wachten op een toegestaan voertuig"
             }
+          },
+          "source": {
+            "name": "Aanleiding",
+            "state": {
+              "unknown": "Bron niet gemeld",
+              "home_assistant": "Home Assistant (bediening of automatisering)",
+              "app": "Appinterface",
+              "plug_charge": "Virtuele Plug & Charge",
+              "departure_plan": "Vertrekplanning",
+              "energy_goal": "Bescherming energiedoel",
+              "soc_goal": "Laadniveau voertuig",
+              "recovery": "Foutherstel",
+              "guest": "Gastladen"
+            }
+          },
+          "requested_value": {
+            "name": "Gevraagde registerwaarde",
+            "state": {
+              "0": "Geen softwarematige stroomlimiet"
+            }
+          },
+          "occurred_at": {
+            "name": "Tijdstip"
           }
         }
       },

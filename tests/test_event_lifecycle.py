@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from homeassistant import config_entries
-from homeassistant.const import EVENT_STATE_CHANGED, STATE_UNKNOWN
+from homeassistant.const import EVENT_LOGBOOK_ENTRY, EVENT_STATE_CHANGED, STATE_UNKNOWN
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
@@ -84,6 +84,8 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 assert hass.states.get(event_id).state == STATE_UNKNOWN
                 assert hass.states.get(event_id).attributes["event_type"] is None
 
+                activity = []
+                remove_activity = hass.bus.async_listen(EVENT_LOGBOOK_ENTRY, activity.append)
                 await hass.services.async_call(
                     "number", "set_value", {"entity_id": number_id, "value": 10},
                     blocking=True,
@@ -97,6 +99,11 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                     "event_type": "set_current_executed", "action": "set_current", "reason": "completed",
                 }
 
+                assert len(activity) == 1
+                assert activity[0].data["entity_id"] == wallbox_event_id
+                assert "Home Assistant" in activity[0].data["message"]
+                assert "10 A" in activity[0].data["message"]
+                activity.clear()
                 changes = []
                 remove = hass.bus.async_listen(
                     EVENT_STATE_CHANGED,
@@ -107,10 +114,12 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                     await entry.runtime_data.coordinator.async_refresh()
                 await hass.async_block_till_done()
                 assert changes == []
+                assert activity == []
+                remove_activity()
                 remove()
 
                 old_feed = entry.runtime_data.control.events
-                assert len(old_feed._listeners) == 1
+                assert len(old_feed._listeners) == 2
                 assert await hass.config_entries.async_unload(entry.entry_id)
                 await hass.async_block_till_done()
                 assert not old_feed._listeners
@@ -124,7 +133,7 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 assert restored.attributes == recorded.attributes
                 assert entry.runtime_data.control.events is not old_feed
                 assert entry.runtime_data.control.events.snapshot()["events"] == []
-                assert len(entry.runtime_data.control.events._listeners) == 1
+                assert len(entry.runtime_data.control.events._listeners) == 2
                 await entry.runtime_data.control.async_set_lock_evse(False)
                 await hass.async_block_till_done()
                 assert hass.states.get(event_id).state > recorded.state

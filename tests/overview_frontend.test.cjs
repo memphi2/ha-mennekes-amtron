@@ -98,3 +98,16 @@ test("waiting guidance follows the current reason and disappears during ordinary
   await flush();
   assert.equal(put(h, "op_advice"), "");
 });
+
+
+test("command activity shows time, current, trigger and reason", async () => {
+  const data = overview(operation());
+  data.commands = [{sequence:7, action:"resume", outcome:"executed", reason:"vehicle_authorized",
+    source:"plug_charge", occurred_at:START, requested_value:16}];
+  const h = setup("de", data); await flush();
+  const row = h.ids.get("command_results").children[0];
+  assert.match(row.children[0].textContent, /2026/);
+  assert.match(row.children[0].textContent, /16 A/);
+  assert.match(row.children[1].textContent, /Virtuelles Plug & Charge/);
+  assert.match(row.children[1].textContent, /Steckvorgang/);
+});

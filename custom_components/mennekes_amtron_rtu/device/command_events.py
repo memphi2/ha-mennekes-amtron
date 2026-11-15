@@ -8,13 +8,34 @@ historical commands; reconnecting does the same.
 from __future__ import annotations
 
 import logging
+import math
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Coroutine
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from functools import wraps
 from uuid import uuid4
 
 _LOGGER = logging.getLogger(__name__)
 MAX_EVENTS = 32
+SOURCES = ("unknown", "home_assistant", "app", "plug_charge", "departure_plan", "energy_goal", "soc_goal", "recovery", "guest")
+command_source: ContextVar[str] = ContextVar("amtron_command_source", default="unknown")
+
+
+def attributed[**P, T](source: str) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Coroutine[object, object, T]]]:
+    """Scope provenance to this task, including calls through the service API."""
+    def decorate(method: Callable[P, Awaitable[T]]) -> Callable[P, Coroutine[object, object, T]]:
+        @wraps(method)
+        async def call(*args: P.args, **kwargs: P.kwargs) -> T:
+            token = command_source.set(source)
+            try:
+                return await method(*args, **kwargs)
+            finally:
+                command_source.reset(token)
+        return call
+    return decorate
+
 CONTROL_OUTCOMES = ("executed", "replaced", "cancelled", "failed", "uncertain")
 RECOVERY_OUTCOMES = ("recovery_succeeded", "recovery_failed", "uncertain")
 OUTCOMES = (*CONTROL_OUTCOMES, "recovery_succeeded", "recovery_failed")
@@ -48,7 +69,7 @@ REASONS = (
     "completed", "replaced", "shutdown", "phase_timeout", "phase_unconfirmed",
     "connection_error", "write_rejected", "permission_denied",
     "status_refresh_failed", "unknown", "error_still_active", "user_cancelled", "energy_goal", "time_limit", "guest_confirmation",
-    "deadline_expired",
+    "deadline_expired", "vehicle_authorized", "vehicle_waiting",
 )
 
 
@@ -60,6 +81,9 @@ class CommandEvent:
     action: str
     outcome: str
     reason: str
+    source: str = "unknown"
+    occurred_at: str | None = None
+    requested_value: float | None = None
 
 
 class CommandEvents:
@@ -77,12 +101,17 @@ class CommandEvents:
         self._listeners.add(callback)
         return lambda: self._listeners.discard(callback)
 
-    def record(self, outcome: str, action: str, reason: str = "completed") -> None:
+    def record(self, outcome: str, action: str, reason: str = "completed", *,
+               source: str | None = None, requested_value: float | None = None) -> None:
         """Publish one outcome, without creating a persisted device history."""
         if not _valid(action, outcome, reason):
             raise ValueError("invalid command event")
+        source = source or command_source.get()
+        if source == "plug_charge" and reason == "completed" and outcome == "executed":
+            reason = "vehicle_waiting" if action == "disable_charging" else "vehicle_authorized"
         self._sequence += 1
-        event = CommandEvent(self._sequence, action, outcome, reason)
+        event = CommandEvent(self._sequence, action, outcome, reason,
+                             source or command_source.get(), datetime.now(UTC).isoformat(), requested_value)
         self._events.append(event)
         self._publish(event)
 
@@ -119,7 +148,7 @@ class CommandEvents:
         events = []
         previous = 0
         for row in rows:
-            if not isinstance(row, dict) or row.keys() != {"sequence", "action", "outcome", "reason"}:
+            if not isinstance(row, dict) or row.keys() != {"sequence", "action", "outcome", "reason", "source", "occurred_at", "requested_value"}:
                 raise ValueError("invalid command event fields")
             index = row["sequence"]
             if (
@@ -127,7 +156,17 @@ class CommandEvents:
                 or not _valid(row["action"], row["outcome"], row["reason"])
             ):
                 raise ValueError("invalid command event value")
-            events.append(CommandEvent(index, row["action"], row["outcome"], row["reason"]))
+            source = row.get("source", "unknown")
+            occurred_at = row.get("occurred_at")
+            value = row.get("requested_value")
+            if source not in SOURCES or (value is not None and (type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 32)):
+                raise ValueError("invalid command event details")
+            if occurred_at is not None and (
+                not isinstance(occurred_at, str) or len(occurred_at) > 40
+                or datetime.fromisoformat(occurred_at).tzinfo is None
+            ):
+                raise ValueError("invalid command event time")
+            events.append(CommandEvent(index, row["action"], row["outcome"], row["reason"], source, occurred_at, value))
             previous = index
         if (events and previous != sequence) or (not events and sequence != 0):
             raise ValueError("incomplete command event cursor")

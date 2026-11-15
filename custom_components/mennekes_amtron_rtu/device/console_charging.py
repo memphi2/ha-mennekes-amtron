@@ -70,7 +70,7 @@ class ChargingConsole(ServiceConsole):
         action = payload["action"]
         try:
             if action in ("energy", "soc"):
-                await service.command({
+                await service.command({"origin": "app",
                     "command": "energy_goal" if action == "energy" else "soc_goal_choice",
                     "value": payload["value"], "expected_choice_revision": payload["revision"],
                     "expected_serial_number": service.identity.serial_number,
@@ -78,19 +78,19 @@ class ChargingConsole(ServiceConsole):
             elif action == "guest":
                 if payload["value"] is not True:
                     raise ValueError("guest start must be explicit")
-                await service.command({
+                await service.command({"origin": "app",
                     "command": "guest_start", "expected_guest_revision": payload["revision"],
                     "expected_serial_number": service.identity.serial_number,
                 })
             elif action == "pause":
                 if payload["value"] is not True:
                     raise ValueError("pause must be explicit")
-                await service.command({
+                await service.command({"origin": "app",
                     "command": "pause", "value": True,
                     "expected_serial_number": service.identity.serial_number,
                 })
             elif action == "departure":
-                await service.command({
+                await service.command({"origin": "app",
                     "command": "departure_choice", "deadline": payload["value"],
                     "revision": payload["revision"],
                     "expected_serial_number": service.identity.serial_number,

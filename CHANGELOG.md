@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.9.1
+
+- Command activity identifies its trigger, request and outcome in Home Assistant
+  and the app, including a timestamp retained through the remote connection.
+  Home Assistant adds translated command messages alongside observed
+  wallbox changes. Update the app first; this integration requires app 0.9.1.
+
 - Virtual Plug & Charge no longer writes an old resume current when a stale
   pause intent remains but the wallbox already confirms a running current.
   If the pause readback is unknown, it waits for a reliable reading.

@@ -616,47 +616,47 @@
           "event_type": {
             "name": "Command and result",
             "state": {
-              "pause_executed": "Pause charging: Command accepted",
+              "pause_executed": "Pause charging: Command completed",
               "pause_replaced": "Pause charging: Replaced",
               "pause_cancelled": "Pause charging: Cancelled",
               "pause_failed": "Pause charging: Failed",
               "pause_uncertain": "Pause charging: Result unconfirmed",
-              "resume_executed": "Resume charging: Command accepted",
+              "resume_executed": "Resume charging: Command completed",
               "resume_replaced": "Resume charging: Replaced",
               "resume_cancelled": "Resume charging: Cancelled",
               "resume_failed": "Resume charging: Failed",
               "resume_uncertain": "Resume charging: Result unconfirmed",
-              "set_current_executed": "Set charging current: Command accepted",
+              "set_current_executed": "Set charging current: Command completed",
               "set_current_replaced": "Set charging current: Replaced",
               "set_current_cancelled": "Set charging current: Cancelled",
               "set_current_failed": "Set charging current: Failed",
               "set_current_uncertain": "Set charging current: Result unconfirmed",
-              "single_phase_executed": "Use one phase: Command accepted",
+              "single_phase_executed": "Use one phase: Command completed",
               "single_phase_replaced": "Use one phase: Replaced",
               "single_phase_cancelled": "Use one phase: Cancelled",
               "single_phase_failed": "Use one phase: Failed",
               "single_phase_uncertain": "Use one phase: Result unconfirmed",
-              "all_phases_executed": "Use all available phases: Command accepted",
+              "all_phases_executed": "Use all available phases: Command completed",
               "all_phases_replaced": "Use all available phases: Replaced",
               "all_phases_cancelled": "Use all available phases: Cancelled",
               "all_phases_failed": "Use all available phases: Failed",
               "all_phases_uncertain": "Use all available phases: Result unconfirmed",
-              "disable_charging_executed": "Disable charging release: Command accepted",
+              "disable_charging_executed": "Disable charging release: Command completed",
               "disable_charging_replaced": "Disable charging release: Replaced",
               "disable_charging_cancelled": "Disable charging release: Cancelled",
               "disable_charging_failed": "Disable charging release: Failed",
               "disable_charging_uncertain": "Disable charging release: Result unconfirmed",
-              "enable_charging_executed": "Enable charging release: Command accepted",
+              "enable_charging_executed": "Enable charging release: Command completed",
               "enable_charging_replaced": "Enable charging release: Replaced",
               "enable_charging_cancelled": "Enable charging release: Cancelled",
               "enable_charging_failed": "Enable charging release: Failed",
               "enable_charging_uncertain": "Enable charging release: Result unconfirmed",
-              "lock_executed": "Lock wallbox: Command accepted",
+              "lock_executed": "Lock wallbox: Command completed",
               "lock_replaced": "Lock wallbox: Replaced",
               "lock_cancelled": "Lock wallbox: Cancelled",
               "lock_failed": "Lock wallbox: Failed",
               "lock_uncertain": "Lock wallbox: Result unconfirmed",
-              "unlock_executed": "Unlock wallbox: Command accepted",
+              "unlock_executed": "Unlock wallbox: Command completed",
               "unlock_replaced": "Unlock wallbox: Replaced",
               "unlock_cancelled": "Unlock wallbox: Cancelled",
               "unlock_failed": "Unlock wallbox: Failed",
@@ -669,7 +669,7 @@
           "result": {
             "name": "Result",
             "state": {
-              "executed": "Command accepted",
+              "executed": "Command completed",
               "replaced": "Replaced",
               "cancelled": "Cancelled",
               "failed": "Failed",
@@ -711,8 +711,33 @@
               "energy_goal": "Charge target stop",
               "deadline_expired": "Departure time expired",
               "time_limit": "Time limit reached",
-              "guest_confirmation": "Guest start requires confirmation"
+              "guest_confirmation": "Guest start requires confirmation",
+              "vehicle_authorized": "Recognized vehicle released for this connection",
+              "vehicle_waiting": "Waiting for an authorized vehicle"
             }
+          },
+          "source": {
+            "name": "Trigger",
+            "state": {
+              "unknown": "Source not reported",
+              "home_assistant": "Home Assistant (control or automation)",
+              "app": "App interface",
+              "plug_charge": "Virtual Plug & Charge",
+              "departure_plan": "Departure plan",
+              "energy_goal": "Energy target protection",
+              "soc_goal": "Vehicle percentage target",
+              "recovery": "Error recovery",
+              "guest": "Guest charging"
+            }
+          },
+          "requested_value": {
+            "name": "Requested register value",
+            "state": {
+              "0": "No software current limit"
+            }
+          },
+          "occurred_at": {
+            "name": "Occurred at"
           }
         }
       },

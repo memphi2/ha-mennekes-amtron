@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -157,7 +158,21 @@ def test_the_entity_reports_changes_after_a_baseline_and_restarts_after_a_failed
             entity, "async_write_ha_state",
             lambda: written.append((entity.state_attributes["event_type"], entity.state)),
         )
+        hass.config.language = "en"
+        entity.hass = hass
+        entity.entity_id = "event.test_wallbox"
+        activity = []
+        monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_get_translations", AsyncMock(return_value={}))
+        monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_log_entry", lambda *args, **kwargs: activity.append(args[2]))
         await entity.async_added_to_hass()
+        entry.runtime_data.control.events.record("executed", "resume", source="plug_charge", requested_value=16)
+        assert activity == ["plug_charge: resume_executed (Requested: 16 A). vehicle_authorized."]
+        entry.runtime_data.control.events.record("replaced", "set_current", "replaced", requested_value=10)
+        assert len(activity) == 1
+        entity._activity_translations["component.mennekes_amtron_rtu.entity.event.control_result.state_attributes.requested_value.state.0"] = "No software current limit"
+        entry.runtime_data.control.events.record("executed", "set_current", requested_value=0)
+        assert "No software current limit" in activity[-1]
+        assert "0 A" not in activity[-1]
         assert entity.state is None
 
         put(transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)

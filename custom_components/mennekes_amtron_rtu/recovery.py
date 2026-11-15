@@ -10,6 +10,7 @@ from contextlib import suppress
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
+from .device.command_events import attributed
 from .device.const import ERROR_CODE_EMS_UNAVAILABLE, MIN_CURRENT_WRITE_INTERVAL_SECONDS
 from .entry_types import MennekesAmtronConfigEntry
 
@@ -79,6 +80,7 @@ class HeartbeatRecovery:
         self._retry = None
         self.async_check()
 
+    @attributed("recovery")
     async def _async_recover(self) -> None:
         retry_after: float | None = None
         runtime = self._entry.runtime_data

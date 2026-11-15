@@ -616,47 +616,47 @@
           "event_type": {
             "name": "Commande et résultat",
             "state": {
-              "pause_executed": "Mettre la charge en pause: Commande acceptée",
+              "pause_executed": "Mettre la charge en pause: Commande terminée",
               "pause_replaced": "Mettre la charge en pause: Remplacée",
               "pause_cancelled": "Mettre la charge en pause: Annulée",
               "pause_failed": "Mettre la charge en pause: Échec",
               "pause_uncertain": "Mettre la charge en pause: Résultat non confirmé",
-              "resume_executed": "Reprendre la charge: Commande acceptée",
+              "resume_executed": "Reprendre la charge: Commande terminée",
               "resume_replaced": "Reprendre la charge: Remplacée",
               "resume_cancelled": "Reprendre la charge: Annulée",
               "resume_failed": "Reprendre la charge: Échec",
               "resume_uncertain": "Reprendre la charge: Résultat non confirmé",
-              "set_current_executed": "Régler le courant de charge: Commande acceptée",
+              "set_current_executed": "Régler le courant de charge: Commande terminée",
               "set_current_replaced": "Régler le courant de charge: Remplacée",
               "set_current_cancelled": "Régler le courant de charge: Annulée",
               "set_current_failed": "Régler le courant de charge: Échec",
               "set_current_uncertain": "Régler le courant de charge: Résultat non confirmé",
-              "single_phase_executed": "Utiliser une phase: Commande acceptée",
+              "single_phase_executed": "Utiliser une phase: Commande terminée",
               "single_phase_replaced": "Utiliser une phase: Remplacée",
               "single_phase_cancelled": "Utiliser une phase: Annulée",
               "single_phase_failed": "Utiliser une phase: Échec",
               "single_phase_uncertain": "Utiliser une phase: Résultat non confirmé",
-              "all_phases_executed": "Utiliser toutes les phases disponibles: Commande acceptée",
+              "all_phases_executed": "Utiliser toutes les phases disponibles: Commande terminée",
               "all_phases_replaced": "Utiliser toutes les phases disponibles: Remplacée",
               "all_phases_cancelled": "Utiliser toutes les phases disponibles: Annulée",
               "all_phases_failed": "Utiliser toutes les phases disponibles: Échec",
               "all_phases_uncertain": "Utiliser toutes les phases disponibles: Résultat non confirmé",
-              "disable_charging_executed": "Désactiver l’autorisation de charge: Commande acceptée",
+              "disable_charging_executed": "Désactiver l’autorisation de charge: Commande terminée",
               "disable_charging_replaced": "Désactiver l’autorisation de charge: Remplacée",
               "disable_charging_cancelled": "Désactiver l’autorisation de charge: Annulée",
               "disable_charging_failed": "Désactiver l’autorisation de charge: Échec",
               "disable_charging_uncertain": "Désactiver l’autorisation de charge: Résultat non confirmé",
-              "enable_charging_executed": "Autoriser la charge: Commande acceptée",
+              "enable_charging_executed": "Autoriser la charge: Commande terminée",
               "enable_charging_replaced": "Autoriser la charge: Remplacée",
               "enable_charging_cancelled": "Autoriser la charge: Annulée",
               "enable_charging_failed": "Autoriser la charge: Échec",
               "enable_charging_uncertain": "Autoriser la charge: Résultat non confirmé",
-              "lock_executed": "Verrouiller la borne: Commande acceptée",
+              "lock_executed": "Verrouiller la borne: Commande terminée",
               "lock_replaced": "Verrouiller la borne: Remplacée",
               "lock_cancelled": "Verrouiller la borne: Annulée",
               "lock_failed": "Verrouiller la borne: Échec",
               "lock_uncertain": "Verrouiller la borne: Résultat non confirmé",
-              "unlock_executed": "Déverrouiller la borne: Commande acceptée",
+              "unlock_executed": "Déverrouiller la borne: Commande terminée",
               "unlock_replaced": "Déverrouiller la borne: Remplacée",
               "unlock_cancelled": "Déverrouiller la borne: Annulée",
               "unlock_failed": "Déverrouiller la borne: Échec",
@@ -669,7 +669,7 @@
           "result": {
             "name": "Résultat",
             "state": {
-              "executed": "Commande acceptée",
+              "executed": "Commande terminée",
               "replaced": "Remplacée",
               "cancelled": "Annulée",
               "failed": "Échec",
@@ -711,8 +711,33 @@
               "energy_goal": "Arrêt demandé par un objectif de recharge",
               "deadline_expired": "Heure de départ dépassée",
               "time_limit": "Limite horaire atteinte",
-              "guest_confirmation": "Confirmez le démarrage invité"
+              "guest_confirmation": "Confirmez le démarrage invité",
+              "vehicle_authorized": "Véhicule reconnu autorisé pour ce branchement",
+              "vehicle_waiting": "En attente d’un véhicule autorisé"
             }
+          },
+          "source": {
+            "name": "Déclencheur",
+            "state": {
+              "unknown": "Source non transmise",
+              "home_assistant": "Home Assistant (commande ou automatisation)",
+              "app": "Interface de l’application",
+              "plug_charge": "Plug & Charge virtuel",
+              "departure_plan": "Plan de départ",
+              "energy_goal": "Protection de l’objectif énergétique",
+              "soc_goal": "Objectif de charge du véhicule",
+              "recovery": "Récupération après erreur",
+              "guest": "Recharge invité"
+            }
+          },
+          "requested_value": {
+            "name": "Valeur de registre demandée",
+            "state": {
+              "0": "Sans limite logicielle de courant"
+            }
+          },
+          "occurred_at": {
+            "name": "Survenu à"
           }
         }
       },

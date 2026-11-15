@@ -119,9 +119,9 @@ class GuestModbusService(ConsoleModbusService):
         raw = f"{self.choice_revision}|{self.target_time_revision}|{self._connection_scope}|{self._guest_scope}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
-    async def command(self, payload: dict[str, Any], *, _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None) -> dict[str, Any]:
+    async def _command_with_origin(self, payload: dict[str, Any], *, _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None) -> dict[str, Any]:
         if payload.get("command") != "guest_start":
-            return await super().command(payload, _soc_outcome=_soc_outcome)
+            return await super()._command_with_origin(payload, _soc_outcome=_soc_outcome)
         if payload.keys() != {"command", "expected_serial_number", "expected_guest_revision"}:
             raise ValueError("invalid guest command")
         async with self._command_lock:

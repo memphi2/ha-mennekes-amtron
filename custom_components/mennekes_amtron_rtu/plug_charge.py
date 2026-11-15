@@ -19,6 +19,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
 from .device.client_errors import AmtronBusError
+from .device.command_events import attributed
 from .device.const import DOMAIN
 from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
@@ -424,6 +425,7 @@ class PlugChargeObserver:
         if candidate is not None and self._selection() == candidate:
             self._task = self._hass.async_create_task(self._authorize(candidate))
 
+    @attributed("plug_charge")
     async def _authorize(self, candidate: tuple[str, str]) -> None:
         try:
             if self._selection() == candidate:

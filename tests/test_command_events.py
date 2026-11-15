@@ -268,7 +268,7 @@ def test_event_entity_subscribes_without_replaying_and_tracks_feed_support(monke
         monkeypatch.setattr(entity, "async_on_remove", removals.append)
         await entity.async_added_to_hass()
         assert writes == []
-        feed.record("executed", "resume")
+        feed.record("executed", "resume", source="plug_charge", requested_value=16)
         # The type names the command, so HA's history shows which one it was.
         assert entity.state_attributes["event_type"] == "resume_executed"
         assert entity.state_attributes["action"] == "resume"
@@ -380,4 +380,72 @@ def test_service_recovery_observation_uses_the_poll_generation(tmp_path, monkeyp
         await service.refresh()
         assert outcomes(service.control.events) == [("recovery_succeeded", "recover", "completed")]
         await service.stop()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("key", "value"), [
+    ("source", "private name"), ("requested_value", True),
+    ("requested_value", float("nan")), ("requested_value", 33),
+    ("occurred_at", 1), ("occurred_at", "2026-11-15T12:00:00"),
+])
+def test_event_details_reject_unbounded_or_invalid_metadata(key, value):
+    feed = CommandEvents()
+    feed.record("executed", "resume")
+    raw = feed.snapshot()
+    raw["events"][0][key] = value
+    with pytest.raises(ValueError, match="command event"):
+        CommandEvents.parse(raw)
+
+
+def test_source_and_requested_value_survive_queued_execution():
+    from custom_components.mennekes_amtron_rtu.device.command_events import (
+        command_source,
+    )
+
+    async def run():
+        harness = Harness()
+        control = await harness.connect()
+        await control.async_set_charging_current(16)
+        token = command_source.set("plug_charge")
+        try:
+            await control.async_set_charging_current(6)
+        finally:
+            command_source.reset(token)
+        assert control.pending_action == "set_current"
+        harness.clock[0] += 6
+        await control._async_flush_pending()
+        event = CommandEvents.parse(control.events.snapshot())[2][-1]
+        assert event.source == "plug_charge"
+        assert event.requested_value == 6
+        assert event.occurred_at is not None
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_origin_scope_resets_after_failure_and_stays_local_to_a_task():
+    from custom_components.mennekes_amtron_rtu.device.command_events import (
+        attributed,
+        command_source,
+    )
+
+    async def run():
+        ready = asyncio.Event()
+        finish = asyncio.Event()
+
+        @attributed("plug_charge")
+        async def grant():
+            ready.set()
+            await finish.wait()
+            assert command_source.get() == "plug_charge"
+            raise RuntimeError("failed")
+
+        task = asyncio.create_task(grant())
+        await ready.wait()
+        assert command_source.get() == "unknown"
+        finish.set()
+        with pytest.raises(RuntimeError):
+            await task
+        assert command_source.get() == "unknown"
+
     asyncio.run(run())

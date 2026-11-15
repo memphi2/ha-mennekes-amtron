@@ -218,6 +218,7 @@ class PlugChargeController:
             # Do not overwrite the user's release/pause intent or pending work.
             absent = await self._control._async_vehicle_absent()
             await self._control._async_write(CHARGING_RELEASE, 0, refresh=False)
+            self._control.events.record("executed", "disable_charging", source="plug_charge")
             if not absent:
                 self._control.write_state.mode_change_at = self._control._monotonic()
         self.state.hold = True
@@ -324,6 +325,7 @@ class PlugChargeController:
                     CHARGING_RELEASE, 1, refresh=False, precondition=self._live_presence,
                 )
                 self._check_request(session, deadline)
+                self._control.events.record("executed", "enable_charging", source="plug_charge")
                 self.state.authorized = True
                 self.state.hold = False
                 if switches:

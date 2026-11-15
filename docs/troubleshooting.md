@@ -527,3 +527,29 @@ model/firmware; direct or service connection; read-only setting; expected
 behavior and exact error. Attach diagnostics and the relevant log messages.
 Review extra logs before posting: remove tokens, serial numbers, private
 hostnames and adapter identifiers.
+
+
+## Understand the activity timeline
+
+The enabled **Wallbox event** entity combines readable command messages in
+Home Assistant Activity with observed physical changes. **Control result** is an
+optional diagnostic event entity; leave it disabled unless an automation needs
+its structured command outcomes. In Activity, filter by **Wallbox event** for
+the concise wallbox timeline. The unfiltered HA activity also includes ordinary
+entity changes, such as sensors becoming unavailable during an HA reload.
+A command acknowledgement does not prove that the car has started charging;
+look for the subsequent **Charging started** observation.
+
+Command messages name the trigger (Plug & Charge, departure plan, target
+protection, app or Home Assistant), outcome and requested current where relevant.
+Home Assistant means a control or automation; it does not identify a person.
+Unknown sources are labelled explicitly. The app overview shows the same command
+results with the original event time. Reconnects establish a fresh cursor and do
+not replay commands that happened while HA was disconnected.
+
+Unsent current-slider values superseded by another request are omitted from
+the readable timeline and app overview; the diagnostic feed retains them.
+Only discrete outcomes and state transitions create activity. Polls, heartbeats
+and countdowns do not. The app keeps at most 32 command results in memory; HA
+retention follows your Recorder configuration. Enabling the optional **Control result** entity adds a structured diagnostic
+record of each command alongside the readable activity message.
