@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.10.0
+## 0.10.0b1 — 2026-11-15
 
 ### Breaking changes
 
@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   status sensor instead of the Downgrade active binary sensor.
 - Downloaded diagnostics contain the service state, its counters and the raw
   registers.
-- The app must be 0.10.0. Update the app first; an older app is refused.
+- The app must be 0.10.0b1. Update the app first; an older app is refused.
 - The wallbox's solar charging mode is shown and no longer changed.
 
 ### Changes
