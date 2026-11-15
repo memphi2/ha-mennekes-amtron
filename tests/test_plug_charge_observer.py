@@ -55,7 +55,8 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True
     options["active_vehicle_profile"] = selected
     coordinator, timers = Coordinator(), []
     control = SimpleNamespace(
-        read_only=False, pause_requested=False, charging_release_requested=None,
+        read_only=False, pause_requested=False, is_paused=False,
+        charging_release_requested=None,
         energy_goal_stop_requested=False, pending_action=None, supports_soc_goal=True,
         soc_goal=SimpleNamespace(target_percent=0.0, stop_requested=False),
         async_resume_charging=AsyncMock(),
@@ -374,6 +375,7 @@ def arm_plan(h, status):
 
 async def plug_in_paused(h, *, pending=None, plan=None, goal_stop=False, paused=True):
     h.control.pause_requested = paused
+    h.control.is_paused = paused
     h.control.pending_action = pending
     h.control.energy_goal_stop_requested = goal_stop
     if plan is not None:
@@ -402,6 +404,36 @@ def test_recognized_plug_in_ends_a_manual_pause_before_the_grant(tmp_path, monke
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()
             assert order == ["resume", "authorize"]
+    asyncio.run(run())
+
+
+def test_stale_pause_intent_does_not_lower_a_confirmed_running_current(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            # A prior intent may still say "paused" after the wallbox has
+            # already returned to its 16 A setpoint. Grant the car without a
+            # second resume write that could restore an older 6 A setpoint.
+            await plug_in_paused(h)
+            h.control.is_paused = False
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_resume_charging.assert_not_awaited()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_unknown_pause_readback_defers_the_grant(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            await plug_in_paused(h)
+            h.control.is_paused = None
+            h.coordinator.async_update_listeners()
+            assert h.observer.status == "blocked"
+            assert h.observer.blocked_reason == "register_unavailable"
+            h.control.async_resume_charging.assert_not_awaited()
+            h.control.async_authorize_plug_charge.assert_not_awaited()
+
     asyncio.run(run())
 
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Virtual Plug & Charge no longer writes an old resume current when a stale
+  pause intent remains but the wallbox already confirms a running current.
+  If the pause readback is unknown, it waits for a reliable reading.
+
 ## 0.9.0
 
 Stable release of the 0.9 charging and app changes since 0.8.2. The

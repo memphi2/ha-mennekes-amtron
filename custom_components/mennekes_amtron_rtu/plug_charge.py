@@ -286,6 +286,15 @@ class PlugChargeObserver:
             ("energy_goal_stop", bool(self._control.energy_goal_stop_requested)),
         )
         reasons = [reason for reason, failed in checks if failed]
+        if (
+            self._control.pause_requested is True
+            and self._plan_status() is None
+            and self._control.pending_action is None
+            and self._control.is_paused is None
+        ):
+            # Do not open the gate while the actual pause register is unknown:
+            # a stale saved intent cannot tell us which current is active.
+            reasons.append("register_unavailable")
         for key, reason in (
             ("lock_evse", "wallbox_locked"), ("error_code", "error_code"),
             ("authorization_enabled", "authorization_required"),
@@ -421,7 +430,7 @@ class PlugChargeObserver:
                 if (
                     candidate[1] == self._fresh_session
                     and self._control.pause_requested is True and self._control.pending_action is None
-                    and self._plan_status() is None
+                    and self._plan_status() is None and self._control.is_paused is True
                 ):
                     # The gate keeps the release off until the grant below, so
                     # this resume switches no charge and starts no long guard.
