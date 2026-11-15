@@ -114,7 +114,8 @@ class PresenceGap:
     or a silent stall. The allowance is two minutes, or two and a half
     observed poll intervals for a slow scan, so one unknown poll is bridged at
     any configured interval but a longer gap is not. The interval is learned
-    only from two similar consecutive gaps, so a bridged stall cannot widen it.
+    only from two similar consecutive gaps, so one bridged stall cannot widen
+    it, and only raised, so extra refreshes cannot narrow it.
     """
 
     def __init__(self) -> None:
@@ -146,7 +147,9 @@ class PresenceGap:
             if not self._unknown and self._known_at is not None:
                 gap = now - self._known_at
                 if self._gap is not None and abs(gap - self._gap) <= 0.25 * max(gap, self._gap):
-                    self._interval = min(gap, _MAX_POLL_INTERVAL_SECONDS)
+                    # Only ever raised: extra refreshes after commands must
+                    # not make the regular slow poll look like a stall.
+                    self._interval = min(max(gap, self._interval or 0.0), _MAX_POLL_INTERVAL_SECONDS)
                 self._gap = gap
             else:
                 self._gap = None
@@ -250,11 +253,16 @@ class SessionHistory:
             return self._latest != previous
 
         if self._closing is not None:
-            # Plugged in again before the final meter: a charge stays
-            # unmeasured, a plug-in that never charged keeps the last one.
-            if not self._idle(self._closing[0], total):
-                self._latest = None
+            cycle, unplugged_at = self._closing
             self._closing = None
+            if total is not None and data.get(EVSE_STATE.key) != EvseState.CHARGING:
+                # Plugged in again, not charging yet: no energy flowed since
+                # the unplug, so this reading is the final and new baseline.
+                self._finish(cycle, total, unplugged_at)
+                self._idle_energy = total
+            elif not self._idle(cycle, total):
+                # Charging already: the earlier charge stays unmeasured.
+                self._latest = None
         if self._cycle is None:
             anchored = self._absent_at is not None and self._idle_energy is not None
             self._cycle = _Cycle(

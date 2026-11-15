@@ -437,3 +437,29 @@ def test_replug_while_an_idle_plug_in_awaits_its_meter_keeps_the_last_charge():
     history.observe(reading(IDLE, 110, fresh=False), now=80)
     history.observe(reading(CONNECTED, 110), now=90)
     assert history.latest == previous
+
+
+def test_command_refreshes_do_not_turn_the_slow_poll_into_a_stall():
+    history = SessionHistory()
+    now = 0
+    history.observe(reading(IDLE, 100), now=now)
+    for gap, state, total in ((300, CONNECTED, 100), (300, CHARGING, 101), (30, CHARGING, 102),
+                              (30, CHARGING, 103), (300, CHARGING, 108)):
+        now += gap
+        history.observe(reading(state, total), now=now)
+    history.observe(reading(IDLE, 110), now=now + 300)
+    assert history.latest is not None
+    assert history.latest.wallbox_kwh == 10
+
+
+def test_replug_before_the_final_meter_completes_the_earlier_charge():
+    history = complete()
+    history.observe(reading(CONNECTED, 110), now=70)
+    history.observe(reading(CHARGING, 115), now=80)
+    history.observe(reading(IDLE, 115, fresh=False), now=90)
+    history.observe(reading(CONNECTED, 115), now=100)  # not charging yet: still the final meter
+    assert history.latest is not None
+    assert history.latest.wallbox_kwh == 5
+    history.observe(reading(CHARGING, 117), now=110)
+    assert history.observe(reading(IDLE, 121), now=120)
+    assert history.latest.wallbox_kwh == 6  # the new car's cycle is measured from 115

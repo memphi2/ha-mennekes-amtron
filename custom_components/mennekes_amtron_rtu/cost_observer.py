@@ -288,10 +288,12 @@ class ChargingCostObserver:
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
         charging = data.get(EVSE_STATE.key) == EvseState.CHARGING
         checkpoint = None
-        if fresh:
-            self._accumulator.observe_energy(at, energy)
+        # A failed or rejected read leaves the previous value, which must not
+        # pass for a new reading.
+        if fresh and self._accumulator.observe_energy(at, energy):
             checkpoint = self._accumulator.checkpoint()
             self._record(checkpoint, charging=charging)
+        fresh = checkpoint is not None
         if present is True:
             self._active = True
             if self._cycle_start is None and fresh:
@@ -304,7 +306,7 @@ class ChargingCostObserver:
             # Only a reading while unplugged starts the next running cost; an
             # unplug without one must not carry this charge into the next.
             if fresh:
-                self._cycle_start, self._cycle_partial = self._accumulator.checkpoint(), False
+                self._cycle_start, self._cycle_partial = checkpoint, False
             elif self._active:
                 self._cycle_start, self._cycle_partial = None, False
             self._active = False
@@ -327,7 +329,10 @@ class ChargingCostObserver:
         if checkpoint is None:
             return
         self._newest = checkpoint
-        if charging:
+        tail = self._runs[-1] if self._runs else None
+        # A charging reading at the idle value still marks the baseline, e.g.
+        # an app sample taken just before charging started.
+        if charging and (tail is None or tail.last.meter_kwh != checkpoint.meter_kwh):
             return
         if self._runs and self._runs[-1].last.meter_kwh == checkpoint.meter_kwh:
             self._runs[-1] = _MeterRun(self._runs[-1].first, checkpoint)

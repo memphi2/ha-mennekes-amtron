@@ -138,7 +138,7 @@
     const action=key==="guest"&&state.guest_active?"pause":key;
     const csrf=state.csrf,rev=action==="pause"?state.revision:key==="guest"?state.guest_revision:revisions[key];busy=true;suspend();error="";render();
     const own=generation,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
-    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(Object.hasOwn(refusals,data?.error)?refusals[data.error]:"uncertain");return;}validate(data);dirty.delete(key);error=t(action==="guest"?"guest_started":"saved");apply(data);}
+    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(Object.prototype.hasOwnProperty.call(refusals,data?.error)?refusals[data.error]:"uncertain");return;}validate(data);dirty.delete(key);error=t(action==="guest"?"guest_started":"saved");apply(data);}
     catch(_){if(own===generation&&live())error=t("uncertain");}
     finally{clearTimeout(timeout);busy=false;render();schedule();}
   }

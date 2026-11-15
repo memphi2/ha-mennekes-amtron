@@ -388,15 +388,16 @@ class CostAccumulator:
             self._invalid_interval = True
             self._pending.clear()
 
-    def observe_energy(self, at: float, lifetime_kwh: float | None) -> None:
+    def observe_energy(self, at: float, lifetime_kwh: float | None) -> bool:
+        """Return whether the reading became the newest meter value."""
         timestamp = self._touch(at)
         if timestamp is None:
-            return
+            return False
         value = _price(lifetime_kwh)
         if value is None or value < 0:
             self._mark_incomplete()
             self._invalid_interval = True
-            return
+            return False
         if self._meter_kwh is not None and self._meter_at is not None:
             delta = value - self._meter_kwh
             elapsed = timestamp - self._meter_at
@@ -411,6 +412,7 @@ class CostAccumulator:
         self._meter_price = self._price
         self._pending.clear()
         self._invalid_interval = False
+        return True
 
     def sample(self, at: float, lifetime_kwh: float | None, unit_price: float | None) -> None:
         """Observe the price applying from now, then a fresh meter reading."""
