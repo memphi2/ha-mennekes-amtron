@@ -314,7 +314,7 @@ class CostAccumulator:
     Only fresh meter reads belong in observe_energy; None means a failed read,
     not an unchanged cached value. Events must arrive in chronological order.
     The charging-cost observer runs one accumulator continuously and prices
-    sessions as differences of checkpoints; reset would invalidate those.
+    sessions as differences of checkpoints; result is the total since creation.
     """
 
     def __init__(self, tariff: TariffConfig | None = None, *, max_gap: float = 300.0) -> None:
@@ -322,9 +322,6 @@ class CostAccumulator:
         self.max_gap = _number(max_gap)
         if self.max_gap <= 0 or self.max_gap > MAX_TARIFF_INTERVAL:
             raise ValueError("max_gap out of range")
-        self.reset()
-
-    def reset(self) -> None:
         self._last_at: float | None = None
         self._meter_at: float | None = None
         self._meter_kwh: float | None = None
@@ -332,14 +329,12 @@ class CostAccumulator:
         self._meter_price: float | None = None
         self._pending: list[tuple[float, float | None]] = []
         self._invalid_interval = False
-        self._complete = True
         self.incomplete_events = 0
         self._known_cost = 0.0
         self._unpriced_kwh = 0.0
         self._energy_kwh = 0.0
 
     def _mark_incomplete(self) -> None:
-        self._complete = False
         self.incomplete_events += 1
 
     def checkpoint(self) -> CostCheckpoint | None:
@@ -355,7 +350,7 @@ class CostAccumulator:
     def result(self) -> CostResult:
         return CostResult(
             self._known_cost, self._unpriced_kwh, self._energy_kwh,
-            self._complete and self._meter_at is not None,
+            self.incomplete_events == 0 and self._meter_at is not None,
         )
 
     def _touch(self, at: float) -> float | None:

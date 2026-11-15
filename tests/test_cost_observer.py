@@ -678,3 +678,57 @@ def test_many_charging_readings_do_not_evict_the_session_baseline(tmp_path):
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+def test_a_newest_reading_taken_while_charging_never_ends_a_session(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            for offset, energy, present in ((0, 90, False), (10, 95, True), (20, 100, False), (30, 110, True)):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present))
+            # 90 -> 100 also has 10 kWh, but the newest reading is mid-charge.
+            with patch(clock, return_value=at + 40):
+                await observer.async_observe(data(at + 40, 120, fresh=False, session=completed(at)))
+            assert not observer.last.result.complete
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_waiting_plugged_in_moves_the_running_cost_start_past_a_tariff_edit(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        configured = entry()
+        observer = ChargingCostObserver(hass, configured, remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            with patch(clock, return_value=at):
+                await observer.async_observe(data(at, 100))
+            waiting = data(at+10, 100)
+            waiting.values[EVSE_STATE.key], waiting.values[CP_STATE.key] = EvseState.EV_CONNECTED, CpState.B1
+            with patch(clock, return_value=at+10):
+                await observer.async_observe(waiting)
+            configured.options = {**configured.options, "charging_network_tariff": {
+                "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
+            with patch(clock, return_value=at+20):
+                assert observer.apply_tariff_only_update()
+            for offset, energy in ((30, 100), (40, 105)):
+                reading = data(at + offset, energy, present=energy > 100)
+                if energy == 100:
+                    reading.values[EVSE_STATE.key], reading.values[CP_STATE.key] = EvseState.EV_CONNECTED, CpState.B1
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(reading)
+            assert observer.current.complete
+            assert observer.current.energy_kwh == 5
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

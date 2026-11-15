@@ -297,6 +297,7 @@ def test_queued_guest_start_cannot_release_another_plug_in(tmp_path, monkeypatch
 def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, monkeypatch):
     from custom_components.mennekes_amtron_rtu.device.errors import (
         DeviceError,
+        DeviceValidationError,
         validation_error,
     )
 
@@ -310,10 +311,13 @@ def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, mo
                 raise validation_error("energy_goal_stop_active")
 
             monkeypatch.setattr(control, "async_start_guest_charging", release_then_stop)
-            with pytest.raises(DeviceError):
+            with pytest.raises(DeviceError) as caught:
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
                                        "expected_guest_revision": service.guest_revision})
             assert service.guest_start_uncertain is True
+            # Every caller, e.g. HA over HTTP, must see a change, not a refusal.
+            assert not isinstance(caught.value, DeviceValidationError)
+            assert caught.value.translation_key == "energy_goal_stop_active"
             assert service._guest_scope is not None
             # A later start refused before any write is a definite refusal again.
             with pytest.raises(DeviceError):

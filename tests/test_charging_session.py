@@ -292,7 +292,7 @@ def _real_poll_cycle(history, *, cp_first_on_unplug):
     history.observe(reading(CHARGING, 100), now=15)
     history.observe(reading(CHARGING, 101, fresh=False), now=20)
     history.observe(reading(CHARGING, 108), now=75)
-    history.observe(reading(READY, 110), now=200)
+    history.observe(reading(READY, 110), now=180)
     if cp_first_on_unplug:
         history.observe(reading(READY, 110, fresh=False, cp=a1), now=205)
         return history.observe(reading(IDLE, 110), now=210)
@@ -416,3 +416,24 @@ def test_a_silent_stall_between_known_polls_ends_the_cycle():
     history.observe(reading(CHARGING, 105), now=500)  # host suspended
     history.observe(reading(IDLE, 110), now=510)
     assert history.latest is None
+
+
+def test_a_bridged_stall_does_not_widen_the_next_allowance():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=0)
+    history.observe(reading(CONNECTED, 100), now=5)
+    history.observe(reading(CHARGING, 101), now=10)
+    history.observe(reading(CHARGING, 102), now=15)
+    history.observe(reading(CHARGING, 103), now=125)  # bridged 110 s stall
+    history.observe(reading(CHARGING, 105), now=395)  # 270 s stall
+    history.observe(reading(IDLE, 110), now=400)
+    assert history.latest is None
+
+
+def test_replug_while_an_idle_plug_in_awaits_its_meter_keeps_the_last_charge():
+    history = complete()
+    previous = history.latest
+    history.observe(reading(CONNECTED, 110), now=70)
+    history.observe(reading(IDLE, 110, fresh=False), now=80)
+    history.observe(reading(CONNECTED, 110), now=90)
+    assert history.latest == previous

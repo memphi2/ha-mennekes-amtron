@@ -286,13 +286,20 @@ class ChargingCostObserver:
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         energy = data.get(ENERGY_TOTAL.key)
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
+        charging = data.get(EVSE_STATE.key) == EvseState.CHARGING
+        checkpoint = None
         if fresh:
             self._accumulator.observe_energy(at, energy)
-            self._record(self._accumulator.checkpoint(), charging=data.get(EVSE_STATE.key) == EvseState.CHARGING)
+            checkpoint = self._accumulator.checkpoint()
+            self._record(checkpoint, charging=charging)
         if present is True:
             self._active = True
             if self._cycle_start is None and fresh:
-                self._cycle_start, self._cycle_partial = self._accumulator.checkpoint(), True
+                self._cycle_start, self._cycle_partial = checkpoint, True
+            elif (checkpoint is not None and self._cycle_start is not None and not charging
+                  and checkpoint.meter_kwh == self._cycle_start.meter_kwh):
+                # Waiting plugged in: start where the session's baseline does.
+                self._cycle_start = checkpoint
         elif present is False:
             # Only a reading while unplugged starts the next running cost; an
             # unplug without one must not carry this charge into the next.
@@ -338,10 +345,12 @@ class ChargingCostObserver:
             return CostResult(0.0, kwh, kwh, False)
         # The earliest reading of the final value, before later idle gaps.
         tail = self._runs[-1]
-        same = tail.last.meter_kwh == newest.meter_kwh
-        end = tail.first if same else newest
+        if tail.last.meter_kwh != newest.meter_kwh:
+            # The newest reading was taken while charging; it is not final.
+            return CostResult(0.0, kwh, kwh, False)
+        end = tail.first
         target = end.meter_kwh - kwh
-        for start in islice(reversed(self._runs), 1 if same else 0, None):
+        for start in islice(reversed(self._runs), 1, None):
             if math.isclose(start.last.meter_kwh, target, rel_tol=1e-9, abs_tol=1e-6):
                 return end.since(start.last, energy_kwh=kwh)
             if start.last.meter_kwh < target:

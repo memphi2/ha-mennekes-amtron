@@ -113,7 +113,8 @@ class PresenceGap:
     The span runs from the last known poll, through failed or unknown polls
     or a silent stall. The allowance is two minutes, or two and a half
     observed poll intervals for a slow scan, so one unknown poll is bridged at
-    any configured interval but a longer gap is not.
+    any configured interval but a longer gap is not. The interval is learned
+    only from two similar consecutive gaps, so a bridged stall cannot widen it.
     """
 
     def __init__(self) -> None:
@@ -122,6 +123,7 @@ class PresenceGap:
     def reset(self) -> None:
         self._known_at: float | None = None
         self._interval: float | None = None
+        self._gap: float | None = None
         self._unknown = False
 
     def observe(self, now: float, *, known: bool) -> bool:
@@ -142,7 +144,12 @@ class PresenceGap:
         )
         if known:
             if not self._unknown and self._known_at is not None:
-                self._interval = min(now - self._known_at, _MAX_POLL_INTERVAL_SECONDS)
+                gap = now - self._known_at
+                if self._gap is not None and abs(gap - self._gap) <= 0.25 * max(gap, self._gap):
+                    self._interval = min(gap, _MAX_POLL_INTERVAL_SECONDS)
+                self._gap = gap
+            else:
+                self._gap = None
             self._known_at, self._unknown = now, False
         else:
             self._unknown = True
@@ -243,9 +250,11 @@ class SessionHistory:
             return self._latest != previous
 
         if self._closing is not None:
-            # Plugged in again before the final meter: the charge stays unmeasured.
+            # Plugged in again before the final meter: a charge stays
+            # unmeasured, a plug-in that never charged keeps the last one.
+            if not self._idle(self._closing[0], total):
+                self._latest = None
             self._closing = None
-            self._latest = None
         if self._cycle is None:
             anchored = self._absent_at is not None and self._idle_energy is not None
             self._cycle = _Cycle(
@@ -278,13 +287,17 @@ class SessionHistory:
         # nor claim that charging stopped. A later known state bounds its end.
         return self._latest != previous
 
-    def _finish(self, cycle: _Cycle, total: float | None, now: float) -> None:
-        """A plug-in without charging or energy, e.g. a full car, keeps the last charge."""
-        idle = (
+    @staticmethod
+    def _idle(cycle: _Cycle, total: float | None) -> bool:
+        """A plug-in without charging or energy, e.g. a full car."""
+        return (
             cycle.valid and cycle.started_after is None and total is not None
             and cycle.baseline_kwh is not None and total <= cycle.baseline_kwh
         )
-        if not idle:
+
+    def _finish(self, cycle: _Cycle, total: float | None, now: float) -> None:
+        """An idle plug-in keeps the last completed charge."""
+        if not self._idle(cycle, total):
             self._latest = self._complete(cycle, total, now)
 
     @staticmethod

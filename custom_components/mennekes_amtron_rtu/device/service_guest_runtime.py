@@ -15,7 +15,7 @@ from typing import Any
 from .client_errors import AmtronBusError
 from .command_events import CommandEvent
 from .control import AmtronControl
-from .errors import DeviceError
+from .errors import DeviceError, DeviceValidationError, device_error
 from .guest_permission import GuestPermission
 from .power_window import observed_phases
 from .service_console_runtime import ConsoleModbusService
@@ -163,7 +163,7 @@ class GuestModbusService(ConsoleModbusService):
                 await control.async_cancel_timed_current("departure")
                 await control.async_start_guest_charging(current_cap=self.config.current_cap)
                 accepted = True  # Includes the complete deferred guest start.
-            except BaseException:
+            except BaseException as err:
                 # A refused command has no guest grant. An applied/uncertain
                 # write or a queued release keeps its guards; rolling them
                 # back could leave an already charging guest without limits.
@@ -175,6 +175,9 @@ class GuestModbusService(ConsoleModbusService):
                 self.guest_start_uncertain = (
                     accepted or control.pending_guest_start or departure_queued
                 )
+                if self.guest_start_uncertain and isinstance(err, DeviceValidationError):
+                    # No caller may report this as a clean refusal.
+                    raise device_error(err.translation_key, err.translation_placeholders) from err
                 raise
             finally:
                 unlisten()
