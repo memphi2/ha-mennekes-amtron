@@ -525,30 +525,6 @@ def test_session_published_after_the_next_idle_reading_keeps_its_cost(tmp_path):
     asyncio.run(run())
 
 
-def test_long_unknown_presence_makes_the_running_cost_partial(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            with patch(clock, return_value=at):
-                await observer.async_observe(data(at, 100))
-            with patch(clock, return_value=at+10):
-                await observer.async_observe(data(at+10, 101, present=True))
-            for offset in (60, 200):
-                with patch(clock, return_value=at+offset):
-                    await observer.async_observe(None)
-            with patch(clock, return_value=at+210):
-                await observer.async_observe(data(at+210, 105, present=True))
-            assert not observer.current.complete
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
 def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -597,24 +573,24 @@ def test_ha_to_app_outage_does_not_make_the_app_measured_cost_partial(tmp_path):
     asyncio.run(run())
 
 
-def test_a_settled_cycle_is_not_kept_for_a_later_session(tmp_path):
+def test_app_reading_before_the_unplug_still_prices_the_later_session(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
+        observer = ChargingCostObserver(hass, entry(), remote=True)
         at = time.time()+1
         try:
             await observer.async_start()
             clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            first = completed(at)
-            for offset, energy, present, fresh, summary in (
-                (0, 100, False, True, None),
-                (25, 110, True, True, None),
-                (100, 110, False, False, first),  # Session arrives without a fresh read.
-                (160, 110, False, True, first),
+            for offset, energy, present, summary in (
+                (0, 100, False, None),
+                (25, 102.5, True, None),
+                (90, 108, False, None),  # HA first sees a pre-unplug reading once unplugged.
+                (160, 110, False, completed(at)),  # The app's final meter completes the session.
             ):
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh, session=summary))
-            assert observer._ended is None
+                    await observer.async_observe(data(at + offset, energy, present=present, session=summary))
+            assert observer.last.result.complete
+            assert observer.last.result.cost == pytest.approx(3)
         finally:
             await observer.async_stop()
             await hass.async_stop()

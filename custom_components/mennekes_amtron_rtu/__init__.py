@@ -408,17 +408,9 @@ async def async_setup_entry(
                     entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
                     await entry.runtime_data.charging_cost.async_start()
 
-            estimates_generation = client.connection_generation if not remote else None
-
+            # A reconnect is like a failed poll: the session bridges a short
+            # gap, and costs follow the completed session.
             async def observe_estimates(data: WallboxData | None) -> None:
-                nonlocal estimates_generation
-                if not remote and estimates_generation != client.connection_generation:
-                    # A reconnect is an unknown gap; only a long one invalidates.
-                    estimates_generation = client.connection_generation
-                    if entry.runtime_data.sessions is not None:
-                        await entry.runtime_data.sessions.async_observe(None)
-                    if entry.runtime_data.charging_cost is not None:
-                        await entry.runtime_data.charging_cost.async_observe(None)
                 if entry.runtime_data.sessions is not None:
                     await entry.runtime_data.sessions.async_observe(data)
                 if entry.runtime_data.charging_cost is not None:

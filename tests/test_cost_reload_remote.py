@@ -66,7 +66,7 @@ def test_remote_profile_reload_retains_costs_or_closes_failed_handoff(tmp_path, 
                 await observe(1, 100, False)
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 1):
                     await old.coordinator.async_refresh()
-                assert old.charging_cost._anchored
+                assert old.charging_cost._cycle_start is not None
                 await observe(10, 102, True)
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 10):
                     await old.coordinator.async_refresh()

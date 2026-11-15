@@ -321,3 +321,26 @@ def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, mo
                                        "expected_guest_revision": "stale"})
             assert service.guest_start_uncertain is False
     asyncio.run(run())
+
+
+def test_guest_refusal_after_cancelling_a_queued_departure_is_uncertain(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.errors import (
+        DeviceError,
+        validation_error,
+    )
+
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            control = service.control
+            monkeypatch.setattr(type(control), "pending_owner", property(lambda _self: "departure"))
+
+            async def refused(**_kwargs):
+                raise validation_error("energy_goal_stop_active")
+
+            monkeypatch.setattr(control, "async_start_guest_charging", refused)
+            with pytest.raises(DeviceError):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": service.guest_revision})
+            assert service.guest_start_uncertain is True
+    asyncio.run(run())

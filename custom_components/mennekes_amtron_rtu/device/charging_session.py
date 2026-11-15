@@ -126,7 +126,9 @@ class PresenceGap:
     def observe(self, now: float, *, known: bool) -> bool:
         """Record one poll; return true when an unknown span became too long."""
         if self._known_at is not None and now < self._known_at:
-            self.reset()  # The clock moved back; measure from here.
+            # The clock moved back: measure from this poll, known or not.
+            self.reset()
+            self._known_at = now
         expired = (
             (self._unknown or not known) and self._known_at is not None
             and now - self._known_at > max(
@@ -156,6 +158,9 @@ class SessionHistory:
         self._gap = PresenceGap()
         # An unplugged cycle whose final meter is read in a later poll.
         self._closing: tuple[_Cycle, float] | None = None
+        # A meter read in an unknown-presence poll after the last confirmed
+        # connection, e.g. CP unplugged while the EVSE still reports charging.
+        self._transition_total: float | None = None
 
     @property
     def latest(self) -> CompletedSession | None:
@@ -207,10 +212,17 @@ class SessionHistory:
                     # Energy seen while presence is unknown must still count
                     # as accrued at the next unplugged reading.
                     self._last_energy = total
+                else:
+                    self._transition_total = total
         self._presence(observed_at, known=present is not None)
         if present is None:
             return False
 
+        transition_total, self._transition_total = self._transition_total, None
+        if present is False and total is None and data.energy_read is False:
+            # No energy flows once the CP shows the car gone; the meter read
+            # in that transitional poll is the cycle's final value.
+            total = transition_total
         if present is False:
             if self._cycle is not None and total is None and self._cycle.valid:
                 # The meter is read on the next EVSE change or slow poll; no

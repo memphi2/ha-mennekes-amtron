@@ -155,9 +155,11 @@ class GuestModbusService(ConsoleModbusService):
             self._guest_scope = sample.scope
             self._guest_restore_pending = False
             self.client.write_state.guest_permission = GuestPermission(sample.session, deadline)
+            departure_queued = False
             try:
                 # Make the ownership fence durable before any charging write.
                 await self._persist()
+                departure_queued = control.pending_owner == "departure"
                 await control.async_cancel_timed_current("departure")
                 await control.async_start_guest_charging(current_cap=self.config.current_cap)
                 accepted = True  # Includes the complete deferred guest start.
@@ -168,8 +170,11 @@ class GuestModbusService(ConsoleModbusService):
                 if not accepted and not control.pending_guest_start:
                     (self._guest_scope, self._guest_restore_pending,
                      self.client.write_state.guest_permission) = previous
-                else:
-                    self.guest_start_uncertain = True
+                # A cancelled departure command or an applied write is a
+                # change; the console must not report a clean refusal.
+                self.guest_start_uncertain = (
+                    accepted or control.pending_guest_start or departure_queued
+                )
                 raise
             finally:
                 unlisten()

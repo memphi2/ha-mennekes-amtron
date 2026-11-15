@@ -287,6 +287,26 @@ class CostResult:
         return cls(raw["known_cost"], raw["unpriced_kwh"], raw["energy_kwh"], raw["complete"])
 
 
+@dataclass(frozen=True, slots=True)
+class CostCheckpoint:
+    """Running sums at one meter reading; two of them price the energy between."""
+
+    meter_kwh: float
+    known_cost: float
+    unpriced_kwh: float
+    energy_kwh: float
+    incomplete_events: int
+
+    def since(self, start: CostCheckpoint, *, energy_kwh: float | None = None) -> CostResult:
+        """Energy may be given exactly, e.g. as the matched session's value."""
+        energy = max(0.0, self.energy_kwh - start.energy_kwh) if energy_kwh is None else energy_kwh
+        complete = self.incomplete_events == start.incomplete_events
+        missing = 0.0 if complete else min(energy, max(0.0, self.unpriced_kwh - start.unpriced_kwh))
+        return CostResult(
+            self.known_cost - start.known_cost if energy > 0 else 0.0, missing, energy, complete,
+        )
+
+
 class CostAccumulator:
     """Keep running sums and at most 256 price changes between fresh meter reads.
 
@@ -313,9 +333,23 @@ class CostAccumulator:
         self._pending: list[tuple[float, float | None]] = []
         self._invalid_interval = False
         self._complete = True
+        self.incomplete_events = 0
         self._known_cost = 0.0
         self._unpriced_kwh = 0.0
         self._energy_kwh = 0.0
+
+    def _mark_incomplete(self) -> None:
+        self._complete = False
+        self.incomplete_events += 1
+
+    def checkpoint(self) -> CostCheckpoint | None:
+        """Running sums at the last fresh meter reading, for later differences."""
+        if self._meter_kwh is None:
+            return None
+        return CostCheckpoint(
+            self._meter_kwh, self._known_cost, self._unpriced_kwh, self._energy_kwh,
+            self.incomplete_events,
+        )
 
     @property
     def result(self) -> CostResult:
@@ -328,11 +362,11 @@ class CostAccumulator:
         try:
             at = _timestamp(at)
         except ValueError:
-            self._complete = False
+            self._mark_incomplete()
             self._invalid_interval = True
             return None
         if self._last_at is not None and at < self._last_at:
-            self._complete = False
+            self._mark_incomplete()
             self._invalid_interval = True
             return None
         self._last_at = at
@@ -355,7 +389,7 @@ class CostAccumulator:
         elif len(self._pending) < MAX_PRICE_CHANGES:
             self._pending.append((timestamp, price))
         else:
-            self._complete = False
+            self._mark_incomplete()
             self._invalid_interval = True
             self._pending.clear()
 
@@ -365,16 +399,16 @@ class CostAccumulator:
             return
         value = _price(lifetime_kwh)
         if value is None or value < 0:
-            self._complete = False
+            self._mark_incomplete()
             self._invalid_interval = True
             return
         if self._meter_kwh is not None and self._meter_at is not None:
             delta = value - self._meter_kwh
             elapsed = timestamp - self._meter_at
             if delta < 0:
-                self._complete = False
+                self._mark_incomplete()
             elif elapsed > self.max_gap or self._invalid_interval or (elapsed == 0 and delta > 0):
-                self._complete = False
+                self._mark_incomplete()
                 self._add(delta, 0.0, delta)
             elif delta > 0:
                 self._integrate(timestamp, delta)
@@ -405,12 +439,12 @@ class CostAccumulator:
         missing = delta * min(1.0, unknown_duration / duration)
         cost = delta * math.fsum(weighted_prices)
         if unknown_duration > 0:
-            self._complete = False
+            self._mark_incomplete()
         self._add(delta, cost, missing)
 
     def _add(self, energy: float, cost: float, missing: float) -> None:
         if not math.isfinite(self._energy_kwh + energy):
-            self._complete = False
+            self._mark_incomplete()
             return
         if not math.isfinite(self._known_cost + cost):
             cost, missing = 0.0, energy
@@ -418,4 +452,4 @@ class CostAccumulator:
         self._known_cost += cost
         self._unpriced_kwh = min(self._energy_kwh, self._unpriced_kwh + missing)
         if missing > 0:
-            self._complete = False
+            self._mark_incomplete()

@@ -29,7 +29,7 @@ cards:
         conditions:
           - condition: state
             entity: switch.mennekes_amtron_plug_charge_virtuale
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: switch.mennekes_amtron_plug_charge_virtuale
@@ -46,7 +46,7 @@ cards:
         conditions:
           - condition: state
             entity: select.mennekes_amtron_veicolo_attivo
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: select.mennekes_amtron_veicolo_attivo
@@ -55,17 +55,23 @@ cards:
           icon_color: green
           tap_action:
             action: more-info
-      - type: template
-        entity: number.mennekes_amtron_limite_di_corrente_di_ricarica
-        content: "{{ states(entity) | int(0) }} A"
-        icon: mdi:current-ac
-        tap_action:
-          action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: number.mennekes_amtron_limite_di_corrente_di_ricarica
+            state_not: [unknown, unavailable]
+        chip:
+          type: template
+          entity: number.mennekes_amtron_limite_di_corrente_di_ricarica
+          content: "{{ states(entity) | int(0) }} A"
+          icon: mdi:current-ac
+          tap_action:
+            action: more-info
       - type: conditional
         conditions:
           - condition: state
             entity: switch.mennekes_amtron_ricarica_in_pausa
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: switch.mennekes_amtron_ricarica_in_pausa
@@ -78,7 +84,7 @@ cards:
         conditions:
           - condition: state
             entity: switch.mennekes_amtron_consenso_alla_ricarica
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: switch.mennekes_amtron_consenso_alla_ricarica

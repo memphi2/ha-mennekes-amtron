@@ -29,7 +29,7 @@ cards:
         conditions:
           - condition: state
             entity: switch.mennekes_amtron_virtuelles_plug_charge
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: switch.mennekes_amtron_virtuelles_plug_charge
@@ -46,7 +46,7 @@ cards:
         conditions:
           - condition: state
             entity: select.mennekes_amtron_aktives_fahrzeug
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: select.mennekes_amtron_aktives_fahrzeug
@@ -55,17 +55,23 @@ cards:
           icon_color: green
           tap_action:
             action: more-info
-      - type: template
-        entity: number.mennekes_amtron_ladestrom_begrenzung
-        content: "{{ states(entity) | int(0) }} A"
-        icon: mdi:current-ac
-        tap_action:
-          action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: number.mennekes_amtron_ladestrom_begrenzung
+            state_not: [unknown, unavailable]
+        chip:
+          type: template
+          entity: number.mennekes_amtron_ladestrom_begrenzung
+          content: "{{ states(entity) | int(0) }} A"
+          icon: mdi:current-ac
+          tap_action:
+            action: more-info
       - type: conditional
         conditions:
           - condition: state
             entity: switch.mennekes_amtron_laden_pausiert
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: switch.mennekes_amtron_laden_pausiert
@@ -78,7 +84,7 @@ cards:
         conditions:
           - condition: state
             entity: switch.mennekes_amtron_ladefreigabe
-            state_not: unavailable
+            state_not: [unknown, unavailable]
         chip:
           type: template
           entity: switch.mennekes_amtron_ladefreigabe

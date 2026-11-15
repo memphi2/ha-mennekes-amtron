@@ -364,3 +364,26 @@ def test_energy_during_unknown_presence_still_hides_an_older_latest():
     history.observe(reading(EvseState.NOT_INITIALIZED, 118), now=80)
     assert history.observe(reading(IDLE, 118), now=90)
     assert history.latest is None
+
+
+def test_meter_read_in_the_unplug_transition_is_the_final_value():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=0)
+    history.observe(reading(CHARGING, 101), now=10)
+    history.observe(reading(CHARGING, 110, cp=CpState.A1), now=20)  # CP gone, EVSE lags; meter read
+    assert history.observe(reading(IDLE, 110, fresh=False), now=25)
+    assert history.latest.wallbox_kwh == 10
+
+
+def test_clock_rollback_followed_by_failed_polls_still_expires():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=1000)
+    history.observe(reading(IDLE, 100), now=400)
+    history.observe(reading(IDLE, 100), now=405)
+    history.observe(reading(CHARGING, 101), now=410)
+    history.observe(None, now=300)  # The clock moves back again, then polls fail.
+    for now in (360, 420, 480):
+        history.observe(None, now=now)
+    history.observe(reading(CHARGING, 106), now=490)
+    history.observe(reading(IDLE, 110), now=500)
+    assert history.latest is None

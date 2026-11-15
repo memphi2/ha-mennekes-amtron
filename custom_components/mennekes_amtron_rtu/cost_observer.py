@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections import deque
 from copy import deepcopy
 from typing import Any
 
@@ -30,17 +31,38 @@ from .charging_cost_const import (
     CONF_CHARGING_PRICE_ENTITY,
     COST_SOURCE_FIXED,
 )
-from .device.charging_cost import CostAccumulator, CostResult, TariffConfig
-from .device.charging_session import CompletedSession, PresenceGap
+from .device.charging_cost import (
+    CostAccumulator,
+    CostCheckpoint,
+    CostResult,
+    TariffConfig,
+)
+from .device.charging_session import CompletedSession
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
-from .device.registers import CP_STATE, ENERGY_TOTAL
-from .device.vehicle import metered_vehicle_present
+from .device.registers import ENERGY_TOTAL
+from .device.vehicle import snapshot_metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60
+# Meter runs kept to price a completed session: one per distinct reading,
+# about three days of charging at the slow one-minute meter cadence.
+_MAX_METER_RUNS = 4096
+# Sessions complete within a few polls of their final reading.
+_END_SEARCH = 16
+
+
+class _MeterRun:
+    """Consecutive readings with one meter value: first and last running sums."""
+
+    __slots__ = ("first", "last")
+
+    def __init__(self, checkpoint: CostCheckpoint) -> None:
+        self.first = self.last = checkpoint
+
+
 _PRICE_UNITS = {"EUR/kWh": 1.0, "€/kWh": 1.0, "ct/kWh": 0.01, "EUR/MWh": 0.001, "€/MWh": 0.001}
 _RETAINED_OPTIONS = (
     CONF_CHARGING_COST_SOURCE, CONF_CHARGING_PRICE, CONF_CHARGING_PRICE_ENTITY,
@@ -112,16 +134,14 @@ class ChargingCostObserver:
         )
         self.last = LastChargingCost()
         self._supported = False
-        self._anchored = False
-        self._active = False
-        self._final_pending = False
-        # The ended cycle's cost, kept until its session arrives: the app may
-        # publish the session after HA has already seen the next idle reading.
-        self._ended: CostResult | None = None
-        self._settled = False  # The ended cycle's session already arrived.
-        # Direct mode only: in app mode the app observes the wallbox without
-        # HA's gaps, and its session already applies the same rule.
-        self._gap = PresenceGap()
+        # The session decides which plug cycle is complete; costs only find
+        # the observed meter interval with exactly its energy. No plug-cycle
+        # state is duplicated here.
+        self._runs: deque[_MeterRun] = deque(maxlen=_MAX_METER_RUNS)
+        self._active = False  # A car is plugged in: show the running cost.
+        self._cycle_start: CostCheckpoint | None = None
+        # The running cost started without an idle reading: never complete.
+        self._cycle_partial = False
         self._started_at = time.time()
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
@@ -178,10 +198,9 @@ class ChargingCostObserver:
         except ValueError:
             return False
         if tariff != self._tariff:
-            if self._active or self._final_pending:
-                # A meter interval spanning two tariff definitions cannot be
-                # priced with either definition alone.
-                self._accumulator.observe_energy(time.time(), None)
+            # A meter interval spanning two tariff definitions cannot be
+            # priced with either definition alone.
+            self._accumulator.observe_energy(time.time(), None)
             self._tariff = tariff
             self._accumulator.tariff = tariff
         self._configured_options = current
@@ -191,10 +210,13 @@ class ChargingCostObserver:
     def current(self) -> CostResult | None:
         if not self._active:
             return None
-        result = self._accumulator.result
-        if self._anchored:
-            return result
-        return CostResult(result.known_cost, result.unpriced_kwh, result.energy_kwh, False)
+        now = self._accumulator.checkpoint()
+        if now is None or self._cycle_start is None:
+            return CostResult(0.0, 0.0, 0.0, False)
+        result = now.since(self._cycle_start)
+        if self._cycle_partial and result.complete:
+            return CostResult(result.known_cost, 0.0, result.energy_kwh, False)
+        return result
 
     @property
     def available(self) -> bool:
@@ -211,6 +233,8 @@ class ChargingCostObserver:
         except (ValueError, OSError):
             self._storage_corrupt = True
             _LOGGER.warning("Charging-cost storage cannot be read; optional cost estimates are unavailable")
+        if self._fixed:
+            self._accumulator.set_price(self._started_at, self._price())
         if not self._fixed and self._entity:
             self._unsubscribe = async_track_state_change_event(self._hass, [self._entity], self._price_changed)
             self._unsubscribe_report = async_track_state_report_event(self._hass, [self._entity], self._price_changed)
@@ -249,70 +273,57 @@ class ChargingCostObserver:
         if data is None:
             # One failed poll is no meter evidence: the next reading spans the
             # gap, and a gap longer than max_gap still marks the cost partial.
-            self._presence(now, known=False)
             return
         self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
-        present = metered_vehicle_present(
-            data.get, cp_supported=self._entry.runtime_data.identity.layout_version >= CP_STATE.min_layout,
-        )
-        self._presence(now, known=present is not None)
+        present = snapshot_metered_vehicle_present(data.get, self._entry.runtime_data.identity.layout_version)
         at = (data.energy_observed_at or 0.0) if self._remote else now
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
-        # Plug transitions report CP and EVSE in different polls. Keep the
-        # anchor: the final energy must still equal the measured session.
-        if present:
-            if self._final_pending:
-                # Plugged in again before the last cycle's final meter read:
-                # that energy must not count for the new connection.
-                self._accumulator.reset()
-                self._accumulator.set_price(min(at, now), self._price())
-                self._anchored = self._final_pending = False
-            self._ended = None
-            self._settled = False
-            self._active = True
         energy = data.get(ENERGY_TOTAL.key)
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
         if fresh:
             self._accumulator.observe_energy(at, energy)
+            self._record(self._accumulator.checkpoint())
+        if present is True:
+            self._active = True
+            if self._cycle_start is None and fresh:
+                self._cycle_start, self._cycle_partial = self._accumulator.checkpoint(), True
+        elif present is False:
+            self._active = False
+            # Only a reading while unplugged starts the next running cost; an
+            # unplug without one must not carry this charge into the next.
+            self._cycle_start = self._accumulator.checkpoint() if fresh else None
+            self._cycle_partial = False
         latest = CompletedSession.parse(data.charging_session) if data.charging_session else None
-        previous = self.last.session
-        matched = False
-        if data.session_summary_supported and latest != previous:
+        if data.session_summary_supported and latest != self.last.session:
             candidate = LastChargingCost()
             candidate.session = latest
             if latest is not None:
-                result = self._accumulator.result
-                if self._anchored and fresh and math.isclose(result.energy_kwh, latest.wallbox_kwh, rel_tol=1e-9):
-                    candidate.result = result
-                elif self._ended is not None and math.isclose(self._ended.energy_kwh, latest.wallbox_kwh, rel_tol=1e-9):
-                    candidate.result = self._ended
-                else:
-                    candidate.result = CostResult(0.0, latest.wallbox_kwh, latest.wallbox_kwh, False)
-                self._ended, matched, self._settled = None, True, True
+                candidate.result = self._session_cost(latest.wallbox_kwh)
             self.last = candidate
             self._dirty = True
-        if present is False and not fresh and self._active:
-            # The session may complete only with a later meter read; keep the
-            # accumulator for it, but no running cost while unplugged.
-            self._active, self._final_pending = False, True
-        if present is False and fresh:
-            # Any final match happened above. Start the next anchor now.
-            if (self._active or self._final_pending) and not matched and not self._settled:
-                self._ended = self._accumulator.result if self._anchored else None
-            self._accumulator.reset()
-            self._accumulator.set_price(min(at, now), self._price())
-            self._active = self._final_pending = self._anchored = False
-            if energy is not None and math.isfinite(energy) and energy >= 0:
-                self._accumulator.observe_energy(at, energy)
-                self._anchored = True
         if self._dirty and time.monotonic() >= self._retry_at:
             await self._save()
 
-    def _presence(self, now: float, *, known: bool) -> None:
-        """Like the session, a long unknown span may hide another car."""
-        if not self._remote and self._gap.observe(now, known=known):
-            self._anchored = False
-            self._ended = None
+    def _record(self, checkpoint: CostCheckpoint | None) -> None:
+        if checkpoint is None:
+            return
+        if self._runs and self._runs[-1].last.meter_kwh == checkpoint.meter_kwh:
+            self._runs[-1].last = checkpoint
+        else:
+            self._runs.append(_MeterRun(checkpoint))
+
+    def _session_cost(self, kwh: float) -> CostResult:
+        """Price the latest observed interval whose meter rose by the session's energy."""
+        runs = list(self._runs)
+        for end_index in range(len(runs) - 1, max(-1, len(runs) - 1 - _END_SEARCH), -1):
+            end = runs[end_index]
+            target = end.first.meter_kwh - kwh
+            for start in reversed(runs[:end_index]):
+                if math.isclose(start.last.meter_kwh, target, rel_tol=1e-9, abs_tol=1e-6):
+                    return end.first.since(start.last, energy_kwh=kwh)
+                if start.last.meter_kwh < target:
+                    break
+        return CostResult(0.0, kwh, kwh, False)
 
     async def _save(self) -> None:
         try:
