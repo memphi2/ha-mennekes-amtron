@@ -185,12 +185,21 @@ def test_energy_increase_during_idle_poll_outage_does_not_keep_an_older_latest_c
     assert history.latest is None
 
 
-@pytest.mark.parametrize("final", [reading(IDLE, None), reading(IDLE, 0)])
-def test_failed_reset_or_cached_final_meter_does_not_reuse_last_good_sample(final):
+def test_reset_final_meter_does_not_reuse_last_good_sample():
     history = complete()
     history.observe(reading(CHARGING, 115), now=70)
-    assert history.observe(final, now=80)
+    assert history.observe(reading(IDLE, 0), now=80)
     assert history.latest is None
+
+
+def test_a_failed_meter_block_is_a_gap_and_the_final_meter_follows():
+    history = complete()
+    history.observe(reading(CONNECTED, 110), now=70)
+    history.observe(reading(CHARGING, 112), now=80)
+    history.observe(reading(CHARGING, None), now=90)  # only the meter block failed
+    assert not history.observe(reading(IDLE, None), now=100)
+    assert history.observe(reading(IDLE, 116), now=110)
+    assert history.latest.wallbox_kwh == 6
 
 
 def test_plug_in_without_charging_keeps_the_last_completed_charge():
@@ -413,8 +422,8 @@ def test_a_silent_stall_between_known_polls_ends_the_cycle():
     history.observe(reading(IDLE, 100), now=0)
     history.observe(reading(CONNECTED, 100), now=10)
     history.observe(reading(CHARGING, 101), now=20)
-    history.observe(reading(CHARGING, 105), now=500)  # host suspended
-    history.observe(reading(IDLE, 110), now=510)
+    history.observe(reading(CHARGING, 105), now=1000)  # host suspended
+    history.observe(reading(IDLE, 110), now=1010)
     assert history.latest is None
 
 
@@ -425,7 +434,9 @@ def test_a_bridged_stall_does_not_widen_the_next_allowance():
     history.observe(reading(CHARGING, 101), now=10)
     history.observe(reading(CHARGING, 102), now=15)
     history.observe(reading(CHARGING, 103), now=125)  # bridged 110 s stall
-    history.observe(reading(CHARGING, 105), now=395)  # 270 s stall
+    history.observe(None, now=200)
+    history.observe(None, now=300)
+    history.observe(reading(CHARGING, 105), now=395)  # 270 s unknown
     history.observe(reading(IDLE, 110), now=400)
     assert history.latest is None
 
@@ -463,3 +474,17 @@ def test_replug_before_the_final_meter_completes_the_earlier_charge():
     history.observe(reading(CHARGING, 117), now=110)
     assert history.observe(reading(IDLE, 121), now=120)
     assert history.latest.wallbox_kwh == 6  # the new car's cycle is measured from 115
+
+
+def test_a_raised_scan_interval_does_not_end_the_charge():
+    history = SessionHistory()
+    now = 0
+    history.observe(reading(IDLE, 100), now=now)
+    for state, total in ((CONNECTED, 100), (CHARGING, 101), (CHARGING, 102)):
+        now += 5
+        history.observe(reading(state, total), now=now)
+    for total in (105, 108):  # the scan interval is now five minutes
+        now += 300
+        history.observe(reading(CHARGING, total), now=now)
+    history.observe(reading(IDLE, 110), now=now + 300)
+    assert history.latest.wallbox_kwh == 10

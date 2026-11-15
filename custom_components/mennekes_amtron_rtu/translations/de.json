@@ -933,6 +933,9 @@
     "guest_confirmation_required": {
       "message": "Das Gastladen wurde unterbrochen und braucht einen neuen Start. Gastladen erneut starten; bis dahin bleibt das Laden pausiert."
     },
+    "guest_start_uncertain": {
+      "message": "Start des Gastladens nicht bestätigt: Eine Ladeänderung wurde möglicherweise schon übernommen. Den Ladezustand prüfen."
+    },
     "guest_start_not_permitted": {
       "message": "Gastladen startet nicht: Fahrzeug anstecken, Wallbox entsperren, Wallbox-Fehler beheben und auf einen aktuellen Status warten. Im Nur-Lesen-Modus zuerst Schreiben einschalten."
     },

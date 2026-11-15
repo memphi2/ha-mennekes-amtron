@@ -122,8 +122,9 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
             else:
                 await integration.async_reload_entry(hass, entry)
             assert not hass.data.get("mennekes_amtron_rtu_reload_clients")
-            assert old.charging_cost._closed
-            assert old.sessions._closed is (outcome != "cost_changed")
+            # A reconnect is only a gap: a plain reload keeps both observers.
+            assert old.charging_cost._closed is (outcome != "reconnected")
+            assert old.sessions._closed is (outcome not in {"cost_changed", "reconnected"})
             if outcome in {"skipped", "failed", "connection_changed", "identity_changed"}:
                 assert not old.client.connected
             if outcome in {"skipped", "failed", "identity_changed"}:

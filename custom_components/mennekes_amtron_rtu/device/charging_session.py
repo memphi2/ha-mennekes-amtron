@@ -133,16 +133,13 @@ class PresenceGap:
             # The clock moved back: measure from this poll, known or not.
             self.reset()
             self._known_at = now
-        # Unknown polls, or a silent stall such as a suspended host, both
-        # leave the car unobserved since the last known poll.
-        # A stall between known polls counts once the poll interval is known.
-        expired = (
-            self._known_at is not None
-            and (self._unknown or not known or self._interval is not None)
-            and now - self._known_at > max(
-                UNKNOWN_PRESENCE_GRACE_SECONDS, 2.5 * (self._interval or 0.0),
-            )
-        )
+        allowance = max(UNKNOWN_PRESENCE_GRACE_SECONDS, 2.5 * (self._interval or 0.0))
+        if known and not self._unknown:
+            # Between two known polls only a silent stall longer than any
+            # scan interval counts, e.g. a suspended host; a changed scan
+            # interval must not end the charge.
+            allowance = max(allowance, 2.5 * _MAX_POLL_INTERVAL_SECONDS)
+        expired = self._known_at is not None and now - self._known_at > allowance
         if known:
             if not self._unknown and self._known_at is not None:
                 gap = now - self._known_at
@@ -212,7 +209,8 @@ class SessionHistory:
 
         previous_total = self._last_energy
         total: float | None = None
-        if data.energy_read:
+        # A failed meter block leaves no value: a gap, like a failed poll.
+        if data.energy_read and data.get(ENERGY_TOTAL.key) is not None:
             try:
                 total = _number(data.get(ENERGY_TOTAL.key))
             except ValueError:
@@ -248,7 +246,7 @@ class SessionHistory:
                 # old completed record cannot represent the newest charge.
                 self._latest = None
             self._absent_at = observed_at
-            if data.energy_read:
+            if total is not None:
                 self._idle_energy = total
             return self._latest != previous
 

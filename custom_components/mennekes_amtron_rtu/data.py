@@ -85,7 +85,6 @@ class RuntimeHandoff:
     identity: DeviceIdentity
     unloaded: bool = False
     setup_complete: bool = False
-    connection_generation: int | None = None
     client: MennekesModbusClient | None = None
     sessions: SessionObserver | None = None
     charging_cost: ChargingCostObserver | None = None

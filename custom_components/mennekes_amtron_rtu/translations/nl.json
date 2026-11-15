@@ -933,6 +933,9 @@
     "guest_confirmation_required": {
       "message": "Gastladen is onderbroken en moet opnieuw worden gestart. Start gastladen opnieuw; tot dan blijft het laden gepauzeerd."
     },
+    "guest_start_uncertain": {
+      "message": "Start van gastladen niet bevestigd: een laadwijziging is mogelijk al toegepast. Controleer de laadstatus."
+    },
     "guest_start_not_permitted": {
       "message": "Gastladen start niet: sluit het voertuig aan, ontgrendel de laadpaal, verhelp fouten en wacht op een actuele status. In alleen-lezenmodus eerst schrijven inschakelen."
     },

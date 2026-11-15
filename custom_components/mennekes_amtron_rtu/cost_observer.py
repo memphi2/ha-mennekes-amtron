@@ -290,7 +290,7 @@ class ChargingCostObserver:
         checkpoint = None
         # A failed or rejected read leaves the previous value, which must not
         # pass for a new reading.
-        if fresh and self._accumulator.observe_energy(at, energy):
+        if fresh and energy is not None and self._accumulator.observe_energy(at, energy):
             checkpoint = self._accumulator.checkpoint()
             self._record(checkpoint, charging=charging)
         fresh = checkpoint is not None

@@ -933,6 +933,9 @@
     "guest_confirmation_required": {
       "message": "Guest charging was interrupted and needs a new start. Press Start guest charging again; until then charging stays paused."
     },
+    "guest_start_uncertain": {
+      "message": "Guest charging start not confirmed: a charging change may already have been applied. Check the charging state."
+    },
     "guest_start_not_permitted": {
       "message": "Guest charging cannot start: plug in the car, unlock the wallbox, clear any wallbox error and wait for a current status. In read-only mode, enable writing first."
     },

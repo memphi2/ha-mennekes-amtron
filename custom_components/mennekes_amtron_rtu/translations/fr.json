@@ -933,6 +933,9 @@
     "guest_confirmation_required": {
       "message": "La recharge invité a été interrompue et doit être redémarrée. Appuyez à nouveau sur Démarrer la recharge invité ; d’ici là, la recharge reste en pause."
     },
+    "guest_start_uncertain": {
+      "message": "Démarrage de la recharge invité non confirmé : une modification de la recharge a peut-être déjà été appliquée. Vérifiez l’état de la recharge."
+    },
     "guest_start_not_permitted": {
       "message": "La recharge invité ne démarre pas : branchez le véhicule, déverrouillez la borne, corrigez toute erreur et attendez un état actuel. En lecture seule, activez d’abord l’écriture."
     },

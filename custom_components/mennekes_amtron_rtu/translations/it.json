@@ -933,6 +933,9 @@
     "guest_confirmation_required": {
       "message": "La ricarica ospite è stata interrotta e va riavviata. Premere di nuovo Avvia ricarica ospite; fino ad allora la ricarica resta in pausa."
     },
+    "guest_start_uncertain": {
+      "message": "Avvio della ricarica ospite non confermato: una modifica della ricarica potrebbe essere già stata applicata. Controllare lo stato di ricarica."
+    },
     "guest_start_not_permitted": {
       "message": "La ricarica ospite non parte: collegare il veicolo, sbloccare la wallbox, eliminare gli errori e attendere uno stato attuale. In sola lettura, abilitare prima la scrittura."
     },

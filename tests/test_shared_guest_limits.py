@@ -317,7 +317,7 @@ def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, mo
             assert service.guest_start_uncertain is True
             # Every caller, e.g. HA over HTTP, must see a change, not a refusal.
             assert not isinstance(caught.value, DeviceValidationError)
-            assert caught.value.translation_key == "energy_goal_stop_active"
+            assert caught.value.translation_key == "guest_start_uncertain"
             assert service._guest_scope is not None
             # A later start refused before any write is a definite refusal again.
             with pytest.raises(DeviceError):

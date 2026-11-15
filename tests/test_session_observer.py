@@ -118,16 +118,11 @@ def test_disabled_or_unsupported_session_capture_never_touches_storage(tmp_path,
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("interruption", ["startup", "meter_failure"])
-def test_incomplete_direct_session_is_never_reported_as_complete(tmp_path, interruption):
+def test_incomplete_direct_session_is_never_reported_as_complete(tmp_path):
     async def run():
         observer, clock = observer_at(tmp_path)
         await observer.async_setup()
-        if interruption != "startup":
-            await observe(observer, clock, 1000)
         await observe(observer, clock, 1010, EvseState.CHARGING, 101)
-        if interruption == "meter_failure":
-            await observe(observer, clock, 1020, EvseState.CHARGING, None)
         data = await observe(observer, clock, 1030, total=110)
         assert data.session_summary_supported
         assert data.charging_session is None
@@ -137,7 +132,7 @@ def test_incomplete_direct_session_is_never_reported_as_complete(tmp_path, inter
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("interruption", ["poll_failure", "unplug_transition"])
+@pytest.mark.parametrize("interruption", ["poll_failure", "meter_failure", "unplug_transition"])
 def test_one_failed_poll_or_plug_transition_keeps_the_direct_session(tmp_path, interruption):
     async def run():
         observer, clock = observer_at(tmp_path)
@@ -146,6 +141,8 @@ def test_one_failed_poll_or_plug_transition_keeps_the_direct_session(tmp_path, i
         await observe(observer, clock, 1010, EvseState.CHARGING, 101)
         if interruption == "poll_failure":
             await observer.async_observe(None)
+        elif interruption == "meter_failure":
+            await observe(observer, clock, 1020, EvseState.CHARGING, None)
         else:
             await observe(observer, clock, 1020, EvseState.CHARGING, 105, cp=CpState.A1)
         data = await observe(observer, clock, 1030, total=110)
