@@ -127,6 +127,7 @@ class GuestModbusService(ConsoleModbusService):
         if payload.keys() != {"command", "expected_serial_number", "expected_guest_revision"}:
             raise ValueError("invalid guest command")
         async with self._command_lock:
+            self.guest_start_uncertain = False
             if payload["expected_serial_number"] != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
             control = self.control
@@ -150,7 +151,6 @@ class GuestModbusService(ConsoleModbusService):
                 if event.action in ("enable_charging", "resume") and event.outcome in ("executed", "uncertain"):
                     accepted = True
 
-            self.guest_start_uncertain = False
             unlisten = control.events.listen(outcome)
             self._guest_scope = sample.scope
             self._guest_restore_pending = False

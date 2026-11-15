@@ -316,14 +316,46 @@ def test_replug_before_a_final_meter_never_merges_two_connections():
     assert history.latest is None
 
 
-def test_one_unknown_poll_with_a_long_scan_interval_still_invalidates():
+@pytest.mark.parametrize(("unknown_polls", "kept"), [(1, True), (2, False)])
+def test_slow_scan_bridges_one_unknown_poll_but_not_two(unknown_polls, kept):
     history = SessionHistory()
     history.observe(reading(IDLE, 100), now=0)
-    history.observe(reading(CHARGING, 101), now=300)
-    history.observe(None, now=600)
-    history.observe(reading(CHARGING, 106), now=900)
-    history.observe(reading(IDLE, 110), now=1200)
+    history.observe(reading(CONNECTED, 100), now=300)
+    history.observe(reading(CHARGING, 101), now=600)
+    now = 600
+    for _ in range(unknown_polls):
+        now += 300
+        history.observe(None, now=now)
+    history.observe(reading(CHARGING, 106), now=now + 300)
+    history.observe(reading(IDLE, 110), now=now + 600)
+    assert (history.latest is not None) is kept
+
+
+def test_clock_rollback_restarts_the_unknown_span():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=1000)
+    history.observe(reading(IDLE, 100), now=400)  # NTP correction
+    history.observe(reading(IDLE, 100), now=405)  # fresh idle anchor on the new clock
+    history.observe(reading(CONNECTED, 100), now=410)
+    history.observe(reading(CHARGING, 101), now=420)
+    for now in (450, 500, 560):
+        history.observe(None, now=now)
+    history.observe(reading(CHARGING, 106), now=570)
+    history.observe(reading(IDLE, 110), now=580)
     assert history.latest is None
+
+
+def test_clock_rollback_keeps_a_short_gap_bridgeable():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=1000)
+    history.observe(reading(IDLE, 100), now=400)
+    history.observe(reading(IDLE, 100), now=405)
+    history.observe(reading(CONNECTED, 100), now=410)
+    history.observe(reading(CHARGING, 101), now=420)
+    history.observe(None, now=450)
+    history.observe(reading(CHARGING, 106), now=470)
+    history.observe(reading(IDLE, 110), now=480)
+    assert history.latest.wallbox_kwh == 10
 
 
 def test_energy_during_unknown_presence_still_hides_an_older_latest():

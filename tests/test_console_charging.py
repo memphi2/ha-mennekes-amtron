@@ -259,3 +259,14 @@ def test_console_reports_a_guest_failure_after_a_write_as_uncertain(tmp_path, mo
             response = await client.post("/api/charging", headers=headers, json=guest)
             assert (await response.json())["error"] == "charging_save_uncertain"
     asyncio.run(body())
+
+
+def test_app_names_a_hint_for_exactly_the_definite_refusals():
+    import re
+    from pathlib import Path
+
+    from custom_components.mennekes_amtron_rtu.device import console_charging
+
+    source = Path(console_charging.__file__).with_name("app_charging.js").read_text(encoding="utf-8")
+    mapping = re.search(r"const refusals=\{(.*?)\};", source, re.DOTALL).group(1)
+    assert set(re.findall(r"(\w+):\"\w+\"", mapping)) == console_charging._REFUSALS

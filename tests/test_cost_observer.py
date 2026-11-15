@@ -571,3 +571,51 @@ def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+def test_ha_to_app_outage_does_not_make_the_app_measured_cost_partial(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=True)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            with patch(clock, return_value=at):
+                await observer.async_observe(data(at, 100))
+            with patch(clock, return_value=at+25):
+                await observer.async_observe(data(at+25, 102.5, present=True))
+            for offset in (60, 120, 180, 240):  # HA cannot reach the app.
+                with patch(clock, return_value=at+offset):
+                    await observer.async_observe(None)
+            with patch(clock, return_value=at+300):
+                await observer.async_observe(data(at+300, 110, session=completed(at)))
+            assert observer.last.result.complete
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_a_settled_cycle_is_not_kept_for_a_later_session(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            first = completed(at)
+            for offset, energy, present, fresh, summary in (
+                (0, 100, False, True, None),
+                (25, 110, True, True, None),
+                (100, 110, False, False, first),  # Session arrives without a fresh read.
+                (160, 110, False, True, first),
+            ):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh, session=summary))
+            assert observer._ended is None
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

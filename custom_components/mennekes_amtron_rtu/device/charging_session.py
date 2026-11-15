@@ -25,6 +25,8 @@ _SESSION_KEYS = {
 # can fail. Such short unknown spans keep the cycle; a longer one could hide
 # an unplug and a different car, so it still invalidates.
 UNKNOWN_PRESENCE_GRACE_SECONDS = 120.0
+# A slow scan still bridges one unknown poll: up to 2.5 intervals of 300 s.
+_MAX_POLL_INTERVAL_SECONDS = 300.0
 _NONCHARGING_STATES = frozenset({
     EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID, EvseState.READY_TO_CHARGE,
 })
@@ -105,6 +107,41 @@ class _Cycle:
     ended_before: float | None = None
 
 
+class PresenceGap:
+    """Bridge short unknown vehicle presence, shared by session and cost.
+
+    The span runs from the last known poll. The allowance is two minutes, or
+    two and a half observed poll intervals for a slow scan, so one unknown poll
+    is bridged at any configured interval but a longer run is not.
+    """
+
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self._known_at: float | None = None
+        self._interval: float | None = None
+        self._unknown = False
+
+    def observe(self, now: float, *, known: bool) -> bool:
+        """Record one poll; return true when an unknown span became too long."""
+        if self._known_at is not None and now < self._known_at:
+            self.reset()  # The clock moved back; measure from here.
+        expired = (
+            (self._unknown or not known) and self._known_at is not None
+            and now - self._known_at > max(
+                UNKNOWN_PRESENCE_GRACE_SECONDS, 2.5 * (self._interval or 0.0),
+            )
+        )
+        if known:
+            if not self._unknown and self._known_at is not None:
+                self._interval = min(now - self._known_at, _MAX_POLL_INTERVAL_SECONDS)
+            self._known_at, self._unknown = now, False
+        else:
+            self._unknown = True
+        return expired
+
+
 class SessionHistory:
     """Retain one completed session and one transient connection cycle."""
 
@@ -116,8 +153,7 @@ class SessionHistory:
         self._absent_at: float | None = None
         self._idle_energy: float | None = None
         self._last_energy: float | None = None
-        self._unknown_since: float | None = None
-        self._known_at: float | None = None
+        self._gap = PresenceGap()
         # An unplugged cycle whose final meter is read in a later poll.
         self._closing: tuple[_Cycle, float] | None = None
 
@@ -132,15 +168,8 @@ class SessionHistory:
             self._closing[0].valid = False
         self._absent_at = self._idle_energy = None
 
-    def _unknown(self, observed_at: float) -> None:
-        if self._unknown_since is None:
-            self._unknown_since = observed_at
-        self._check_unknown_span(observed_at)
-
-    def _check_unknown_span(self, observed_at: float) -> None:
-        """Measure from the last known poll, so long scan intervals count too."""
-        start = self._known_at if self._known_at is not None else self._unknown_since
-        if start is not None and observed_at - start > UNKNOWN_PRESENCE_GRACE_SECONDS:
+    def _presence(self, observed_at: float, *, known: bool) -> None:
+        if self._gap.observe(observed_at, known=known):
             self._invalidate()
 
     def observe(self, data: WallboxData | None, *, now: float) -> bool:
@@ -153,13 +182,14 @@ class SessionHistory:
             return False
         if self._last_at is not None and observed_at < self._last_at:
             self._invalidate()
+            self._gap.reset()
             # Discard the overlapping cycle, then allow a fresh idle anchor on
             # the corrected clock rather than blocking until old time catches up.
             self._last_at = observed_at
             return False
         self._last_at = observed_at
         if data is None:
-            self._unknown(observed_at)
+            self._presence(observed_at, known=False)
             return False
         present = metered_vehicle_present(data.get, cp_supported=self._cp_supported)
 
@@ -177,13 +207,9 @@ class SessionHistory:
                     # Energy seen while presence is unknown must still count
                     # as accrued at the next unplugged reading.
                     self._last_energy = total
+        self._presence(observed_at, known=present is not None)
         if present is None:
-            self._unknown(observed_at)
             return False
-        if self._unknown_since is not None:
-            self._check_unknown_span(observed_at)
-            self._unknown_since = None
-        self._known_at = observed_at
 
         if present is False:
             if self._cycle is not None and total is None and self._cycle.valid:

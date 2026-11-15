@@ -315,4 +315,9 @@ def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, mo
                                        "expected_guest_revision": service.guest_revision})
             assert service.guest_start_uncertain is True
             assert service._guest_scope is not None
+            # A later start refused before any write is a definite refusal again.
+            with pytest.raises(DeviceError):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": "stale"})
+            assert service.guest_start_uncertain is False
     asyncio.run(run())
