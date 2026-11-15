@@ -15,7 +15,7 @@ from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.ha_fakes import FakeHass
 from tests.test_config_flow import Flow
 from tests.test_home_assistant_smoke import _boot
@@ -190,7 +190,7 @@ def test_reconfiguring_a_real_entry_preserves_entity_ids(tmp_path):
                 assert result["type"] == "abort"
                 await hass.async_block_till_done()
                 assert entry.entry_id == entry_id
-                assert isinstance(entry.runtime_data.client, RemoteClient)
+                assert isinstance(entry.runtime_data.client, ServiceClient)
                 assert entry_id not in hass.data[f"{DOMAIN}_write_states"]
                 assert "port" not in entry.data
                 migrated = {

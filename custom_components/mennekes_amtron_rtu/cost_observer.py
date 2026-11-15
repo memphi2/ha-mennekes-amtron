@@ -117,8 +117,8 @@ class LastChargingCost:
 class ChargingCostObserver:
     """Price only intervals observed by this HA process, in both connection modes."""
 
-    def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry, *, remote: bool) -> None:
-        self._hass, self._entry, self._remote = hass, entry, remote
+    def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
+        self._hass, self._entry = hass, entry
         self._entity = str(entry.options.get(CONF_CHARGING_PRICE_ENTITY, ""))
         self._fixed = entry.options.get(CONF_CHARGING_COST_SOURCE) == COST_SOURCE_FIXED
         self._tariff = TariffConfig.parse(entry.options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
@@ -127,7 +127,7 @@ class ChargingCostObserver:
         self._identity = (
             entry.runtime_data.identity.serial_number, entry.runtime_data.identity.layout_version,
         )
-        max_gap = 660 if remote else max(600, float(entry.options.get(CONF_MEASUREMENT_INTERVAL_SECONDS, 30)) + float(entry.options.get(CONF_SCAN_INTERVAL_SECONDS, 5)) + 60)
+        max_gap = 660
         self._accumulator = CostAccumulator(self._tariff, max_gap=max_gap)
         self._store = ModelStore(
             hass, entry.entry_id, entry.runtime_data.identity.serial_number or entry.entry_id,
@@ -158,7 +158,7 @@ class ChargingCostObserver:
         self._dirty = False
         self._retry_at = 0.0
 
-    def retain_for_reload(self, entry: MennekesAmtronConfigEntry, *, remote: bool) -> bool:
+    def retain_for_reload(self, entry: MennekesAmtronConfigEntry) -> bool:
         """Keep observed prices and energy only across an unchanged live source.
 
         Continuity across a reconnect is judged by the presence-gap rule.
@@ -167,7 +167,6 @@ class ChargingCostObserver:
         return (
             not self._closed and not self._storage_corrupt
             and entry.entry_id == self._entry.entry_id
-            and remote == self._remote
             and dict(entry.data) == self._configured_data
             and (
                 entry.runtime_data.identity.serial_number,
@@ -181,7 +180,7 @@ class ChargingCostObserver:
 
     def rebind(self, entry: MennekesAmtronConfigEntry) -> None:
         """Hand over the live observer without resubscribing or resetting costs."""
-        if not self.retain_for_reload(entry, remote=self._remote):
+        if not self.retain_for_reload(entry):
             raise ValueError("charging-cost source changed during reload")
         self._entry = entry
         self._configured_options = deepcopy(dict(entry.options))
@@ -281,10 +280,10 @@ class ChargingCostObserver:
             # gap. A long gap may hide another car for the running estimate.
             self._presence(now, known=False)
             return
-        self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
+        self._supported = data.session_summary_supported and data.energy_observed_at is not None
         present = snapshot_metered_vehicle_present(data.get, self._entry.runtime_data.identity.layout_version)
         self._presence(now, known=present is not None)
-        at = (data.energy_observed_at or 0.0) if self._remote else now
+        at = data.energy_observed_at or 0.0
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         energy = data.get(ENERGY_TOTAL.key)
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None

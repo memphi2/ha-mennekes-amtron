@@ -11,10 +11,10 @@ from custom_components.mennekes_amtron_rtu import vehicle_features as features
 from custom_components.mennekes_amtron_rtu.button import (
     async_setup_entry as setup_buttons,
 )
-from custom_components.mennekes_amtron_rtu.control import AmtronControl
 from custom_components.mennekes_amtron_rtu.datetime import (
     async_setup_entry as setup_datetime,
 )
+from custom_components.mennekes_amtron_rtu.device.control import AmtronControl
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureForecast,
 )

@@ -19,7 +19,7 @@ from custom_components.mennekes_amtron_rtu.device.enums import (
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.fakes import put
 from tests.test_control import Harness
 from tests.test_modbus_service import TOKEN, service_fixture
@@ -139,7 +139,7 @@ def test_waiting_for_vehicle_has_unknown_deadline_across_service_api(tmp_path, t
             assert service.control.pending_action == action
             assert service.control.pending_until is None
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 data = await remote.update()
                 assert remote.connected

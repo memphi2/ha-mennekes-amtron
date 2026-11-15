@@ -21,8 +21,8 @@ from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from custom_components.mennekes_amtron_rtu.device.service_overview import (
     overview_snapshot,
 )
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.fakes import put
 from tests.test_charging_status import _data
 from tests.test_control import Harness
@@ -102,7 +102,7 @@ def test_shared_display_survives_remote_transport_without_counting_api_reads(tmp
         service, transport, _clock = await service_fixture(tmp_path, read_only=True)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
                 assert service.snapshot()["charging_display"] == service.data.charging_display
                 reads = list(transport.reads)
                 for state, reason in [("checking_status", "checking_status"),

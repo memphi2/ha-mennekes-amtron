@@ -11,17 +11,15 @@ import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import (
-    RemoteClient,
-    RemoteControl,
-    _pending_status,
-)
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.sensor import async_setup_entry
+from custom_components.mennekes_amtron_rtu.service_client import (
+    ServiceClient,
+    _pending_status,
+)
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.ha_fakes import build_runtime, collect
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
@@ -97,20 +95,19 @@ def test_service_queue_survives_client_restart_and_persists_executed_intent(tmp_
             deadline = state["control"]["pending_until"]
             assert current_writes(transport) == [1]
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 first = await remote.update()
                 assert first.pending_change == "resume"
                 assert first.pending_change_until.isoformat() == deadline
-                remote_control = RemoteControl(
-                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(),
-                    state=lambda: first, request_refresh=remote.update,
+                remote_control = ServiceControl(
+                    remote,                     state=lambda: first, request_refresh=remote.update,
                 )
                 assert remote_control.pending_action == "resume"
                 assert remote_control.pending_until == first.pending_change_until
                 await remote_control.async_shutdown()
                 await remote.async_close()
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 assert remote.snapshot["control"]["pending_until"] == deadline
                 assert service.control.pending_action == "resume"
@@ -180,7 +177,7 @@ def test_invalid_queue_metadata_invalidates_remote_connection(tmp_path, metadata
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://localhost:8765", TOKEN)
+                remote = ServiceClient(session, "http://localhost:8765", TOKEN)
                 remote.apply_snapshot(service.snapshot())
                 payload = copy.deepcopy(service.snapshot())
                 for key in ("pending_action", "pending_until", "state_change_interval_seconds"):
@@ -200,7 +197,7 @@ def test_missing_queue_metadata_is_rejected_and_timezone_offsets_are_supported(t
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://localhost:8765", TOKEN)
+                remote = ServiceClient(session, "http://localhost:8765", TOKEN)
                 payload = copy.deepcopy(service.snapshot())
                 for key in ("pending_action", "pending_until", "state_change_interval_seconds"):
                     payload["control"].pop(key)

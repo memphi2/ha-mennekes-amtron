@@ -7,43 +7,32 @@ from __future__ import annotations
 
 import asyncio
 import math
-from collections.abc import Awaitable, Callable
-from copy import copy
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession
-from homeassistant.core import CALLBACK_TYPE, callback
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.event import async_call_later
-from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from .control import AmtronControl, ControlOptions, ha_command
-from .coordinator import MennekesAmtronCoordinator
 from .device.charging_display import DISPLAY_OPTIONS
 from .device.charging_session import CompletedSession
-from .device.client import MennekesModbusClient, SerialConfig, WritePrecondition
-from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
+from .device.client_errors import AmtronConnectionError
 from .device.command_events import CommandEvents, command_source
 from .device.const import (
-    DOMAIN,
     MAX_PHASE_SWITCH_GRACE_SECONDS,
     MAX_STATE_CHANGE_INTERVAL_SECONDS,
 )
 from .device.control import PENDING_ACTIONS
-from .device.data import DeviceIdentity, WallboxData, WriteDiagnostics
-from .device.decode import RegisterValue, is_hex32
-from .device.departure_plan import DepartureInputs, DepartureState
+from .device.data import DeviceIdentity, WallboxData
+from .device.decode import is_hex32
+from .device.departure_plan import DepartureState
 from .device.energy_goal import EnergyGoal
-from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
-from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
 from .device.link_quality import CONNECTION_QUALITY_STATES
 from .device.operation import Operation
 from .device.register_blocks import REGISTER_BLOCKS
-from .device.registers import ERROR_CODE, RegisterSpec
+from .device.registers import ERROR_CODE
 from .device.soc_goal import SocGoal
 from .remote_compat import SUPPORTED_API_VERSION, validate_service_version
 from .remote_errors import ServiceConnectionError, ServiceFailure
@@ -91,14 +80,13 @@ def server_url(value: str) -> str:
     return value.strip().rstrip("/")
 
 
-class RemoteClient(MennekesModbusClient):
-    """Read service snapshots; no local serial connection or write tunnel."""
+class ServiceClient:
+    """The service's state and commands, however the service is reached."""
 
     def __init__(
         self, session: ClientSession | None = None, url: str = "", token: str = "",
         *, transport: ServiceTransport | None = None,
     ) -> None:
-        super().__init__(SerialConfig(port="remote-service"))
         if transport is None:
             if session is None:
                 raise ValueError("a session or a transport is required")
@@ -119,6 +107,8 @@ class RemoteClient(MennekesModbusClient):
         self.operation: Operation | None = None
         self.pending_until: datetime | None = None
         self.events = CommandEvents(supported=False)
+        self.energy_goal = EnergyGoal()
+        self.soc_goal = SocGoal()
         self._last_energy_observed_at: float | None = None
 
     def bind_identity(self, serial_number: str | None) -> None:
@@ -501,16 +491,9 @@ class RemoteClient(MennekesModbusClient):
         self.pending_until = pending_until
         self.failure_reason = None
         self._connected = True
-        self.write_state.pause_requested = control.get("pause_requested")
-        self.write_state.charging_release_requested = control.get(
-            "charging_release_requested"
-        )
-        self.write_state.charging_setpoint = current
-        self.write_state.current_write_generation = generation
-        self.write_state.confirmed_current = values.get("charging_current_ems")
-        self.write_state.energy_goal = goal
-        self.write_state.soc_goal = soc_goal
-        self.departure = departure if control.get("supports_departure_plan") is True else None
+        self.energy_goal = goal
+        self.soc_goal = soc_goal
+        self.departure = departure
         self.operation = operation
         if self.on_update is not None:
             self.on_update()
@@ -565,14 +548,10 @@ class RemoteClient(MennekesModbusClient):
                     not cancelling and not metadata and self.snapshot.get("available") is not True
                 ):
                     raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
-                if command == "cancel_pending" and self.snapshot.get("control", {}).get("supports_cancel_pending") is not True:
-                    raise DeviceValidationError("cancel_pending_not_supported")
                 if command == "cancel_pending" and self.snapshot.get("control", {}).get("read_only") is not False:
                     raise DeviceValidationError("read_only_mode")
                 if soc_metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
                     raise DeviceValidationError("soc_goal_not_supported")
-                if departure and self.snapshot.get("control", {}).get("supports_departure_plan") is not True:
-                    raise DeviceError("service_unavailable")
                 self.apply_snapshot(
                     await self.request(
                         "POST", "/v2/command", {
@@ -592,17 +571,13 @@ class RemoteClient(MennekesModbusClient):
                 raise DeviceError("service_version_mismatch") from err
             raise DeviceError("service_unavailable") from err
 
-    async def async_read_register(
-        self, spec: RegisterSpec, *, verify_identity: bool = False,
-    ) -> RegisterValue:
-        if spec == ERROR_CODE:
-            data = await self.request("POST", "/v2/read", {"register": spec.key})
-            value = data.get("value")
-            if type(value) is not int:
-                raise AmtronConnectionError("invalid error register")
-            return value
-        value = self.snapshot.get("values", {}).get(spec.key)
-        return value if isinstance(value, (int, float, str)) else None
+    async def async_read_error_code(self) -> int:
+        """Read the wallbox's error register now, not from the last poll."""
+        data = await self.request("POST", "/v2/read", {"register": ERROR_CODE.key})
+        value = data.get("value")
+        if type(value) is not int:
+            raise AmtronConnectionError("invalid error register")
+        return value
 
     async def async_read_words(self, *, address: int, count: int) -> list[int]:
         block = next(
@@ -625,521 +600,3 @@ class RemoteClient(MennekesModbusClient):
         ):
             raise AmtronConnectionError("invalid register image")
         return words
-
-    async def async_write_register(
-        self,
-        spec: RegisterSpec,
-        value: float,
-        *,
-        min_interval: float = 0.0,
-        priority: bool = False,
-        before_write: Callable[[], None] | None = None,
-        precondition: WritePrecondition | None = None,
-    ) -> None:
-        raise AmtronWriteRejectedError(
-            "direct register writes are not available through the service"
-        )
-
-
-class RemoteHeartbeat(HeartbeatTask):
-    """Report server heartbeat health without creating a local sender."""
-
-    def __init__(self, client: RemoteClient, diagnostics: WriteDiagnostics) -> None:
-        super().__init__(client, diagnostics)
-        self._remote = client
-        self.update()
-
-    @property
-    def running(self) -> bool:
-        return (
-            self._remote.connected
-            and self._remote.snapshot.get("heartbeat", {}).get("running") is True
-        )
-
-    def update(self) -> None:
-        value = self._remote.snapshot.get("heartbeat", {}).get("healthy")
-        self._set_healthy(
-            value if self._remote.connected and isinstance(value, bool) else None
-        )
-
-
-# The service stamps the due time without fractions of a second.
-_PENDING_GRACE_SECONDS = 1.0
-
-
-class RemoteCoordinator(MennekesAmtronCoordinator):
-    """Poll the service's cache; the service independently schedules bus reads."""
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        if isinstance(self._client, RemoteClient):
-            self._client.on_auth_error = self._publish_auth_error
-        self._pending_refresh: CALLBACK_TYPE | None = None
-
-    def _follow_pending(self, until: datetime | None) -> None:
-        """Read a queued command's outcome when it is due, not a poll later.
-
-        The service runs the command on its own; without this, HA learned of
-        it up to one poll interval later, together with whatever came next.
-        """
-        if self._pending_refresh is not None:
-            self._pending_refresh()
-            self._pending_refresh = None
-        if until is None or self.update_interval is None:
-            return
-        delay = (until - datetime.now(UTC)).total_seconds() + _PENDING_GRACE_SECONDS
-        # A later due time is followed by an ordinary poll before it.
-        if 0 < delay < self.update_interval.total_seconds():
-            self._pending_refresh = async_call_later(self.hass, delay, self._pending_due)
-
-    @callback
-    def _pending_due(self, _now: datetime) -> None:
-        self._pending_refresh = None
-        self.hass.async_create_task(self.async_request_refresh())
-
-    async def async_shutdown(self) -> None:
-        self._follow_pending(None)
-        await super().async_shutdown()
-
-    def _publish_auth_error(self, new_failure: bool) -> None:
-        """Expose a changed failure reason even when already unavailable."""
-        was_available = self.last_update_success
-        self.async_set_update_error(ConfigEntryAuthFailed(
-            translation_domain=DOMAIN, translation_key="service_auth_failed"
-        ))
-        if new_failure and not was_available:
-            # HA suppresses notifications for consecutive failed refreshes.
-            # Repair listeners must still see this distinct authentication error,
-            # including one reported by a command or diagnostics request.
-            self.async_update_listeners()
-
-    async def _async_update_data(self) -> WallboxData:
-        if not isinstance(self._client, RemoteClient):
-            raise UpdateFailed("service client missing")
-        try:
-            data = await self._client.update()
-        except AmtronConnectionError as err:
-            if self.observe_session is not None:
-                await self.observe_session(None)
-            if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
-                raise ConfigEntryAuthFailed(
-                    translation_domain=DOMAIN, translation_key="service_auth_failed"
-                ) from err
-            if isinstance(err, ServiceConnectionError) and err.reason == "service_identity_changed":
-                raise UpdateFailed(
-                    translation_domain=DOMAIN, translation_key="device_identity_changed"
-                ) from err
-            if isinstance(err, ServiceConnectionError) and err.reason == "service_version_mismatch":
-                raise UpdateFailed(
-                    translation_domain=DOMAIN, translation_key="service_version_mismatch"
-                ) from err
-            raise UpdateFailed(str(err)) from err
-        if self.observe_session is not None:
-            await self.observe_session(data)
-        self._follow_pending(data.pending_change_until)
-        return data
-
-
-class RemoteControl(AmtronControl):
-    """Commands are validated by the server that owns current and pause state."""
-
-    def __init__(
-        self,
-        client: RemoteClient,
-        *,
-        diagnostics: WriteDiagnostics,
-        options: ControlOptions,
-        state: Callable[[], WallboxData],
-        request_refresh: Callable[[], Awaitable[None]],
-        notify_pending: Callable[[], None] | None = None,
-    ) -> None:
-        super().__init__(
-            client,
-            diagnostics=diagnostics,
-            identity=client.identity,
-            options=options,
-            state=state,
-            request_refresh=request_refresh,
-            notify_pending=notify_pending,
-        )
-        self._remote = client
-        self.guest_active = lambda: self._remote.snapshot.get("control", {}).get("guest_mode") is True
-        self._soc_transaction: tuple[str, str | None] | None = None
-        self._soc_transaction_fenced = False
-
-    @property
-    def soc_goal_revision(self) -> str | None:
-        """Identify the service goal used when folding vehicle events."""
-        control = self._remote.snapshot.get("control", {})
-        return control.get("soc_goal_revision") if control.get("soc_transactions_supported") is True else None
-
-    @property
-    def soc_goal_resolution_pending(self) -> bool:
-        return self._soc_transaction is not None
-
-    @property
-    def soc_goal_resolution_fenced(self) -> bool:
-        return self._soc_transaction is not None and self._soc_transaction_fenced
-
-    def abandon_fenced_soc_goal(self) -> None:
-        """Let a user's later explicit target supersede an unresolved request."""
-        if not self.soc_goal_resolution_fenced:
-            raise DeviceError("service_unavailable")
-        self._soc_transaction = None
-        self._soc_transaction_fenced = False
-
-    async def _soc_transaction_request(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        try:
-            return await self._remote.request("POST", path, payload)
-        except AmtronConnectionError as err:
-            raise DeviceError("service_unavailable") from err
-
-    def _apply_soc_transaction_result(self, result: dict[str, Any], previous_revision: str | None) -> str:
-        outcome, snapshot, revision = result.get("outcome"), result.get("snapshot"), result.get("revision")
-        if (
-            not isinstance(outcome, str)
-            or outcome not in ("applied", "rejected", "cancelled", "unknown")
-            or not isinstance(snapshot, dict)
-        ):
-            raise DeviceError("service_unavailable")
-        self._remote.apply_snapshot(snapshot, require_available=False, consume_energy=False)
-        if outcome == "unknown":
-            return outcome
-        current = self.soc_goal_revision
-        expected = revision if outcome == "applied" else previous_revision
-        if not isinstance(expected, str) or current != expected:
-            outcome = "superseded"
-        self._soc_transaction = None
-        self._soc_transaction_fenced = False
-        return outcome
-
-    @ha_command
-    async def async_resolve_soc_goal(self) -> str:
-        """Fence a possibly accepted request before choosing its event fold."""
-        if self._soc_transaction is None:
-            return "superseded"
-        token, previous_revision = self._soc_transaction
-        async with self._remote._snapshot_lock:  # noqa: SLF001 - shared publication fence
-            result = await self._soc_transaction_request("/v2/soc-goal/resolve", {"token": token})
-            outcome = self._apply_soc_transaction_result(result, previous_revision)
-            if outcome == "unknown":
-                self._soc_transaction_fenced = True
-            return outcome
-
-    @property
-    def events(self) -> CommandEvents:
-        """Expose only the bus owner's outcomes, never guessed HTTP results."""
-        return self._remote.events
-
-    @property
-    def supports_energy_goal(self) -> bool:
-        return self._remote.snapshot.get("control", {}).get("supports_energy_goal") is True
-
-    @property
-    def supports_plug_charge(self) -> bool:
-        return self._remote.snapshot.get("control", {}).get("supports_plug_charge") is True
-
-    @property
-    def plug_charge(self) -> dict[str, Any]:
-        if not self.supports_plug_charge:
-            return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False, "manual": False}
-        control = self._remote.snapshot["control"]
-        return {**control["plug_charge"], "manual": control.get("plug_charge_manual", False)}
-
-    @ha_command
-    async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:
-        if not self.supports_plug_charge:
-            raise DeviceValidationError("plug_charge_not_supported")
-        if enabled is not False:
-            await self._command("plug_charge_config", value=enabled, policy=policy)
-            return
-        # Disabling only removes this optional policy. The bus owner keeps its
-        # release hold, so this is allowed even after switching to read-only.
-        await self._remote.execute("plug_charge_config", value=False, policy=policy)
-        if self._notify_pending is not None:
-            self._notify_pending()
-
-    @ha_command
-    async def async_authorize_plug_charge(self, session: str, *, deadline: datetime) -> None:
-        if not self.supports_plug_charge:
-            raise DeviceValidationError("plug_charge_not_supported")
-        await self._command(
-            "plug_charge_authorize", session=session, deadline=deadline.isoformat(),
-        )
-
-    @ha_command
-    async def async_set_energy_goal(self, value: float) -> None:
-        if not self.supports_energy_goal:
-            raise DeviceValidationError("energy_goal_not_supported")
-        candidate = EnergyGoal()
-        try:
-            candidate.set_target(value, 0)
-        except ValueError as err:
-            raise DeviceValidationError("energy_goal_invalid") from err
-        await self._command("energy_goal", value=value)
-
-    @property
-    def supports_soc_goal(self) -> bool:
-        return self._remote.snapshot.get("control", {}).get("supports_soc_goal") is True
-
-    async def _soc_command(self, command: str, **values: Any) -> None:
-        if not self.supports_soc_goal:
-            raise DeviceValidationError("soc_goal_not_supported")
-        if command == "soc_goal":
-            self._require_write_access()
-        await self._remote.execute(command, **values)
-        # The command returns the authoritative cached snapshot. External car
-        # telemetry must not cause an additional wallbox read or HTTP poll.
-        if self._notify_pending is not None:
-            self._notify_pending()
-
-    @property
-    def soc_configuration_required(self) -> bool:
-        """A new service boot needs HA's optional-cap policy again."""
-        return self._remote.snapshot.get("control", {}).get("soc_maximum_required") is None
-
-    @ha_command
-    async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
-        known = self._remote.snapshot.get("control", {}).get("soc_maximum_required")
-        if source == self.soc_goal.source and known is maximum_required:
-            return
-        await self._soc_command("soc_source", source=source, maximum_required=maximum_required)
-
-    @ha_command
-    async def async_set_soc_goal(
-        self, value: float, *, source: str, soc: float | None = None,
-        maximum: float | None = None,
-    ) -> None:
-        if not self.supports_soc_goal:
-            raise DeviceValidationError("soc_goal_not_supported")
-        if self._soc_transaction is not None:
-            raise DeviceError("service_unavailable")
-        self._require_write_access()
-        if self.soc_goal_revision is None:
-            raise DeviceValidationError("soc_goal_app_update_required")
-        candidate = copy(self.soc_goal)
-        try:
-            candidate.set_target(value, soc, maximum)
-        except ValueError as err:
-            raise DeviceValidationError("soc_goal_invalid") from err
-        async with self._remote._snapshot_lock:  # noqa: SLF001 - shared publication fence
-            previous_revision = self.soc_goal_revision
-            reservation = await self._soc_transaction_request("/v2/soc-goal/reserve", {})
-            token = reservation.get("token")
-            if not is_hex32(token):
-                raise DeviceError("service_unavailable")
-            self._soc_transaction = (token, previous_revision)
-            self._soc_transaction_fenced = False
-            result = await self._soc_transaction_request("/v2/soc-goal/commit", {
-                "token": token, "expected_serial_number": self._remote._bound_serial or self._remote.identity.serial_number,  # noqa: SLF001
-                "value": value, "source": source, "soc": soc, "maximum": maximum,
-            })
-            outcome = self._apply_soc_transaction_result(result, previous_revision)
-            if outcome in ("rejected", "superseded"):
-                # The service answered: it refused the target, or another
-                # command changed it first. That is not an unreachable service.
-                raise DeviceValidationError("soc_goal_unavailable")
-            if outcome != "applied":
-                raise DeviceError("service_unavailable")
-        if self._notify_pending is not None:
-            self._notify_pending()
-
-    @ha_command
-    async def async_observe_soc(
-        self, soc: float | None, maximum: float | None = None, *, source: str,
-        expected_soc_revision: str | None = None,
-    ) -> None:
-        values: dict[str, Any] = {"source": source, "soc": soc, "maximum": maximum}
-        if expected_soc_revision is not None:
-            values["expected_soc_revision"] = expected_soc_revision
-        await self._soc_command("soc_observation", **values)
-
-    @property
-    def supports_departure_plan(self) -> bool:
-        return self._remote.snapshot.get("control", {}).get("supports_departure_plan") is True
-
-    @property
-    def departure(self) -> DepartureState | None:
-        return self._remote.departure
-
-    @property
-    def operation(self) -> Operation | None:
-        return self._remote.operation
-
-    async def _departure_command(self, command: str, **values: Any) -> None:
-        await self._remote.execute(command, **values)
-        # As with the charge level: the reply is the service's own state and
-        # needs no further wallbox read.
-        if self._notify_pending is not None:
-            self._notify_pending()
-
-    @ha_command
-    async def async_set_target_time(self, deadline: datetime | None) -> None:
-        revision = self._remote.snapshot.get("control", {}).get("target_time_revision")
-        await self._departure_command(
-            "departure_choice", deadline=None if deadline is None else deadline.isoformat(),
-            revision=revision,
-        )
-
-    @ha_command
-    async def async_set_departure_trip(
-        self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
-        expected_selection: dict[str, Any] | None = None,
-    ) -> None:
-        await self._departure_command(
-            "departure_trip", deadline=None if deadline is None else deadline.isoformat(),
-            source=source, withdraw=withdraw,
-            **({"expected_selection": expected_selection} if expected_selection is not None else {}),
-        )
-
-    @ha_command
-    async def async_set_departure_inputs(self, inputs: DepartureInputs) -> None:
-        await self._departure_command("departure_inputs", value=inputs.snapshot())
-
-    @property
-    def pending_action(self) -> str | None:
-        """The bus-owning service retains queued work across HA restarts."""
-        value = self._remote.snapshot.get("control", {}).get("pending_action")
-        return str(value) if value is not None else None
-
-    @property
-    def pending_until(self) -> datetime | None:
-        return self._remote.pending_until
-
-    @property
-    def supports_cancel_pending(self) -> bool:
-        return self._remote.snapshot.get("control", {}).get("supports_cancel_pending") is True
-
-    @property
-    def can_cancel_pending(self) -> bool:
-        return (
-            self.supports_cancel_pending and self._remote.connected
-            and self._remote.snapshot.get("control", {}).get("read_only") is False
-            and self.pending_action is not None
-        )
-
-    @ha_command
-    async def async_cancel_pending_change(self) -> None:
-        """Cancel only service-owned future work, even while its wallbox is down."""
-        previous = (self.pending_action, self.pending_until)
-        await self._remote.execute("cancel_pending")
-        if previous != (self.pending_action, self.pending_until) and self._notify_pending is not None:
-            self._notify_pending()
-
-    @property
-    def read_only(self) -> bool:
-        return (
-            not self._remote.connected
-            or self._remote.snapshot.get("available") is not True
-            or self._remote.snapshot.get("control", {}).get("read_only") is not False
-        )
-
-    def _require_write_access(self) -> None:
-        """Use current service permission, never a former HA-only setting."""
-        if not self._remote.connected or self._remote.snapshot.get("available") is not True:
-            raise DeviceError("service_unavailable")
-        if self.read_only:
-            raise DeviceValidationError("read_only_mode")
-
-    @property
-    def max_charging_current(self) -> float:
-        maximum = self._remote.snapshot.get("control", {}).get(
-            "max_charging_current", 6
-        )
-        return min(super().max_charging_current, float(maximum))
-
-    @property
-    def charging_setpoint(self) -> float | None:
-        return self._write_state.charging_setpoint
-
-    @charging_setpoint.setter
-    def charging_setpoint(self, value: float | None) -> None:
-        """HA restore data must not overwrite the independent service."""
-
-    @property
-    def pause_requested(self) -> bool | None:
-        return self._write_state.pause_requested
-
-    @pause_requested.setter
-    def pause_requested(self, value: bool | None) -> None:
-        """The server remains authoritative across HA restarts."""
-
-    @property
-    def charging_release_requested(self) -> bool | None:
-        return self._write_state.charging_release_requested
-
-    @charging_release_requested.setter
-    def charging_release_requested(self, value: bool | None) -> None:
-        """The server remains authoritative across HA restarts."""
-
-    async def _command(self, command: str, **values: Any) -> None:
-        self._require_write_access()
-        await self._remote.execute(command, **values)
-        if self._request_refresh is not None:
-            await self._request_refresh()
-
-    @ha_command
-    async def async_set_charging_current(
-        self, value: float, *, allow_unlimited: bool = False
-    ) -> None:
-        if not math.isfinite(value):
-            raise DeviceValidationError(
-                "charging_current_invalid", {"value": str(value), "minimum": "6"}
-            )
-        await self._command(
-            "set_current",
-            value=min(value, self.max_charging_current),
-            allow_unlimited=allow_unlimited,
-        )
-
-    @ha_command
-    async def async_pause_charging(self) -> None:
-        await self._command("pause")
-
-    @ha_command
-    async def async_set_timed_current(
-        self, value: float | None, *, deadline: datetime, owner: str,
-    ) -> None:
-        if value is not None:
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 6:
-                raise DeviceValidationError("charging_current_invalid", {"value": str(value), "minimum": "6"})
-            value = min(value, self.max_charging_current)
-        await self._command("timed_current", value=value, deadline=deadline.isoformat(), owner=owner)
-
-    @ha_command
-    async def async_cancel_timed_current(self, owner: str) -> None:
-        # Queue cancellation is local service bookkeeping, not a bus write.
-        await self._remote.execute("cancel_timed_current", owner=owner)
-        if self._request_refresh is not None:
-            await self._request_refresh()
-
-    @ha_command
-    async def async_resume_charging(self, *, current_cap: float | None = None) -> None:
-        await self._command(
-            "resume", current_cap=self._resume_current_maximum(current_cap)
-        )
-
-    @ha_command
-    async def async_set_charging_release(self, released: bool) -> None:
-        await self._command("release", value=released)
-
-    @ha_command
-    async def async_set_lock_evse(self, locked: bool) -> None:
-        await self._command("lock", value=locked)
-
-    @ha_command
-    async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
-        await self._command("solar", value=int(mode))
-
-    @ha_command
-    async def async_set_requested_phases(self, phases: RequestedPhases) -> None:
-        await self._command("phases", value=int(phases))
-
-    @ha_command
-    async def async_recover_from_error(self) -> bool:
-        await self._command("recover")
-        return True
-
-    @ha_command
-    async def async_restart(self) -> None:
-        await self._command("restart")

@@ -13,8 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from custom_components.mennekes_amtron_rtu.vehicle_soc import VehicleSocObserver
 from tests.test_modbus_service import TOKEN, service_fixture
 from tests.test_vehicle_soc import Coordinator
@@ -65,11 +66,10 @@ def test_lost_target_reply_is_fenced_before_transient_soc_is_forwarded(tmp_path,
         observer = None
         try:
             async with TestServer(app) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=service.diagnostics, options=service.control.options,
-                    state=lambda: service.data, request_refresh=AsyncMock(),
+                control = ServiceControl(
+                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
                 )
                 hass.states.async_set("sensor.car", "50")
                 coordinator = Coordinator()
@@ -115,11 +115,10 @@ def test_older_service_requests_app_update_only_for_percentage_target(tmp_path):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=service.diagnostics, options=service.control.options,
-                    state=lambda: service.data, request_refresh=AsyncMock(),
+                control = ServiceControl(
+                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
                 )
                 await control.async_configure_soc("sensor.car|")
                 old = deepcopy(remote.snapshot)
@@ -161,11 +160,10 @@ def test_explicit_clear_supersedes_a_fenced_unknown_result(tmp_path):
         observer = None
         try:
             async with TestServer(app) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=service.diagnostics, options=service.control.options,
-                    state=lambda: service.data, request_refresh=AsyncMock(),
+                control = ServiceControl(
+                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
                 )
                 hass.states.async_set("sensor.car", "50")
                 observer = VehicleSocObserver(hass, control, Coordinator(), "sensor.car")
@@ -212,11 +210,10 @@ def test_outage_during_resolution_preserves_evidence_and_blocks_replacement(tmp_
         observer = None
         try:
             async with TestServer(app) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=service.diagnostics, options=service.control.options,
-                    state=lambda: service.data, request_refresh=AsyncMock(),
+                control = ServiceControl(
+                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
                 )
                 hass.states.async_set("sensor.car", "50")
                 coordinator = Coordinator()
@@ -260,7 +257,7 @@ def test_invalid_transaction_capability_never_trusts_snapshot(tmp_path, corrupt)
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 snapshot = deepcopy(remote.snapshot)
                 if corrupt == "capability":
@@ -299,11 +296,10 @@ def test_malformed_transaction_response_cannot_silently_apply_target(tmp_path, c
         observer = None
         try:
             async with TestServer(app) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=service.diagnostics, options=service.control.options,
-                    state=lambda: service.data, request_refresh=AsyncMock(),
+                control = ServiceControl(
+                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
                 )
                 hass.states.async_set("sensor.car", "50")
                 observer = VehicleSocObserver(hass, control, Coordinator(), "sensor.car")

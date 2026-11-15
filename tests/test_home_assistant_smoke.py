@@ -148,7 +148,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
             assert entry.domain == "mennekes_amtron_rtu"
-            assert entry.runtime_data.coordinator._poller._measurement_interval == 30
+            assert hass.data[f"{DOMAIN}_embedded"][entry.entry_id].config.measurement_interval == 30
 
             # The title becomes the device name and prefixes every entity id,
             # so it carries no serial number.
@@ -180,23 +180,6 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             assert device.model == "Amtron 4You 310 11 C2"
             assert device.identifiers == {("mennekes_amtron_rtu", SERIAL_NUMBER)}
 
-            # Upgrade an old default title without replacing registered entities
-            # or overwriting a device name explicitly chosen by its owner.
-            original_ids = {entity.entity_id: entity.unique_id for entity in entities}
-            await hass.config_entries.async_unload(entry.entry_id)
-            dr.async_get(hass).async_update_device(device.id, name_by_user="Garage")
-            hass.config_entries.async_update_entry(entry, title="MENNEKES AMTRON")
-            assert await hass.config_entries.async_setup(entry.entry_id)
-            await hass.async_block_till_done()
-            assert entry.title == "Mennekes Amtron"
-            updated_device = dr.async_get(hass).async_get(device.id)
-            assert updated_device.name == "Mennekes Amtron"
-            assert updated_device.name_by_user == "Garage"
-            assert original_ids == {
-                entity.entity_id: entity.unique_id
-                for entity in er.async_entries_for_config_entry(registry, entry.entry_id)
-            }
-
             # A wallbox in error state 200 without a configured fallback.
             issues = {
                 issue.issue_id.removeprefix(f"{entry.entry_id}_")
@@ -222,7 +205,8 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             assert {"number", "switch", "select", "button"} <= {
                 entity.domain for entity in entities
             }
-            assert entry.runtime_data.coordinator._poller._measurement_interval == 60
+            host = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]
+            assert host.config.measurement_interval == 60
             assert entry.runtime_data.heartbeat is not None
             assert entry.runtime_data.heartbeat.running
 
@@ -236,8 +220,9 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
                 blocking=True,
             )
             await hass.async_block_till_done()
-            if pending := entry.runtime_data.control._flush_task:
+            if pending := host._service.control._flush_task:
                 await pending
+            await host._service.refresh()
             await entry.runtime_data.coordinator.async_refresh()
             await hass.async_block_till_done()
             assert hass.states.get(number).state == "10.0"
@@ -247,14 +232,15 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             await hass.services.async_call(
                 "number", "set_value", {"entity_id": number, "value": 0}, blocking=True
             )
-            if pending := entry.runtime_data.control._flush_task:
+            if pending := host._service.control._flush_task:
                 await pending
+            await host._service.refresh()
             await entry.runtime_data.coordinator.async_refresh()
             await hass.async_block_till_done()
             assert hass.states.get(number).state == "0.0"
             assert hass.states.get(number).attributes["min"] == 0
             assert hass.states.get(number).attributes["mode"] == "slider"
-            assert await entry.runtime_data.client.async_read_register(R.CHARGING_CURRENT_EMS) == 0
+            assert entry.runtime_data.client.snapshot["values"][R.CHARGING_CURRENT_EMS.key] == 0
 
             # Reconfiguring starts from the entry, not from the factory values.
             reconfigure = await hass.config_entries.flow.async_init(
@@ -459,7 +445,7 @@ def test_the_bundled_blueprints_run_as_automations(
                         "use_blueprint": {
                             "path": f"{DOMAIN}/downgrade_notification.yaml",
                             "input": {
-                                "downgrade_active": pick("_downgrade_active"),
+                                "charging_status": pick("sensor.", "_charging_status"),
                             },
                         },
                     },
@@ -483,8 +469,10 @@ def test_the_bundled_blueprints_run_as_automations(
             await hass.async_block_till_done()
             await asyncio.sleep(0.5)
             await hass.async_block_till_done()
-            if pending := entry.runtime_data.control._flush_task:
+            host = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]
+            if pending := host._service.control._flush_task:
                 await pending
+            await host._service.refresh()
             await entry.runtime_data.coordinator.async_refresh()
             await hass.async_block_till_done()
             # 5000 W / 230 V / 3 phases, through a float32 register

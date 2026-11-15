@@ -15,9 +15,6 @@ from custom_components.mennekes_amtron_rtu.device.service_departure_runtime impo
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.entity import entry_entity_unique_id
-from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-    OPERATION_SENSOR_KEYS,
-)
 from tests import service_guest_fixture as runtime
 from tests.test_home_assistant_smoke import _boot
 from tests.test_service_departure_runtime import hand_over

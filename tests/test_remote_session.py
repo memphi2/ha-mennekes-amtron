@@ -8,8 +8,8 @@ from copy import deepcopy
 import pytest
 from aiohttp import ClientSession
 
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.test_charging_session import complete
 from tests.test_modbus_service import TOKEN, service_fixture
 
@@ -19,7 +19,7 @@ def test_remote_session_metadata_is_optional_stable_and_detached(tmp_path):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
                 payload = service.snapshot()
                 payload.pop("charging_session", None)
                 old = client.apply_snapshot(payload)
@@ -65,7 +65,7 @@ def test_malformed_session_metadata_rejects_snapshot_without_publishing_controls
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
                 valid = service.snapshot()
                 client.apply_snapshot(valid)
                 retained = client.snapshot

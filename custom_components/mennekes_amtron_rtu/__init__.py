@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Callable
 from typing import Any, NoReturn
 
@@ -31,7 +30,6 @@ from .blueprint_installer import async_install_blueprints
 from .charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
     LOSS_SOURCE_DISABLED,
-    LOSS_SOURCE_SENSOR,
 )
 from .charge_loss_observer import ChargeLossObserver
 from .charging_cost_const import (
@@ -39,66 +37,27 @@ from .charging_cost_const import (
     CONF_CHARGING_COST_SOURCE,
     COST_SOURCE_DISABLED,
 )
-from .control import AmtronControl, ControlOptions
-from .coordinator import MennekesAmtronCoordinator
+from .coordinator import ServiceCoordinator
 from .cost_observer import ChargingCostObserver, LastChargingCost
 from .data import (
-    ConnectionState,
     MennekesAmtronRuntimeData,
     RuntimeHandoff,
     WallboxData,
-    WriteDiagnostics,
 )
-from .device.client import MennekesModbusClient, SerialConfig
 from .device.client_errors import AmtronBusError
-from .device.connection import ConnectionConfig, NetworkConfig
 from .device.const import (
-    CONF_BAUDRATE,
-    CONF_BYTESIZE,
-    CONF_CONNECTION_TYPE,
-    CONF_CURRENT_LIMIT,
-    CONF_DEVICE_ID,
-    CONF_HOST,
-    CONF_MEASUREMENT_INTERVAL_SECONDS,
-    CONF_PARITY,
-    CONF_PHASE_SWITCH_GRACE_SECONDS,
-    CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SERIAL_NUMBER,
-    CONF_STATE_CHANGE_INTERVAL_SECONDS,
-    CONF_STOPBITS,
-    CONF_TCP_AUTH_PASSWORD,
-    CONF_TCP_AUTHENTICATION,
-    CONF_TCP_PORT,
-    CONNECTION_SERIAL,
-    DEFAULT_BAUDRATE,
-    DEFAULT_BYTESIZE,
-    DEFAULT_DEVICE_ID,
-    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
-    DEFAULT_NAME,
-    DEFAULT_PARITY,
-    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
-    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
-    DEFAULT_STOPBITS,
-    DEFAULT_TCP_PORT,
     DOMAIN,
 )
-from .device.energy_goal_controller import EnergyGoalController
-from .device.errors import device_error
-from .device.heartbeat import HeartbeatTask
-from .device.identity import async_read_identity
-from .device.soc_goal_controller import SocGoalController
+from .device.errors import DeviceError
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError
-from .device.write_state import WriteState
+from .embedded import async_acquire, async_forget, async_release, mark_reloading
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import (
     DepartureIntent,
-    GoalStore,
     ModelStore,
-    PlanPauseStore,
-    SessionHistoryStore,
-    SocGoalStore,
     TimedGoalStore,
 )
 from .guest_charging import GuestCharging
@@ -115,25 +74,24 @@ from .network_tariff_year import (
 )
 from .options_flow import control_mode_is_master
 from .plug_charge import PlugChargeObserver, plug_charge_policy
-from .recovery import HeartbeatRecovery
-from .remote import (
-    CONF_SERVER_TOKEN,
-    CONF_SERVER_URL,
-    RemoteClient,
-    RemoteControl,
-    RemoteCoordinator,
-    RemoteHeartbeat,
-)
 from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
+from .service_client import (
+    CONF_SERVER_TOKEN,
+    CONF_SERVER_URL,
+    ServiceClient,
+    server_url,
+)
+from .service_control import ServiceControl, ServiceHeartbeat
+from .service_transport import HttpTransport, ServiceTransport
 from .services import async_setup_services
-from .session_observer import SessionObserver, session_capture_enabled
 from .timed_goal_const import (
     CONF_TIMED_GOAL_ENABLED,
     CONF_TIMED_GOAL_RESET_PENDING,
     timed_goal_is_enabled,
 )
 from .timed_goal_observer import TimedGoalObserver
+from .unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG, UnplugRule
 from .vehicle_binding import VehicleBinding, VehicleBindingStore
 from .vehicle_detection import (
     VehicleDetectionObserver,
@@ -150,7 +108,6 @@ from .vehicle_profiles import (
     CONF_VEHICLE_SOC_USE_PROFILE,
     CONF_VIRTUAL_PLUG_CHARGE,
     SELECTION_KEYS,
-    each_vehicle_options,
     profile_options,
     profiles,
     vehicle_options,
@@ -215,49 +172,32 @@ async def async_setup_entry(
     remote = CONF_SERVER_URL in entry.data
     expected_serial = _entry_serial_binding(entry)
     handoff: RuntimeHandoff | None = hass.data.get(f"{DOMAIN}_reload_clients", {}).get(entry.entry_id)
-    if handoff is not None and handoff.client is not None and (
-        remote or handoff.client.config != _connection_config(entry)
-    ):
-        await handoff.async_close()
-    client: MennekesModbusClient
-    if remote:
-        # Direct-mode intent must not return after a later switch back from
-        # the service, which has since owned the authoritative charging state.
-        hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
-        client = RemoteClient(
-            async_get_clientsession(hass),
-            str(entry.data[CONF_SERVER_URL]),
-            str(entry.data[CONF_SERVER_TOKEN]),
-        )
-        client.bind_identity(expected_serial)
-    else:
-        states: dict[str, WriteState] = hass.data.setdefault(
-            f"{DOMAIN}_write_states", {}
-        )
-        if entry.entry_id not in states:
-            states[entry.entry_id] = WriteState.cold_start(time.monotonic())
-        retained_client = handoff.client if handoff is not None else None
-        client = retained_client or MennekesModbusClient(
-            _connection_config(entry), write_state=states[entry.entry_id]
-        )
+    client: ServiceClient | None = None
     try:
+        if remote:
+            transport: ServiceTransport = HttpTransport(
+                async_get_clientsession(hass),
+                server_url(str(entry.data[CONF_SERVER_URL])),
+                str(entry.data[CONF_SERVER_TOKEN]),
+            )
+        else:
+            transport = (await async_acquire(hass, entry)).transport
+        client = ServiceClient(transport=transport)
+        client.bind_identity(expected_serial)
         await client.async_connect()
-        identity = (
-            client.identity
-            if isinstance(client, RemoteClient)
-            else await async_read_identity(client)
-        )
+        identity = client.identity
         if expected_serial is not None and identity.serial_number != expected_serial:
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN, translation_key="device_identity_changed"
             )
-        if isinstance(client, RemoteClient):
-            # Legacy endpoint-only entries keep their registry identifiers, but
-            # can still bind this running client to a serial it has just read.
-            client.bind_identity(identity.serial_number)
+        # An entry without a saved serial binds to the wallbox it just read.
+        client.bind_identity(identity.serial_number)
         validate_vehicle_selection()
     except BaseException as err:
-        await client.async_close()
+        if client is not None:
+            await client.async_close()
+        if not remote:
+            await async_release(hass, entry.entry_id, force=True)
         if isinstance(err, WaveshareAuthenticationRejectedError):
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
@@ -274,31 +214,12 @@ async def async_setup_entry(
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN, translation_key="service_version_mismatch"
             ) from err
-        if isinstance(err, AmtronBusError):
+        if isinstance(err, (AmtronBusError, DeviceError, OSError, TimeoutError, ValueError)):
             raise ConfigEntryNotReady(str(err)) from err
         raise
 
-    # Update only the former generated title. HA preserves device names chosen
-    # by the user separately, and existing registry entity IDs do not change.
-    if entry.title == "MENNEKES AMTRON":
-        hass.config_entries.async_update_entry(entry, title=DEFAULT_NAME)
-
-    diagnostics = WriteDiagnostics()
-    connection_state = ConnectionState()
-    coordinator_type = RemoteCoordinator if remote else MennekesAmtronCoordinator
-    coordinator = coordinator_type(
-        hass,
-        entry,
-        client=client,
-        identity=identity,
-        connection_state=connection_state,
-        timeline=diagnostics.timeline,
-        scan_interval=_scan_interval(entry),
-        measurement_interval=float(
-            entry.options.get(
-                CONF_MEASUREMENT_INTERVAL_SECONDS, DEFAULT_MEASUREMENT_INTERVAL_SECONDS
-            )
-        ),
+    coordinator = ServiceCoordinator(
+        hass, entry, client=client, scan_interval=_scan_interval(entry),
     )
 
     def notify_pending() -> None:
@@ -309,58 +230,27 @@ async def async_setup_entry(
             coordinator.data.pending_change_until = control.pending_until
         coordinator.async_update_listeners()
 
-    if isinstance(client, RemoteClient):
-        control: AmtronControl = RemoteControl(
-            client,
-            diagnostics=diagnostics,
-            options=_control_options(entry),
-            state=coordinator.current_data,
-            request_refresh=coordinator.async_refresh,
-            notify_pending=notify_pending,
-        )
-    else:
-        def validate_deferred() -> None:
-            if not coordinator.last_update_success:
-                raise device_error("control_state_unknown")
-
-        control = AmtronControl(
-            client,
-            diagnostics=diagnostics,
-            identity=identity,
-            options=_control_options(entry),
-            state=coordinator.current_data,
-            request_refresh=coordinator.async_request_refresh,
-            notify_write_error=lambda: async_check_repairs(hass, entry),
-            validate_deferred=validate_deferred,
-            notify_pending=notify_pending,
-        )
-        coordinator.control_status = lambda: (control.pending_action, control.pending_until)
-        coordinator.observe_recovery = control.observe_recovery
-        coordinator.observe_plug_charge = lambda data, observed_at: control.observe_plug_charge(
-            data, observed_at=observed_at,
-        )
-    guest = None
-    if isinstance(client, RemoteClient) and isinstance(coordinator, RemoteCoordinator):
-        guest = GuestCharging(client, coordinator.async_refresh)
+    control = ServiceControl(
+        client,
+        state=coordinator.current_data,
+        request_refresh=coordinator.async_refresh,
+        notify_pending=notify_pending,
+    )
+    guest = GuestCharging(client, coordinator.async_refresh)
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
         control=control,
-        identity=identity,
-        diagnostics=diagnostics,
-        connection_state=connection_state,
-        entry_data=dict(entry.data),
         guest=guest,
+        identity=identity,
+        entry_data=dict(entry.data),
+        controls=remote or control_mode_is_master(dict(entry.options)),
     )
     try:
-        if handoff is not None:
-            # The new runtime now owns the connection, including failed-setup
-            # cleanup. Transient estimates must never cross a changed wallbox.
-            handoff.client = None
-            # A reconnect is only a gap; the session's presence rule judges it.
-            if handoff.identity != identity:
-                await handoff.async_close()
-                forget_loss_attribution(hass, entry.entry_id)
+        # A reconnect is only a gap; the session's presence rule judges it.
+        if handoff is not None and handoff.identity != identity:
+            await handoff.async_close()
+            forget_loss_attribution(hass, entry.entry_id)
         if profiles(entry.options):
             entry.runtime_data.loss_attribution_unsubscribe = track_loss_attribution(hass, entry)
         validate_vehicle_selection()
@@ -372,7 +262,7 @@ async def async_setup_entry(
             # The gate keeps its last state until writing is allowed again.
             _LOGGER.warning("Plug & Charge: not applied while the wallbox is read-only")
         elif not _service_intent_rejected(client) and (plug_enabled or (
-            CONF_VIRTUAL_PLUG_CHARGE in entry.options and control.supports_plug_charge
+            CONF_VIRTUAL_PLUG_CHARGE in entry.options
             and control.plug_charge.get("enabled") is True
         )):
             try:
@@ -381,22 +271,15 @@ async def async_setup_entry(
                 )
             except (AmtronBusError, HomeAssistantError) as err:
                 _raise_optional_setup_error(client, err, "plug_charge_unavailable")
-        if control.supports_plug_charge and not _service_intent_rejected(client):
+        if entry.runtime_data.controls and not _service_intent_rejected(client):
             entry.runtime_data.plug_charge = PlugChargeObserver(hass, entry)
         await _async_resume_trip(hass, entry, timed_reset_complete)
         await _async_cancel_old_trip(hass, entry, timed_reset_complete)
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
-        if session_capture_enabled(entry):
-            if not remote:
-                retained_sessions = handoff.sessions if handoff is not None else None
-                entry.runtime_data.sessions = retained_sessions or SessionObserver(hass, entry, identity, coordinator)
-                if handoff is not None and retained_sessions is not None:
-                    retained_sessions.rebind(coordinator)
-                    handoff.sessions = None
-                await entry.runtime_data.sessions.async_setup()
+        if _estimates_enabled(entry):
             if cost_enabled:
                 retained_cost = handoff.charging_cost if handoff is not None else None
-                if handoff is not None and retained_cost is not None and retained_cost.retain_for_reload(entry, remote=remote):
+                if handoff is not None and retained_cost is not None and retained_cost.retain_for_reload(entry):
                     retained_cost.rebind(entry)
                     entry.runtime_data.charging_cost = retained_cost
                     handoff.charging_cost = None
@@ -404,103 +287,51 @@ async def async_setup_entry(
                     if handoff is not None and retained_cost is not None:
                         await retained_cost.async_stop()
                         handoff.charging_cost = None
-                    entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
+                    entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry)
                     await entry.runtime_data.charging_cost.async_start()
 
             # Failed polls arrive as None. A reconnect re-checks the wallbox
             # identity; the session judges continuity, costs follow it.
             async def observe_estimates(data: WallboxData | None) -> None:
-                if entry.runtime_data.sessions is not None:
-                    await entry.runtime_data.sessions.async_observe(data)
                 if entry.runtime_data.charging_cost is not None:
                     await entry.runtime_data.charging_cost.async_observe(data)
 
             coordinator.observe_session = observe_estimates
-        if not remote:
-            soc_store = SocGoalStore(
-                hass, entry.entry_id,
-                identity.serial_number or f"{client.config.port}:{client.config.device_id}",
-            )
-            try:
-                client.write_state.soc_goal = await soc_store.async_load()
-            except (OSError, ValueError) as err:
-                raise ConfigEntryNotReady(
-                    translation_domain=DOMAIN, translation_key="soc_goal_state_invalid"
-                ) from err
+        client.on_auth_failed = lambda: entry.async_start_reauth(hass)
+        heartbeat = ServiceHeartbeat(client)
+        entry.runtime_data.heartbeat = heartbeat
 
-            async def persist_soc_goal() -> None:
-                await soc_store.async_save(control.soc_goal)
+        intent_rejected = _service_intent_rejected(client)
 
-            entry.runtime_data.soc_goal = SocGoalController(control, persist_soc_goal, notify_pending)
-        if not remote and control.supports_energy_goal:
-            store = GoalStore(
-                hass, entry.entry_id,
-                identity.serial_number or f"{client.config.port}:{client.config.device_id}",
-            )
-            try:
-                client.write_state.energy_goal = await store.async_load()
-            except (OSError, ValueError) as err:
-                raise ConfigEntryNotReady(
-                    translation_domain=DOMAIN, translation_key="energy_goal_state_invalid"
-                ) from err
+        known_write_errors: tuple[str, ...] = ()
 
-            async def persist_goal() -> None:
-                await store.async_save(control.energy_goal)
+        def update_remote() -> None:
+            nonlocal intent_rejected, known_write_errors
+            rejected = _service_intent_rejected(client)
+            if rejected != intent_rejected:
+                intent_rejected = rejected
+                # Rebuild deferred vehicle owners after the reset, including
+                # one acknowledged through another HA or API client.
+                hass.config_entries.async_schedule_reload(entry.entry_id)
+            heartbeat.update()
+            if not client.connected:
+                # A command or diagnostics request can fail long before
+                # the next scheduled poll. Reflect this in entity state now.
+                key = {
+                    "service_auth_failed": "service_auth_failed",
+                    "service_identity_changed": "device_identity_changed",
+                    "service_version_mismatch": "service_version_mismatch",
+                }.get(client.failure_reason or "", "service_unavailable")
+                coordinator.async_set_update_error(UpdateFailed(
+                    translation_domain=DOMAIN, translation_key=key
+                ))
+            write_errors = tuple(client.snapshot.get("write_errors", ()))
+            if write_errors != known_write_errors:
+                known_write_errors = write_errors
+                async_check_repairs(hass, entry)
 
-            goal = EnergyGoalController(control, client, persist_goal, notify_pending)
-            entry.runtime_data.goal = goal
-            coordinator.observe_goal = goal.observe
-        if isinstance(client, RemoteClient):
-            client.on_auth_failed = lambda: entry.async_start_reauth(hass)
-            heartbeat = RemoteHeartbeat(client, diagnostics)
-            entry.runtime_data.heartbeat = heartbeat
-
-            intent_rejected = _service_intent_rejected(client)
-
-            def update_remote() -> None:
-                nonlocal intent_rejected
-                rejected = _service_intent_rejected(client)
-                if rejected != intent_rejected:
-                    intent_rejected = rejected
-                    # Rebuild deferred vehicle owners after the reset, including
-                    # one acknowledged through another HA or API client.
-                    hass.config_entries.async_schedule_reload(entry.entry_id)
-                heartbeat.update()
-                if not client.connected:
-                    # A command or diagnostics request can fail long before
-                    # the next scheduled poll. Reflect this in entity state now.
-                    key = {
-                        "service_auth_failed": "service_auth_failed",
-                        "service_identity_changed": "device_identity_changed",
-                        "service_version_mismatch": "service_version_mismatch",
-                    }.get(client.failure_reason or "", "service_unavailable")
-                    coordinator.async_set_update_error(UpdateFailed(
-                        translation_domain=DOMAIN, translation_key=key
-                    ))
-                counters = client.snapshot.get("diagnostics", {})
-                for name in (
-                    "heartbeats_sent",
-                    "heartbeats_failed",
-                    "heartbeats_late",
-                    "writes_sent",
-                    "writes_rejected",
-                    "writes_rate_limited",
-                    "recoveries",
-                ):
-                    value = counters.get(name)
-                    if type(value) is int and value >= 0:
-                        setattr(diagnostics, name, value)
-                write_errors = set(client.snapshot.get("write_errors", []))
-                if write_errors != diagnostics.write_errors:
-                    diagnostics.write_errors = write_errors
-                    async_check_repairs(hass, entry)
-
-            client.on_update = update_remote
-            update_remote()
-        elif not control.read_only:
-            entry.runtime_data.heartbeat = _start_heartbeat(
-                hass, entry, client, diagnostics
-            )
+        client.on_update = update_remote
+        update_remote()
         await coordinator.async_config_entry_first_refresh()
         validate_vehicle_selection()
         if automatic_selection_available(entry.options):
@@ -508,16 +339,6 @@ async def async_setup_entry(
             entry.runtime_data.vehicle_binding = VehicleBinding(hass, entry)
             await entry.runtime_data.vehicle_binding.async_start()
         await _async_start_vehicle(hass, entry, options, timed_reset_complete, validate_vehicle_selection)
-        if entry.runtime_data.soc_goal is not None:
-            # The first poll must never retry a restored old vehicle's stop
-            # before its source has been rebound or deliberately cleared.
-            coordinator.retry_soc_goal = entry.runtime_data.soc_goal.retry_stop
-        if remote:
-            # The service owns its own durable goal. Old direct-mode intent must
-            # not return when this entry later switches back from the service.
-            await GoalStore(hass, entry.entry_id, "").async_remove()
-            await SocGoalStore(hass, entry.entry_id, "").async_remove()
-            await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
         platforms = tuple(_entry_platforms(entry))
         await hass.config_entries.async_forward_entry_setups(
             entry, platforms
@@ -547,12 +368,13 @@ async def async_setup_entry(
 
             entry.async_on_unload(async_track_tariff_midnight(hass, refresh_new_tariff_year))
         async_setup_repairs(hass, entry)
-        if not control.read_only and not remote:
-            entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
-            entry.runtime_data.recovery.start()
+        if entry.runtime_data.controls and entry.options.get(CONF_RELEASE_OFF_ON_UNPLUG) is True:
+            entry.runtime_data.unplug_rule = UnplugRule(hass, entry)
     except BaseException:
         try:
             await _async_stop_runtime(entry.runtime_data)
+            if not remote:
+                await async_release(hass, entry.entry_id, force=True)
         finally:
             forget_loss_attribution(hass, entry.entry_id)
         raise
@@ -560,6 +382,18 @@ async def async_setup_entry(
     if handoff is not None:
         handoff.setup_complete = True
     return True
+
+
+def _estimates_enabled(entry: MennekesAmtronConfigEntry) -> bool:
+    """Whether any cost or loss estimate follows the charging sessions."""
+    return (
+        entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
+        or vehicle_options(entry.options).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+        or any(
+            profile.options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+            for profile in profiles(entry.options).values()
+        )
+    )
 
 
 def _trip_memory(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> VehicleTripMemory:
@@ -622,20 +456,13 @@ async def _async_cancel_old_trip(
         vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
         or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
         or not timed_reset_complete
-    ):
-        try:
-            # Reclaim only this entry's work after an unreachable unload;
-            # manual requests and other owners remain authoritative.
-            await runtime.control.async_cancel_timed_current(f"timed:{entry.entry_id}")
-        except (AmtronBusError, HomeAssistantError) as err:
-            _raise_optional_setup_error(runtime.client, err, "timed_goal_unavailable")
-        if timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
-            stored_options = dict(entry.options)
-            stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
-            # Complete both halves of the reset before consuming its
-            # authority. A failed reconnect must still cancel the old
-            # service queue on the next attempt, even after re-enabling.
-            hass.config_entries.async_update_entry(entry, options=stored_options)
+    ) and timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
+        stored_options = dict(entry.options)
+        stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
+        # Complete both halves of the reset before consuming its
+        # authority. A failed reconnect must still cancel the old
+        # service queue on the next attempt, even after re-enabling.
+        hass.config_entries.async_update_entry(entry, options=stored_options)
 
 
 async def _async_start_vehicle(
@@ -741,8 +568,6 @@ async def _async_switch_vehicle(
         return True
     # Like at setup, a poll during the switch must not retry the previous
     # car's stop before the new car's source has been bound or cleared.
-    retry = runtime.coordinator.retry_soc_goal
-    runtime.coordinator.retry_soc_goal = None
     runtime.vehicle_switching = True
     try:
         await _async_park_trip(hass, entry)
@@ -776,23 +601,22 @@ async def _async_switch_vehicle(
         return False
     finally:
         runtime.vehicle_switching = False
-    runtime.coordinator.retry_soc_goal = retry
     runtime.vehicle_selection = selection
     runtime.coordinator.async_update_listeners()
     return True
 
 
-def _service_intent_rejected(client: MennekesModbusClient) -> bool:
-    return isinstance(client, RemoteClient) and client.snapshot.get("control", {}).get("intent_rejected") is True
+def _service_intent_rejected(client: ServiceClient) -> bool:
+    return client.snapshot.get("control", {}).get("intent_rejected") is True
 
 
 def _raise_optional_setup_error(
-    client: MennekesModbusClient, err: Exception, translation_key: str,
+    client: ServiceClient, err: Exception, translation_key: str,
 ) -> NoReturn:
     """Retry transient source setup failures while preserving reauthentication."""
     if isinstance(err, ConfigEntryAuthFailed):
         raise err
-    if isinstance(client, RemoteClient) and client.failure_reason == "service_auth_failed":
+    if client.failure_reason == "service_auth_failed":
         raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN, translation_key="service_auth_failed"
         ) from err
@@ -846,13 +670,10 @@ async def async_unload_entry(
     )
     if not unloaded:
         return False
-    retain_client = runtime_data.retain_client_on_unload
     retain_cost = runtime_data.retain_cost_on_unload
-    if retain_client or retain_cost or runtime_data.retain_attribution_on_unload:
+    if retain_cost or runtime_data.retain_attribution_on_unload:
         handoff = hass.data[f"{DOMAIN}_reload_clients"][entry.entry_id]
         handoff.unloaded = True
-        handoff.client = runtime_data.client if retain_client else None
-        handoff.sessions = runtime_data.sessions if retain_client else None
         handoff.charging_cost = runtime_data.charging_cost if retain_cost else None
     # A reload that also selects another car must end the old car's plan
     # pause, like an in-place switch; a plain reload or shutdown keeps it.
@@ -866,10 +687,11 @@ async def async_unload_entry(
         and not (vehicle_soc_is_configured(options) and timed_goal_is_enabled(options))
     )
     try:
-        await _async_stop_runtime(
-            runtime_data, close_client=not retain_client, retain_cost=retain_cost,
-            withdraw_plan=withdraw,
-        )
+        try:
+            await _async_stop_runtime(runtime_data, retain_cost=retain_cost, withdraw_plan=withdraw)
+        finally:
+            # Last: the car's observers above still withdraw through it.
+            await async_release(hass, entry.entry_id)
     finally:
         if not runtime_data.retain_attribution_on_unload:
             forget_loss_attribution(hass, entry.entry_id)
@@ -877,15 +699,16 @@ async def async_unload_entry(
 
 
 async def _async_stop_runtime(
-    runtime: MennekesAmtronRuntimeData, *, close_client: bool = True, retain_cost: bool = False,
+    runtime: MennekesAmtronRuntimeData, *, retain_cost: bool = False,
     withdraw_plan: bool = False,
 ) -> None:
     """Release the same owners after partial setup and ordinary unloading.
 
-    Detach source and polling listeners before their consumers, and keep the
-    heartbeat until the charging controllers have finished their persistence.
-    The command owner and physical connection are always closed last.
+    Detach source and polling listeners before their consumers; the client
+    is closed last.
     """
+    if runtime.unplug_rule is not None:
+        runtime.unplug_rule.stop()
     if runtime.vehicle_detection is not None:
         runtime.vehicle_detection.stop()
     if runtime.vehicle_binding is not None:
@@ -895,25 +718,16 @@ async def _async_stop_runtime(
         runtime.loss_attribution_unsubscribe = None
     if runtime.plug_charge is not None:
         await runtime.plug_charge.async_stop()
-    runtime.coordinator.observe_plug_charge = None
     runtime.coordinator.observe_session = None
     if runtime.charge_loss is not None:
         await runtime.charge_loss.async_stop()
     if runtime.charging_cost is not None and not retain_cost:
         await runtime.charging_cost.async_stop()
-    if runtime.sessions is not None and close_client:
-        await runtime.sessions.async_close()
     if runtime.timed_goal is not None:
         await runtime.timed_goal.async_stop(withdraw=withdraw_plan)
-    for owner in (
-        runtime.vehicle_soc, runtime.soc_goal,
-        runtime.goal, runtime.recovery, runtime.heartbeat,
-    ):
-        if owner is not None:
-            await owner.async_stop()
-    await runtime.control.async_shutdown()
-    if close_client:
-        await runtime.client.async_close()
+    if runtime.vehicle_soc is not None:
+        await runtime.vehicle_soc.async_stop()
+    await runtime.client.async_close()
 
 
 async def async_reload_entry(
@@ -944,33 +758,23 @@ async def _async_reload_entry_locked(
             return
         # A reload that also selects another car keeps the previous car's trip.
         await _async_park_trip(hass, entry)
-    # Automatic profile changes reload optional observers. Preserve the open
-    # physical connection so this logical reload does not discard the current
-    # cable observation or an already granted session. Real disconnects still
-    # invalidate the gate in the driver. Other reloads retain their lifecycle.
-    retain = (
-        runtime is not None and CONF_SERVER_URL not in entry.data
-        and not isinstance(runtime.client, RemoteClient)
-        and runtime.client.connected
-        and (runtime.control.plug_charge.get("enabled") is True or runtime.sessions is not None)
-        and runtime.client.config == _connection_config(entry)
-    )
-    if runtime is not None and retain:
-        runtime.retain_client_on_unload = True
-    remote = CONF_SERVER_URL in entry.data
-    retain_cost = cost is not None and (remote or retain) and cost.retain_for_reload(entry, remote=remote)
-    retain_attribution = runtime is not None and (remote or retain) and runtime.entry_data == dict(entry.data)
+    retain_cost = cost is not None and cost.retain_for_reload(entry)
+    retain_attribution = runtime is not None and runtime.entry_data == dict(entry.data)
     if runtime is not None:
         runtime.retain_cost_on_unload = retain_cost
         runtime.retain_attribution_on_unload = retain_attribution
-    if runtime is not None and (retain or retain_cost or retain_attribution):
+    if runtime is not None and (retain_cost or retain_attribution):
         handoff = RuntimeHandoff(identity=runtime.identity)
         hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = handoff
+    # The embedded service keeps its connection and heartbeat through this.
+    mark_reloading(hass, entry.entry_id, True)
     try:
         await hass.config_entries.async_reload(entry.entry_id)
     finally:
-        if runtime is not None and (retain or retain_cost or retain_attribution):
-            runtime.retain_client_on_unload = False
+        mark_reloading(hass, entry.entry_id, False)
+        if entry.state is not ConfigEntryState.LOADED:
+            await async_release(hass, entry.entry_id)
+        if runtime is not None and (retain_cost or retain_attribution):
             runtime.retain_cost_on_unload = False
             runtime.retain_attribution_on_unload = False
             unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
@@ -987,18 +791,14 @@ async def async_remove_entry(
 ) -> None:
     """Remove repairs owned by a deleted entry, also on HA before 2026.11."""
 
-    hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
     hass.data.get(f"{DOMAIN}_reload_locks", {}).pop(entry.entry_id, None)
     forget_loss_attribution(hass, entry.entry_id)
-    await GoalStore(hass, entry.entry_id, "").async_remove()
-    await SocGoalStore(hass, entry.entry_id, "").async_remove()
+    await async_forget(hass, entry.entry_id)
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
-    await PlanPauseStore(hass, entry.entry_id, "").async_remove()
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
     await VehicleBindingStore(hass, entry.entry_id, "").async_remove()
-    await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())
     await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()
@@ -1011,51 +811,17 @@ async def async_remove_entry(
 def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     """Return the platforms this entry exposes.
 
-    Direct read-only entries omit controls. Service entries retain their control
-    entities and follow the service's live write permission through availability.
+    A direct connection set to read only shows no controls. With the app, the
+    controls stay and follow the app's write permission through availability.
     """
 
     platforms = list(READ_PLATFORMS)
     if CONF_SERVER_URL in entry.data or control_mode_is_master(dict(entry.options)):
         platforms.extend(CONTROL_PLATFORMS)
-    else:
-        if any(
-            options.get(CONF_CHARGE_LOSS_SOURCE) == LOSS_SOURCE_SENSOR
-            for options in each_vehicle_options(entry.options)
-        ):
-            platforms.append(Platform.BUTTON)
-        if profiles(entry.options):
-            platforms.append(Platform.SELECT)
+    elif profiles(entry.options):
+        # The vehicle choice is a setting of the entry, not a wallbox control.
+        platforms.append(Platform.SELECT)
     return platforms
-
-
-def _connection_config(entry: MennekesAmtronConfigEntry) -> ConnectionConfig:
-    """Load direct transport settings, using serial as the default."""
-
-    data = entry.data
-    connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_SERIAL)
-    if connection_type != CONNECTION_SERIAL:
-        return NetworkConfig(
-            host=data.get(CONF_HOST, ""),
-            tcp_port=data.get(CONF_TCP_PORT, DEFAULT_TCP_PORT),
-            connection_type=connection_type,
-            device_id=data.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID),
-            tcp_authentication=data.get(CONF_TCP_AUTHENTICATION, False),
-            tcp_auth_password=data.get(CONF_TCP_AUTH_PASSWORD, ""),
-        )
-    return _serial_config(entry)
-
-
-def _serial_config(entry: MennekesAmtronConfigEntry) -> SerialConfig:
-    data = entry.data
-    return SerialConfig(
-        port=str(data[CONF_PORT]),
-        baudrate=int(data.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)),
-        bytesize=int(data.get(CONF_BYTESIZE, DEFAULT_BYTESIZE)),
-        parity=str(data.get(CONF_PARITY, DEFAULT_PARITY)),
-        stopbits=int(data.get(CONF_STOPBITS, DEFAULT_STOPBITS)),
-        device_id=int(data.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID)),
-    )
 
 
 def _scan_interval(entry: MennekesAmtronConfigEntry) -> float:
@@ -1065,42 +831,6 @@ def _scan_interval(entry: MennekesAmtronConfigEntry) -> float:
         return float(DEFAULT_SCAN_INTERVAL_SECONDS)
     value = entry.options.get(CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS)
     return float(value)
-
-
-def _control_options(entry: MennekesAmtronConfigEntry) -> ControlOptions:
-    options = dict(entry.options)
-    # With the app, its current cap is the only one; HA adds none of its own.
-    cap = None if CONF_SERVER_URL in entry.data else options.get(CONF_CURRENT_LIMIT)
-    return ControlOptions(
-        read_only=CONF_SERVER_URL not in entry.data and not control_mode_is_master(options),
-        current_cap=float(cap) if isinstance(cap, (int, float)) else None,
-        state_change_interval_seconds=float(options.get(
-            CONF_STATE_CHANGE_INTERVAL_SECONDS, DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
-        )),
-        phase_switch_grace_seconds=float(options.get(
-            CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
-        )),
-    )
-
-
-def _start_heartbeat(
-    hass: HomeAssistant,
-    entry: MennekesAmtronConfigEntry,
-    client: MennekesModbusClient,
-    diagnostics: WriteDiagnostics,
-) -> HeartbeatTask:
-    """Start the heartbeat as an entry-owned background task.
-
-    Home Assistant cancels entry background tasks on unload, which is what
-    keeps a stale heartbeat from holding the bus after the entry is gone.
-    """
-
-    heartbeat = HeartbeatTask(client, diagnostics)
-    task = entry.async_create_background_task(
-        hass, heartbeat.async_run(), "mennekes_amtron_rtu_heartbeat"
-    )
-    heartbeat.attach(task)
-    return heartbeat
 
 
 __all__ = ["WallboxData", "async_setup", "async_setup_entry", "async_unload_entry"]

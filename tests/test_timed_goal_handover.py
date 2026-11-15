@@ -10,8 +10,9 @@ import pytest
 from aiohttp import ClientSession
 from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.mennekes_amtron_rtu.control import AmtronControl
-from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.device.control import (
+    AmtronControl,
+)
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureForecast,
     DepartureInputs,
@@ -19,12 +20,9 @@ from custom_components.mennekes_amtron_rtu.device.departure_plan import (
 )
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.remote import (
-    ControlOptions,
-    RemoteClient,
-    RemoteControl,
-)
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.test_modbus_service import TOKEN, service_fixture
 from tests.test_timed_goal import NOW, setup_observer
 
@@ -251,10 +249,9 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
-                control = RemoteControl(
-                    client, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                    state=lambda: None, request_refresh=lambda: None, notify_pending=lambda: None,
+                client = ServiceClient(session, "http://service:8765", TOKEN)
+                control = ServiceControl(
+                    client,                     state=lambda: None, request_refresh=lambda: None, notify_pending=lambda: None,
                 )
                 payload = service.snapshot()
                 client.apply_snapshot(payload)

@@ -17,7 +17,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.test_modbus_service import TOKEN, current_writes
 from tests.test_plug_charge_observer import observer_harness, plug_in_paused
 from tests.test_plug_charge_remote import remote_control
@@ -38,7 +38,7 @@ async def control_path(tmp_path, *, remote):
             await service.heartbeat.async_stop()
             server = await stack.enter_async_context(TestServer(create_app(service)))
             session = await stack.enter_async_context(ClientSession())
-            client = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            client = ServiceClient(session, str(server.make_url("/")), TOKEN)
             await client.async_connect()
             stack.push_async_callback(client.async_close)
             control, owner = remote_control(client), service.control

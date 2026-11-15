@@ -119,6 +119,9 @@ class ModbusService:
         self._intent_notice = FailureNotice(_LOGGER, "Control")
         self._intent_rejected = False
         self._stopping = False
+        # Set by the first attempt to reach the wallbox, whatever its outcome.
+        self._attempted = asyncio.Event()
+        self._startup_error: BaseException | None = None
         self._phase = f"opening {self._connection_name} connection"
         self.heartbeat.async_add_listener(self._log_heartbeat_health)
 
@@ -126,6 +129,26 @@ class ModbusService:
         _LOGGER.info("Connection: opening %s connection to the wallbox", self._connection_name)
         self._task = asyncio.create_task(self._run(), name="amtron_service")
         return self._task
+
+    async def wait_started(self) -> None:
+        """Return once the wallbox is initialized; raise what the first try raised.
+
+        The service keeps retrying on its own. An owner that needs an answer
+        now, like a Home Assistant setup, decides here whether to keep it.
+        """
+        task = self._task
+        if task is None:
+            raise RuntimeError("service was not started")
+        attempted = asyncio.create_task(self._attempted.wait())
+        try:
+            await asyncio.wait((task, attempted), return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            attempted.cancel()
+        if task.done():
+            task.result()
+            raise RuntimeError("service stopped")
+        if self._startup_error is not None:
+            raise self._startup_error
 
     def _log_heartbeat_health(self) -> None:
         if self._stopping:
@@ -278,14 +301,18 @@ class ModbusService:
                 await self._enforce_current_cap()
                 await self._save_intent()
                 self._wallbox_notice.recovered("wallbox communication restored")
+                self._startup_error = None
             except (AmtronBusError, DeviceError, OSError, ValueError) as err:
                 self._success = False
+                if self.control is None:
+                    self._startup_error = err
                 if self.control is not None:
                     self.control.observe_plug_charge(None)
                 self._wallbox_notice.failed(
                     f"wallbox unavailable during {self._phase}; retrying every {self.config.scan_interval:.0f} seconds",
                     type(err).__name__,
                 )
+            self._attempted.set()
             await asyncio.sleep(self.config.scan_interval)
 
     async def _save_intent(self) -> None:

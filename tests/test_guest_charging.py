@@ -16,7 +16,7 @@ from custom_components.mennekes_amtron_rtu import services
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.guest_charging import GuestCharging
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.ha_fakes import FakeConfigEntry, build_runtime
 from tests.test_services import _patch_registry
 
@@ -41,7 +41,7 @@ def test_guest_button_uses_real_snapshot_and_identity_bound_command(tmp_path, mo
             runtime.guest_service(tmp_path) as (service, transport, clock),
             TestServer(create_app(service)) as server, ClientSession() as session,
         ):
-            client = RemoteClient(session, str(server.make_url("/")), runtime.TOKEN)
+            client = ServiceClient(session, str(server.make_url("/")), runtime.TOKEN)
             client.bind_identity(service.identity.serial_number)
             await client.update()
             guest = GuestCharging(client, client.update)
@@ -165,14 +165,10 @@ def test_failed_refresh_prevents_guest_start_and_reports_service_unavailable():
 def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypatch):
     from datetime import timedelta
 
-    from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
     from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
         DepartureModbusService,
     )
-    from custom_components.mennekes_amtron_rtu.remote import (
-        ControlOptions,
-        RemoteControl,
-    )
+    from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
     from tests import service_guest_fixture as runtime
 
     async def run():
@@ -180,11 +176,10 @@ def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypat
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock), TestServer(
             create_app(service)
         ) as server, ClientSession() as session:
-            client = RemoteClient(session, str(server.make_url("/")), runtime.TOKEN)
+            client = ServiceClient(session, str(server.make_url("/")), runtime.TOKEN)
             await client.update()
-            control = RemoteControl(
-                client, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                state=lambda: None, request_refresh=lambda: None,
+            control = ServiceControl(
+                client,                 state=lambda: None, request_refresh=lambda: None,
             )
             deadline = datetime.now(UTC) + timedelta(hours=1)
             await control.async_set_target_time(deadline)

@@ -16,7 +16,7 @@ from custom_components.mennekes_amtron_rtu.diagnostics import (
     decoded_values,
     fnv1a64,
 )
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.ha_fakes import build_runtime
 
 
@@ -144,7 +144,7 @@ def test_remote_write_diagnostics_are_optional_and_allowlisted(monkeypatch, fail
     async def run():
         hass, entry, _transport = await build_runtime()
         original = entry.runtime_data.client
-        remote = RemoteClient(None, "http://service.invalid:8765", "private-token")
+        remote = ServiceClient(None, "http://service.invalid:8765", "private-token")
         remote.async_read_words = original.async_read_words
         if failure == "unavailable":
             remote.request = AsyncMock(side_effect=AmtronConnectionError("private-token"))
@@ -175,7 +175,7 @@ def test_remote_write_diagnostics_are_optional_and_allowlisted(monkeypatch, fail
 def test_remote_diagnostic_reads_leave_the_connection_state_alone():
     async def run():
         block = REGISTER_BLOCKS[0]
-        remote = RemoteClient(None, "http://service.invalid:8765", "private-token")
+        remote = ServiceClient(None, "http://service.invalid:8765", "private-token")
         remote.request = AsyncMock(return_value={"words": [0] * block.count})
         assert await remote.async_read_words(address=block.address, count=block.count) == [0] * block.count
         # A failed diagnostics download must not mark the entry unavailable.

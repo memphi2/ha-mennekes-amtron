@@ -78,7 +78,7 @@ from .device.const import (
     frame_label,
     frame_parts,
 )
-from .device.identity import async_read_identity, display_identifier
+from .device.identity import display_identifier
 from .device.registers import VALIDATED_LAYOUT, layout_label
 from .device.service_config import validate_token
 from .device.service_discovery import APP_HOSTNAME
@@ -91,10 +91,16 @@ from .device.waveshare_gateway import (
     GatewaySnapshot,
     inspect_gateway,
 )
+from .entry_connection import connection_config
 from .entry_types import MennekesAmtronConfigEntry
 from .options_flow import MennekesAmtronOptionsFlow
-from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL, RemoteClient, server_url
 from .remote_errors import ServiceConnectionError
+from .service_client import (
+    CONF_SERVER_TOKEN,
+    CONF_SERVER_URL,
+    ServiceClient,
+    server_url,
+)
 from .supervisor_discovery import async_app_discoveries
 
 _LOGGER = logging.getLogger(__name__)
@@ -285,7 +291,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reauth_entry()
         original_data = dict(entry.data)
         url = str(original_data[CONF_SERVER_URL])
-        client = RemoteClient(async_get_clientsession(self.hass), url, token)
+        client = ServiceClient(async_get_clientsession(self.hass), url, token)
         try:
             try:
                 await client.async_connect()
@@ -514,7 +520,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 token = str(user_input[CONF_SERVER_TOKEN])
                 if len(token) < 32:
                     raise ValueError("invalid token")
-                client = RemoteClient(async_get_clientsession(self.hass), url, token)
+                client = ServiceClient(async_get_clientsession(self.hass), url, token)
                 try:
                     await client.async_connect()
                     if entry is not None and dict(entry.data) != expected_data:
@@ -615,7 +621,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         if data is None:
             return self.async_abort(reason="invalid_service_discovery")
         errors: dict[str, str] = {}
-        client = RemoteClient(
+        client = ServiceClient(
             async_get_clientsession(self.hass),
             data[CONF_SERVER_URL],
             data[CONF_SERVER_TOKEN],
@@ -792,11 +798,12 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
         saved_data: dict[str, Any] | None = None
-        if loaded and entry is not None and gateway is None and config == entry.runtime_data.client.config:
-            # The existing client owns the bus connection and serializes reads
-            # with polling and heartbeat; an unchanged form needs no new client.
+        if loaded and entry is not None and gateway is None and config == connection_config(entry):
+            # The running service owns the bus connection; an unchanged form
+            # needs no second connection, only the service's current answer.
             try:
-                identity = await async_read_identity(entry.runtime_data.client)
+                await entry.runtime_data.client.update()
+                identity = entry.runtime_data.client.identity
                 return await self._async_finish(
                     step_id, user_input, identity, config=config, expected_data=original_data,
                 )

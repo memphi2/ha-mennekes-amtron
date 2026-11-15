@@ -1,27 +1,18 @@
-"""Switch platform for the MENNEKES AMTRON integration."""
+"""Switches: pause, charging release, lock and Plug & Charge."""
 
 from __future__ import annotations
 
-import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
-from .coordinator import MennekesAmtronCoordinator
-from .device.errors import DeviceError
-from .device.registers import (
-    CHARGING_CURRENT_EMS,
-    CHARGING_RELEASE,
-    LOCK_EVSE,
-)
-from .device.vehicle import snapshot_vehicle_connected
-from .entity import MennekesAmtronControlEntity
+from .device.registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
+from .entity import AmtronEntity, Projection, Runtime, wanted
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
 
@@ -31,7 +22,63 @@ else:
     from homeassistant.components.switch import SwitchDeviceClass
 
 PARALLEL_UPDATES = 1
-_LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, kw_only=True)
+class AmtronSwitchDescription(Projection, SwitchEntityDescription):
+    is_on: Callable[[Runtime], bool | None]
+    turn: Callable[[Runtime, bool], Awaitable[None]]
+
+
+def _flag(key: str) -> Callable[[Runtime], bool | None]:
+    def read(runtime: Runtime) -> bool | None:
+        value = runtime.coordinator.current_data().get(key)
+        return value == 1 if isinstance(value, int) else None
+
+    return read
+
+
+async def _pause(runtime: Runtime, on: bool) -> None:
+    if on:
+        await runtime.control.async_pause_charging()
+    else:
+        await runtime.control.async_resume_charging()
+
+
+async def _plug_charge(runtime: Runtime, on: bool) -> None:
+    if runtime.plug_charge is None:
+        raise service_validation_error("plug_charge_unavailable")
+    await runtime.plug_charge.async_set_enabled(on)
+
+
+def _plug_charge_enabled(runtime: Runtime) -> bool:
+    return runtime.control.plug_charge.get("enabled") is True
+
+
+SWITCHES: tuple[AmtronSwitchDescription, ...] = (
+    # Signals 0 A to the car and leaves the relay closed: the way to pause.
+    AmtronSwitchDescription(
+        key="charging_paused", register=CHARGING_CURRENT_EMS.key, writes=True,
+        is_on=lambda runtime: runtime.control.is_paused, turn=_pause,
+    ),
+    # Opens and closes the relay, which wears it out: not for everyday pausing.
+    AmtronSwitchDescription(
+        key="charging_release", register=CHARGING_RELEASE.key, writes=True,
+        device_class=SwitchDeviceClass.SWITCH, is_on=_flag(CHARGING_RELEASE.key),
+        turn=lambda runtime, on: runtime.control.async_set_charging_release(on),
+    ),
+    AmtronSwitchDescription(
+        key="lock_evse", register=LOCK_EVSE.key, writes=True, is_on=_flag(LOCK_EVSE.key),
+        turn=lambda runtime, on: runtime.control.async_set_lock_evse(on),
+    ),
+    AmtronSwitchDescription(
+        key="virtual_plug_charge", entity_category=EntityCategory.CONFIG,
+        exists=lambda runtime: runtime.plug_charge is not None,
+        # Switching it off stays possible while the service allows no writes.
+        ready=lambda runtime: not runtime.control.read_only or _plug_charge_enabled(runtime),
+        is_on=_plug_charge_enabled, turn=_plug_charge,
+    ),
+)
 
 
 async def async_setup_entry(
@@ -39,284 +86,18 @@ async def async_setup_entry(
     entry: MennekesAmtronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add the command switches this device supports."""
-
-    coordinator = entry.runtime_data.coordinator
-    entities: list[SwitchEntity] = [
-        AmtronPauseSwitch(entry, coordinator),
-        AmtronChargingReleaseSwitch(entry, coordinator),
-        AmtronLockSwitch(entry, coordinator),
-        AmtronReleaseOffOnUnplugSwitch(entry, coordinator),
-    ]
-    if entry.runtime_data.plug_charge is not None:
-        entities.append(AmtronPlugChargeSwitch(entry, coordinator))
-    async_add_entities(entities)
+    async_add_entities(AmtronSwitch(entry, description) for description in wanted(hass, entry, SWITCHES))
 
 
-class AmtronPlugChargeSwitch(MennekesAmtronControlEntity, SwitchEntity):
-    """Configure automatic charging permission directly on the HA device."""
-
-    _attr_translation_key = "virtual_plug_charge"
-    _attr_entity_category = EntityCategory.CONFIG
-
-    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
-        super().__init__(entry, coordinator, "virtual_plug_charge")
-
-    @property
-    def available(self) -> bool:
-        return (
-            self.coordinator.last_update_success
-            and self.runtime_data.control.supports_plug_charge
-            and (not self.runtime_data.control.read_only or self.is_on)
-        )
-
-    @property
-    def is_on(self) -> bool:
-        return self.runtime_data.control.plug_charge.get("enabled") is True
-
-    async def _async_set_enabled(self, enabled: bool) -> None:
-        observer = self.runtime_data.plug_charge
-        if observer is None:
-            raise service_validation_error("plug_charge_unavailable")
-        await observer.async_set_enabled(enabled)
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        await self._async_set_enabled(True)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._async_set_enabled(False)
-
-
-@dataclass(frozen=True)
-class SettingRestoreData(ExtraStoredData):
-    """Persist an HA-side setting even while its entity is unavailable."""
-
-    enabled: bool
-
-    def as_dict(self) -> dict[str, Any]:
-        return {"enabled": self.enabled}
-
-
-class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntity):
-    """Switch the charging release off whenever a vehicle is unplugged.
-
-    Without Virtual Plug & Charge, an open release lets any car charge. This
-    HA-side rule closes it after a confirmed disconnect, so the next car needs
-    an explicit release. With the gate enabled, the gate already owns 0x0D05.
-    A manual pause ends with it: the release now holds the next car, and a
-    left-over pause would keep the wallbox showing it. A goal stop stays.
-    """
-
-    _attr_translation_key = "release_off_on_unplug"
-    _attr_entity_category = EntityCategory.CONFIG
-
-    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
-        super().__init__(entry, coordinator, "release_off_on_unplug")
-        self._attr_is_on = False
-        self._connected: bool | None = None
-
-    @property
-    def available(self) -> bool:
-        return self.coordinator.last_update_success and (
-            not self.runtime_data.control.read_only or self.is_on is True
-        )
-
-    @property
-    def extra_restore_state_data(self) -> ExtraStoredData:
-        return SettingRestoreData(self._attr_is_on is True)
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        # The shown state reads "unavailable" while the wallbox is offline or
-        # read-only; the stored setting keeps what the user chose.
-        if (extra := await self.async_get_last_extra_data()) is not None:
-            self._attr_is_on = extra.as_dict().get("enabled") is True
-        self._connected = self._vehicle_connected()
-
-    def _vehicle_connected(self) -> bool | None:
-        data = self.wallbox_data
-        return snapshot_vehicle_connected(data.get, self.runtime_data.identity.layout_version)
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        connected = self._vehicle_connected()
-        # Unknown readings never count as a disconnect.
-        unplugged = connected is False and self._connected is True
-        if connected is not None:
-            self._connected = connected
-        control = self.runtime_data.control
-        if (
-            unplugged and self.is_on and not control.read_only
-            and control.plug_charge.get("enabled") is not True
-        ):
-            # Tied to the entry: an unload cancels it before it can write to
-            # a control that has been shut down or replaced.
-            self._entry.async_create_background_task(
-                self.hass, self._after_unplug(), "amtron_release_off_on_unplug",
-            )
-        super()._handle_coordinator_update()
-
-    async def _after_unplug(self) -> None:
-        control = self.runtime_data.control
-        try:
-            if self.wallbox_data.get(CHARGING_RELEASE.key) != 0:
-                await control.async_set_charging_release(False)
-            # Without a vehicle and with the release off, ending the pause
-            # switches nothing and waits for no state-change interval.
-            if control.pause_requested is True and not control.energy_goal_stop_requested:
-                await control.async_resume_charging()
-        except (HomeAssistantError, DeviceError, OSError) as err:
-            _LOGGER.warning("Control: charging release not switched off after unplugging (%s)", err)
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        self._attr_is_on = True
-        self.async_write_ha_state()
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        self._attr_is_on = False
-        self.async_write_ha_state()
-
-
-type IntentKey = Literal["pause_requested", "charging_release_requested"]
-
-
-@dataclass(frozen=True)
-class ControlIntentRestoreData(ExtraStoredData):
-    """Persist explicit intent outside Recorder and register readback."""
-
-    key: IntentKey
-    requested: bool | None
-
-    def as_dict(self) -> dict[str, Any]:
-        return {self.key: self.requested}
-
-
-class AmtronIntentSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntity):
-    """Restore saved intent without replacing live service or runtime intent."""
-
-    _intent_key: IntentKey
-
-    @property
-    def extra_restore_state_data(self) -> ExtraStoredData:
-        return ControlIntentRestoreData(
-            self._intent_key, getattr(self.runtime_data.control, self._intent_key)
-        )
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        control = self.runtime_data.control
-        if getattr(control, self._intent_key) is not None:
-            return
-        if extra := await self.async_get_last_extra_data():
-            values = extra.as_dict()
-            requested = values.get(self._intent_key)
-            if self._intent_key in values and (
-                requested is None or isinstance(requested, bool)
-            ):
-                setattr(control, self._intent_key, requested)
-                return
-
-
-class AmtronPauseSwitch(AmtronIntentSwitch):
-    """Pause and resume charging the documented way.
-
-    Turning this on writes the vendor's pause value to 0x0302 so the wallbox
-    signals 0 A to the EV. Unlike the charging release it does not switch the
-    relay, which is why it is the recommended way to pause.
-    """
-
-    _attr_translation_key = "charging_paused"
-    _intent_key: IntentKey = "pause_requested"
-
-    def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
-    ) -> None:
-        super().__init__(
-            entry,
-            coordinator,
-            "charging_paused",
-            register_key=CHARGING_CURRENT_EMS.key,
-        )
+class AmtronSwitch(AmtronEntity, SwitchEntity):
+    entity_description: AmtronSwitchDescription
 
     @property
     def is_on(self) -> bool | None:
-        """Return true while the EMS limit holds the pause value."""
-
-        return self.runtime_data.control.is_paused
+        return self.entity_description.is_on(self.runtime)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Pause charging."""
-
-        await self.runtime_data.control.async_pause_charging()
+        await self.entity_description.turn(self.runtime, True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Resume charging with the stored setpoint."""
-
-        await self.runtime_data.control.async_resume_charging()
-
-class AmtronChargingReleaseSwitch(AmtronIntentSwitch):
-    """The energy-manager charging release in 0x0D05.
-
-    This opens and closes the wallbox relay. For everyday pausing use the
-    charging-pause switch instead; switching the relay wears it out.
-    """
-
-    _attr_translation_key = "charging_release"
-    _attr_device_class = SwitchDeviceClass.SWITCH
-    _intent_key: IntentKey = "charging_release_requested"
-
-    def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
-    ) -> None:
-        super().__init__(
-            entry,
-            coordinator,
-            "charging_release",
-            register_key=CHARGING_RELEASE.key,
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return whether the wallbox relay is released for charging."""
-
-        value = self.register_value
-        return value == 1 if isinstance(value, int) else None
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Release charging."""
-
-        await self.runtime_data.control.async_set_charging_release(True)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Block charging."""
-
-        await self.runtime_data.control.async_set_charging_release(False)
-
-class AmtronLockSwitch(MennekesAmtronControlEntity, SwitchEntity):
-    """Lock the wallbox against charging, through 0x0D06."""
-
-    _attr_translation_key = "lock_evse"
-
-    def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
-    ) -> None:
-        super().__init__(
-            entry, coordinator, "lock_evse", register_key=LOCK_EVSE.key
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return whether the wallbox is locked."""
-
-        value = self.register_value
-        return value == 1 if isinstance(value, int) else None
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Lock the wallbox."""
-
-        await self.runtime_data.control.async_set_lock_evse(True)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Unlock the wallbox."""
-
-        await self.runtime_data.control.async_set_lock_evse(False)
+        await self.entity_description.turn(self.runtime, False)

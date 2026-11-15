@@ -11,7 +11,6 @@ import probatio
 import pytest
 from aiohttp import ClientSession
 
-from custom_components.mennekes_amtron_rtu import _control_options
 from custom_components.mennekes_amtron_rtu.config_schemas import advanced_schema
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.const import (
@@ -20,8 +19,8 @@ from custom_components.mennekes_amtron_rtu.device.const import (
 from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_modbus_service import TOKEN, service_fixture
@@ -108,7 +107,7 @@ def test_service_owns_grace_and_publishes_authoritative_configuration(tmp_path, 
             payload = service.snapshot()
             assert payload["control"]["phase_switch_grace_seconds"] == seconds
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 remote.apply_snapshot(payload)
                 assert remote.connected
                 payload["control"].pop("phase_switch_grace_seconds")
@@ -126,7 +125,7 @@ def test_malformed_optional_service_grace_invalidates_snapshot(tmp_path, value):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 remote.apply_snapshot(service.snapshot())
                 payload = copy.deepcopy(service.snapshot())
                 payload["control"]["phase_switch_grace_seconds"] = value

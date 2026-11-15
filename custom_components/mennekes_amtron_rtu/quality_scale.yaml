@@ -247,7 +247,7 @@ rules:
     status: done
     comment: Both [setup](custom_components/mennekes_amtron_rtu/__init__.py#async_setup_entry) and the
       [config flow](custom_components/mennekes_amtron_rtu/config_flow.py) inject Home Assistant shared
-      sessions into [RemoteClient](custom_components/mennekes_amtron_rtu/remote.py#RemoteClient). Raw
+      sessions into [ServiceClient](custom_components/mennekes_amtron_rtu/remote.py#ServiceClient). Raw
       Modbus transports use no HTTP session.
   strict-typing:
     status: done

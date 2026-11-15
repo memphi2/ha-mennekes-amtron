@@ -16,8 +16,8 @@ from custom_components.mennekes_amtron_rtu import remote_compat
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_version import SERVICE_VERSION
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_service_reauth import add_entry
@@ -134,7 +134,7 @@ def test_service_versions_use_numeric_and_prerelease_ordering(
         monkeypatch.setattr(remote_compat, "MIN_SERVICE_VERSION", minimum)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 payload = service.snapshot()
                 # Seed a known compatible snapshot before changing its version.
                 payload["service_version"] = minimum

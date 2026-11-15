@@ -11,11 +11,11 @@ from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 
 import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
-from custom_components.mennekes_amtron_rtu.data import WallboxData, WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.test_control import Harness
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_timed_goal import setup_observer, state
@@ -166,11 +166,10 @@ def test_service_cancels_outdated_owned_resume_but_retains_manual_command(tmp_pa
             await service.control.async_configure_soc("sensor.soc|")
             await service.control.async_set_soc_goal(80, source="sensor.soc|", soc=20)
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                    state=lambda: WallboxData(), request_refresh=None,
+                control = ServiceControl(
+                    remote,                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 observer._runtime.control = control
                 observer.goal.set(now + timedelta(hours=5))

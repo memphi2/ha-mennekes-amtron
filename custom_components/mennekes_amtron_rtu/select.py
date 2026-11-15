@@ -1,29 +1,22 @@
-"""Select platform for the MENNEKES AMTRON integration."""
+"""Selects: the phases to charge with, and the vehicle that is plugged in."""
 
 from __future__ import annotations
 
-from enum import IntEnum
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any
 
-from homeassistant.components.select import SelectEntity
+from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .coordinator import MennekesAmtronCoordinator
-from .device.capabilities import capability_is_supported
-from .device.decode import RegisterValue
-from .device.enums import (
-    RequestedPhases,
-    SolarChargingMode,
-    SwitchedPhases,
-    enum_option,
-    enum_options,
-)
-from .device.registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE, SWITCHED_PHASES
-from .entity import MennekesAmtronControlEntity, MennekesAmtronEntity
+from .device.decode import enum_option
+from .device.enums import RequestedPhases, enum_options
+from .device.registers import REQUESTED_PHASES, SWITCHED_PHASES
+from .entity import AmtronEntity, Projection, Runtime, wanted
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
-from .remote import CONF_SERVER_URL
 from .vehicle_detection import automatic_selection_available
 from .vehicle_profiles import (
     CONF_VEHICLE_AUTO_SELECTION,
@@ -35,49 +28,85 @@ from .vehicle_profiles import (
 PARALLEL_UPDATES = 1
 
 
+@dataclass(frozen=True, kw_only=True)
+class AmtronSelectDescription(Projection, SelectEntityDescription):
+    current: Callable[[Runtime], str | None]
+    select: Callable[[Runtime, str], Awaitable[None]]
+
+
+SELECTS: tuple[AmtronSelectDescription, ...] = (
+    # Exists only when the hardware can switch phases. The service pauses the
+    # charge first and waits the vehicle-protection interval.
+    AmtronSelectDescription(
+        key="requested_phases", register=REQUESTED_PHASES.key, writes=True,
+        options=list(enum_options(RequestedPhases)),
+        exists=lambda runtime: runtime.controls,
+        current=lambda runtime: enum_option(
+            REQUESTED_PHASES, runtime.coordinator.current_data().get(REQUESTED_PHASES.key)
+        ),
+        select=lambda runtime, option: runtime.control.async_set_requested_phases(
+            RequestedPhases[option.upper()]
+        ),
+        # The phases the wallbox will really use when it next closes the relay.
+        attributes=lambda runtime: {
+            "switched": enum_option(
+                SWITCHED_PHASES, runtime.coordinator.current_data().get(SWITCHED_PHASES.key)
+            ),
+        },
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add the selects this device supports."""
-
-    runtime_data = entry.runtime_data
-    identity = runtime_data.identity
-    coordinator = runtime_data.coordinator
-    entities: list[SelectEntity] = []
-    if CONF_SERVER_URL in entry.data or not runtime_data.control.read_only:
-        entities.append(AmtronSolarModeSelect(entry, coordinator))
-        if capability_is_supported(
-            identity.layout_version, identity.phase_options_hw, REQUESTED_PHASES.key
-        ):
-            entities.append(AmtronRequestedPhasesSelect(entry, coordinator))
+    entities: list[SelectEntity] = [
+        AmtronSelect(entry, description) for description in wanted(hass, entry, SELECTS)
+    ]
     if profiles(entry.options):
-        entities.append(AmtronVehicleSelect(entry, coordinator))
+        entities.append(AmtronVehicleSelect(entry, _VEHICLE))
     async_add_entities(entities)
 
 
-class AmtronVehicleSelect(MennekesAmtronEntity, SelectEntity):
-    """Select one configured vehicle; never start a charge or infer its presence."""
+class AmtronSelect(AmtronEntity, SelectEntity):
+    entity_description: AmtronSelectDescription
 
-    _attr_translation_key = "active_vehicle"
-    _attr_entity_category = EntityCategory.CONFIG
+    @property
+    def current_option(self) -> str | None:
+        return self.entity_description.current(self.runtime)
 
-    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
-        super().__init__(entry, coordinator, "active_vehicle")
+    async def async_select_option(self, option: str) -> None:
+        await self.entity_description.select(self.runtime, option)
+
+
+@dataclass(frozen=True, kw_only=True)
+class _VehicleDescription(Projection, SelectEntityDescription):
+    pass
+
+
+_VEHICLE = _VehicleDescription(key="active_vehicle", entity_category=EntityCategory.CONFIG)
+
+
+class AmtronVehicleSelect(AmtronEntity, SelectEntity):
+    """Choose one configured vehicle. A setting of this entry, not of the wallbox:
+    it never starts a charge and works while the wallbox is unreachable.
+    """
 
     @property
     def available(self) -> bool:
         return True
 
     def _choices(self) -> dict[str, str | None]:
+        options = self._entry.options
         choices: dict[str, str | None] = {"none": None}
-        if automatic_selection_available(self._entry.options) or self._entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
+        if automatic_selection_available(options) or options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
             choices["automatic"] = "automatic"
-        for profile in profiles(self._entry.options).values():
+        for profile in profiles(options).values():
             label = profile.name
-            # User labels are not stable identifiers. Disambiguate even a label
-            # equal to the translated empty-choice token without exposing VINs.
+            # Names are not identifiers: two cars, or a car called like a
+            # fixed choice, still get distinct labels.
             ordinal = 2
             while label in choices:
                 label = f"{profile.name} ({ordinal})"
@@ -100,7 +129,7 @@ class AmtronVehicleSelect(MennekesAmtronEntity, SelectEntity):
         )
 
     @property
-    def extra_state_attributes(self) -> dict[str, str | None]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         profile = active_profile(self._entry.options)
         return {"active_vehicle": profile.name if profile is not None else None}
 
@@ -114,89 +143,3 @@ class AmtronVehicleSelect(MennekesAmtronEntity, SelectEntity):
             updated = activate_profile(self._entry.options, choices[option])
             updated[CONF_VEHICLE_AUTO_SELECTION] = False
         self.hass.config_entries.async_update_entry(self._entry, options=updated)
-
-
-class AmtronSolarModeSelect(MennekesAmtronControlEntity, SelectEntity):
-    """The solar charging mode in 0x0D03.
-
-    Writing this register drives the wallbox HMI and its solar LEDs only; the
-    energy manager stays responsible for the solar algorithm, and the wallbox
-    needs DIP 7 on for the mode to have any effect.
-    """
-
-    _attr_translation_key = "solar_charging_mode"
-    _attr_entity_category = EntityCategory.CONFIG
-    # Home Assistant declares _attr_options as an instance attribute, so
-    # annotating it ClassVar does not type-check. The list is never mutated.
-    _attr_options = list(enum_options(SolarChargingMode))  # noqa: RUF012
-
-    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
-        super().__init__(
-            entry,
-            coordinator,
-            "solar_charging_mode",
-            register_key=SOLAR_CHARGING_MODE.key,
-        )
-
-    @property
-    def current_option(self) -> str | None:
-        """Return the solar mode shown by the wallbox."""
-
-        return _option_of(SolarChargingMode, self.register_value)
-
-    async def async_select_option(self, option: str) -> None:
-        """Set the solar mode shown by the wallbox."""
-
-        await self.runtime_data.control.async_set_solar_charging_mode(
-            SolarChargingMode[option.upper()]
-        )
-
-
-class AmtronRequestedPhasesSelect(MennekesAmtronControlEntity, SelectEntity):
-    """The requested phase usage in 0x0D04.
-
-    This entity only exists when the hardware can switch phases. Switching
-    phases can abort a charging session and some EVs do not tolerate it, so
-    the control layer pauses the charge first and applies the configured
-    vehicle-protection interval when a vehicle is connected.
-    """
-
-    _attr_translation_key = "requested_phases"
-    _attr_options = list(enum_options(RequestedPhases))  # noqa: RUF012
-
-    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
-        super().__init__(
-            entry,
-            coordinator,
-            "requested_phases",
-            register_key=REQUESTED_PHASES.key,
-        )
-
-    @property
-    def current_option(self) -> str | None:
-        """Return the requested phase usage."""
-
-        return _option_of(RequestedPhases, self.register_value)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, str] | None:
-        """Which phases the wallbox will really use when it next closes the relay."""
-
-        switched = _option_of(SwitchedPhases, self.wallbox_data.get(SWITCHED_PHASES.key))
-        return {"switched": switched} if switched is not None else None
-
-    async def async_select_option(self, option: str) -> None:
-        """Request single-phase or all-phase charging."""
-
-        await self.runtime_data.control.async_set_requested_phases(
-            RequestedPhases[option.upper()]
-        )
-
-
-def _option_of(enum_class: type[IntEnum], value: RegisterValue) -> str | None:
-    if not isinstance(value, int):
-        return None
-    try:
-        return enum_option(enum_class(value))
-    except ValueError:
-        return None

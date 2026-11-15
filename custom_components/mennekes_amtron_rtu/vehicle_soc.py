@@ -34,7 +34,7 @@ from .exceptions import service_validation_error
 from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
-    from .coordinator import MennekesAmtronCoordinator
+    from .coordinator import ServiceCoordinator
     from .vehicle_binding import VehicleBinding
     from .vehicle_targets import VehicleTargetMemory
 
@@ -158,7 +158,7 @@ class VehicleSocObserver:
 
     def __init__(
         self, hass: HomeAssistant, control: SocControl,
-        coordinator: MennekesAmtronCoordinator,
+        coordinator: ServiceCoordinator,
         soc_entity: str | None, limit_entity: str | None = None,
         *, telemetry: VehicleTelemetrySource | None = None,
         use_vehicle_soc: bool = False, use_vehicle_limit: bool = False,

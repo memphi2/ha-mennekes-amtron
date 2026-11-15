@@ -1,133 +1,122 @@
-"""Polling coordinator for one AMTRON wallbox.
-
-The wallbox has no push channel, so the integration polls. Only the blocks
-the device's register layout actually supports are read, and a block that
-fails is reported instead of dropping the whole snapshot: a single
-unsupported range must not take the charging state with it.
-"""
+"""Fetch the service's state for Home Assistant's entities."""
 
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .data import ConnectionState, DeviceIdentity, WallboxData
-from .device.client import MennekesModbusClient
-from .device.client_errors import AmtronBusError
-from .device.const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS, DOMAIN
-from .device.poller import DevicePoller
-from .device.registers import ERROR_CODE
-from .device.runtime_events import EventTimeline
-from .device.waveshare_auth import WaveshareAuthenticationRejectedError
-from .entry_types import MennekesAmtronConfigEntry
+from .data import DeviceIdentity, WallboxData
+from .device.client_errors import AmtronConnectionError
+from .device.const import DOMAIN
+from .remote_errors import ServiceConnectionError
+
+if TYPE_CHECKING:
+    from .entry_types import MennekesAmtronConfigEntry
+    from .service_client import ServiceClient
 
 _LOGGER = logging.getLogger(__name__)
 
+# The service stamps the due time without fractions of a second.
+_PENDING_GRACE_SECONDS = 1.0
 
-class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
-    """Read the supported register blocks on a fixed interval."""
+
+class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
+    """Poll the service's cache; the service schedules its own bus reads."""
 
     def __init__(
         self,
         hass: HomeAssistant,
         entry: MennekesAmtronConfigEntry,
         *,
-        client: MennekesModbusClient,
-        identity: DeviceIdentity,
-        connection_state: ConnectionState,
+        client: ServiceClient,
         scan_interval: float,
-        measurement_interval: float = DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
-        timeline: EventTimeline | None = None,
-        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"MENNEKES AMTRON {client.config.port}",
+            name="MENNEKES AMTRON",
             update_interval=timedelta(seconds=scan_interval),
             always_update=False,
         )
         self._client = client
-        self._entry = entry
-        self._identity = identity
-        self.control_status: Callable[[], tuple[str | None, datetime | None]] | None = None
-        self.observe_recovery: Callable[[object, int], None] | None = None
-        self.observe_goal: Callable[[WallboxData | None], None] | None = None
-        self.observe_plug_charge: Callable[[WallboxData | None, datetime | None], None] | None = None
-        self.retry_soc_goal: Callable[[], None] | None = None
+        # Estimates follow every poll, a failed one as None.
         self.observe_session: Callable[[WallboxData | None], Awaitable[None]] | None = None
-        self._poller = DevicePoller(
-            client,
-            identity,
-            connection_state=connection_state,
-            measurement_interval=measurement_interval,
-            timeline=timeline,
-            monotonic=monotonic,
-        )
+        self._pending_refresh: CALLBACK_TYPE | None = None
+        client.on_auth_error = self._publish_auth_error
 
     @property
     def identity(self) -> DeviceIdentity:
-        """Return the device facts read during setup."""
-
-        return self._identity
+        return self._client.identity
 
     def current_data(self) -> WallboxData:
-        """Return the newest snapshot, or an empty one before the first poll."""
-
+        """Return the newest state, or an empty one before the first poll."""
         return self.data or WallboxData()
 
+    def _follow_pending(self, until: datetime | None) -> None:
+        """Read a queued command's outcome when it is due, not a poll later.
+
+        The service runs the command on its own; without this, HA learned of
+        it up to one poll interval later, together with whatever came next.
+        """
+        if self._pending_refresh is not None:
+            self._pending_refresh()
+            self._pending_refresh = None
+        if until is None or self.update_interval is None:
+            return
+        delay = (until - datetime.now(UTC)).total_seconds() + _PENDING_GRACE_SECONDS
+        # A later due time is followed by an ordinary poll before it.
+        if 0 < delay < self.update_interval.total_seconds():
+            self._pending_refresh = async_call_later(self.hass, delay, self._pending_due)
+
+    @callback
+    def _pending_due(self, _now: datetime) -> None:
+        self._pending_refresh = None
+        self.hass.async_create_task(self.async_request_refresh())
+
+    async def async_shutdown(self) -> None:
+        self._follow_pending(None)
+        await super().async_shutdown()
+
+    def _publish_auth_error(self, new_failure: bool) -> None:
+        """Expose a changed failure reason even when already unavailable."""
+        was_available = self.last_update_success
+        self.async_set_update_error(ConfigEntryAuthFailed(
+            translation_domain=DOMAIN, translation_key="service_auth_failed"
+        ))
+        if new_failure and not was_available:
+            # HA suppresses notifications for consecutive failed refreshes.
+            # Repair listeners must still see this distinct authentication error,
+            # including one reported by a command or diagnostics request.
+            self.async_update_listeners()
+
     async def _async_update_data(self) -> WallboxData:
-        goal_generation = self._client.write_state.energy_goal_generation
-        observed_at = datetime.now(UTC)
         try:
-            data = await self._poller.async_poll(
-                self.current_data(), last_success=self.last_update_success
-            )
-            if data.energy_read:
-                data.energy_observed_at = observed_at.timestamp()
-            if self.observe_plug_charge is not None:
-                self.observe_plug_charge(data, observed_at)
-            if self.control_status is not None:
-                data.pending_change, data.pending_change_until = self.control_status()
-            if self.observe_recovery is not None:
-                self.observe_recovery(
-                    data.fresh(ERROR_CODE.key), data.current_write_generation,
-                )
-            if self.observe_goal is not None:
-                self.observe_goal(data)
-            if self.retry_soc_goal is not None:
-                self.retry_soc_goal()
-            if self.observe_session is not None:
-                await self.observe_session(data)
-            return data
-        except AmtronBusError as err:
-            if self.observe_plug_charge is not None:
-                self.observe_plug_charge(None, None)
+            data = await self._client.update()
+        except AmtronConnectionError as err:
             if self.observe_session is not None:
                 await self.observe_session(None)
-            if self.observe_goal is not None:
-                self.observe_goal(WallboxData(
-                    energy_read=True, energy_goal_generation=goal_generation,
-                ))
-            if isinstance(err, WaveshareAuthenticationRejectedError):
-                auth_error = ConfigEntryAuthFailed(
-                    translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
-                )
-                # HA suppresses listener notifications for two consecutive
-                # failed polls. Publish this distinct reason before stopping
-                # heartbeat so an earlier connectivity repair can clear too.
-                was_available = self.last_update_success
-                self.async_set_update_error(auth_error)
-                if not was_available:
-                    self.async_update_listeners()
-                if (heartbeat := self._entry.runtime_data.heartbeat) is not None:
-                    await heartbeat.async_stop()
-                raise auth_error from err
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
+                raise ConfigEntryAuthFailed(
+                    translation_domain=DOMAIN, translation_key="service_auth_failed"
+                ) from err
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_identity_changed":
+                raise UpdateFailed(
+                    translation_domain=DOMAIN, translation_key="device_identity_changed"
+                ) from err
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_version_mismatch":
+                raise UpdateFailed(
+                    translation_domain=DOMAIN, translation_key="service_version_mismatch"
+                ) from err
             raise UpdateFailed(str(err)) from err
+        if self.observe_session is not None:
+            await self.observe_session(data)
+        self._follow_pending(data.pending_change_until)
+        return data

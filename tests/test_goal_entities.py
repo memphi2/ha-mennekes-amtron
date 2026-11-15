@@ -17,11 +17,12 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import 
 from custom_components.mennekes_amtron_rtu.number import (
     async_setup_entry as setup_numbers,
 )
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.sensor import (
     async_setup_entry as setup_sensors,
 )
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.ha_fakes import build_runtime, collect
 from tests.test_modbus_service import TOKEN, service_fixture
 
@@ -72,11 +73,10 @@ def test_remote_capabilities_and_quality_change_snapshots_but_old_formats_are_re
     async def run():
         service, _, _ = await service_fixture(tmp_path)
         async with ClientSession() as session:
-            remote = RemoteClient(session, "http://localhost", TOKEN)
+            remote = ServiceClient(session, "http://localhost", TOKEN)
             first = remote.apply_snapshot(service.snapshot())
-            wrapper = RemoteControl(
-                remote, diagnostics=service.diagnostics, options=service.control.options,
-                state=lambda: service.data, request_refresh=AsyncMock(),
+            wrapper = ServiceControl(
+                remote,                 state=lambda: service.data, request_refresh=AsyncMock(),
             )
             remote.execute = AsyncMock()
             assert wrapper.supports_energy_goal
@@ -127,7 +127,7 @@ def test_bad_optional_goal_metadata_is_rejected_without_commands(tmp_path, mutat
     async def run():
         service, transport, _ = await service_fixture(tmp_path)
         async with ClientSession() as session:
-            remote = RemoteClient(session, "http://localhost", TOKEN)
+            remote = ServiceClient(session, "http://localhost", TOKEN)
             raw = deepcopy(service.snapshot())
             mutate(raw)
             before = list(transport.writes)

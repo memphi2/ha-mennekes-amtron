@@ -29,12 +29,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
 from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
-from custom_components.mennekes_amtron_rtu.goal_store import (
-    GoalStore,
-    ModelStore,
-    SessionHistoryStore,
-    SocGoalStore,
-)
+from custom_components.mennekes_amtron_rtu.goal_store import ModelStore
 from custom_components.mennekes_amtron_rtu.loss_store import LossStore
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass

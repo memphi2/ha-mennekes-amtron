@@ -10,7 +10,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .entry_types import MennekesAmtronConfigEntry
-from .remote import RemoteClient
 from .repair_issues import (
     ISSUE_HEARTBEAT_UNAVAILABLE,
     ISSUE_SERVICE_UNAVAILABLE,
@@ -63,15 +62,12 @@ class HeartbeatRepairMonitor:
         heartbeat = runtime.heartbeat
         if heartbeat is None:
             return None
-        if isinstance(runtime.client, RemoteClient):
-            # RemoteControl.read_only also means temporarily unreachable. Use
-            # the last authenticated app policy instead, including HTTP outages.
-            if runtime.client.snapshot.get("control", {}).get("read_only") is not False:
-                return None
-            if not runtime.client.connected:
-                return ISSUE_SERVICE_UNAVAILABLE
-        elif runtime.control.read_only:
+        # ServiceControl.read_only also means temporarily unreachable. Use the
+        # last valid policy of the service instead, including outages.
+        if runtime.client.snapshot.get("control", {}).get("read_only") is not False:
             return None
+        if not runtime.client.connected:
+            return ISSUE_SERVICE_UNAVAILABLE
         if heartbeat.healthy is not False:
             return None
         coordinator = runtime.coordinator

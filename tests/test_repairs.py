@@ -329,7 +329,7 @@ def test_intent_reset_repair_handles_unavailable_entries(state):
         elif state == "unloaded":
             hass.config_entries.entries[entry_id] = SimpleNamespace()
         elif state == "offline":
-            client = Mock(spec=repairs.RemoteClient)
+            client = Mock(spec=repairs.ServiceClient)
             client.execute = AsyncMock(side_effect=HomeAssistantError("offline"))
             entry.runtime_data.client = client
         flow = await repairs.async_create_fix_flow(

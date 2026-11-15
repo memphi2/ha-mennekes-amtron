@@ -25,12 +25,13 @@ from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
 from custom_components.mennekes_amtron_rtu.device.waveshare_auth import (
     WaveshareAuthenticationRejectedError,
 )
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteHeartbeat
 from custom_components.mennekes_amtron_rtu.repair_issues import (
     ISSUE_EMS_HEARTBEAT_LOST,
     ISSUE_HEARTBEAT_UNAVAILABLE,
     ISSUE_SERVICE_UNAVAILABLE,
 )
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceHeartbeat
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 from tests.ha_fakes import build_runtime
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
@@ -49,13 +50,13 @@ async def _setup(monkeypatch, *, remote=False, read_only=False, healthy=True, er
     if remote:
         # No HTTP request or socket is used. The authenticated cache and update
         # callback are exactly what the real remote heartbeat observes.
-        client = RemoteClient(SimpleNamespace(), "http://app.invalid:8765", "test")
+        client = ServiceClient(SimpleNamespace(), "http://app.invalid:8765", "test")
         client._connected = True
         client.snapshot = {
             "control": {"read_only": read_only},
             "heartbeat": {"healthy": healthy, "running": not read_only},
         }
-        heartbeat = RemoteHeartbeat(client, runtime.diagnostics)
+        heartbeat = ServiceHeartbeat(client, runtime.diagnostics)
         runtime.client = client
 
         def update():

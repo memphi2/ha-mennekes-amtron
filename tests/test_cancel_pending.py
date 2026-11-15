@@ -17,10 +17,11 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import RequestedPhases
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.remote_errors import (
     ServiceConnectionError,
 )
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.ha_fakes import build_runtime, collect
 from tests.test_command_events import outcomes
 from tests.test_control import Harness
@@ -180,13 +181,12 @@ def test_remote_cancels_over_http_without_refresh_or_false_availability(tmp_path
         await service.control.async_set_charging_current(10)
         await service.control.async_set_charging_current(12)
         async with TestServer(create_app(service)) as server, ClientSession() as session:
-            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             await remote.async_connect()
             notifications = []
             refresh = AsyncMock(side_effect=AssertionError("cancel must not refresh"))
-            control = RemoteControl(
-                remote, diagnostics=service.diagnostics, options=service.control.options,
-                state=lambda: service.data, request_refresh=refresh,
+            control = ServiceControl(
+                remote,                 state=lambda: service.data, request_refresh=refresh,
                 notify_pending=lambda: notifications.append(control.pending_action),
             )
             service._success = False
@@ -215,7 +215,7 @@ def test_older_service_capabilities_disable_cancel_without_sending(tmp_path, uns
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         async with ClientSession() as session:
-            remote = RemoteClient(session, "http://localhost", TOKEN)
+            remote = ServiceClient(session, "http://localhost", TOKEN)
             payload = service.snapshot()
             if unsupported == "missing":
                 del payload["control"]["supports_cancel_pending"]
@@ -223,9 +223,8 @@ def test_older_service_capabilities_disable_cancel_without_sending(tmp_path, uns
                 payload["control"]["supports_cancel_pending"] = False
             remote.apply_snapshot(payload)
             remote.request = AsyncMock(side_effect=AssertionError("unsupported cancel must not send"))
-            control = RemoteControl(
-                remote, diagnostics=service.diagnostics, options=service.control.options,
-                state=lambda: service.data, request_refresh=AsyncMock(),
+            control = ServiceControl(
+                remote,                 state=lambda: service.data, request_refresh=AsyncMock(),
             )
             assert not control.supports_cancel_pending
             assert not control.can_cancel_pending
@@ -243,7 +242,7 @@ def test_service_cancel_capability_is_strict_boolean(tmp_path, invalid):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         async with ClientSession() as session:
-            remote = RemoteClient(session, "http://localhost", TOKEN)
+            remote = ServiceClient(session, "http://localhost", TOKEN)
             payload = deepcopy(service.snapshot())
             payload["control"]["supports_cancel_pending"] = invalid
             with pytest.raises(ServiceConnectionError, match=r"control\.supports_cancel_pending"):
@@ -257,7 +256,7 @@ def test_remote_cancellation_rechecks_permission_and_connection(tmp_path):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path, read_only=True)
         async with ClientSession() as session:
-            remote = RemoteClient(session, "http://localhost", TOKEN)
+            remote = ServiceClient(session, "http://localhost", TOKEN)
             remote.apply_snapshot(service.snapshot())
             remote.request = AsyncMock(side_effect=AssertionError("refused cancel must not send"))
             with pytest.raises(DeviceError, match="read_only_mode"):

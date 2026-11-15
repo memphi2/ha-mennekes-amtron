@@ -11,14 +11,14 @@ blueprint:
   homeassistant:
     min_version: "2026.9.0"
   input:
-    downgrade_active:
-      name: Downgrade active
-      description: The wallbox Downgrade active binary sensor; its current attribute holds the limit.
+    charging_status:
+      name: Charging status
+      description: The wallbox Charging status sensor; its "downgraded_to" attribute holds the limit while one applies.
       selector:
         entity:
           filter:
             - integration: mennekes_amtron_rtu
-              domain: binary_sensor
+              domain: sensor
     notify_action:
       name: Notification action
       description: The notify action to call, for example notify.persistent_notification.
@@ -30,34 +30,31 @@ mode: queued
 max: 5
 
 variables:
-  downgrade_entity: !input downgrade_active
   notify_service: !input notify_action
 
 triggers:
   - trigger: state
-    entity_id: !input downgrade_active
-    to: "on"
-    id: downgraded
-  - trigger: state
-    entity_id: !input downgrade_active
-    to: "off"
-    id: released
+    entity_id: !input charging_status
+    attribute: downgraded_to
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none
+         and trigger.from_state.state not in ['unavailable', 'unknown']
+         and trigger.to_state.state not in ['unavailable', 'unknown'] }}
 
 actions:
+  - variables:
+      limit: "{{ trigger.to_state.attributes.downgraded_to }}"
   - choose:
-      - conditions:
-          - condition: trigger
-            id: downgraded
+      - conditions: "{{ limit is not none }}"
         sequence:
           - action: "{{ notify_service }}"
             data:
               title: Wallbox downgraded
-              message: >-
-                The grid operator limited the wallbox to
-                {{ state_attr(downgrade_entity, 'current') }} A.
-      - conditions:
-          - condition: trigger
-            id: released
+              message: The grid operator limited the wallbox to {{ limit }} A.
+      - conditions: "{{ trigger.from_state.attributes.downgraded_to is not none }}"
         sequence:
           - action: "{{ notify_service }}"
             data:

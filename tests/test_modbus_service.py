@@ -9,7 +9,6 @@ import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import (
@@ -27,11 +26,13 @@ from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
-from custom_components.mennekes_amtron_rtu.remote import (
-    RemoteClient,
-    RemoteControl,
-    RemoteHeartbeat,
+from custom_components.mennekes_amtron_rtu.service_client import (
+    ServiceClient,
     server_url,
+)
+from custom_components.mennekes_amtron_rtu.service_control import (
+    ServiceControl,
+    ServiceHeartbeat,
 )
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
 
@@ -74,7 +75,7 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
             ClientSession() as session,
         ):
             url = str(server.make_url("/"))
-            remote = RemoteClient(session, url, TOKEN)
+            remote = ServiceClient(session, url, TOKEN)
             try:
                 await remote.async_connect()
                 data = WallboxData(values=remote.snapshot["values"])
@@ -83,10 +84,8 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
                     nonlocal data
                     data = await remote.update()
 
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=lambda: data,
                     request_refresh=refresh,
                 )
@@ -101,12 +100,10 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
                 await asyncio.sleep(0.08)
                 assert service.diagnostics.heartbeats_sent > before
                 assert current_writes(transport) == accepted
-                fresh = RemoteClient(session, url, TOKEN)
+                fresh = ServiceClient(session, url, TOKEN)
                 await fresh.async_connect()
-                restored = RemoteControl(
+                restored = ServiceControl(
                     fresh,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=lambda: data,
                     request_refresh=refresh,
                 )
@@ -117,7 +114,7 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
                 assert restored.charging_setpoint == (8 if paused else 10)
                 assert current_writes(transport) == accepted
                 assert service.heartbeat.running
-                heartbeat = RemoteHeartbeat(fresh, WriteDiagnostics())
+                heartbeat = ServiceHeartbeat(fresh, WriteDiagnostics())
                 assert heartbeat.healthy is True
                 assert heartbeat.running
                 await fresh.async_close()

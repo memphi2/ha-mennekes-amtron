@@ -24,10 +24,7 @@ from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
     EVENT_TYPES,
     WallboxChanges,
 )
-from custom_components.mennekes_amtron_rtu.event import (
-    AmtronWallboxEvent,
-    async_setup_entry,
-)
+from custom_components.mennekes_amtron_rtu.event import async_setup_entry
 from tests.fakes import put, raise_connection_error
 from tests.ha_fakes import build_runtime
 

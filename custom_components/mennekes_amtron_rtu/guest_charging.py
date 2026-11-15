@@ -3,16 +3,16 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from .control import ha_command
 from .device.client_errors import AmtronConnectionError
 from .device.errors import DeviceError
-from .remote import RemoteClient
+from .service_client import ServiceClient
+from .service_control import ha_command
 
 
 class GuestCharging:
     """Read current guest state and explicitly start the connected guest."""
 
-    def __init__(self, client: RemoteClient, refresh: Callable[[], Awaitable[None]]) -> None:
+    def __init__(self, client: ServiceClient, refresh: Callable[[], Awaitable[None]]) -> None:
         self._client = client
         self._refresh = refresh
 

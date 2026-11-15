@@ -10,12 +10,13 @@ from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
-from custom_components.mennekes_amtron_rtu.data import WallboxData, WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import control as device_control
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.test_control import Harness as ControlHarness
 from tests.test_modbus_service import TOKEN, current_writes
 from tests.test_modbus_service import service_fixture as base_service_fixture
@@ -204,9 +205,9 @@ def test_remote_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkey
             await service.heartbeat.async_stop()
             service.control._sleep = lambda _delay: release.wait()
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16), state=lambda: WallboxData(), request_refresh=None)
+                control = ServiceControl(remote, state=lambda: WallboxData(), request_refresh=None)
                 await control.async_set_timed_current(None, deadline=future(), owner=OWNER)
                 deadline = future()
                 await control.async_set_timed_current(6, deadline=deadline, owner=OWNER)
@@ -266,9 +267,9 @@ def test_remote_timed_current_keeps_local_cap_and_rejects_invalid_values(tmp_pat
         service, transport, _clock = await service_fixture(tmp_path)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 8), state=lambda: WallboxData(), request_refresh=None)
+                control = ServiceControl(remote, state=lambda: WallboxData(), request_refresh=None)
                 for value in (True, float("nan"), 0, 1, "6"):
                     with pytest.raises(ServiceValidationError):
                         await control.async_set_timed_current(value, deadline=future(), owner=OWNER)

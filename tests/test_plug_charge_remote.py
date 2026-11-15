@@ -11,27 +11,24 @@ from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.data import (
     WallboxData,
-    WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import (
-    RemoteClient,
-    RemoteControl,
+from custom_components.mennekes_amtron_rtu.service_client import (
+    ServiceClient,
     ServiceConnectionError,
 )
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.test_modbus_service import TOKEN, service_fixture
 
 POLICY = "a" * 64
 
 
 def remote_control(remote):
-    return RemoteControl(
-        remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-        state=lambda: WallboxData(values=remote.snapshot["values"]), request_refresh=remote.update,
+    return ServiceControl(
+        remote,         state=lambda: WallboxData(values=remote.snapshot["values"]), request_refresh=remote.update,
     )
 
 
@@ -44,7 +41,7 @@ def test_read_only_app_can_disable_restored_gate_without_bus_access(tmp_path, av
             # read-only. It deliberately has no surviving charging grant.
             service.client.write_state.plug_charge.configure(True, POLICY)
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 control = remote_control(remote)
                 with pytest.raises(ServiceValidationError) as error:
@@ -73,7 +70,7 @@ def test_gate_grant_survives_ha_reconnect_but_not_unplug_and_disable_does_not_re
         service, transport, clock = await service_fixture(tmp_path)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 control = remote_control(remote)
                 assert control.supports_plug_charge
@@ -92,7 +89,7 @@ def test_gate_grant_survives_ha_reconnect_but_not_unplug_and_disable_does_not_re
                 assert control.plug_charge["authorized"]
                 assert transport.bank[R.CHARGING_RELEASE.address] == 1
                 await remote.async_close()
-                fresh = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                fresh = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await fresh.async_connect()
                 restored = remote_control(fresh)
                 await restored.async_configure_plug_charge(True, policy=POLICY)
@@ -145,7 +142,7 @@ def test_invalid_gate_snapshot_never_becomes_authoritative(tmp_path, key, value)
         service, _, _ = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 valid = service.snapshot()
                 remote.apply_snapshot(valid)
                 bad = deepcopy(valid)
@@ -169,7 +166,7 @@ def test_older_app_remains_readable_but_cannot_claim_virtual_authorization(tmp_p
         service, _, _ = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 old = service.snapshot()
                 old["control"].pop("supports_plug_charge")
                 old["control"].pop("plug_charge")
@@ -198,7 +195,7 @@ def test_a_manual_release_crosses_the_service_boundary(tmp_path):
         service, transport, clock = await service_fixture(tmp_path)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 control = remote_control(remote)
                 await control.async_configure_plug_charge(True, policy=POLICY)

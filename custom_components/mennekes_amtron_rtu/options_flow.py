@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import probatio
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import valid_entity_id
 
@@ -17,6 +16,7 @@ from .config_schemas import (
     departure_configure_schema,
     departure_entity_schema,
     options_schema,
+    unplug_schema,
     vehicle_device_schema,
     vehicle_limit_schema,
     vehicle_profile_soc_schema,
@@ -33,7 +33,7 @@ from .device.const import (
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
 )
-from .remote import CONF_SERVER_URL
+from .service_client import CONF_SERVER_URL
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
@@ -48,6 +48,7 @@ from .timed_goal_const import (
     CONF_TIMED_VEHICLE_TIME_ZONE,
     TIMED_WEEKDAYS,
 )
+from .unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG
 from .vehicle_profiles import (
     CONF_TIMED_USE_VEHICLE_CAPACITY,
     CONF_VEHICLE_DEVICE,
@@ -75,6 +76,7 @@ from .vehicle_sources.const import (
 )
 
 WALLBOX_KEYS = {
+    CONF_RELEASE_OFF_ON_UNPLUG,
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
@@ -137,11 +139,16 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Show the app's wallbox settings; with the app they are changed there."""
-        if user_input is not None or CONF_SERVER_URL not in self.config_entry.data:
+        if CONF_SERVER_URL not in self.config_entry.data:
             return await self.async_step_init()
+        # The one wallbox rule that Home Assistant applies itself.
+        draft = self._begin("wallbox", {CONF_RELEASE_OFF_ON_UNPLUG})
+        if user_input is not None:
+            draft.values[CONF_RELEASE_OFF_ON_UNPLUG] = user_input.get(CONF_RELEASE_OFF_ON_UNPLUG) is True
+            return await self._finish_section()
         return self.async_show_form(
             step_id="wallbox_service",
-            data_schema=probatio.Schema({}),
+            data_schema=unplug_schema(draft.values),
             description_placeholders=_service_values(self.config_entry),
             last_step=False,
         )
@@ -666,6 +673,7 @@ def _normalized(user_input: dict[str, Any]) -> dict[str, Any]:
         CONF_SCAN_INTERVAL_SECONDS: int(user_input[CONF_SCAN_INTERVAL_SECONDS]),
         CONF_CURRENT_LIMIT: float(user_input[CONF_CURRENT_LIMIT]),
         CONF_CONTROL_MODE: str(user_input[CONF_CONTROL_MODE]),
+        CONF_RELEASE_OFF_ON_UNPLUG: user_input.get(CONF_RELEASE_OFF_ON_UNPLUG) is True,
     }
 
 

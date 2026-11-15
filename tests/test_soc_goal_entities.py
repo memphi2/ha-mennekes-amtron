@@ -16,11 +16,12 @@ from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.number import (
     async_setup_entry as setup_numbers,
 )
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.sensor import (
     async_setup_entry as setup_sensors,
 )
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_SOC_ENTITY,
 )
@@ -77,11 +78,10 @@ def test_remote_vehicle_observations_need_no_extra_wallbox_poll_and_old_service_
         service, transport, _clock = await service_fixture(tmp_path)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                wrapper = RemoteControl(
-                    remote, diagnostics=service.diagnostics, options=service.control.options,
-                    state=lambda: service.data, request_refresh=AsyncMock(),
+                wrapper = ServiceControl(
+                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
                 )
                 assert wrapper.supports_soc_goal
                 before_writes = current_writes(transport)
@@ -131,11 +131,10 @@ def test_read_only_remote_accepts_vehicle_metadata_during_outage_but_never_a_tar
         service, transport, _clock = await service_fixture(tmp_path, read_only=True)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                wrapper = RemoteControl(
-                    remote, diagnostics=service.diagnostics, options=service.control.options,
-                    state=lambda: service.data, request_refresh=AsyncMock(),
+                wrapper = ServiceControl(
+                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
                 )
                 service._success = False
                 remote.apply_snapshot(service.snapshot(), require_available=False)
@@ -176,7 +175,7 @@ def test_invalid_remote_vehicle_snapshot_is_rejected_atomically(tmp_path, mutate
         service, transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://localhost", TOKEN)
+                remote = ServiceClient(session, "http://localhost", TOKEN)
                 remote.apply_snapshot(service.snapshot())
                 previous = remote.write_state.soc_goal.snapshot()
                 raw = deepcopy(service.snapshot())

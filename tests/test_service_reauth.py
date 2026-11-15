@@ -19,8 +19,8 @@ from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN, service_fixture
 from tests.test_service_discovery import URL, discovery_info
@@ -303,14 +303,14 @@ def test_app_reauth_uses_only_matching_supervisor_credentials(
             async with TestServer(app) as server:
                 sessions = []
 
-                class LoopbackRemote(RemoteClient):
+                class LoopbackRemote(ServiceClient):
                     def __init__(self, session, url, token):
                         assert url == URL
                         sessions.append(session)
                         super().__init__(session, str(server.make_url("/")), token)
 
-                monkeypatch.setattr(config_flow, "RemoteClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "RemoteClient", LoopbackRemote)
+                monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
                 entry = await add_entry(hass, URL)
                 before = entity_ids(hass, entry)
                 service.config = replace(service.config, token=NEW_TOKEN)

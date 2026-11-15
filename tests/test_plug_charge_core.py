@@ -10,8 +10,11 @@ from unittest.mock import AsyncMock
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.control import (
+    AmtronControl,
+    ControlOptions,
+)
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import (
     EnergyGoalController,

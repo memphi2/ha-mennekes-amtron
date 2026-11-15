@@ -16,8 +16,8 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.timed_goal_const import (
     CONF_TIMED_GOAL_ENABLED,
     CONF_TIMED_GOAL_RESET_PENDING,
@@ -134,7 +134,7 @@ def test_disabled_setup_reclaims_service_queue_after_unreachable_unload(tmp_path
                     # A user can re-enable after an earlier failed disable.
                     # Deleting the trip must not consume the queue-cancel
                     # request if this reconnect attempt cannot reach the app.
-                    with patch.object(RemoteClient, "async_connect", side_effect=ServiceConnectionError("service_not_ready", "offline")):
+                    with patch.object(ServiceClient, "async_connect", side_effect=ServiceConnectionError("service_not_ready", "offline")):
                         assert not await hass.config_entries.async_setup(entry.entry_id)
                     assert entry.options[CONF_TIMED_GOAL_RESET_PENDING] is True
                     assert service.control.pending_action == "set_current"

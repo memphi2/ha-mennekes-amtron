@@ -16,7 +16,7 @@ from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.ha_fakes import FakeHass
 from tests.test_config_flow import SearchFlow
 from tests.test_home_assistant_smoke import _boot
@@ -53,12 +53,12 @@ def test_failed_service_setup_can_recover_in_the_same_flow(
             assert await async_setup_component(hass, "network", {})
             async with TestServer(app) as server:
 
-                class LoopbackRemote(RemoteClient):
+                class LoopbackRemote(ServiceClient):
                     def __init__(self, session, _url, token):
                         super().__init__(session, str(server.make_url("/")), token)
 
-                monkeypatch.setattr(config_flow, "RemoteClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "RemoteClient", LoopbackRemote)
+                monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
                 if source == "user":
                     flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
                     flow = await hass.config_entries.flow.async_configure(
@@ -100,7 +100,7 @@ def test_multiple_apps_require_explicit_discovery_selection(tmp_path, monkeypatc
         monkeypatch.setattr(
             config_flow, "async_app_discoveries", AsyncMock(return_value=[discovery_info(), discovery_info()])
         )
-        monkeypatch.setattr(config_flow, "RemoteClient", lambda *_: pytest.fail("must not guess which app to probe"))
+        monkeypatch.setattr(config_flow, "ServiceClient", lambda *_: pytest.fail("must not guess which app to probe"))
         try:
             flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
             result = await hass.config_entries.flow.async_configure(
@@ -122,12 +122,12 @@ def test_discovery_preserves_an_unrelated_pending_user_flow(tmp_path, monkeypatc
             assert await async_setup_component(hass, "network", {})
             async with TestServer(create_app(service)) as server:
 
-                class LoopbackRemote(RemoteClient):
+                class LoopbackRemote(ServiceClient):
                     def __init__(self, session, _url, token):
                         super().__init__(session, str(server.make_url("/")), token)
 
-                monkeypatch.setattr(config_flow, "RemoteClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "RemoteClient", LoopbackRemote)
+                monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
                 user_flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
                 discovered = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "hassio"}, data=discovery_info()
@@ -154,12 +154,12 @@ def test_discovered_token_rotation_reloads_a_loaded_entry_once(tmp_path, monkeyp
         try:
             async with TestServer(create_app(service)) as server:
 
-                class LoopbackRemote(RemoteClient):
+                class LoopbackRemote(ServiceClient):
                     def __init__(self, session, _url, token):
                         super().__init__(session, str(server.make_url("/")), token)
 
-                monkeypatch.setattr(config_flow, "RemoteClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "RemoteClient", LoopbackRemote)
+                monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
                 entry = await add_entry(hass, URL)
                 before = entity_ids(hass, entry)
                 service.config = replace(service.config, token=NEW_TOKEN)
@@ -186,7 +186,7 @@ def test_discovered_token_rotation_reloads_a_loaded_entry_once(tmp_path, monkeyp
 def test_discovery_confirmation_without_private_payload_is_rejected(monkeypatch):
     async def run():
         flow = SearchFlow(FakeHass())
-        monkeypatch.setattr(config_flow, "RemoteClient", lambda *_: pytest.fail("missing discovery must not connect"))
+        monkeypatch.setattr(config_flow, "ServiceClient", lambda *_: pytest.fail("missing discovery must not connect"))
         result = await flow.async_step_hassio_confirm()
         assert result["reason"] == "invalid_service_discovery"
 

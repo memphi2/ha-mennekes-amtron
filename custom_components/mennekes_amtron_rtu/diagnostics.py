@@ -29,12 +29,23 @@ from .device.const import (
 from .device.registers import REGISTERS_BY_KEY, layout_label
 from .device.runtime_events import sanitize_events
 from .device.write_trace import sanitize_snapshot
+from .entry_connection import connection_config
 from .entry_types import MennekesAmtronConfigEntry
-from .remote import RemoteClient
+from .service_client import CONF_SERVER_URL
 
 FNV1A64_OFFSET = 0xCBF29CE484222325
 FNV1A64_PRIME = 0x100000001B3
 FNV1A64_MASK = 0xFFFFFFFFFFFFFFFF
+
+
+# Sections of the service state that carry no identifier. The serial number,
+# the Plug & Charge session and the vehicle source stay out.
+_CONTROL_KEYS = (
+    "read_only", "current_cap", "max_charging_current", "charging_setpoint",
+    "pause_requested", "charging_release_requested", "guest_mode", "intent_rejected",
+    "pending_action", "pending_until", "state_change_interval_seconds",
+    "phase_switch_grace_seconds",
+)
 
 
 async def async_get_config_entry_diagnostics(
@@ -47,46 +58,44 @@ async def async_get_config_entry_diagnostics(
     client = runtime_data.client
     coordinator = runtime_data.coordinator
     data = coordinator.current_data()
-    if isinstance(client, RemoteClient):
-        try:
-            trace = await client.request("GET", "/v2/diagnostics", update_connection=False)
-            write_transactions = sanitize_snapshot(trace.get("write_transactions"))
-            runtime_events = sanitize_events(trace.get("runtime_events"))
-        except AmtronBusError:
-            write_transactions = None
-            runtime_events = None
-    else:
-        write_transactions = client.write_trace.snapshot()
-        runtime_events = runtime_data.diagnostics.timeline.snapshot()
+    state = client.snapshot
+    try:
+        trace = await client.request("GET", "/v2/diagnostics", update_connection=False)
+        write_transactions = sanitize_snapshot(trace.get("write_transactions"))
+        runtime_events = sanitize_events(trace.get("runtime_events"))
+    except AmtronBusError:
+        write_transactions = None
+        runtime_events = None
 
-    config = client.config
-    identifiers: tuple[str | None, ...] = (config.port, identity.serial_number)
-    bus: dict[str, Any]
-    if isinstance(client, RemoteClient):
-        # The local API client cannot report the service's actual bus setup.
-        bus = {"transport": "service", "connected": client.connected}
+    identifiers: tuple[str | None, ...] = (identity.serial_number,)
+    bus: dict[str, Any] = {"connected": client.connected}
+    if CONF_SERVER_URL in entry.data:
+        bus["transport"] = "service"
     else:
-        bus = {
-            CONF_DEVICE_ID: client.config.device_id,
-            "connected": client.connected,
-            "response_timeout_seconds": client.config.timeout,
-            "read_retries": client.config.retries,
-            "write_retries": 0,
-        }
+        config = connection_config(entry)
+        identifiers += (config.port,)
+        bus[CONF_DEVICE_ID] = config.device_id
         if isinstance(config, NetworkConfig):
             bus["transport"] = config.connection_type
             bus["tcp_authentication"] = config.tcp_authentication
             identifiers += (config.host, config.tcp_auth_password or None)
         else:
             bus.update({
+                "transport": "serial",
                 "port_category": port_category(config.port),
                 CONF_BAUDRATE: config.baudrate,
                 CONF_BYTESIZE: config.bytesize,
                 CONF_PARITY: config.parity,
                 CONF_STOPBITS: config.stopbits,
             })
+    control = state.get("control", {})
     payload = {
         "bus": bus,
+        "service": {
+            "api_version": state.get("api_version"),
+            "service_version": state.get("service_version"),
+            "available": state.get("available"),
+        },
         "device": {
             "layout_version": layout_label(identity.layout_version),
             "firmware_version": identity.firmware_version,
@@ -95,40 +104,17 @@ async def async_get_config_entry_diagnostics(
             "phase_options_hw": identity.phase_options_hw,
             "max_evse_current": identity.max_evse_current,
         },
-        "control": {
-            "read_only": runtime_data.control.read_only,
-            "current_cap": runtime_data.control.options.current_cap,
-            "max_charging_current": runtime_data.control.max_charging_current,
-            "charging_setpoint": runtime_data.control.charging_setpoint,
-            "is_paused": runtime_data.control.is_paused,
-            "pause_requested": runtime_data.control.pause_requested,
-            "charging_release_requested": runtime_data.control.charging_release_requested,
-            "energy_goal_stop_requested": runtime_data.control.energy_goal_stop_requested,
-            "heartbeat_running": bool(
-                runtime_data.heartbeat is not None and runtime_data.heartbeat.running
-            ),
-            "heartbeat_healthy": (
-                runtime_data.heartbeat.healthy
-                if runtime_data.heartbeat is not None else None
-            ),
-        },
+        "control": {key: control.get(key) for key in _CONTROL_KEYS},
+        "operation": control.get("operation"),
+        "heartbeat": state.get("heartbeat"),
         "plug_charge": _plug_charge_diagnostics(runtime_data),
         "connection_quality": {
             "state": data.connection_quality,
             "failed_transactions": data.connection_failures,
             "retried_transactions": data.connection_retries,
         },
-        "write_diagnostics": {
-            "heartbeats_sent": runtime_data.diagnostics.heartbeats_sent,
-            "heartbeats_failed": runtime_data.diagnostics.heartbeats_failed,
-            "heartbeats_late": runtime_data.diagnostics.heartbeats_late,
-            "writes_sent": runtime_data.diagnostics.writes_sent,
-            "writes_rejected": runtime_data.diagnostics.writes_rejected,
-            "unresolved_write_errors": sorted(runtime_data.diagnostics.write_errors),
-            "writes_rate_limited": runtime_data.diagnostics.writes_rate_limited,
-            "recoveries": runtime_data.diagnostics.recoveries,
-            "last_error": runtime_data.diagnostics.last_error,
-        },
+        "counters": state.get("diagnostics"),
+        "unresolved_write_errors": state.get("write_errors"),
         "poll": {
             "last_update_success": coordinator.last_update_success,
             "failed_blocks": list(data.failed_blocks),

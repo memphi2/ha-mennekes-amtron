@@ -207,17 +207,19 @@
       "charging": {
         "name": "Charging"
       },
-      "downgrade_active": {
-        "name": "Downgrade active"
-      },
       "error": {
-        "name": "Error"
-      },
-      "master_lost_fallback": {
-        "name": "Energy manager fallback active"
+        "name": "Error",
+        "state_attributes": {
+          "heartbeat_lost": {
+            "name": "Energy manager fallback active"
+          }
+        }
       },
       "vehicle_connected": {
         "name": "Vehicle connected"
+      },
+      "guest_charging": {
+        "name": "Guest charging"
       }
     },
     "button": {
@@ -229,15 +231,6 @@
       },
       "cancel_pending_change": {
         "name": "Cancel pending change"
-      },
-      "assign_vehicle_charge": {
-        "name": "Assign vehicle charge energy"
-      },
-      "timed_next_calendar_event": {
-        "name": "Use next calendar event"
-      },
-      "timed_vehicle_departure": {
-        "name": "Use vehicle departure"
       },
       "guest_start": {
         "name": "Start guest charging"
@@ -260,15 +253,6 @@
         "state": {
           "all_available": "All available phases",
           "single_phase": "Single phase only"
-        }
-      },
-      "solar_charging_mode": {
-        "name": "Solar display mode",
-        "state": {
-          "fast": "Fast charging",
-          "not_active": "Not active",
-          "sunshine": "Sunshine",
-          "sunshine_plus": "Sunshine+"
         }
       },
       "active_vehicle": {
@@ -327,21 +311,17 @@
         "name": "Temperature"
       },
       "wallbox_settings": {
-        "name": "Wallbox settings"
-      },
-      "pending_change": {
-        "name": "Pending change",
-        "state": {
-          "none": "No pending change",
-          "pause": "Pause charging",
-          "resume": "Resume charging",
-          "set_current": "Set charging current",
-          "single_phase": "Use one phase",
-          "all_phases": "Use all available phases",
-          "enable_charging": "Enable charging release",
-          "disable_charging": "Disable charging release",
-          "unlock": "Unlock wallbox",
-          "lock": "Lock wallbox"
+        "name": "Wallbox settings",
+        "state_attributes": {
+          "solar_mode": {
+            "name": "Solar display mode",
+            "state": {
+              "fast": "Fast charging",
+              "not_active": "Not active",
+              "sunshine": "Sunshine",
+              "sunshine_plus": "Sunshine+"
+            }
+          }
         }
       },
       "charging_status": {
@@ -361,6 +341,11 @@
           "checking_status": "Checking status",
           "state_uncertain": "State is ambiguous",
           "data_missing": "Waiting for readings"
+        },
+        "state_attributes": {
+          "downgraded_to": {
+            "name": "Downgrade active"
+          }
         }
       },
       "connection_quality": {
@@ -376,24 +361,6 @@
           "retried_transactions": {
             "name": "Retried transactions"
           }
-        }
-      },
-      "energy_goal_status": {
-        "name": "Energy target status",
-        "state": {
-          "disabled": "Disabled",
-          "active": "Active",
-          "reached": "Energy target reached",
-          "meter_unavailable": "Energy meter unavailable",
-          "meter_reset": "Energy meter reading decreased"
-        }
-      },
-      "soc_goal_status": {
-        "name": "Vehicle charge target status",
-        "state": {
-          "disabled": "Disabled",
-          "active": "Active",
-          "reached": "Target reached"
         }
       },
       "last_charging_loss": {
@@ -442,70 +409,50 @@
           }
         }
       },
-      "timed_goal_status": {
-        "name": "Timed charging status",
+      "operation_waiting": {
+        "name": "Charging wait reason",
         "state": {
-          "disabled": "Disabled",
-          "waiting_for_target": "Waiting for percentage target",
-          "waiting_for_capacity": "Waiting for battery capacity",
-          "waiting_for_soc": "Waiting for vehicle charge level",
-          "waiting_for_device": "Waiting for wallbox",
+          "none": "Nothing is holding the charge",
+          "wallbox_unavailable": "Wallbox unavailable",
+          "no_vehicle": "No vehicle connected",
+          "release_off": "Charging release switched off",
+          "plug_charge_waiting": "Virtual Plug & Charge has not released the car",
+          "meter_unavailable": "Waiting for the energy meter",
           "vehicle_unconfirmed": "Car not confirmed",
+          "until_planned_start": "Paused until the planned start",
+          "estimated_target_reached": "Charged to the estimated target",
+          "waiting_for_device": "Waiting for wallbox",
+          "waiting_for_soc": "Waiting for vehicle charge level",
+          "waiting_for_capacity": "Waiting for battery capacity",
+          "waiting_for_target": "Waiting for percentage target",
           "read_only": "Read only",
-          "guest_mode": "Guest charging has priority",
-          "queued": "Change queued",
-          "paused_until_start": "Paused until start",
-          "minimum_level": "Charging to the minimum level",
-          "charging": "Charging at full current",
-          "finishing": "Finishing at minimum current",
-          "unreachable": "Target may be unreachable",
-          "late": "Deadline passed",
-          "estimated_reached": "Charged to the estimated target",
-          "reached": "Target reached",
-          "write_pending": "Write pending",
-          "error": "Error"
-        }
-      },
-      "virtual_plug_charge_status": {
-        "name": "Virtual Plug & Charge status",
-        "state": {
-          "waiting_vehicle": "Waiting for a vehicle",
-          "waiting_detection": "Waiting for fresh vehicle data",
-          "vehicle_not_selected": "Recognized vehicle not selected",
-          "waiting_release": "Waiting for charging release",
-          "authorized": "Vehicle authorized",
-          "manual_release": "Released by hand",
-          "blocked": "Charging blocked",
-          "disabled": "Disabled"
+          "command_pending": "Change queued",
+          "target_reached": "Target reached",
+          "paused": "Charging paused"
         },
         "state_attributes": {
-          "blocked_reason": {
-            "name": "Blocking reason",
+          "controller": {
+            "name": "Charging control",
             "state": {
-              "connection_lost": "Connection lost",
-              "gate_inactive": "Release gate not active",
-              "read_only": "Read-only mode",
-              "departure_plan": "Departure plan is preparing the current",
-              "pause_requested": "Charging paused",
-              "release_off": "Charging release switched off",
-              "energy_goal_stop": "Energy target reached",
-              "wallbox_locked": "Wallbox locked",
-              "error_code": "Wallbox error",
-              "authorization_required": "Wallbox authorization enabled",
-              "register_unavailable": "Register value unavailable"
+              "unavailable": "Wallbox unavailable",
+              "departure_plan": "Departure planning",
+              "direct": "Direct control",
+              "guest": "Guest order"
             }
-          }
-        }
-      },
-      "operation_controller": {
-        "name": "Charging control",
-        "state": {
-          "unavailable": "Wallbox unavailable",
-          "departure_plan": "Departure planning",
-          "direct": "Direct control",
-          "guest": "Guest order"
-        },
-        "state_attributes": {
+          },
+          "next_event": {
+            "name": "Next charging step",
+            "state": {
+              "none": "Nothing scheduled",
+              "queued_command": "Queued change runs",
+              "plan_start": "Planned charge starts",
+              "target_reached": "Target expected",
+              "departure": "Target time"
+            }
+          },
+          "next_at": {
+            "name": "Time"
+          },
           "vehicle": {
             "name": "Vehicle",
             "state": {
@@ -527,70 +474,95 @@
           },
           "target_deadline": {
             "name": "Target time"
-          }
-        }
-      },
-      "operation_waiting": {
-        "name": "Charging wait reason",
-        "state": {
-          "none": "Nothing is holding the charge",
-          "wallbox_unavailable": "Wallbox unavailable",
-          "no_vehicle": "No vehicle connected",
-          "release_off": "Charging release switched off",
-          "plug_charge_waiting": "Virtual Plug & Charge has not released the car",
-          "meter_unavailable": "Waiting for the energy meter",
-          "vehicle_unconfirmed": "Car not confirmed",
-          "until_planned_start": "Paused until the planned start",
-          "estimated_target_reached": "Charged to the estimated target",
-          "waiting_for_device": "Waiting for wallbox",
-          "waiting_for_soc": "Waiting for vehicle charge level",
-          "waiting_for_capacity": "Waiting for battery capacity",
-          "waiting_for_target": "Waiting for percentage target",
-          "read_only": "Read only",
-          "command_pending": "Change queued",
-          "target_reached": "Target reached",
-          "paused": "Charging paused"
-        }
-      },
-      "operation_next": {
-        "name": "Next charging step",
-        "state": {
-          "none": "Nothing scheduled",
-          "queued_command": "Queued change runs",
-          "plan_start": "Planned charge starts",
-          "target_reached": "Target expected",
-          "departure": "Target time"
-        },
-        "state_attributes": {
-          "at": {
-            "name": "Time"
-          }
-        }
-      },
-      "guest_charging": {
-        "name": "Guest charging",
-        "state": {
-          "inactive": "Inactive",
-          "active": "Active"
-        },
-        "state_attributes": {
-          "start": {
-            "name": "Start"
           },
-          "finish": {
-            "name": "End"
+          "pending": {
+            "name": "Pending change",
+            "state": {
+              "none": "No pending change",
+              "pause": "Pause charging",
+              "resume": "Resume charging",
+              "set_current": "Set charging current",
+              "single_phase": "Use one phase",
+              "all_phases": "Use all available phases",
+              "enable_charging": "Enable charging release",
+              "disable_charging": "Disable charging release",
+              "unlock": "Unlock wallbox",
+              "lock": "Lock wallbox"
+            }
           },
-          "current": {
-            "name": "Current"
+          "pending_at": {
+            "name": "Pending change runs at"
           },
-          "energy": {
-            "name": "Energy"
+          "energy_target": {
+            "name": "Energy target status",
+            "state": {
+              "disabled": "Disabled",
+              "active": "Active",
+              "reached": "Energy target reached",
+              "meter_unavailable": "Energy meter unavailable",
+              "meter_reset": "Energy meter reading decreased"
+            }
           },
-          "delivered": {
-            "name": "Delivered"
+          "vehicle_target": {
+            "name": "Vehicle charge target status",
+            "state": {
+              "disabled": "Disabled",
+              "active": "Active",
+              "reached": "Target reached"
+            }
           },
-          "reason": {
-            "name": "Reason"
+          "departure_plan": {
+            "name": "Timed charging status",
+            "state": {
+              "disabled": "Disabled",
+              "waiting_for_target": "Waiting for percentage target",
+              "waiting_for_capacity": "Waiting for battery capacity",
+              "waiting_for_soc": "Waiting for vehicle charge level",
+              "waiting_for_device": "Waiting for wallbox",
+              "vehicle_unconfirmed": "Car not confirmed",
+              "read_only": "Read only",
+              "guest_mode": "Guest charging has priority",
+              "queued": "Change queued",
+              "paused_until_start": "Paused until start",
+              "minimum_level": "Charging to the minimum level",
+              "charging": "Charging at full current",
+              "finishing": "Finishing at minimum current",
+              "unreachable": "Target may be unreachable",
+              "late": "Deadline passed",
+              "estimated_reached": "Charged to the estimated target",
+              "reached": "Target reached",
+              "write_pending": "Write pending",
+              "error": "Error"
+            }
+          },
+          "plug_charge": {
+            "name": "Virtual Plug & Charge status",
+            "state": {
+              "waiting_vehicle": "Waiting for a vehicle",
+              "waiting_detection": "Waiting for fresh vehicle data",
+              "vehicle_not_selected": "Recognized vehicle not selected",
+              "waiting_release": "Waiting for charging release",
+              "authorized": "Vehicle authorized",
+              "manual_release": "Released by hand",
+              "blocked": "Charging blocked",
+              "disabled": "Disabled"
+            }
+          },
+          "plug_charge_blocked": {
+            "name": "Blocking reason",
+            "state": {
+              "connection_lost": "Connection lost",
+              "gate_inactive": "Release gate not active",
+              "read_only": "Read-only mode",
+              "departure_plan": "Departure plan is preparing the current",
+              "pause_requested": "Charging paused",
+              "release_off": "Charging release switched off",
+              "energy_goal_stop": "Energy target reached",
+              "wallbox_locked": "Wallbox locked",
+              "error_code": "Wallbox error",
+              "authorization_required": "Wallbox authorization enabled",
+              "register_unavailable": "Register value unavailable"
+            }
           }
         }
       }
@@ -607,78 +579,21 @@
       },
       "virtual_plug_charge": {
         "name": "Virtual Plug & Charge"
-      },
-      "release_off_on_unplug": {
-        "name": "Switch off charging release when unplugged"
       }
     },
     "event": {
-      "control_result": {
-        "name": "Control result",
+      "activity": {
+        "name": "Activity",
         "state_attributes": {
           "event_type": {
-            "name": "Command and result",
+            "name": "Kind",
             "state": {
-              "pause_executed": "Pause charging: Command completed",
-              "pause_replaced": "Pause charging: Replaced",
-              "pause_cancelled": "Pause charging: Cancelled",
-              "pause_failed": "Pause charging: Failed",
-              "pause_uncertain": "Pause charging: Result unconfirmed",
-              "resume_executed": "Resume charging: Command completed",
-              "resume_replaced": "Resume charging: Replaced",
-              "resume_cancelled": "Resume charging: Cancelled",
-              "resume_failed": "Resume charging: Failed",
-              "resume_uncertain": "Resume charging: Result unconfirmed",
-              "set_current_executed": "Set charging current: Command completed",
-              "set_current_replaced": "Set charging current: Replaced",
-              "set_current_cancelled": "Set charging current: Cancelled",
-              "set_current_failed": "Set charging current: Failed",
-              "set_current_uncertain": "Set charging current: Result unconfirmed",
-              "single_phase_executed": "Use one phase: Command completed",
-              "single_phase_replaced": "Use one phase: Replaced",
-              "single_phase_cancelled": "Use one phase: Cancelled",
-              "single_phase_failed": "Use one phase: Failed",
-              "single_phase_uncertain": "Use one phase: Result unconfirmed",
-              "all_phases_executed": "Use all available phases: Command completed",
-              "all_phases_replaced": "Use all available phases: Replaced",
-              "all_phases_cancelled": "Use all available phases: Cancelled",
-              "all_phases_failed": "Use all available phases: Failed",
-              "all_phases_uncertain": "Use all available phases: Result unconfirmed",
-              "disable_charging_executed": "Disable charging release: Command completed",
-              "disable_charging_replaced": "Disable charging release: Replaced",
-              "disable_charging_cancelled": "Disable charging release: Cancelled",
-              "disable_charging_failed": "Disable charging release: Failed",
-              "disable_charging_uncertain": "Disable charging release: Result unconfirmed",
-              "enable_charging_executed": "Enable charging release: Command completed",
-              "enable_charging_replaced": "Enable charging release: Replaced",
-              "enable_charging_cancelled": "Enable charging release: Cancelled",
-              "enable_charging_failed": "Enable charging release: Failed",
-              "enable_charging_uncertain": "Enable charging release: Result unconfirmed",
-              "lock_executed": "Lock wallbox: Command completed",
-              "lock_replaced": "Lock wallbox: Replaced",
-              "lock_cancelled": "Lock wallbox: Cancelled",
-              "lock_failed": "Lock wallbox: Failed",
-              "lock_uncertain": "Lock wallbox: Result unconfirmed",
-              "unlock_executed": "Unlock wallbox: Command completed",
-              "unlock_replaced": "Unlock wallbox: Replaced",
-              "unlock_cancelled": "Unlock wallbox: Cancelled",
-              "unlock_failed": "Unlock wallbox: Failed",
-              "unlock_uncertain": "Unlock wallbox: Result unconfirmed",
-              "recovery_succeeded": "Error recovery confirmed",
-              "recovery_failed": "Error recovery failed",
-              "recovery_uncertain": "Recover from error: Result unconfirmed"
-            }
-          },
-          "result": {
-            "name": "Result",
-            "state": {
-              "executed": "Command completed",
-              "replaced": "Replaced",
-              "cancelled": "Cancelled",
-              "failed": "Failed",
-              "uncertain": "Result unconfirmed",
-              "recovery_succeeded": "Error recovery confirmed",
-              "recovery_failed": "Error recovery failed"
+              "command_done": "Command carried out",
+              "command_failed": "Command failed",
+              "command_cancelled": "Command cancelled",
+              "session_started": "Vehicle plugged in",
+              "session_ended": "Vehicle unplugged",
+              "wallbox_changed": "Wallbox changed"
             }
           },
           "action": {
@@ -694,6 +609,18 @@
               "unlock": "Unlock wallbox",
               "lock": "Lock wallbox",
               "recover": "Recover from error"
+            }
+          },
+          "result": {
+            "name": "Result",
+            "state": {
+              "executed": "Command completed",
+              "replaced": "Replaced",
+              "cancelled": "Cancelled",
+              "failed": "Failed",
+              "uncertain": "Result unconfirmed",
+              "recovery_succeeded": "Error recovery confirmed",
+              "recovery_failed": "Error recovery failed"
             }
           },
           "reason": {
@@ -719,7 +646,7 @@
               "vehicle_waiting": "Waiting for an authorized vehicle"
             }
           },
-          "source": {
+          "trigger": {
             "name": "Trigger",
             "state": {
               "unknown": "Source not reported",
@@ -733,7 +660,7 @@
               "guest": "Guest charging"
             }
           },
-          "requested_value": {
+          "value": {
             "name": "Requested register value",
             "state": {
               "0": "No software current limit"
@@ -741,13 +668,8 @@
           },
           "occurred_at": {
             "name": "Occurred at"
-          }
-        }
-      },
-      "wallbox_event": {
-        "name": "Wallbox event",
-        "state_attributes": {
-          "event_type": {
+          },
+          "change": {
             "name": "Change",
             "state": {
               "vehicle_plugged_in": "Vehicle plugged in",
@@ -1052,14 +974,18 @@
       },
       "wallbox_service": {
         "title": "Wallbox settings of the app",
-        "description": "This wallbox runs through the Modbus app, so its settings are kept there and apply to Home Assistant as well.\n\nCharging current cap: {current_cap} A\nMinimum time between state changes: {state_change_interval} s\nExtra wait before phase changes: {phase_switch_grace} s\n\nChange these values, the polling intervals and the connection in the app under Open Web UI. Write permission is on the app’s Configuration tab."
+        "description": "This wallbox runs through the Modbus app, so its settings are kept there and apply to Home Assistant as well.\n\nCharging current cap: {current_cap} A\nMinimum time between state changes: {state_change_interval} s\nExtra wait before phase changes: {phase_switch_grace} s\n\nChange these values, the polling intervals and the connection in the app under Open Web UI. Write permission is on the app’s Configuration tab.",
+        "data": {
+          "release_off_on_unplug": "Switch off charging release when unplugged"
+        }
       },
       "wallbox_basic": {
         "title": "Current limit and polling",
         "data": {
           "control_mode": "Control mode",
           "current_limit": "Charging current cap",
-          "scan_interval_seconds": "Status polling interval"
+          "scan_interval_seconds": "Status polling interval",
+          "release_off_on_unplug": "Switch off charging release when unplugged"
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
@@ -1667,6 +1593,36 @@
     "clear_target_time": {
       "name": "Clear target time",
       "description": "Clears the shared time without changing energy or vehicle targets."
+    },
+    "use_calendar_departure": {
+      "name": "Use next calendar event",
+      "description": "Take the next matching calendar event as the target time.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        }
+      }
+    },
+    "use_vehicle_departure": {
+      "name": "Use vehicle departure",
+      "description": "Take the car's next departure as the target time.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        }
+      }
+    },
+    "assign_vehicle_charge": {
+      "name": "Assign vehicle charge energy",
+      "description": "Assign the energy the car reports to the last charge.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        }
+      }
     }
   }
 }

@@ -11,7 +11,6 @@ import pytest
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
-from custom_components.mennekes_amtron_rtu.recovery import HeartbeatRecovery
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
 from tests.ha_fakes import build_runtime
 

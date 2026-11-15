@@ -9,24 +9,19 @@ from typing import TYPE_CHECKING, Any
 from .device.data import ConnectionState as ConnectionState
 from .device.data import DeviceIdentity as DeviceIdentity
 from .device.data import WallboxData as WallboxData
-from .device.data import WriteDiagnostics as WriteDiagnostics
 
 if TYPE_CHECKING:
     from homeassistant.const import Platform
 
     from .charge_loss_observer import ChargeLossObserver
-    from .control import AmtronControl
-    from .coordinator import MennekesAmtronCoordinator
+    from .coordinator import ServiceCoordinator
     from .cost_observer import ChargingCostObserver
-    from .device.client import MennekesModbusClient
-    from .device.energy_goal_controller import EnergyGoalController
-    from .device.heartbeat import HeartbeatTask
-    from .device.soc_goal_controller import SocGoalController
     from .guest_charging import GuestCharging
     from .plug_charge import PlugChargeObserver
-    from .recovery import HeartbeatRecovery
-    from .session_observer import SessionObserver
+    from .service_client import ServiceClient
+    from .service_control import ServiceControl, ServiceHeartbeat
     from .timed_goal_observer import TimedGoalObserver
+    from .unplug_rule import UnplugRule
     from .vehicle_binding import VehicleBinding
     from .vehicle_detection import VehicleDetectionObserver, VehicleEvidence
     from .vehicle_soc import VehicleSocObserver
@@ -37,13 +32,13 @@ if TYPE_CHECKING:
 class MennekesAmtronRuntimeData:
     """Everything one loaded config entry owns."""
 
-    client: MennekesModbusClient
-    coordinator: MennekesAmtronCoordinator
-    control: AmtronControl
+    client: ServiceClient
+    coordinator: ServiceCoordinator
+    control: ServiceControl
+    guest: GuestCharging
     identity: DeviceIdentity
-    diagnostics: WriteDiagnostics
-    connection_state: ConnectionState
-    retain_client_on_unload: bool = False
+    # False for a direct connection set to read only: it shows no controls.
+    controls: bool = True
     retain_cost_on_unload: bool = False
     retain_attribution_on_unload: bool = False
     entry_data: dict[str, Any] = field(default_factory=dict)
@@ -57,20 +52,15 @@ class MennekesAmtronRuntimeData:
     vehicle_selection: dict[str, Any] = field(default_factory=dict)
     vehicle_profile_id: str | None = None
     vehicle_switching: bool = False
-    heartbeat: HeartbeatTask | None = None
-    # Charging jobs of the app; None with a direct connection.
-    guest: GuestCharging | None = None
-    recovery: HeartbeatRecovery | None = None
-    goal: EnergyGoalController | None = None
-    soc_goal: SocGoalController | None = None
+    heartbeat: ServiceHeartbeat | None = None
     vehicle_soc: VehicleSocObserver | None = None
     vehicle_telemetry: VehicleTelemetrySource | None = None
     vehicle_detection: VehicleDetectionObserver | None = None
     vehicle_binding: VehicleBinding | None = None
     vehicle_evidence: VehicleEvidence | None = None
     plug_charge: PlugChargeObserver | None = None
+    unplug_rule: UnplugRule | None = None
     timed_goal: TimedGoalObserver | None = None
-    sessions: SessionObserver | None = None
     charge_loss: ChargeLossObserver | None = None
     charging_cost: ChargingCostObserver | None = None
     # What the repair issues looked like last time, so an unchanged issue is
@@ -85,21 +75,10 @@ class RuntimeHandoff:
     identity: DeviceIdentity
     unloaded: bool = False
     setup_complete: bool = False
-    client: MennekesModbusClient | None = None
-    sessions: SessionObserver | None = None
     charging_cost: ChargingCostObserver | None = None
 
     async def async_close(self) -> None:
         """Release anything not claimed by the replacement runtime."""
-        sessions, cost, client = self.sessions, self.charging_cost, self.client
-        self.sessions = self.charging_cost = self.client = None
-        try:
-            if sessions is not None:
-                await sessions.async_close()
-        finally:
-            try:
-                if cost is not None:
-                    await cost.async_stop()
-            finally:
-                if client is not None:
-                    await client.async_close()
+        cost, self.charging_cost = self.charging_cost, None
+        if cost is not None:
+            await cost.async_stop()

@@ -9,11 +9,8 @@ from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import (
-    _connection_config,
-    _control_options,
     _entry_platforms,
     _scan_interval,
-    _serial_config,
     async_reload_entry,
     async_setup,
     async_setup_entry,

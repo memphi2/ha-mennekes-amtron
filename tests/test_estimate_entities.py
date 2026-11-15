@@ -19,10 +19,6 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
 from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
 from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
 from custom_components.mennekes_amtron_rtu.device.charging_cost import CostResult
-from custom_components.mennekes_amtron_rtu.estimate_sensor import AmtronEstimateSensor
-from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-    ESTIMATE_SENSOR_DESCRIPTIONS,
-)
 from tests.ha_fakes import FakeConfigEntry, build_runtime, collect
 from tests.test_charging_session import complete
 

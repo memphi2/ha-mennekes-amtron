@@ -7,9 +7,9 @@ it stay in one place.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
-from .data import DeviceIdentity, WallboxData, WriteDiagnostics
+from .data import DeviceIdentity, WallboxData
 from .device.const import ERROR_CODE_EMS_UNAVAILABLE
 from .device.registers import VALIDATED_LAYOUT, layout_label
 
@@ -44,10 +44,10 @@ def unsupported_layout(identity: DeviceIdentity) -> bool:
     return identity.layout_version < VALIDATED_LAYOUT
 
 
-def write_rejected(diagnostics: WriteDiagnostics) -> bool:
+def write_rejected(snapshot: dict[str, Any]) -> bool:
     """Return true until the affected command has succeeded again."""
 
-    return bool(diagnostics.write_errors)
+    return bool(snapshot.get("write_errors"))
 
 
 def layout_placeholders(identity: DeviceIdentity) -> dict[str, str]:

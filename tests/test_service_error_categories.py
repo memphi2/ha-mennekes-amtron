@@ -19,8 +19,8 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
@@ -32,7 +32,7 @@ def test_unknown_phase_code_keeps_readings_but_disables_phase_switching(tmp_path
         service.identity.phase_options_hw = phase_code
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 assert remote.connected
                 assert remote.identity.phase_options_hw == phase_code
@@ -70,7 +70,7 @@ def test_optional_current_capability_cannot_block_setup_or_lift_command_limits(
                 # it. Updating HA first must also accept that existing app.
                 service.identity.max_evse_current = float(maximum)
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 assert remote.connected
                 assert remote.identity.max_evse_current == expected
@@ -110,7 +110,7 @@ def test_failure_categories_are_precise_and_do_not_expose_response_data(tmp_path
                 app.router.add_get("/v2/state", invalid)
             async with TestServer(app) as server, ClientSession() as session:
                 token = "wrong" * 10 if fault == "authentication" else TOKEN
-                remote = RemoteClient(session, str(server.make_url("/")), token)
+                remote = ServiceClient(session, str(server.make_url("/")), token)
                 with pytest.raises(ServiceConnectionError) as raised:
                     await remote.async_connect()
                 assert raised.value.reason == {

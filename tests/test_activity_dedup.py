@@ -8,10 +8,6 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
-from custom_components.mennekes_amtron_rtu.event import (
-    AmtronControlResultEvent,
-    AmtronWallboxEvent,
-)
 from tests.ha_fakes import build_runtime
 
 

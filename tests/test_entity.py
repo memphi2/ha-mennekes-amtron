@@ -9,7 +9,6 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     DOMAIN,
 )
 from custom_components.mennekes_amtron_rtu.entity import (
-    MennekesAmtronEntity,
     entry_device_info,
     entry_device_key,
     entry_entity_unique_id,

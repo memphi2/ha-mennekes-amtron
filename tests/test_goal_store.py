@@ -21,7 +21,6 @@ from custom_components.mennekes_amtron_rtu.device.persistence import (
     StorageCommitUncertainError,
 )
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
-from custom_components.mennekes_amtron_rtu.goal_store import GoalStore, SocGoalStore
 from tests.ha_fakes import FakeHass
 from tests.test_home_assistant_smoke import _boot
 

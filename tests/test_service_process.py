@@ -17,7 +17,7 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.fakes import device_bank
 from tests.test_home_assistant_smoke import _boot, _start_wallbox
 from tests.test_modbus_service import TOKEN
@@ -76,7 +76,7 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
         )
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, f"http://127.0.0.1:{port}", TOKEN)
+                remote = ServiceClient(session, f"http://127.0.0.1:{port}", TOKEN)
 
                 async def ready():
                     while True:

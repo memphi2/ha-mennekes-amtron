@@ -11,8 +11,7 @@ from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 
 import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
-from custom_components.mennekes_amtron_rtu.data import WallboxData, WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.persistence import (
     StorageCommitUncertainError,
@@ -25,7 +24,8 @@ from custom_components.mennekes_amtron_rtu.goal_store import (
     DepartureIntent,
     TimedGoalStore,
 )
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
 from tests.ha_fakes import FakeHass
 from tests.test_control import Harness
@@ -664,11 +664,10 @@ def test_disabling_target_cancels_service_queue_without_removing_manual_work(tmp
             await service.control.async_configure_soc("sensor.soc|")
             await service.control.async_set_soc_goal(80, source="sensor.soc|", soc=20)
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                    state=lambda: WallboxData(), request_refresh=None,
+                control = ServiceControl(
+                    remote,                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 observer._runtime.control = control
                 observer.goal.set(now + timedelta(hours=5))
@@ -747,11 +746,10 @@ def test_reloaded_observer_reclaims_service_queue_after_offline_unload(tmp_path,
             await service.control.async_set_soc_goal(80, source="sensor.soc|", soc=20)
             async with TestServer(create_app(service)) as server, ClientSession() as session:
                 endpoint = str(server.make_url("/"))
-                remote = RemoteClient(session, endpoint, TOKEN)
+                remote = ServiceClient(session, endpoint, TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                    state=lambda: WallboxData(), request_refresh=None,
+                control = ServiceControl(
+                    remote,                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 observer._runtime.control = control
                 observer.goal.set(now + timedelta(hours=5))
@@ -771,11 +769,10 @@ def test_reloaded_observer_reclaims_service_queue_after_offline_unload(tmp_path,
                 await observer.async_stop()
                 assert service.control.pending_action == "set_current"
 
-                fresh = RemoteClient(session, endpoint, TOKEN)
+                fresh = ServiceClient(session, endpoint, TOKEN)
                 await fresh.async_connect()
-                observer._runtime.control = RemoteControl(
-                    fresh, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                    state=lambda: WallboxData(), request_refresh=None,
+                observer._runtime.control = ServiceControl(
+                    fresh,                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 reloaded = observer_module.TimedGoalObserver(hass, observer._entry)
                 reloaded.request_evaluate = lambda: None

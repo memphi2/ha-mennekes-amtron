@@ -21,8 +21,9 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     validation_error,
 )
 from custom_components.mennekes_amtron_rtu.event import async_setup_entry
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.fakes import raise_connection_error
 from tests.ha_fakes import build_runtime
 from tests.test_control import Harness
@@ -218,7 +219,7 @@ def test_service_event_extension_is_optional_and_identity_validated_before_deliv
     async def run():
         service, _transport, clock = await service_fixture(tmp_path)
         async with ClientSession() as session:
-            remote = RemoteClient(session, "http://localhost", TOKEN)
+            remote = ServiceClient(session, "http://localhost", TOKEN)
             remote.apply_snapshot(service.snapshot())
             events = []
             remote.events.listen(events.append)
@@ -227,9 +228,8 @@ def test_service_event_extension_is_optional_and_identity_validated_before_deliv
             remote.apply_snapshot(snapshot)
             remote.apply_snapshot(snapshot)
             assert [event.action for event in events] == ["pause"]
-            wrapper = RemoteControl(
-                remote, diagnostics=service.diagnostics, options=service.control.options,
-                state=lambda: service.data, request_refresh=AsyncMock(),
+            wrapper = ServiceControl(
+                remote,                 state=lambda: service.data, request_refresh=AsyncMock(),
             )
             assert wrapper.events is remote.events
             old = deepcopy(snapshot)

@@ -12,16 +12,19 @@ import asyncio
 import pytest
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
-from custom_components.mennekes_amtron_rtu.data import (
-    DeviceIdentity,
-    WallboxData,
-    WriteDiagnostics,
-)
+from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.device.control import (
+    AmtronControl,
+    ControlOptions,
+)
+from custom_components.mennekes_amtron_rtu.device.data import (
+    DeviceIdentity,
+    WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.enums import (

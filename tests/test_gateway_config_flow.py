@@ -13,11 +13,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.data_entry_flow import FlowManagerResourceView
 
-from custom_components.mennekes_amtron_rtu import (
-    _connection_config,
-    _flow_gateway,
-    config_flow,
-)
+from custom_components.mennekes_amtron_rtu import _flow_gateway, config_flow
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronBusError,
     AmtronConnectionError,

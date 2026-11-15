@@ -10,7 +10,6 @@ from aiohttp import ClientSession, web
 from aiohttp.test_utils import TestServer
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
@@ -31,7 +30,8 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
 from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
 from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
 
@@ -53,7 +53,7 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
 
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 remote.request = request
                 poll = asyncio.create_task(remote.update())
                 await asyncio.wait_for(poll_started.wait(), 2)
@@ -107,7 +107,7 @@ def test_malformed_snapshots_are_never_published_as_live_state(tmp_path, field, 
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://127.0.0.1:8765", TOKEN)
+                remote = ServiceClient(session, "http://127.0.0.1:8765", TOKEN)
                 original = service.snapshot()
                 remote.apply_snapshot(original)
                 notifications = []
@@ -166,7 +166,7 @@ def test_http_errors_have_stable_types_and_no_retries(status, payload, kind):
         app = web.Application()
         app.router.add_get("/v2/state", respond)
         async with TestServer(app) as server, ClientSession() as session:
-            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(kind):
                 await remote.request("GET", "/v2/state")
             assert calls == [1]
@@ -182,7 +182,7 @@ def test_large_or_streamed_replies_are_bounded():
         app = web.Application()
         app.router.add_get("/v2/state", oversized)
         async with TestServer(app) as server, ClientSession() as session:
-            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(AmtronConnectionError, match="service response too large"):
                 await remote.update()
 
@@ -209,12 +209,10 @@ def test_every_remote_action_uses_the_shared_service(tmp_path, method, value):
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=lambda: WallboxData(values=remote.snapshot["values"]),
                     request_refresh=remote.update,
                 )
@@ -242,12 +240,10 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, cap),
                     state=lambda: WallboxData(values=remote.snapshot["values"]),
                     request_refresh=remote.update,
                 )
@@ -300,12 +296,10 @@ def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, cap),
                     state=lambda: WallboxData(values=remote.snapshot["values"]),
                     request_refresh=remote.update,
                 )
@@ -335,7 +329,7 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 assert await remote.async_read_register(R.ERROR_CODE) == 0
                 assert await remote.async_read_register(R.CHARGING_CURRENT_EMS) == 8
@@ -366,10 +360,8 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
                     )
                 assert not precondition_called
                 await server.close()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=WallboxData,
                     request_refresh=remote.update,
                 )
@@ -414,7 +406,7 @@ def test_optional_diagnostics_failure_does_not_mark_service_offline():
 
         app.router.add_get("/v2/diagnostics", unavailable)
         async with TestServer(app) as server, ClientSession() as session:
-            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             remote._connected = True
             notifications = []
             remote.on_update = lambda: notifications.append(True)
@@ -427,7 +419,7 @@ def test_optional_diagnostics_failure_does_not_mark_service_offline():
 
 
 def test_wallbox_failure_is_distinguished_from_a_lost_service_connection(tmp_path):
-    from custom_components.mennekes_amtron_rtu.remote import RemoteHeartbeat
+    from custom_components.mennekes_amtron_rtu.service_control import ServiceHeartbeat
 
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
@@ -436,9 +428,9 @@ def test_wallbox_failure_is_distinguished_from_a_lost_service_connection(tmp_pat
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                heartbeat = RemoteHeartbeat(remote, WriteDiagnostics())
+                heartbeat = ServiceHeartbeat(remote, WriteDiagnostics())
                 remote.on_update = heartbeat.update
                 service._success = False
                 service.heartbeat._set_healthy(False)

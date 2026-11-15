@@ -14,9 +14,9 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.mennekes_amtron_rtu import repair_health
+from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteCoordinator
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from tests.ha_fakes import build_runtime
 from tests.test_home_assistant_smoke import _boot
@@ -94,9 +94,8 @@ def test_remote_coordinator_rejects_a_direct_client():
         hass, entry, _transport = await build_runtime()
         runtime = entry.runtime_data
         try:
-            coordinator = RemoteCoordinator(
-                hass, entry, client=runtime.client, identity=runtime.identity,
-                connection_state=runtime.connection_state, scan_interval=5,
+            coordinator = ServiceCoordinator(
+                hass, entry, client=runtime.client,                 scan_interval=5,
             )
             with pytest.raises(UpdateFailed, match="service client missing"):
                 await coordinator._async_update_data()

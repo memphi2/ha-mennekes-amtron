@@ -7,8 +7,8 @@ import asyncio
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.enums import (
     EvseState,
     RequestedPhases,

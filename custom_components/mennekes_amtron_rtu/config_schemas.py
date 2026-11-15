@@ -104,6 +104,7 @@ from .timed_goal_const import (
     CONF_TIMED_VEHICLE_TIME_ZONE,
     TIMED_WEEKDAYS,
 )
+from .unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
     CONF_VEHICLE_SOC_ENTITY,
@@ -263,7 +264,21 @@ def options_schema(
             mode=SelectSelectorMode.LIST,
         )
     )
+    fields.update(_unplug_field(current))
     return probatio.Schema(fields)
+
+
+def _unplug_field(current: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        probatio.Optional(
+            CONF_RELEASE_OFF_ON_UNPLUG, default=current.get(CONF_RELEASE_OFF_ON_UNPLUG) is True
+        ): BooleanSelector(),
+    }
+
+
+def unplug_schema(current: dict[str, Any]) -> probatio.Schema:
+    """The rule Home Assistant applies itself, also with the app."""
+    return probatio.Schema(_unplug_field(current))
 
 
 def advanced_schema(current: dict[str, Any], *, phase_switch: bool) -> probatio.Schema:
@@ -780,7 +795,7 @@ def service_schema(*, credentials_only: bool = False) -> probatio.Schema:
         TextSelectorType,
     )
 
-    from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL
+    from .service_client import CONF_SERVER_TOKEN, CONF_SERVER_URL
 
     fields = {
         probatio.Required(CONF_SERVER_TOKEN): TextSelector(

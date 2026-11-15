@@ -11,15 +11,15 @@ import pytest
 from aiohttp import ClientSession
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-import custom_components.mennekes_amtron_rtu.remote as remote_module
+import custom_components.mennekes_amtron_rtu.service_client as remote_module
+from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
-from custom_components.mennekes_amtron_rtu.device.data import ConnectionState
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteCoordinator
 from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_charging_session import reading
 from tests.test_modbus_service import TOKEN, service_fixture
@@ -108,7 +108,7 @@ def test_remote_repeated_cache_is_not_fresh_and_command_does_not_consume_next_sa
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
                 payload = service.snapshot()
                 payload["energy_sample"] = {"observed_at": 1000.0, "value": 100.0}
                 first = client.apply_snapshot(payload)
@@ -157,7 +157,7 @@ def test_malformed_remote_energy_sample_cannot_be_published(tmp_path, sample):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
                 payload = service.snapshot()
                 payload["energy_sample"] = sample
                 with pytest.raises(ServiceConnectionError, match=r"snapshot \(energy_sample\)"):
@@ -175,12 +175,12 @@ def test_remote_coordinator_observes_success_and_failed_poll(tmp_path):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
                 data = client.apply_snapshot(service.snapshot())
                 client.update = AsyncMock(return_value=data)
-                coordinator = RemoteCoordinator(
+                coordinator = ServiceCoordinator(
                     FakeHass(str(tmp_path)), FakeConfigEntry(), client=client,
-                    identity=client.identity, connection_state=ConnectionState(), scan_interval=5,
+                    scan_interval=5,
                 )
                 callback = AsyncMock()
                 coordinator.observe_session = callback
@@ -212,10 +212,10 @@ def test_remote_coordinator_reads_a_queued_command_when_it_is_due(tmp_path, monk
 
         monkeypatch.setattr(remote_module, "async_call_later", call_later)
         async with ClientSession() as session:
-            client = RemoteClient(session, "http://service:8765", TOKEN)
-            coordinator = RemoteCoordinator(
+            client = ServiceClient(session, "http://service:8765", TOKEN)
+            coordinator = ServiceCoordinator(
                 FakeHass(str(tmp_path)), FakeConfigEntry(), client=client,
-                identity=client.identity, connection_state=ConnectionState(), scan_interval=5,
+                scan_interval=5,
             )
             coordinator.async_request_refresh = AsyncMock()
             now = datetime.now(UTC)

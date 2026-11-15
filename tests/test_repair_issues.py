@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron_rtu.data import (
+from custom_components.mennekes_amtron_rtu.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.data import (
     DeviceIdentity,
-    WallboxData,
     WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.registers import (

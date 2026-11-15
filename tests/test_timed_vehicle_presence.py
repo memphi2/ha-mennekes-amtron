@@ -10,13 +10,13 @@ from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
-from custom_components.mennekes_amtron_rtu.data import WallboxData, WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import control as device_control
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.fakes import put, raise_connection_error
 from tests.test_modbus_service import TOKEN, current_writes
 from tests.test_timed_control import OWNER, Harness, future, service_fixture
@@ -408,11 +408,10 @@ def test_service_cancels_timed_resume_after_ha_disconnects(tmp_path):
             await service.refresh()
             service.control._sleep = sleep
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
-                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                    state=lambda: WallboxData(), request_refresh=None,
+                control = ServiceControl(
+                    remote,                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 await control.async_set_timed_current(None, deadline=future(), owner=OWNER)
                 await control.async_set_timed_current(10, deadline=future(), owner=OWNER)

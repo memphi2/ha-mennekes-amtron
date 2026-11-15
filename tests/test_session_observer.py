@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import session_observer
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
 )
@@ -19,8 +18,6 @@ from custom_components.mennekes_amtron_rtu.charging_cost_const import (
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
-from custom_components.mennekes_amtron_rtu.goal_store import SessionHistoryStore
-from custom_components.mennekes_amtron_rtu.session_observer import SessionObserver
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_charging_session import complete, reading
 

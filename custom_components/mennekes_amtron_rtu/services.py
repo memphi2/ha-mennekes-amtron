@@ -22,7 +22,6 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_register_platform_entity_service
 
-from .control import AmtronControl
 from .data import MennekesAmtronRuntimeData
 from .device.const import (
     ATTR_ALLOW_UNLIMITED,
@@ -32,8 +31,8 @@ from .device.const import (
 )
 from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
-from .guest_charging import GuestCharging
 from .recorder_profile import async_setup_recorder_service
+from .service_control import ServiceControl
 
 SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
     {
@@ -47,9 +46,33 @@ SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
 
 # With one wallbox the target may be left out, which keeps dashboards short.
 _DEVICE = {probatio.Optional(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string])}
-# The single guest action takes its limits from the ordinary target controls.
-GUEST_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[GuestCharging, dict[str, Any]], Awaitable[None]]]] = {
-    "start_guest_charging": ({}, lambda guest, _data: guest.async_start_guest()),
+
+
+async def _use_calendar_departure(runtime: MennekesAmtronRuntimeData) -> None:
+    if runtime.timed_goal is None:
+        raise service_validation_error("timed_goal_unavailable")
+    await runtime.timed_goal.async_use_next_calendar_event()
+
+
+async def _use_vehicle_departure(runtime: MennekesAmtronRuntimeData) -> None:
+    if runtime.timed_goal is None:
+        raise service_validation_error("timed_goal_unavailable")
+    await runtime.timed_goal.async_use_vehicle_departure()
+
+
+async def _assign_vehicle_charge(runtime: MennekesAmtronRuntimeData) -> None:
+    if runtime.charge_loss is None:
+        raise service_validation_error("loss_unavailable")
+    await runtime.charge_loss.async_assign()
+
+
+# Actions on a wallbox that have no state of their own. Each takes what it
+# needs from the wallbox's ordinary controls and settings.
+DEVICE_ACTIONS: dict[str, Callable[[MennekesAmtronRuntimeData], Awaitable[None]]] = {
+    "start_guest_charging": lambda runtime: runtime.guest.async_start_guest(),
+    "use_calendar_departure": _use_calendar_departure,
+    "use_vehicle_departure": _use_vehicle_departure,
+    "assign_vehicle_charge": _assign_vehicle_charge,
 }
 
 
@@ -87,8 +110,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
         schema=SET_CHARGING_CURRENT_SCHEMA,
     )
 
-    def guest_handler(
-        run: Callable[[GuestCharging, dict[str, Any]], Awaitable[None]],
+    def device_handler(
+        run: Callable[[MennekesAmtronRuntimeData], Awaitable[None]],
     ) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
         async def handle(call: ServiceCall) -> None:
             user = None
@@ -96,27 +119,22 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 user = await hass.auth.async_get_user(call.context.user_id)
                 if user is None:
                     raise UnknownUser(context=call.context)
-            # Resolve and authorize every target before the first start is sent.
-            targets = []
+            # Resolve and authorize every target before the first one acts.
             for runtime in _resolve_runtimes(hass, call.data.get(ATTR_DEVICE_ID), user):
-                if runtime.guest is None:
-                    raise service_validation_error("app_required")
-                targets.append(runtime.guest)
-            for guest in targets:
-                await run(guest, dict(call.data))
+                await run(runtime)
 
         return handle
 
-    for name, (fields, run) in GUEST_ACTIONS.items():
+    for name, run in DEVICE_ACTIONS.items():
         hass.services.async_register(
-            DOMAIN, name, guest_handler(run), schema=probatio.Schema({**_DEVICE, **fields}),
+            DOMAIN, name, device_handler(run), schema=probatio.Schema(_DEVICE),
         )
 
 
 @callback
 def async_resolve_controls(
     hass: HomeAssistant, device_ids: list[str], user: User | None = None
-) -> list[AmtronControl]:
+) -> list[ServiceControl]:
     """Return the control objects of the targeted devices."""
 
     return [runtime.control for runtime in _resolve_runtimes(hass, device_ids, user)]

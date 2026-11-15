@@ -15,7 +15,6 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.plug_charge import PlugChargeObserver
-from custom_components.mennekes_amtron_rtu.switch import AmtronPlugChargeSwitch
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import build_runtime
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot

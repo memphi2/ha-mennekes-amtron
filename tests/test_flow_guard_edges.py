@@ -131,7 +131,7 @@ def test_service_identity_lookup_cannot_commit_an_entry_changed_during_lookup(mo
         flow = _flow()
         client = SimpleNamespace(identity=IDENTITY, async_connect=AsyncMock(), async_close=AsyncMock())
         monkeypatch.setattr(config_flow, "async_get_clientsession", lambda _hass: None)
-        monkeypatch.setattr(config_flow, "RemoteClient", lambda *_args: client)
+        monkeypatch.setattr(config_flow, "ServiceClient", lambda *_args: client)
 
         async def set_unique(_serial):
             _change(flow)
@@ -190,7 +190,7 @@ def test_app_confirmation_rejects_a_connection_changed_at_any_async_stage(monkey
         flow.async_set_unique_id = set_unique
         monkeypatch.setattr(config_flow, "async_app_discoveries", discover)
         monkeypatch.setattr(config_flow, "async_get_clientsession", lambda _hass: None)
-        monkeypatch.setattr(config_flow, "RemoteClient", lambda *_args: client)
+        monkeypatch.setattr(config_flow, "ServiceClient", lambda *_args: client)
         result = await flow.async_step_hassio_confirm({})
         _assert_changed(result)
         if stage != "discovery":
