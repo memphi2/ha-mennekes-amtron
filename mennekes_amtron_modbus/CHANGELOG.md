@@ -1,117 +1,16 @@
 # Changes
 
-## 0.9.0b8
+## 0.9.0
 
-- Replace guest orders with ordinary controls and shared limits.
-- Restore guest permission only for the proven same plug-in; retain pauses and stop guards.
-- Reject incompatible beta intent files with a safe reset acknowledgement.
-
-## 0.9.0b7
-
-- Split charging controls into charge targets, next departure and guest charging.
-- Share guest settings, targets and departure edits with Home Assistant; reject
-  outdated edits and preserve vehicle and Plug & Charge guards.
-- Remove the separate scheduled-order, reserve and boost pages/actions.
-- Store guest sessions and settings separately from old beta order files.
-- Update all five app languages and dashboard guidance.
-
-## 0.9.0b6
-
-- Share one persistent charging-job draft between Home Assistant and the app,
-  with native current, energy, date/time, status and action entities.
-- Provide Mushroom dashboards in five languages without manual helpers or scripts.
-- Simplify installation, everyday-use and troubleshooting documentation.
-- Preserve exact job times across app edits, including the repeated autumn hour;
-  reject stale edits and malformed drafts and keep UI polling bounded.
-- Require service **0.9.0b6 or newer**, API 2, for the shared draft. Update the
-  app first, then the integration. Editing a draft never starts charging.
-
-## 0.9.0b5
-
-- Clearer My charging overview and Diagnostics navigation.
-- Recover stalled live logs and include all pages in local builds.
-- Block rejected saved control state until an explicit Home Assistant Repair.
-  Acknowledgement keeps charging paused and release off, even after unplugging.
-- Keep protective gate closure active while waiting for that acknowledgement.
-- Old beta control state and departure plans are not migrated. Update the app
-  first, then check pause, release, Plug & Charge, targets and departure.
-
-## 0.9.0b4
-
-- The registers are a page below Overview again, with the complete table.
-- Pages carry their styles inside, so a change of page cannot show an
-  unformatted page for a moment.
-- A page appears once its texts are in your language, so the English
-  fallback is not visible for a moment after a click.
-- Weekly plans are removed: the page, its API and its saved file. Recurring
-  departures come from a Home Assistant calendar instead.
-- Home Assistant can start and stop charging jobs, boost and guest charging
-  through the app's API.
-
-## 0.9.0b3
-
-- The web pages have the look of Home Assistant, use the whole width and
-  group their pages into Overview, Charging, Settings and Log. A change of
-  page no longer flashes an empty white frame.
-- The registers are a card of the overview.
-- **Log** replaces the Debug log tab: it starts by itself, follows the newest
-  line and can be paused, filtered and downloaded.
-
-## 0.9.0b2
-
-Update the app together with integration 0.9.0b2.
-
-- **Overview:** **Open Web UI** now starts on an overview of the wallbox, the
-  last commands and their results. Adapter and connection settings moved to
-  the **Connection** page.
-- **Charging jobs:** an energy and time order for the car that is plugged in,
-  with preview, confirmation and stop. It keeps running when Home Assistant
-  restarts or disconnects and ends at unplugging. After an app restart it
-  continues only when the wallbox proves the car stayed plugged in.
-- **Boost:** charge early for up to two hours before a job's planned start,
-  then return to the plan.
-- **Guest charging:** a bounded order for a guest car that is already
-  authorized at the wallbox, for example by RFID. It never grants a release,
-  unlocks the wallbox or uses a saved vehicle target.
-- **Weekly plans:** recurring departures for one car. An activation for the
-  plugged-in car creates the job for each departure, when its window opens, for
-  up to seven days. Between departures Home Assistant controls charging. A
-  plan activated while Home Assistant had detected the car remembers it and
-  activates itself at the next plug-in, after a restart and beyond seven days.
-- **Departure planning in the app:** Home Assistant hands over the next
-  departure, the car's capacity and its charge levels; the app plans start and
-  current itself, also while Home Assistant is offline. Without new reports
-  from the car it projects the charge level from the metered energy and pauses
-  at the target. Below the minimum charge level set in Home Assistant it
-  charges at once and then waits for the planned start. The plan learns each
-  car's transfer efficiency and its metered power at full current, plans the
-  start with both and reports a forecast up to the percentage target.
-- **Charging control on the overview:** one card names which controller
-  decides right now (guest order, charging job, weekly plan, departure plan or
-  none), why the car does not charge yet, the next step with its time and the
-  target. Home Assistant shows the same summary as three sensors.
-- **Immediate reserve:** a job or the first departure of a weekly plan can
-  charge part of its energy amount at once, then wait for the planned start.
-- **Finish estimate:** the Charging jobs page shows when an order will
-  probably reach its energy amount, from the measured charging power.
-- **Registers:** a read-only page with the raw register values, their age
-  and read quality.
-- **Runtime:** preview new poll intervals, the current cap and the waits
-  between charging changes and apply them without restarting the app. A
-  charge above a lower cap is lowered after the next poll.
-- A finished order hands control back to Home Assistant once the wallbox
-  confirms its pause; charging stays paused until you resume it there.
-- All pages are available in English, German, French, Dutch and Italian and
-  share one navigation bar.
-- The pages always load completely, keep a refused action visible, name
-  read-only mode as the cause and say why a runtime setting was not saved.
-  Weekly plans of another wallbox or a damaged plan file start empty instead
-  of blocking the weekly plans.
-
-## 0.9.0b1
-
-- The sidebar entry is called **Modbus RTU** instead of the full app name.
-  Nothing else changes; the app also works with integration 0.8.2.
+- Publish the 0.9 service in both stable and beta app catalogs.
+- Use one charging page for shared kWh/time limits and an explicit guest-start
+  button. Resume proven same-plug guest permission and accepted departure plans
+  across HA Core restarts.
+- Completed charges for loss and cost estimates survive a failed poll or
+  meter read and the plug-in and unplug transitions.
+- A refused guest start or limit change names what to do, e.g. plug in the
+  car or raise the reached limit, instead of an unconfirmed save.
+- Old beta control state is not migrated; acknowledge a safe reset if requested.
 
 ## 0.8.2
 
