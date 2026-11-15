@@ -87,6 +87,7 @@ def test_guest_refusal_never_grants_release(tmp_path, monkeypatch, denial):
                 await service.command(payload)
             assert transport.writes == before
             assert service._guest_scope is None
+            assert service.guest_start_uncertain is False
     asyncio.run(body())
 
 
@@ -290,4 +291,28 @@ def test_queued_guest_start_cannot_release_another_plug_in(tmp_path, monkeypatch
             assert not service.guest_mode
             assert service.control.pending_action is None
             assert service.data.get("charging_release") == 0
+    asyncio.run(run())
+
+
+def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.errors import (
+        DeviceError,
+        validation_error,
+    )
+
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            control = service.control
+
+            async def release_then_stop(**_kwargs):
+                control.events.record("executed", "enable_charging")
+                raise validation_error("energy_goal_stop_active")
+
+            monkeypatch.setattr(control, "async_start_guest_charging", release_then_stop)
+            with pytest.raises(DeviceError):
+                await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                                       "expected_guest_revision": service.guest_revision})
+            assert service.guest_start_uncertain is True
+            assert service._guest_scope is not None
     asyncio.run(run())

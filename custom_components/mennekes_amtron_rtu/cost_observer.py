@@ -31,7 +31,7 @@ from .charging_cost_const import (
     COST_SOURCE_FIXED,
 )
 from .device.charging_cost import CostAccumulator, CostResult, TariffConfig
-from .device.charging_session import CompletedSession
+from .device.charging_session import UNKNOWN_PRESENCE_GRACE_SECONDS, CompletedSession
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
 from .device.registers import CP_STATE, ENERGY_TOTAL
@@ -115,6 +115,11 @@ class ChargingCostObserver:
         self._anchored = False
         self._active = False
         self._final_pending = False
+        # The ended cycle's cost, kept until its session arrives: the app may
+        # publish the session after HA has already seen the next idle reading.
+        self._ended: CostResult | None = None
+        self._known_at: float | None = None
+        self._unknown_seen = False
         self._started_at = time.time()
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
@@ -171,7 +176,7 @@ class ChargingCostObserver:
         except ValueError:
             return False
         if tariff != self._tariff:
-            if self._active:
+            if self._active or self._final_pending:
                 # A meter interval spanning two tariff definitions cannot be
                 # priced with either definition alone.
                 self._accumulator.observe_energy(time.time(), None)
@@ -242,11 +247,18 @@ class ChargingCostObserver:
         if data is None:
             # One failed poll is no meter evidence: the next reading spans the
             # gap, and a gap longer than max_gap still marks the cost partial.
+            self._observe_unknown(now)
             return
         self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
         present = metered_vehicle_present(
             data.get, cp_supported=self._entry.runtime_data.identity.layout_version >= CP_STATE.min_layout,
         )
+        if present is None:
+            self._observe_unknown(now)
+        else:
+            if self._unknown_seen:
+                self._check_unknown_span(now)
+            self._unknown_seen, self._known_at = False, now
         at = (data.energy_observed_at or 0.0) if self._remote else now
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         # Plug transitions report CP and EVSE in different polls. Keep the
@@ -258,6 +270,7 @@ class ChargingCostObserver:
                 self._accumulator.reset()
                 self._accumulator.set_price(min(at, now), self._price())
                 self._anchored = self._final_pending = False
+            self._ended = None
             self._active = True
         energy = data.get(ENERGY_TOTAL.key)
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
@@ -265,6 +278,7 @@ class ChargingCostObserver:
             self._accumulator.observe_energy(at, energy)
         latest = CompletedSession.parse(data.charging_session) if data.charging_session else None
         previous = self.last.session
+        matched = False
         if data.session_summary_supported and latest != previous:
             candidate = LastChargingCost()
             candidate.session = latest
@@ -272,8 +286,11 @@ class ChargingCostObserver:
                 result = self._accumulator.result
                 if self._anchored and fresh and math.isclose(result.energy_kwh, latest.wallbox_kwh, rel_tol=1e-9):
                     candidate.result = result
+                elif self._ended is not None and math.isclose(self._ended.energy_kwh, latest.wallbox_kwh, rel_tol=1e-9):
+                    candidate.result = self._ended
                 else:
                     candidate.result = CostResult(0.0, latest.wallbox_kwh, latest.wallbox_kwh, False)
+                self._ended, matched = None, True
             self.last = candidate
             self._dirty = True
         if present is False and not fresh and self._active:
@@ -282,6 +299,8 @@ class ChargingCostObserver:
             self._active, self._final_pending = False, True
         if present is False and fresh:
             # Any final match happened above. Start the next anchor now.
+            if (self._active or self._final_pending) and not matched:
+                self._ended = self._accumulator.result if self._anchored else None
             self._accumulator.reset()
             self._accumulator.set_price(min(at, now), self._price())
             self._active = self._final_pending = self._anchored = False
@@ -290,6 +309,16 @@ class ChargingCostObserver:
                 self._anchored = True
         if self._dirty and time.monotonic() >= self._retry_at:
             await self._save()
+
+    def _observe_unknown(self, now: float) -> None:
+        self._unknown_seen = True
+        self._check_unknown_span(now)
+
+    def _check_unknown_span(self, now: float) -> None:
+        """Like the session, a long unknown span may hide another car."""
+        if self._known_at is not None and now - self._known_at > UNKNOWN_PRESENCE_GRACE_SECONDS:
+            self._anchored = False
+            self._ended = None
 
     async def _save(self) -> None:
         try:

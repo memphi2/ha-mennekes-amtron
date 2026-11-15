@@ -235,3 +235,27 @@ def test_console_names_definite_guest_refusals_only(tmp_path, monkeypatch):
             unknown = await client.post("/api/charging", headers=headers, json=guest)
             assert (await unknown.json())["error"] == "charging_save_uncertain"
     asyncio.run(body())
+
+
+def test_console_reports_a_guest_failure_after_a_write_as_uncertain(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.errors import validation_error
+
+    async def body():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with (
+            runtime.guest_service(tmp_path) as (service, _transport, _clock),
+            TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+        ):
+            state = await (await client.get("/api/charging", headers=HEADERS)).json()
+            headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
+
+            async def released_then_stopped(_payload):
+                service.guest_start_uncertain = True  # The release write already applied.
+                raise validation_error("energy_goal_stop_active")
+
+            monkeypatch.setattr(service, "command", released_then_stopped)
+            guest = {"action": "guest", "value": True, "revision": state["guest_revision"], "confirm": True}
+            response = await client.post("/api/charging", headers=headers, json=guest)
+            assert (await response.json())["error"] == "charging_save_uncertain"
+    asyncio.run(body())

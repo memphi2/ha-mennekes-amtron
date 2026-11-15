@@ -57,7 +57,8 @@
     time_passed:["The saved target time has passed. Change or clear it first.","Der gespeicherte Zielzeitpunkt ist vorbei. Zuerst ändern oder löschen.","L’heure cible enregistrée est passée. Modifiez-la ou effacez-la d’abord.","De opgeslagen doeltijd is verstreken. Wijzig of wis deze eerst.","L’orario obiettivo salvato è passato. Modificarlo o cancellarlo prima."],
     limit_reached:["A charging limit is already reached. Raise it or set it to 0 first.","Eine Ladegrenze ist bereits erreicht. Zuerst erhöhen oder mit 0 deaktivieren.","Une limite de recharge est déjà atteinte. Augmentez-la ou mettez-la à 0 d’abord.","Een laadgrens is al bereikt. Verhoog deze of zet deze eerst op 0.","Un limite di ricarica è già raggiunto. Aumentarlo o impostarlo a 0 prima."],
     busy:["The wallbox is not ready for this change yet. Try again in a few seconds.","Die Wallbox ist für diese Änderung noch nicht bereit. In einigen Sekunden erneut versuchen.","La borne n’est pas encore prête pour ce changement. Réessayez dans quelques secondes.","De laadpaal is nog niet klaar voor deze wijziging. Probeer het over enkele seconden opnieuw.","La wallbox non è ancora pronta per questa modifica. Riprovare tra qualche secondo."],
-    invalid:["Value outside the allowed range: 0 or 0.1–1000 kWh, 0–100 %.","Wert außerhalb des erlaubten Bereichs: 0 oder 0,1–1000 kWh, 0–100 %.","Valeur hors plage : 0 ou 0,1–1000 kWh, 0–100 %.","Waarde buiten bereik: 0 of 0,1–1000 kWh, 0–100 %.","Valore fuori intervallo: 0 o 0,1–1000 kWh, 0–100 %."],
+    invalid:["Enter 0 or 0.1–1000 kWh.","0 oder 0,1–1000 kWh eingeben.","Saisissez 0 ou 0,1–1000 kWh.","Voer 0 of 0,1–1000 kWh in.","Inserire 0 o 0,1–1000 kWh."],
+    invalid_soc:["Enter 0–100 %, at most the vehicle's charge limit.","0–100 % eingeben, höchstens das Ladelimit des Fahrzeugs.","Saisissez 0–100 %, au plus la limite de charge du véhicule.","Voer 0–100 % in, hoogstens de laadlimiet van het voertuig.","Inserire 0–100 %, al massimo il limite di carica del veicolo."],
     invalid_time:["Enter a complete date and time.","Vollständiges Datum mit Uhrzeit eingeben.","Saisissez une date et une heure complètes.","Voer een volledige datum en tijd in.","Inserire data e ora complete."],
     meter_missing:["No valid energy reading from the wallbox yet. Wait for the connection and try again.","Noch kein gültiger Energiezählerwert der Wallbox. Auf die Verbindung warten und erneut versuchen.","Pas encore de mesure d’énergie valide de la borne. Attendez la connexion et réessayez.","Nog geen geldige energiemeting van de laadpaal. Wacht op de verbinding en probeer opnieuw.","Ancora nessuna misura di energia valida dalla wallbox. Attendere la connessione e riprovare."],
     active:["Active","Aktiv","Actif","Actief","Attivo"],disabled:["Disabled","Deaktiviert","Désactivé","Uitgeschakeld","Disattivato"],reached:["Target reached","Ziel erreicht","Objectif atteint","Doel bereikt","Obiettivo raggiunto"],
@@ -67,7 +68,7 @@
   const refusals={soc_goal_source_changed:"changed",soc_goal_limit_unavailable:"limit_missing",read_only_mode:"read_only",
     guest_start_not_permitted:"not_permitted",guest_deadline_expired:"time_passed",time_limit_reached:"time_passed",
     energy_goal_stop_active:"limit_reached",write_rate_limited:"busy",
-    control_state_unknown:"busy",energy_goal_invalid:"invalid",soc_goal_invalid:"invalid",energy_goal_unavailable:"meter_missing"};
+    control_state_unknown:"busy",energy_goal_invalid:"invalid",soc_goal_invalid:"invalid_soc",energy_goal_unavailable:"meter_missing"};
   document.querySelectorAll("[data-text]").forEach(n=>{n.textContent=t(n.dataset.text);});
   document.documentElement.classList?.add("ready");
   const keys=["energy","departure","soc"];

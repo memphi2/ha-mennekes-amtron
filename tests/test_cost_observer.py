@@ -498,3 +498,76 @@ def test_final_meter_after_the_unplug_poll_still_prices_the_whole_charge(tmp_pat
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+def test_session_published_after_the_next_idle_reading_keeps_its_cost(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=True)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            for offset, energy, present, summary in (
+                (0, 100, False, None),
+                (25, 102.5, True, None),
+                (90, 110, True, None),
+                (100, 110, False, None),  # HA first sees the meter read only once unplugged.
+                (160, 110, False, completed(at)),  # The app publishes the session later.
+            ):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present, session=summary))
+            assert observer.last.result.complete
+            assert observer.last.result.cost == pytest.approx(3)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_long_unknown_presence_makes_the_running_cost_partial(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            with patch(clock, return_value=at):
+                await observer.async_observe(data(at, 100))
+            with patch(clock, return_value=at+10):
+                await observer.async_observe(data(at+10, 101, present=True))
+            for offset in (60, 200):
+                with patch(clock, return_value=at+offset):
+                    await observer.async_observe(None)
+            with patch(clock, return_value=at+210):
+                await observer.async_observe(data(at+210, 105, present=True))
+            assert not observer.current.complete
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        configured = entry()
+        observer = ChargingCostObserver(hass, configured, remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            for offset, energy, present, fresh in ((0, 100, False, True), (25, 105, True, True), (100, 110, False, False)):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh))
+            configured.options = {**configured.options, "charging_network_tariff": {
+                "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
+            assert observer.apply_tariff_only_update()
+            with patch(clock, return_value=at+160):
+                await observer.async_observe(data(at+160, 110, session=completed(at)))
+            assert not observer.last.result.complete
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

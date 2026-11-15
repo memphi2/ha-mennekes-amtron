@@ -25,17 +25,23 @@ cards:
       action: more-info
   - type: custom:mushroom-chips-card
     chips:
-      - type: template
-        entity: switch.mennekes_amtron_virtual_plug_charge
-        content: >-
-          {{ 'P&C ready' if states('sensor.mennekes_amtron_virtual_plug_charge_status') in ['authorized', 'manual_release']
-          else 'P&C waiting' if is_state(entity, 'on') else 'P&C off' }}
-        icon: mdi:car-key
-        icon_color: >-
-          {{ 'green' if states('sensor.mennekes_amtron_virtual_plug_charge_status') in ['authorized', 'manual_release']
-          else 'amber' if is_state(entity, 'on') else 'grey' }}
-        tap_action:
-          action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: switch.mennekes_amtron_virtual_plug_charge
+            state_not: unavailable
+        chip:
+          type: template
+          entity: switch.mennekes_amtron_virtual_plug_charge
+          content: >-
+            {{ 'P&C ready' if states('sensor.mennekes_amtron_virtual_plug_charge_status') in ['authorized', 'manual_release']
+            else 'P&C waiting' if is_state(entity, 'on') else 'P&C off' }}
+          icon: mdi:car-key
+          icon_color: >-
+            {{ 'green' if states('sensor.mennekes_amtron_virtual_plug_charge_status') in ['authorized', 'manual_release']
+            else 'amber' if is_state(entity, 'on') else 'grey' }}
+          tap_action:
+            action: more-info
       - type: conditional
         conditions:
           - condition: state
@@ -55,20 +61,32 @@ cards:
         icon: mdi:current-ac
         tap_action:
           action: more-info
-      - type: template
-        entity: switch.mennekes_amtron_charging_paused
-        content: "{{ 'Paused' if is_state(entity, 'on') else 'Pause' }}"
-        icon: mdi:pause
-        icon_color: "{{ 'amber' if is_state(entity, 'on') else 'grey' }}"
-        tap_action:
-          action: toggle
-      - type: template
-        entity: switch.mennekes_amtron_charging_release
-        content: "{{ 'Release' if is_state(entity, 'on') else 'Release off' }}"
-        icon: "{{ 'mdi:lock-open-variant' if is_state(entity, 'on') else 'mdi:lock' }}"
-        icon_color: "{{ 'green' if is_state(entity, 'on') else 'red' }}"
-        tap_action:
-          action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: switch.mennekes_amtron_charging_paused
+            state_not: unavailable
+        chip:
+          type: template
+          entity: switch.mennekes_amtron_charging_paused
+          content: "{{ 'Paused' if is_state(entity, 'on') else 'Pause' }}"
+          icon: mdi:pause
+          icon_color: "{{ 'amber' if is_state(entity, 'on') else 'grey' }}"
+          tap_action:
+            action: toggle
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: switch.mennekes_amtron_charging_release
+            state_not: unavailable
+        chip:
+          type: template
+          entity: switch.mennekes_amtron_charging_release
+          content: "{{ 'Release' if is_state(entity, 'on') else 'Release off' }}"
+          icon: "{{ 'mdi:lock-open-variant' if is_state(entity, 'on') else 'mdi:lock' }}"
+          icon_color: "{{ 'green' if is_state(entity, 'on') else 'red' }}"
+          tap_action:
+            action: more-info
   - type: custom:mushroom-chips-card
     chips:
       - type: template

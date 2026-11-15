@@ -413,6 +413,7 @@ async def async_setup_entry(
             async def observe_estimates(data: WallboxData | None) -> None:
                 nonlocal estimates_generation
                 if not remote and estimates_generation != client.connection_generation:
+                    # A reconnect is an unknown gap; only a long one invalidates.
                     estimates_generation = client.connection_generation
                     if entry.runtime_data.sessions is not None:
                         await entry.runtime_data.sessions.async_observe(None)

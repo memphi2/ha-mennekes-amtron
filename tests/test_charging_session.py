@@ -324,3 +324,11 @@ def test_one_unknown_poll_with_a_long_scan_interval_still_invalidates():
     history.observe(reading(CHARGING, 106), now=900)
     history.observe(reading(IDLE, 110), now=1200)
     assert history.latest is None
+
+
+def test_energy_during_unknown_presence_still_hides_an_older_latest():
+    history = complete()
+    history.observe(reading(EvseState.NOT_INITIALIZED, 112), now=70)
+    history.observe(reading(EvseState.NOT_INITIALIZED, 118), now=80)
+    assert history.observe(reading(IDLE, 118), now=90)
+    assert history.latest is None

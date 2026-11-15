@@ -44,9 +44,8 @@ def metered_vehicle_present(
     ``vehicle_connected``."""
     evse, cp = get(EVSE_STATE.key), get(CP_STATE.key)
     if (
-        cp_supported and isinstance(cp, int) and not isinstance(cp, bool) and cp in CONNECTED_CP_STATES
-        and isinstance(evse, int) and not isinstance(evse, bool)
-        and evse in EvseState and evse != EvseState.NOT_INITIALIZED
+        cp_supported and evse == EvseState.IDLE and not isinstance(evse, bool)
+        and isinstance(cp, int) and not isinstance(cp, bool) and cp in CONNECTED_CP_STATES
     ):
         return True
     return vehicle_connected(evse, cp, cp_supported=cp_supported)

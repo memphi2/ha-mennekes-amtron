@@ -50,6 +50,8 @@ class GuestModbusService(ConsoleModbusService):
     _connection_session: dict[str, Any] | None = None
     # Also fences the vehicle planner after a manual guest stop, until unplug.
     _guest_scope: str | None = None
+    # The last failed guest start kept its grant: a write may have applied.
+    guest_start_uncertain = False
     _guest_restore_pending = False
     _guest_ready = False
 
@@ -148,6 +150,7 @@ class GuestModbusService(ConsoleModbusService):
                 if event.action in ("enable_charging", "resume") and event.outcome in ("executed", "uncertain"):
                     accepted = True
 
+            self.guest_start_uncertain = False
             unlisten = control.events.listen(outcome)
             self._guest_scope = sample.scope
             self._guest_restore_pending = False
@@ -165,6 +168,8 @@ class GuestModbusService(ConsoleModbusService):
                 if not accepted and not control.pending_guest_start:
                     (self._guest_scope, self._guest_restore_pending,
                      self.client.write_state.guest_permission) = previous
+                else:
+                    self.guest_start_uncertain = True
                 raise
             finally:
                 unlisten()

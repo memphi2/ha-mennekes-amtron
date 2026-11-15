@@ -24,7 +24,7 @@ _SESSION_KEYS = {
 # Plug-in and unplug change CP and EVSE state in separate polls, and a poll
 # can fail. Such short unknown spans keep the cycle; a longer one could hide
 # an unplug and a different car, so it still invalidates.
-_UNKNOWN_GRACE_SECONDS = 120.0
+UNKNOWN_PRESENCE_GRACE_SECONDS = 120.0
 _NONCHARGING_STATES = frozenset({
     EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID, EvseState.READY_TO_CHARGE,
 })
@@ -140,7 +140,7 @@ class SessionHistory:
     def _check_unknown_span(self, observed_at: float) -> None:
         """Measure from the last known poll, so long scan intervals count too."""
         start = self._known_at if self._known_at is not None else self._unknown_since
-        if start is not None and observed_at - start > _UNKNOWN_GRACE_SECONDS:
+        if start is not None and observed_at - start > UNKNOWN_PRESENCE_GRACE_SECONDS:
             self._invalidate()
 
     def observe(self, data: WallboxData | None, *, now: float) -> bool:
@@ -173,7 +173,10 @@ class SessionHistory:
             else:
                 if self._last_energy is not None and total < self._last_energy:
                     self._invalidate()
-                self._last_energy = total
+                if present is not None:
+                    # Energy seen while presence is unknown must still count
+                    # as accrued at the next unplugged reading.
+                    self._last_energy = total
         if present is None:
             self._unknown(observed_at)
             return False

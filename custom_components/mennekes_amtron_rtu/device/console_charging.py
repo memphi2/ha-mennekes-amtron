@@ -100,7 +100,10 @@ class ChargingConsole(ServiceConsole):
         except DeviceError as err:
             # Codes only; never expose source IDs, credentials or arbitrary errors.
             code = str(err)
-            safe = code if code in _REFUSALS else "charging_save_uncertain"
+            # A guest start can fail after its release write; the runtime then
+            # keeps the grant, so no refusal code may claim nothing happened.
+            applied = action == "guest" and getattr(service, "guest_start_uncertain", False)
+            safe = code if code in _REFUSALS and not applied else "charging_save_uncertain"
             raise SettingsError(safe, 409) from err
         except (ValueError, TypeError, OverflowError) as err:
             raise SettingsError("invalid_request") from err
