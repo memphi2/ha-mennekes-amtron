@@ -238,7 +238,7 @@ def test_console_names_definite_guest_refusals_only(tmp_path, monkeypatch):
 
 
 def test_console_reports_a_guest_failure_after_a_write_as_uncertain(tmp_path, monkeypatch):
-    from custom_components.mennekes_amtron_rtu.device.errors import validation_error
+    from custom_components.mennekes_amtron_rtu.device.errors import device_error
 
     async def body():
         monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
@@ -251,8 +251,7 @@ def test_console_reports_a_guest_failure_after_a_write_as_uncertain(tmp_path, mo
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
 
             async def released_then_stopped(_payload):
-                service.guest_start_uncertain = True  # The release write already applied.
-                raise validation_error("energy_goal_stop_active")
+                raise device_error("guest_start_uncertain")  # The release write already applied.
 
             monkeypatch.setattr(service, "command", released_then_stopped)
             guest = {"action": "guest", "value": True, "revision": state["guest_revision"], "confirm": True}

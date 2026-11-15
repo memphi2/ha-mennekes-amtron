@@ -140,6 +140,7 @@ class ChargingCostObserver:
         self._runs: deque[_MeterRun] = deque(maxlen=_MAX_METER_RUNS)
         self._newest: CostCheckpoint | None = None
         self._active = False  # A car is plugged in: show the running cost.
+        self._unplugged = False  # The last known poll saw no car.
         self._cycle_start: CostCheckpoint | None = None
         # The running cost started without an idle reading: never complete.
         self._cycle_partial = False
@@ -159,7 +160,7 @@ class ChargingCostObserver:
     def retain_for_reload(self, entry: MennekesAmtronConfigEntry, *, remote: bool) -> bool:
         """Keep observed prices and energy only across an unchanged live source.
 
-        The owner additionally proves continuity of the wallbox connection.
+        Continuity across a reconnect is judged by the presence-gap rule.
         Vehicle-profile changes do not change this wallbox-wide calculation.
         """
         return (
@@ -295,9 +296,11 @@ class ChargingCostObserver:
             self._record(checkpoint, charging=charging)
         fresh = checkpoint is not None
         if present is True:
-            self._active = True
+            replugged, self._unplugged, self._active = self._unplugged, False, True
             if self._cycle_start is None and fresh:
-                self._cycle_start, self._cycle_partial = checkpoint, True
+                # Right after an unplug and before charging, no energy has
+                # flowed since; the session takes this reading as baseline too.
+                self._cycle_start, self._cycle_partial = checkpoint, not (replugged and not charging)
             elif (checkpoint is not None and self._cycle_start is not None and not charging
                   and checkpoint.meter_kwh == self._cycle_start.meter_kwh):
                 # Waiting plugged in: start where the session's baseline does.
@@ -309,7 +312,7 @@ class ChargingCostObserver:
                 self._cycle_start, self._cycle_partial = checkpoint, False
             elif self._active:
                 self._cycle_start, self._cycle_partial = None, False
-            self._active = False
+            self._active, self._unplugged = False, True
         latest = CompletedSession.parse(data.charging_session) if data.charging_session else None
         if data.session_summary_supported and latest != self.last.session:
             candidate = LastChargingCost()
@@ -323,7 +326,7 @@ class ChargingCostObserver:
 
     def _presence(self, now: float, *, known: bool) -> None:
         if self._gap.observe(now, known=known):
-            self._cycle_start, self._cycle_partial = None, False
+            self._cycle_start, self._cycle_partial, self._unplugged = None, False, False
 
     def _record(self, checkpoint: CostCheckpoint | None, *, charging: bool) -> None:
         if checkpoint is None:

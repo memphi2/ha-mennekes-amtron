@@ -295,9 +295,9 @@ class SessionHistory:
 
     @staticmethod
     def _idle(cycle: _Cycle, total: float | None) -> bool:
-        """A plug-in without charging or energy, e.g. a full car."""
+        """A plug-in without metered energy, e.g. a full car charging briefly."""
         return (
-            cycle.valid and cycle.started_after is None and total is not None
+            cycle.valid and total is not None
             and cycle.baseline_kwh is not None and total <= cycle.baseline_kwh
         )
 

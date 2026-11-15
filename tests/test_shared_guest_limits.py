@@ -87,7 +87,6 @@ def test_guest_refusal_never_grants_release(tmp_path, monkeypatch, denial):
                 await service.command(payload)
             assert transport.writes == before
             assert service._guest_scope is None
-            assert service.guest_start_uncertain is False
     asyncio.run(body())
 
 
@@ -314,16 +313,14 @@ def test_failure_after_an_applied_guest_release_is_marked_uncertain(tmp_path, mo
             with pytest.raises(DeviceError) as caught:
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
                                        "expected_guest_revision": service.guest_revision})
-            assert service.guest_start_uncertain is True
             # Every caller, e.g. HA over HTTP, must see a change, not a refusal.
             assert not isinstance(caught.value, DeviceValidationError)
             assert caught.value.translation_key == "guest_start_uncertain"
             assert service._guest_scope is not None
             # A later start refused before any write is a definite refusal again.
-            with pytest.raises(DeviceError):
+            with pytest.raises(DeviceError, match="soc_goal_source_changed"):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
                                        "expected_guest_revision": "stale"})
-            assert service.guest_start_uncertain is False
     asyncio.run(run())
 
 
@@ -343,8 +340,7 @@ def test_guest_refusal_after_cancelling_a_queued_departure_is_uncertain(tmp_path
                 raise validation_error("energy_goal_stop_active")
 
             monkeypatch.setattr(control, "async_start_guest_charging", refused)
-            with pytest.raises(DeviceError):
+            with pytest.raises(DeviceError, match="guest_start_uncertain"):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
                                        "expected_guest_revision": service.guest_revision})
-            assert service.guest_start_uncertain is True
     asyncio.run(run())

@@ -219,11 +219,12 @@ def test_plug_in_without_charging_closed_later_keeps_the_last_charge():
     assert history.latest == previous
 
 
-def test_zero_energy_charging_does_not_create_a_completed_charge():
+def test_zero_energy_charging_keeps_the_last_completed_charge():
     history = complete()
+    previous = history.latest
     history.observe(reading(CHARGING, 110), now=70)
-    assert history.observe(reading(IDLE, 110), now=80)
-    assert history.latest is None
+    assert not history.observe(reading(IDLE, 110), now=80)
+    assert history.latest == previous
 
 
 def test_partial_progress_is_not_persisted_and_never_restored_as_complete():

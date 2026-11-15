@@ -781,3 +781,30 @@ def test_a_sample_at_the_idle_value_labelled_charging_still_marks_the_baseline(t
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("seen_unplugged", [True, False])
+def test_replug_before_a_meter_read_starts_a_complete_running_cost(tmp_path, seen_unplugged):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            readings = [data(at, 100), data(at+10, 105, present=True)]
+            if seen_unplugged:
+                readings.append(data(at+20, 105, fresh=False))  # unplugged, meter not read
+            waiting = data(at+30, 108)
+            waiting.values[EVSE_STATE.key], waiting.values[CP_STATE.key] = EvseState.EV_CONNECTED, CpState.B1
+            readings += [waiting, data(at+40, 110, present=True)]
+            for value in readings:
+                with patch(clock, return_value=value.energy_observed_at):
+                    await observer.async_observe(value)
+            # Without the unplug poll it is one cycle from the first idle reading.
+            assert observer.current.complete
+            assert observer.current.energy_kwh == (2 if seen_unplugged else 10)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

@@ -50,8 +50,6 @@ class GuestModbusService(ConsoleModbusService):
     _connection_session: dict[str, Any] | None = None
     # Also fences the vehicle planner after a manual guest stop, until unplug.
     _guest_scope: str | None = None
-    # The last failed guest start kept its grant: a write may have applied.
-    guest_start_uncertain = False
     _guest_restore_pending = False
     _guest_ready = False
 
@@ -127,7 +125,6 @@ class GuestModbusService(ConsoleModbusService):
         if payload.keys() != {"command", "expected_serial_number", "expected_guest_revision"}:
             raise ValueError("invalid guest command")
         async with self._command_lock:
-            self.guest_start_uncertain = False
             if payload["expected_serial_number"] != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
             control = self.control
@@ -172,10 +169,7 @@ class GuestModbusService(ConsoleModbusService):
                      self.client.write_state.guest_permission) = previous
                 # A cancelled departure command or an applied write is a
                 # change; the console must not report a clean refusal.
-                self.guest_start_uncertain = (
-                    accepted or control.pending_guest_start or departure_queued
-                )
-                if self.guest_start_uncertain and isinstance(err, DeviceError):
+                if (accepted or control.pending_guest_start or departure_queued) and isinstance(err, DeviceError):
                     # No caller, the app or HA, may report this as a refusal.
                     raise device_error("guest_start_uncertain") from err
                 raise
