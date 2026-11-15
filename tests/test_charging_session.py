@@ -193,12 +193,28 @@ def test_failed_reset_or_cached_final_meter_does_not_reuse_last_good_sample(fina
     assert history.latest is None
 
 
-def test_zero_energy_and_no_charging_do_not_create_a_completed_charge():
-    for state in (CONNECTED, CHARGING):
-        history = complete()
-        history.observe(reading(state, 110), now=70)
-        assert history.observe(reading(IDLE, 110), now=80)
-        assert history.latest is None
+def test_plug_in_without_charging_keeps_the_last_completed_charge():
+    history = complete()
+    previous = history.latest
+    history.observe(reading(CONNECTED, 110), now=70)
+    assert not history.observe(reading(IDLE, 110), now=80)
+    assert history.latest == previous
+
+
+def test_plug_in_without_charging_closed_later_keeps_the_last_charge():
+    history = complete()
+    previous = history.latest
+    history.observe(reading(CONNECTED, 110), now=70)
+    history.observe(reading(IDLE, 110, fresh=False), now=80)
+    assert not history.observe(reading(IDLE, 110), now=90)
+    assert history.latest == previous
+
+
+def test_zero_energy_charging_does_not_create_a_completed_charge():
+    history = complete()
+    history.observe(reading(CHARGING, 110), now=70)
+    assert history.observe(reading(IDLE, 110), now=80)
+    assert history.latest is None
 
 
 def test_partial_progress_is_not_persisted_and_never_restored_as_complete():
@@ -389,4 +405,14 @@ def test_clock_rollback_followed_by_failed_polls_still_expires():
         history.observe(None, now=now)
     history.observe(reading(CHARGING, 106), now=490)
     history.observe(reading(IDLE, 110), now=500)
+    assert history.latest is None
+
+
+def test_a_silent_stall_between_known_polls_ends_the_cycle():
+    history = SessionHistory()
+    history.observe(reading(IDLE, 100), now=0)
+    history.observe(reading(CONNECTED, 100), now=10)
+    history.observe(reading(CHARGING, 101), now=20)
+    history.observe(reading(CHARGING, 105), now=500)  # host suspended
+    history.observe(reading(IDLE, 110), now=510)
     assert history.latest is None

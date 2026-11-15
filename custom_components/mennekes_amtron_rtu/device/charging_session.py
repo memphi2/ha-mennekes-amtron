@@ -108,11 +108,12 @@ class _Cycle:
 
 
 class PresenceGap:
-    """Bridge short unknown vehicle presence, for the session and running cost.
+    """Bridge short unobserved spans, for the session and running cost.
 
-    The span runs from the last known poll. The allowance is two minutes, or
-    two and a half observed poll intervals for a slow scan, so one unknown poll
-    is bridged at any configured interval but a longer run is not.
+    The span runs from the last known poll, through failed or unknown polls
+    or a silent stall. The allowance is two minutes, or two and a half
+    observed poll intervals for a slow scan, so one unknown poll is bridged at
+    any configured interval but a longer gap is not.
     """
 
     def __init__(self) -> None:
@@ -129,8 +130,12 @@ class PresenceGap:
             # The clock moved back: measure from this poll, known or not.
             self.reset()
             self._known_at = now
+        # Unknown polls, or a silent stall such as a suspended host, both
+        # leave the car unobserved since the last known poll.
+        # A stall between known polls counts once the poll interval is known.
         expired = (
-            (self._unknown or not known) and self._known_at is not None
+            self._known_at is not None
+            and (self._unknown or not known or self._interval is not None)
             and now - self._known_at > max(
                 UNKNOWN_PRESENCE_GRACE_SECONDS, 2.5 * (self._interval or 0.0),
             )
@@ -221,13 +226,13 @@ class SessionHistory:
                 self._cycle = None
                 self._idle_energy = None
             elif self._cycle is not None:
-                self._latest = self._complete(self._cycle, total, observed_at)
+                self._finish(self._cycle, total, observed_at)
                 self._cycle = None
                 self._idle_energy = None
             elif self._closing is not None and total is not None:
                 cycle, unplugged_at = self._closing
                 self._closing = None
-                self._latest = self._complete(cycle, total, unplugged_at)
+                self._finish(cycle, total, unplugged_at)
             elif total is not None and previous_total is not None and total > previous_total:
                 # Energy accrued without an observed connection cycle. The
                 # old completed record cannot represent the newest charge.
@@ -272,6 +277,15 @@ class SessionHistory:
         # Error/service states with confirmed presence neither close the cycle
         # nor claim that charging stopped. A later known state bounds its end.
         return self._latest != previous
+
+    def _finish(self, cycle: _Cycle, total: float | None, now: float) -> None:
+        """A plug-in without charging or energy, e.g. a full car, keeps the last charge."""
+        idle = (
+            cycle.valid and cycle.started_after is None and total is not None
+            and cycle.baseline_kwh is not None and total <= cycle.baseline_kwh
+        )
+        if not idle:
+            self._latest = self._complete(cycle, total, now)
 
     @staticmethod
     def _complete(cycle: _Cycle, total: float | None, now: float) -> CompletedSession | None:

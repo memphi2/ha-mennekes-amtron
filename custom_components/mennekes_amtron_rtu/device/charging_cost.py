@@ -313,8 +313,8 @@ class CostAccumulator:
     Call set_price when an input price changes, including becoming unavailable.
     Only fresh meter reads belong in observe_energy; None means a failed read,
     not an unchanged cached value. Events must arrive in chronological order.
-    Call reset for a new fully observed plug cycle, then supply its idle baseline
-    and current price. A reset does not carry the previous cycle's price forward.
+    The charging-cost observer runs one accumulator continuously and prices
+    sessions as differences of checkpoints; reset would invalidate those.
     """
 
     def __init__(self, tariff: TariffConfig | None = None, *, max_gap: float = 300.0) -> None:

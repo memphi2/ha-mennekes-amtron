@@ -636,3 +636,45 @@ def test_long_outage_restarts_the_running_cost_without_claiming_completeness(tmp
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+def test_an_idle_poll_without_a_meter_read_keeps_the_running_cost_baseline(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            for offset, value in ((0, data(at, 100)), (10, data(at+10, 100, fresh=False)),
+                                  (20, data(at+20, 105, present=True))):
+                with patch(clock, return_value=at + offset):
+                    await observer.async_observe(value)
+            assert observer.current.complete
+            assert observer.current.energy_kwh == 5
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_many_charging_readings_do_not_evict_the_session_baseline(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        with patch("custom_components.mennekes_amtron_rtu.cost_observer._MAX_METER_RUNS", 2):
+            observer = ChargingCostObserver(hass, entry(), remote=False)
+        at = time.time()+1
+        try:
+            await observer.async_start()
+            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+            readings = [data(at, 100)] + [data(at+i, 100+i, present=True) for i in range(1, 11)]
+            readings += [data(at+20, 110), data(at+30, 110, session=completed(at))]
+            for value in readings:
+                with patch(clock, return_value=value.energy_observed_at):
+                    await observer.async_observe(value)
+            assert observer.last.result.complete
+            assert observer.last.result.cost == pytest.approx(3)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

@@ -7,6 +7,8 @@ import math
 import time
 from collections import deque
 from copy import deepcopy
+from dataclasses import dataclass
+from itertools import islice
 from typing import Any
 
 from homeassistant.core import (
@@ -40,25 +42,25 @@ from .device.charging_cost import (
 from .device.charging_session import CompletedSession, PresenceGap
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
-from .device.registers import ENERGY_TOTAL
+from .device.enums import EvseState
+from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .device.vehicle import snapshot_metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60
-# Meter runs kept to price a completed session: one per distinct reading,
-# about three days of charging at the slow one-minute meter cadence.
+# Possible session baselines: one run per distinct meter value read while not
+# charging, so even many long charges fit.
 _MAX_METER_RUNS = 4096
 
 
+@dataclass(frozen=True, slots=True)
 class _MeterRun:
-    """Consecutive readings with one meter value: first and last running sums."""
+    """Consecutive non-charging readings with one meter value."""
 
-    __slots__ = ("first", "last")
-
-    def __init__(self, checkpoint: CostCheckpoint) -> None:
-        self.first = self.last = checkpoint
+    first: CostCheckpoint
+    last: CostCheckpoint
 
 
 _PRICE_UNITS = {"EUR/kWh": 1.0, "€/kWh": 1.0, "ct/kWh": 0.01, "EUR/MWh": 0.001, "€/MWh": 0.001}
@@ -136,6 +138,7 @@ class ChargingCostObserver:
         # the observed meter interval with exactly its energy. No plug-cycle
         # state is duplicated here.
         self._runs: deque[_MeterRun] = deque(maxlen=_MAX_METER_RUNS)
+        self._newest: CostCheckpoint | None = None
         self._active = False  # A car is plugged in: show the running cost.
         self._cycle_start: CostCheckpoint | None = None
         # The running cost started without an idle reading: never complete.
@@ -285,17 +288,19 @@ class ChargingCostObserver:
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
         if fresh:
             self._accumulator.observe_energy(at, energy)
-            self._record(self._accumulator.checkpoint())
+            self._record(self._accumulator.checkpoint(), charging=data.get(EVSE_STATE.key) == EvseState.CHARGING)
         if present is True:
             self._active = True
             if self._cycle_start is None and fresh:
                 self._cycle_start, self._cycle_partial = self._accumulator.checkpoint(), True
         elif present is False:
-            self._active = False
             # Only a reading while unplugged starts the next running cost; an
             # unplug without one must not carry this charge into the next.
-            self._cycle_start = self._accumulator.checkpoint() if fresh else None
-            self._cycle_partial = False
+            if fresh:
+                self._cycle_start, self._cycle_partial = self._accumulator.checkpoint(), False
+            elif self._active:
+                self._cycle_start, self._cycle_partial = None, False
+            self._active = False
         latest = CompletedSession.parse(data.charging_session) if data.charging_session else None
         if data.session_summary_supported and latest != self.last.session:
             candidate = LastChargingCost()
@@ -311,13 +316,16 @@ class ChargingCostObserver:
         if self._gap.observe(now, known=known):
             self._cycle_start, self._cycle_partial = None, False
 
-    def _record(self, checkpoint: CostCheckpoint | None) -> None:
+    def _record(self, checkpoint: CostCheckpoint | None, *, charging: bool) -> None:
         if checkpoint is None:
             return
+        self._newest = checkpoint
+        if charging:
+            return
         if self._runs and self._runs[-1].last.meter_kwh == checkpoint.meter_kwh:
-            self._runs[-1].last = checkpoint
+            self._runs[-1] = _MeterRun(self._runs[-1].first, checkpoint)
         else:
-            self._runs.append(_MeterRun(checkpoint))
+            self._runs.append(_MeterRun(checkpoint, checkpoint))
 
     def _session_cost(self, kwh: float) -> CostResult:
         """Price the interval from the last baseline reading to the newest one.
@@ -325,13 +333,17 @@ class ChargingCostObserver:
         Only the newest reading may end it: the session completes with its
         final meter value, and an older end could match another interval.
         """
-        if not self._runs:
+        newest = self._newest
+        if newest is None or not self._runs:
             return CostResult(0.0, kwh, kwh, False)
-        end = self._runs[-1]
-        target = end.first.meter_kwh - kwh
-        for start in reversed(list(self._runs)[:-1]):
+        # The earliest reading of the final value, before later idle gaps.
+        tail = self._runs[-1]
+        same = tail.last.meter_kwh == newest.meter_kwh
+        end = tail.first if same else newest
+        target = end.meter_kwh - kwh
+        for start in islice(reversed(self._runs), 1 if same else 0, None):
             if math.isclose(start.last.meter_kwh, target, rel_tol=1e-9, abs_tol=1e-6):
-                return end.first.since(start.last, energy_kwh=kwh)
+                return end.since(start.last, energy_kwh=kwh)
             if start.last.meter_kwh < target:
                 break
         return CostResult(0.0, kwh, kwh, False)
