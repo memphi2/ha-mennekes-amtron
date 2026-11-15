@@ -31,7 +31,7 @@ A profile does not enable every feature at once:
 | Charge level | A percentage charging target |
 | Vehicle charge limit | A maximum selectable percentage based on the car's own limit |
 | Usable battery capacity | Planning current for a selected departure time |
-| Vehicle departure timers | A button to copy the next supported vehicle climate timer; only when the car sends its timers |
+| Vehicle departure timers | The `use_vehicle_departure` action to copy the next supported vehicle climate timer; only when the car sends its timers |
 | Vehicle charging history | Better matching for estimated charging losses |
 | Cable and home signals | Optional selection of the active profile, and recognition for Virtual Plug & Charge |
 
@@ -257,7 +257,8 @@ manually, but that choice alone never proves which car is connected.
 2. Open the wallbox's device page and turn on **Virtual Plug & Charge** under
    **Configuration**. This switch controls the feature for the whole wallbox.
    The feature requires write access.
-3. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
+3. Connect the car and check the `plug_charge` attribute of **Charging wait
+   reason**. Allow time for
    the vehicle integration to report the new cable connection.
 
 You can still switch the feature off on the wallbox
@@ -300,18 +301,19 @@ current. Charging therefore never starts briefly before a planned pause. A plan
 that still lacks its target, charge level or capacity does not hold a manual
 pause. A wallbox lock, a charging release switched off for this connection, reached target or a newer
 queued command still prevents charging; the feature does not remove those
-choices. While charging stays blocked, the status sensor's **Blocking reason**
-attribute names the condition, such as **Departure plan is preparing the
+choices. While charging stays blocked, the `plug_charge_blocked` attribute of
+**Charging wait reason** (**Blocking reason**) names the condition, such as **Departure plan is preparing the
 current**. Once granted, a later missing or stale vehicle
-report does not interrupt that connection. In service mode, its existing grant
+report does not interrupt that connection. With the app, its existing grant
 also survives an HA Core restart because the app continues observing the wallbox.
-A confirmed disconnect (control pilot A with an idle wallbox) or an app restart
-requires a fresh grant. A briefly unreadable or contradictory
+A confirmed disconnect (control pilot A with an idle wallbox) or a restart of
+the service requires a fresh grant. A briefly unreadable or contradictory
 wallbox state is not treated as unplugging: the grant stays. Only when the
 state remains unknown for 60 seconds is the release switched off; HA then
 grants the same connection again as soon as the car is reported connected,
-without replugging and without lifting a pause. Direct mode loses
-its grant on a full HA restart or when its physical connection closes. Automatic profile changes preserve the open connection.
+without replugging and without lifting a pause. A direct entry's service runs
+inside HA, so it loses its grant on a full HA restart or when its physical
+connection closes. Automatic profile changes preserve the open connection.
 Choosing another profile alone also leaves an existing grant with that same
 physical connection. Changing a vehicle's identity or detection sources invalidates the grant; the
 next connection always needs a fresh match for the then-active profile.
@@ -361,7 +363,8 @@ The percentage target is **off by default**. Open the profile under
 **Configure → Vehicles**, then **Charge level and charge limit → Configure charge
 level**. Use the BavarianData profile's charge level or
 select a **Vehicle charge level entity** from an existing vehicle integration.
-This adds **Vehicle charge target** and its status sensor. The integration only
+This adds **Vehicle charge target**; its status is the `vehicle_target`
+attribute of **Charging wait reason**. The integration only
 reads the selected vehicle data; it does not change the car's settings or estimate
 battery capacity from wallbox energy.
 
@@ -422,7 +425,7 @@ are unchanged.
 | Usable battery capacity | The departure planner cannot calculate a new current; see [departure planning](departure-planning.md). |
 | Detection signals are unclear | Automatic mode keeps the previously selected car until another car or an unknown car at the wallbox is detected. Choose the correct profile manually if needed. |
 | Virtual Plug & Charge is waiting for detection | Wait for a new cable report for this connection and check that the recognized car's profile is selected. Manually selecting it does not replace the detection check. |
-| Virtual Plug & Charge shows **Charging blocked** | Open the status sensor and check its **Blocking reason** attribute, for example a switched-off charging release, a wallbox lock or authorization, a reached target or a missing register value. |
+| Virtual Plug & Charge shows **Charging blocked** | Open **Charging wait reason** and check its `plug_charge_blocked` (**Blocking reason**) attribute, for example a switched-off charging release, a wallbox lock or authorization, a reached target or a missing register value. |
 | Charging history cannot be matched | Loss estimates stay unknown instead of being assigned to the wrong charge. See [charging estimates](charging-estimates.md). |
 
 For absent BavarianData entities, open the vehicle's HA entity list and enable

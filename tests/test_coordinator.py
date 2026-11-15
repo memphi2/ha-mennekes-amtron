@@ -1,29 +1,75 @@
+"""What one poll of the wallbox reads, and what the service's state shows HA.
+
+The first part covers the poller the service runs on the bus; the second
+the coordinator that fetches the service's state for Home Assistant.
+"""
+
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from custom_components.mennekes_amtron_rtu import coordinator as coordinator_module
+from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
+from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronBusError,
+    AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.data import (
     ConnectionState,
     DeviceIdentity,
 )
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
+from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from custom_components.mennekes_amtron_rtu.device.register_blocks import (
     REGISTER_BLOCKS,
     SLOW_BLOCK_INTERVAL_SECONDS,
     BlockCadence,
 )
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 from tests.ha_fakes import FakeConfigEntry, FakeHass
+
+
+class _Polling:
+    """Poll like the service does: each poll builds on the previous one."""
+
+    def __init__(self, poller: DevicePoller, identity: DeviceIdentity) -> None:
+        self._poller = poller
+        self.identity = identity
+        self.data: WallboxData | None = None
+        self.last_update_success = True
+
+    def current_data(self) -> WallboxData:
+        return self.data or WallboxData()
+
+    async def _async_update_data(self) -> WallboxData:
+        try:
+            data = await self._poller.async_poll(
+                self.current_data(), last_success=self.last_update_success
+            )
+        except AmtronBusError:
+            self.last_update_success = False
+            raise
+        self.last_update_success = True
+        return data
+
+    async def async_refresh(self) -> None:
+        with contextlib.suppress(AmtronBusError):
+            self.data = await self._async_update_data()
 
 
 async def _coordinator(
@@ -33,20 +79,21 @@ async def _coordinator(
     connection_state: ConnectionState | None = None,
     monotonic: Any = None,
     measurement_interval: float = 5,
-) -> MennekesAmtronCoordinator:
+) -> _Polling:
     client = MennekesModbusClient(
         SerialConfig(port="/dev/fake"), client_factory=lambda _config: transport
     )
     await client.async_connect()
-    return MennekesAmtronCoordinator(
-        FakeHass(),
-        FakeConfigEntry(),
-        client=client,
-        identity=DeviceIdentity(layout_version=layout),
-        connection_state=connection_state or ConnectionState(),
-        scan_interval=5,
-        measurement_interval=measurement_interval,
-        **({"monotonic": monotonic} if monotonic else {}),
+    identity = DeviceIdentity(layout_version=layout)
+    return _Polling(
+        DevicePoller(
+            client,
+            identity,
+            connection_state=connection_state or ConnectionState(),
+            measurement_interval=measurement_interval,
+            **({"monotonic": monotonic} if monotonic else {}),
+        ),
+        identity,
     )
 
 
@@ -68,22 +115,20 @@ def test_recovery_observes_fresh_error_status_only() -> None:
     async def run() -> None:
         transport = FakeModbusClient(device_bank())
         coordinator = await _coordinator(transport)
-        observed: list[tuple[object, int]] = []
-        coordinator.observe_recovery = lambda error, generation: observed.append((error, generation))
         transport.bank[R.ERROR_CODE.address] = 200
         coordinator.data = await coordinator._async_update_data()
+        assert coordinator.data.fresh(R.ERROR_CODE.key) == 200
         transport.bank[R.ERROR_CODE.address] = 0
         coordinator.data = await coordinator._async_update_data()
-        assert observed == [(200, 0), (0, 0)]
+        assert coordinator.data.fresh(R.ERROR_CODE.key) == 0
 
         # An unreadable error register must not confirm a cached zero.
         transport.read_exceptions[R.ERROR_CODE.address] = 0x04
         coordinator.data = await coordinator._async_update_data()
-        assert observed == [(200, 0), (0, 0), (None, 0)]
+        assert coordinator.data.fresh(R.ERROR_CODE.key) is None
         transport.read_exceptions[0x0100] = raise_connection_error()
-        with pytest.raises(UpdateFailed):
+        with pytest.raises(AmtronBusError):
             await coordinator._async_update_data()
-        assert observed == [(200, 0), (0, 0), (None, 0)]
 
     asyncio.run(run())
 
@@ -116,7 +161,7 @@ def test_a_lost_connection_fails_the_update() -> None:
         transport = FakeModbusClient(device_bank())
         transport.read_exceptions[0x0100] = raise_connection_error()
         coordinator = await _coordinator(transport)
-        with pytest.raises(UpdateFailed):
+        with pytest.raises(AmtronBusError):
             await coordinator._async_update_data()
 
     asyncio.run(run())
@@ -147,7 +192,7 @@ def test_an_entirely_silent_device_fails_the_update() -> None:
         ):
             transport.read_exceptions[block_address] = 0x04
         coordinator = await _coordinator(transport)
-        with pytest.raises(UpdateFailed, match="no register block"):
+        with pytest.raises(AmtronBusError, match="no register block"):
             await coordinator._async_update_data()
 
     asyncio.run(run())
@@ -166,7 +211,7 @@ def test_availability_is_logged_once_per_change(
         transport.read_exceptions[0x0100] = raise_connection_error()
         with caplog.at_level(logging.INFO):
             for _ in range(3):
-                with pytest.raises(UpdateFailed):
+                with pytest.raises(AmtronBusError):
                     await coordinator._async_update_data()
             assert sum("Connection: lost" in r.message for r in caplog.records) == 1
 
@@ -512,5 +557,184 @@ def test_a_failed_measurement_stays_unavailable_until_read_again() -> None:
         coordinator.data = await coordinator._async_update_data()
         assert coordinator.data.has("voltage_l1")
         assert coordinator.data.failed_blocks == ()
+
+    asyncio.run(run())
+
+
+# --- the coordinator that shows the service's state ------------------------
+
+
+class _Client:
+    """The part of the service client the coordinator uses."""
+
+    def __init__(self, *results: object) -> None:
+        self.identity = DeviceIdentity(serial_number="ABC123456789")
+        self.on_auth_error = None
+        self._results = list(results)
+
+    async def update(self) -> WallboxData:
+        result = self._results.pop(0)
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+
+def _service_coordinator(client: _Client) -> ServiceCoordinator:
+    return ServiceCoordinator(FakeHass(), FakeConfigEntry(), client=client, scan_interval=5)
+
+
+def test_the_coordinator_shows_the_services_identity_and_state() -> None:
+    async def run() -> None:
+        data = WallboxData(values={"evse_state": 1})
+        coordinator = _service_coordinator(_Client(data))
+        assert coordinator.identity.serial_number == "ABC123456789"
+        assert coordinator.current_data().values == {}
+        observed: list[WallboxData | None] = []
+
+        async def observe(value: WallboxData | None) -> None:
+            observed.append(value)
+
+        coordinator.observe_session = observe
+        assert await coordinator._async_update_data() is data
+        assert observed == [data]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("reason", "error", "key"), [
+    ("service_auth_failed", ConfigEntryAuthFailed, "service_auth_failed"),
+    ("service_identity_changed", UpdateFailed, "device_identity_changed"),
+    ("service_version_mismatch", UpdateFailed, "service_version_mismatch"),
+    ("service_not_ready", UpdateFailed, None),
+])
+def test_each_service_failure_has_its_own_reason(reason, error, key) -> None:
+    async def run() -> None:
+        coordinator = _service_coordinator(_Client(ServiceConnectionError(reason, "failed")))
+        observed: list[WallboxData | None] = []
+
+        async def observe(value: WallboxData | None) -> None:
+            observed.append(value)
+
+        coordinator.observe_session = observe
+        with pytest.raises(error) as caught:
+            await coordinator._async_update_data()
+        assert caught.value.translation_key == key
+        # A failed poll still reaches the estimates, as a gap.
+        assert observed == [None]
+
+    asyncio.run(run())
+
+
+def test_a_lost_service_fails_the_update_without_an_estimate_observer() -> None:
+    async def run() -> None:
+        coordinator = _service_coordinator(_Client(AmtronConnectionError("lost")))
+        with pytest.raises(UpdateFailed, match="lost"):
+            await coordinator._async_update_data()
+
+    asyncio.run(run())
+
+
+def test_a_queued_command_is_read_back_when_it_is_due(monkeypatch) -> None:
+    async def run() -> None:
+        scheduled: list[tuple[float, Any]] = []
+        cancelled: list[int] = []
+
+        def call_later(_hass, delay, action):
+            scheduled.append((delay, action))
+            index = len(scheduled) - 1
+            return lambda: cancelled.append(index)
+
+        monkeypatch.setattr(coordinator_module, "async_call_later", call_later)
+        now = datetime.now(UTC)
+        soon = WallboxData(pending_change_until=now + timedelta(seconds=2))
+        later = WallboxData(pending_change_until=now + timedelta(seconds=60))
+        coordinator = _service_coordinator(_Client(soon, soon, later, WallboxData()))
+        await coordinator._async_update_data()
+        assert len(scheduled) == 1
+        assert 2 < scheduled[0][0] < 3.5
+        # A newer poll replaces the timer instead of adding one.
+        await coordinator._async_update_data()
+        assert cancelled == [0]
+        assert len(scheduled) == 2
+        # A due time beyond the next poll needs no timer of its own.
+        await coordinator._async_update_data()
+        assert cancelled == [0, 1]
+        assert len(scheduled) == 2
+        await coordinator._async_update_data()
+        assert len(scheduled) == 2
+
+        refreshed: list[bool] = []
+
+        async def request_refresh() -> None:
+            refreshed.append(True)
+
+        coordinator.async_request_refresh = request_refresh
+        coordinator._pending_refresh = lambda: cancelled.append(99)
+        scheduled[1][1](now)
+        await asyncio.sleep(0)
+        assert refreshed == [True]
+        assert coordinator._pending_refresh is None
+
+        coordinator._pending_refresh = lambda: cancelled.append(100)
+        await coordinator.async_shutdown()
+        assert cancelled[-1] == 100
+
+    asyncio.run(run())
+
+
+def test_without_a_poll_interval_no_due_time_is_followed(monkeypatch) -> None:
+    async def run() -> None:
+        monkeypatch.setattr(
+            coordinator_module, "async_call_later",
+            lambda *_: pytest.fail("no timer without an interval"),
+        )
+        soon = WallboxData(pending_change_until=datetime.now(UTC) + timedelta(seconds=2))
+        coordinator = _service_coordinator(_Client(soon))
+        coordinator.update_interval = None
+        await coordinator._async_update_data()
+
+    asyncio.run(run())
+
+
+def test_a_new_authentication_failure_is_published_even_while_unavailable(monkeypatch) -> None:
+    # Translating the message needs a running Home Assistant.
+    monkeypatch.setattr(
+        coordinator_module, "ConfigEntryAuthFailed",
+        lambda **_kwargs: ConfigEntryAuthFailed("service authentication failed"),
+    )
+
+    async def run() -> None:
+        client = _Client()
+        coordinator = _service_coordinator(client)
+        notified: list[bool] = []
+        coordinator.async_add_listener(lambda: notified.append(coordinator.last_update_success))
+        client.on_auth_error(True)
+        assert isinstance(coordinator.last_exception, ConfigEntryAuthFailed)
+        # Already available before: HA itself notified the listeners once.
+        assert notified == [False]
+        client.on_auth_error(True)
+        assert notified == [False, False]
+        # A repeated report of the same failure stays quiet.
+        client.on_auth_error(False)
+        assert notified == [False, False]
+
+    asyncio.run(run())
+
+
+def test_a_rejected_gateway_password_asks_for_it_again_instead_of_only_failing() -> None:
+    async def run() -> None:
+        rejected = [False]
+        coordinator = ServiceCoordinator(
+            FakeHass(), FakeConfigEntry(),
+            client=_Client(AmtronConnectionError("lost"), AmtronConnectionError("lost")),
+            scan_interval=5, credentials_rejected=lambda: rejected[0],
+        )
+        # A lost wallbox stays an ordinary failed update.
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        rejected[0] = True
+        with pytest.raises(ConfigEntryAuthFailed) as raised:
+            await coordinator._async_update_data()
+        assert raised.value.translation_key == "gateway_authentication_failed"
 
     asyncio.run(run())

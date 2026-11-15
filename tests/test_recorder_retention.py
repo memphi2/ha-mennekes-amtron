@@ -29,7 +29,7 @@ from sqlalchemy import event
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
-from tests.recorder_replay import DEFAULT_STATISTICS, DETAILS, EXTRAS
+from tests.recorder_replay import DEFAULT_STATISTICS, DETAILS, EXTRAS, embedded_service
 from tests.test_home_assistant_smoke import _boot
 
 
@@ -73,6 +73,7 @@ def test_repeated_retention_cycles_keep_history_bounded_and_energy_statistics(
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
                 coordinator = entry.runtime_data.coordinator
                 coordinator.update_interval = None
+                service = embedded_service(hass, entry)
                 recorder = get_instance(hass)
                 await recorder.async_block_till_done()
 
@@ -98,8 +99,9 @@ def test_repeated_retention_cycles_keep_history_bounded_and_energy_statistics(
                         put(transport.bank, R.ENERGY_TOTAL, 1234.5 + day + sample / 120)
                         put(transport.bank, R.POWER_TOTAL, 1000 + sample)
                         put(transport.bank, R.VOLTAGE_L1, 230 + sample % 3)
-                        coordinator._poller._slow_read_at = None
-                        coordinator._poller._active_read_at = None
+                        service._poller._slow_read_at = None
+                        service._poller._active_read_at = None
+                        await service.refresh()
                         coordinator.async_set_updated_data(await coordinator._async_update_data())
                         await hass.async_block_till_done()
                     await committed()

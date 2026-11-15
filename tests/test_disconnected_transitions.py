@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceValidationError,
+)
 from tests.fakes import put, raise_connection_error
 from tests.test_control import Harness
 from tests.test_modbus_service import current_writes, service_fixture
@@ -198,7 +200,7 @@ def test_idle_with_conflicting_cp_never_skips_phase_preparation(cp):
         harness = Harness()
         control = await harness.connect()
         _unplug(harness, cp)
-        with pytest.raises(ServiceValidationError):
+        with pytest.raises(DeviceValidationError):
             await control.async_set_requested_phases(1)
         assert harness.transport.writes == []
 

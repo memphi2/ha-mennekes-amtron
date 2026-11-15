@@ -29,7 +29,8 @@ visible and shows:
   guest charge, departure plan or manual control), why
   the car does not charge yet, the next step with its time, the target and
   whether Home Assistant confirmed the car. Home Assistant shows the same
-  summary as [three sensors](entities.md#charging-control-at-a-glance).
+  summary as [Charging wait reason](entities.md#charging-wait-reason) and its
+  attributes.
 - the **observed charging state** read from the wallbox, and why the app holds
   a pause or a stop, for example a reached target or a switched-off release
 - power, session energy and the current limit read back from the wallbox;
@@ -52,7 +53,7 @@ Check the observed charging state and power above for the physical result.
 
 The time beside each result is the original command-event time. For a longer
 timeline together with plug-in, charging and fault changes, use **Home Assistant
-Activity → Wallbox event**. Its readable messages include that original time;
+Activity → Activity**. Its readable messages include that original time;
 the HA timeline itself is dated when HA received the event.
 [Activity details and repeated commands](troubleshooting.md#understand-the-activity-timeline).
 

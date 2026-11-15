@@ -21,7 +21,7 @@ from tests.ha_fakes import FakeHass
 from tests.test_config_flow import SearchFlow
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN, service_fixture
-from tests.test_service_discovery import URL, discovery_info
+from tests.test_service_discovery import URL, discovery_info, loopback_transport
 from tests.test_service_reauth import NEW_TOKEN, add_entry, entity_ids
 
 
@@ -58,7 +58,7 @@ def test_failed_service_setup_can_recover_in_the_same_flow(
                         super().__init__(session, str(server.make_url("/")), token)
 
                 monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "HttpTransport", loopback_transport(server))
                 if source == "user":
                     flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
                     flow = await hass.config_entries.flow.async_configure(
@@ -127,7 +127,7 @@ def test_discovery_preserves_an_unrelated_pending_user_flow(tmp_path, monkeypatc
                         super().__init__(session, str(server.make_url("/")), token)
 
                 monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "HttpTransport", loopback_transport(server))
                 user_flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
                 discovered = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "hassio"}, data=discovery_info()
@@ -159,7 +159,7 @@ def test_discovered_token_rotation_reloads_a_loaded_entry_once(tmp_path, monkeyp
                         super().__init__(session, str(server.make_url("/")), token)
 
                 monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "HttpTransport", loopback_transport(server))
                 entry = await add_entry(hass, URL)
                 before = entity_ids(hass, entry)
                 service.config = replace(service.config, token=NEW_TOKEN)

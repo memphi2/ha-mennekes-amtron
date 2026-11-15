@@ -1,65 +1,26 @@
 """Exercise trip completion, concurrent edits and vehicle safety at runtime."""
 
 import asyncio
-from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
+from datetime import timedelta
 from unittest.mock import AsyncMock
 
 import atomicwrites
 import pytest
-from aiohttp import ClientSession
-from aiohttp.test_utils import TestServer
 
 import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
-from custom_components.mennekes_amtron_rtu.data import WallboxData
-from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.departure_plan import DepartureState
 from custom_components.mennekes_amtron_rtu.device.persistence import (
     StorageCommitUncertainError,
     StorageStateUnknownError,
 )
-from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.goal_store import (
     DepartureIntent,
     TimedGoalStore,
 )
-from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
-from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
 from tests.ha_fakes import FakeHass
-from tests.test_control import Harness
-from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_timed_goal import NOW, setup_observer, state
-
-
-@pytest.mark.parametrize("detected", ["missing", None, 0])
-def test_unknown_vehicle_phases_plan_three_until_the_car_charged(monkeypatch, detected):
-    async def run():
-        observer, control, _hass = setup_observer(monkeypatch)
-        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
-        if detected == "missing":
-            control.data.values.pop("detected_ev_phases")
-        else:
-            control.data.values["detected_ev_phases"] = detected
-        observer.goal.set(NOW + timedelta(hours=16))
-
-        # Detection reads zero until the car draws current. Three phases put
-        # the start 5.3 h before departure instead of a whole day.
-        await observer._evaluate()
-        assert observer.status == "paused_until_start"
-        assert observer.planned_start == pytest.approx(
-            NOW + timedelta(hours=16 - 48 / (16 * 0.621) - 0.5), abs=timedelta(seconds=1),
-        )
-
-        # The car's phases from its last charge decide once it had one.
-        observer._known_phases = 1
-        await observer._evaluate()
-        assert observer.planned_start == pytest.approx(
-            NOW + timedelta(hours=16 - 48 / (16 * 0.207) - 0.5), abs=timedelta(seconds=1),
-        )
-
-    asyncio.run(run())
 
 
 def test_completed_trip_roundtrip_and_invalid_completion() -> None:
@@ -90,204 +51,6 @@ def test_partial_or_boolean_input_datetime_is_not_a_departure(attributes: dict) 
     assert departure_time(state(
         "input_datetime.trip", "06:00:00", **{"timestamp": NOW.timestamp(), **attributes},
     )) is None
-
-
-def test_no_vehicle_or_unknown_presence_never_changes_current(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, _hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8))
-        for evse, cp in ((EvseState.IDLE, CpState.A1), (EvseState.ERROR, CpState.E)):
-            control.data.values.update({"evse_state": evse, "cp_state": cp})
-            await observer._evaluate()
-            assert observer.status == "waiting_for_device"
-        assert control.commands == []
-
-    asyncio.run(run())
-
-
-def test_vehicle_cap_completion_cannot_rearm_from_unchanged_source(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, hass = setup_observer(monkeypatch)
-        future = NOW + timedelta(hours=8)
-        observer._entry.options["timed_departure_entity"] = "sensor.departure"
-        hass.states["sensor.departure"] = state("sensor.departure", future.isoformat())
-        goal = SocGoal()
-        goal.configure_source("sensor.soc|")
-        goal.set_target(80, soc=20)
-        goal.observe(60, maximum=60)
-        control.soc_goal = goal
-        # The car reports the same charge level the target saw.
-        hass.states["sensor.soc"] = state("sensor.soc", "60", unit_of_measurement="%")
-        await observer._evaluate()
-        assert observer.status == "reached"
-        assert observer.goal.deadline == future
-        goal.set_target(60, soc=20)
-        control.is_paused = True
-        await observer._evaluate()
-        assert observer.status == "reached"
-        assert control.commands == []
-        # Keep the timestamp for preconditioning, then consume it once the
-        # selected departure has passed without relabelling success as late.
-        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: future + timedelta(seconds=1))
-        await observer._evaluate()
-        assert observer.goal.deadline is None
-        assert observer.goal.finished == "reached"
-        assert control.commands == []
-
-    asyncio.run(run())
-
-
-def test_live_soc_at_goal_consumes_trip_without_writing(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8))
-        hass.states["sensor.soc"] = state("sensor.soc", "80", unit_of_measurement="%")
-        await observer._evaluate()
-        assert observer.status == "reached"
-        assert observer.goal.deadline == NOW + timedelta(hours=8)
-        assert control.commands == []
-
-    asyncio.run(run())
-
-
-def test_a_raised_target_plans_a_reached_trip_again(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, hass = setup_observer(monkeypatch)
-        deadline = NOW + timedelta(hours=8)
-        observer.goal.set(deadline)
-        hass.states["sensor.soc"] = state("sensor.soc", "80", unit_of_measurement="%")
-        await observer._evaluate()
-        assert observer.goal.finished == "reached"
-        assert observer.planned_start is None
-        # A charge level falling before departure keeps the trip finished.
-        hass.states["sensor.soc"] = state("sensor.soc", "78", unit_of_measurement="%")
-        await observer._evaluate()
-        assert observer.status == "reached"
-        hass.states["sensor.soc"] = state("sensor.soc", "80", unit_of_measurement="%")
-        control.soc_goal.target_percent = 90.0
-        await observer._evaluate()
-        assert observer.goal.finished is None
-        assert observer.goal.deadline == deadline
-        await observer._evaluate()
-        # 8 kWh in eight hours fits at the minimum current, so it waits.
-        assert observer.status == "paused_until_start"
-        assert NOW < observer.planned_start < deadline
-        assert control.commands == [("pause", None)]
-
-    asyncio.run(run())
-
-
-def test_a_reached_kwh_target_does_not_reopen_the_trip(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8))
-        hass.states["sensor.soc"] = state("sensor.soc", "80", unit_of_measurement="%")
-        await observer._evaluate()
-        control.soc_goal.target_percent = 90.0
-        control.energy_goal = SimpleNamespace(status="reached")
-        await observer._evaluate()
-        assert observer.goal.finished == "reached"
-
-    asyncio.run(run())
-
-
-def test_planned_start_follows_the_plan_and_clears_without_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, _control, hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=2))
-        await observer._evaluate()
-        # 48 kWh in two hours charges at once; the start is now.
-        assert observer.status in ("paced", "unreachable")
-        assert observer.planned_start == NOW
-        later = NOW + timedelta(minutes=5)
-        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: later)
-        await observer._evaluate()
-        assert observer.planned_start == NOW
-        # Another trip plans its own start instead of keeping the old one.
-        await observer.async_set_deadline(later + timedelta(hours=3))
-        assert observer.planned_start is None
-        await observer._evaluate()
-        assert observer.planned_start is not None
-        started = observer.planned_start
-        # A charge level or poll that drops out keeps the started plan.
-        soc = hass.states.pop("sensor.soc")
-        await observer._evaluate()
-        assert observer.status == "waiting_for_soc"
-        assert observer.planned_start == started
-        hass.states["sensor.soc"] = soc
-        observer._runtime.coordinator.last_update_success = False
-        await observer._evaluate()
-        assert observer.status == "waiting_for_device"
-        assert observer.planned_start == started
-        observer._runtime.coordinator.last_update_success = True
-        # A missing target ends it.
-        observer._runtime.control.soc_goal.status = "inactive"
-        await observer._evaluate()
-        assert observer.status == "waiting_for_target"
-        assert observer.planned_start is None
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("stop", ["meter_unavailable", "meter_reset", "pending_soc"])
-def test_safety_stop_retains_trip_and_recovery_resumes_pacing(monkeypatch: pytest.MonkeyPatch, stop: str) -> None:
-    async def run() -> None:
-        observer, control, _hass = setup_observer(monkeypatch)
-        deadline = NOW + timedelta(hours=5)
-        observer.goal.set(deadline)
-        control.energy_goal.set_target(10, 100)
-        control.data.values["charging_current_ems"] = 10.0
-        await observer._evaluate()
-        assert control.commands == [("current", 16.0)]
-        original = observer.goal
-        if stop != "pending_soc":
-            control.energy_goal.observe(None if stop == "meter_unavailable" else 99)
-            assert control.energy_goal.status == stop
-        # The composite stop can also fence a start while a SoC observation
-        # waits for its controller lock; it is not itself proof of completion.
-        control.energy_goal_stop_requested = True
-        control.is_paused = True
-        control.data.values["charging_current_ems"] = 1.0
-        await observer._evaluate()
-        await observer._evaluate()
-        assert observer.status == "waiting_for_device"
-        assert observer.goal is original
-        assert observer.goal.deadline == deadline
-        assert observer.goal.finished is None
-        assert control.commands == [("current", 16.0)]
-        assert observer._store.saved == []
-        if stop == "meter_unavailable":
-            control.energy_goal.observe(101)
-            assert control.energy_goal.status == "active"
-        elif stop == "meter_reset":
-            # Meter-reset safety remains latched until the energy goal is
-            # explicitly cleared; the independent departure is still usable.
-            control.energy_goal.set_target(0)
-        control.energy_goal_stop_requested = False
-        monkeypatch.setattr(observer_module.time, "monotonic", lambda: 301.0)
-        await observer._evaluate()
-        assert observer.status == "charging"
-        assert observer.goal is original
-        assert control.commands == [("current", 16.0), ("current", 16.0)]
-
-    asyncio.run(run())
-
-
-def test_reached_energy_ceiling_finishes_trip_without_resuming(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, _hass = setup_observer(monkeypatch)
-        deadline = NOW + timedelta(hours=8)
-        observer.goal.set(deadline)
-        control.energy_goal.set_target(10, 100)
-        control.energy_goal.observe(110)
-        control.energy_goal_stop_requested = True
-        await observer._evaluate()
-        assert observer.status == "reached"
-        assert observer.goal.finished == "reached"
-        assert observer.goal.deadline == deadline
-        assert control.commands == []
-
-    asyncio.run(run())
 
 
 def test_manual_selection_wins_until_external_departure_changes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -333,9 +96,9 @@ def test_slow_calendar_lookup_cannot_overwrite_a_new_manual_selection(monkeypatc
     asyncio.run(run())
 
 
-def test_deadline_saves_serialize_and_stale_commands_are_discarded(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deadline_saves_serialize_and_a_stopped_observer_ignores_edits(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
-        observer, control, _hass = setup_observer(monkeypatch)
+        observer, _control, _hass = setup_observer(monkeypatch)
         started, finish = asyncio.Event(), asyncio.Event()
         save = observer._store.async_save
 
@@ -353,12 +116,7 @@ def test_deadline_saves_serialize_and_stale_commands_are_discarded(monkeypatch: 
         await asyncio.gather(first, second)
         assert observer.goal.deadline == NOW + timedelta(hours=2)
         assert observer._store.saved[-1] == observer.goal.snapshot()
-        old = observer.goal
         await observer.async_set_deadline(None)
-        await observer._write(16, old)
-        await observer._finish("reached", old)
-        assert control.commands == []
-        assert observer.goal.finished is None
         observer._stopping = True
         await observer.async_set_deadline(NOW + timedelta(hours=3))
         assert observer.goal.deadline is None
@@ -379,10 +137,10 @@ def test_store_failure_preserves_current_trip(monkeypatch: pytest.MonkeyPatch) -
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("operation", ["replace", "clear", "finish"])
+@pytest.mark.parametrize("operation", ["replace", "clear"])
 def test_cancelled_save_keeps_live_and_durable_trip_consistent(monkeypatch, operation):
     async def run():
-        observer, control, _hass = setup_observer(monkeypatch)
+        observer, _control, _hass = setup_observer(monkeypatch)
         observer.goal.set(NOW + timedelta(hours=8))
         original = observer.goal
         started, finish = asyncio.Event(), asyncio.Event()
@@ -394,12 +152,8 @@ def test_cancelled_save_keeps_live_and_durable_trip_consistent(monkeypatch, oper
             await save(goal)
 
         observer._store.async_save = slow_save
-        if operation == "finish":
-            action = observer._finish("reached", original)
-        else:
-            deadline = None if operation == "clear" else NOW + timedelta(hours=9)
-            action = observer.async_set_deadline(deadline)
-        task = asyncio.create_task(action)
+        deadline = None if operation == "clear" else NOW + timedelta(hours=9)
+        task = asyncio.create_task(observer.async_set_deadline(deadline))
         await started.wait()
         task.cancel()
         await asyncio.sleep(0)
@@ -408,13 +162,8 @@ def test_cancelled_save_keeps_live_and_durable_trip_consistent(monkeypatch, oper
         with pytest.raises(asyncio.CancelledError):
             await task
         assert observer._store.saved[-1] == observer.goal.snapshot()
-        if operation == "finish":
-            assert observer.goal.finished == "reached"
-        else:
-            assert observer.goal.deadline == deadline
-        await observer._evaluate()
-        if operation != "replace":
-            assert control.commands == []
+        assert observer.goal is not original
+        assert observer.goal.deadline == deadline
 
     asyncio.run(run())
 
@@ -503,9 +252,11 @@ def test_unknown_trip_storage_blocks_commands_until_cancelled_retry_succeeds(tmp
                 await observer.async_set_deadline(deadline)
         assert observer._save_dirty
         assert observer._save_unknown
+        # The service would plan the trip; an unknown save hands nothing over.
+        control.departure = DepartureState(TimedGoal(), "disabled", None, None, None, None, False)
         await observer._evaluate()
         assert observer.status == "error"
-        assert not control.commands
+        assert control.trips == []
 
         started, release = asyncio.Event(), asyncio.Event()
         save = observer._store.async_save
@@ -526,37 +277,22 @@ def test_unknown_trip_storage_blocks_commands_until_cancelled_retry_succeeds(tmp
         assert not observer._save_unknown
         assert (await observer._store.async_load()).trip.snapshot() == observer.goal.snapshot()
         await observer._evaluate()
-        assert control.commands
+        assert control.trips == [(deadline, None, False)]
 
     asyncio.run(run())
 
 
-def test_detected_vehicle_phases_bound_the_plan(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detected_vehicle_phases_bound_the_planning_phases(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, control, _hass = setup_observer(monkeypatch)
-        # 48 kWh take 4.8 h at 16 A on three phases but 7.2 h on two.
-        observer.goal.set(NOW + timedelta(hours=7))
-        await observer._evaluate()
-        assert observer.status == "paused_until_start"
+        assert observer._phases() == 3
         control.data.values["detected_ev_phases"] = 2
-        await observer._evaluate()
-        assert observer.status == "unreachable"
+        assert observer._phases() == 2
         control.data.values["detected_ev_phases"] = 1
         assert observer._phases() == 1
         control.data.values["switched_phases"] = 1
         control.data.values["detected_ev_phases"] = 3
         assert observer._phases() == 1
-
-    asyncio.run(run())
-
-
-def test_unknown_pause_leaves_charging_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, _hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8))
-        control.is_paused = None
-        await observer._evaluate()
-        assert control.commands == []
 
     asyncio.run(run())
 
@@ -609,353 +345,3 @@ def test_observer_coalesces_events_and_cancels_inflight_work(monkeypatch: pytest
         await unused.async_stop()
 
     asyncio.run(run())
-
-
-@pytest.mark.parametrize("manual", [False, True])
-def test_disabling_soc_target_cancels_only_owned_real_queue(monkeypatch: pytest.MonkeyPatch, manual: bool) -> None:
-    async def run() -> None:
-        observer, _fake_control, _hass = setup_observer(monkeypatch)
-        now = datetime.now(UTC)
-        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: now)
-        harness = Harness()
-        control = await harness.connect()
-        release = asyncio.Event()
-        control._sleep = lambda _delay: release.wait()
-        control.soc_goal.configure_source("sensor.soc|")
-        control.soc_goal.set_target(80, soc=20)
-        observer._runtime.control = control
-        observer.goal.set(now + timedelta(hours=5))
-        try:
-            await control.async_pause_charging()
-            await observer._evaluate()
-            assert control.pending_action == "set_current"
-            assert control._pending.owner == observer._command_owner
-            task = control._flush_task
-            if manual:
-                await control.async_set_charging_current(12)
-            control.soc_goal.set_target(0)
-            await observer._evaluate()
-            assert observer.status == "waiting_for_target"
-            assert observer.goal.finished is None
-            assert (control.pending_action is not None) is manual
-            harness.clock[0] += 301
-            release.set()
-            await asyncio.wait_for(task, 2)
-            assert current_writes(harness.transport) == ([1, 12] if manual else [1])
-        finally:
-            release.set()
-            await observer.async_stop()
-            await control.async_shutdown()
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("manual", [False, True])
-def test_disabling_target_cancels_service_queue_without_removing_manual_work(tmp_path, monkeypatch: pytest.MonkeyPatch, manual: bool) -> None:
-    async def run() -> None:
-        observer, _fake_control, _hass = setup_observer(monkeypatch)
-        now = datetime.now(UTC)
-        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: now)
-        service, transport, clock = await service_fixture(tmp_path)
-        release = asyncio.Event()
-        try:
-            await service.heartbeat.async_stop()
-            service.control._sleep = lambda _delay: release.wait()
-            await service.control.async_configure_soc("sensor.soc|")
-            await service.control.async_set_soc_goal(80, source="sensor.soc|", soc=20)
-            async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
-                await remote.async_connect()
-                control = ServiceControl(
-                    remote,                     state=lambda: WallboxData(), request_refresh=None,
-                )
-                observer._runtime.control = control
-                observer.goal.set(now + timedelta(hours=5))
-                await control.async_pause_charging()
-                await observer._evaluate()
-                assert service.control.pending_action == "set_current"
-                task = service.control._flush_task
-                if manual:
-                    await control.async_set_charging_current(12)
-                await control.async_set_soc_goal(0, source="sensor.soc|")
-                await observer._evaluate()
-                assert observer.status == "waiting_for_target"
-                assert observer.goal.finished is None
-                assert (service.control.pending_action is not None) is manual
-                clock[0] += 301
-                release.set()
-                await asyncio.wait_for(task, 2)
-                assert current_writes(transport) == ([1, 12] if manual else [1])
-                await observer.async_stop()
-                await remote.async_close()
-        finally:
-            release.set()
-            await service.stop()
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize(("missing", "status"), [
-    ("capacity", "waiting_for_capacity"), ("soc", "waiting_for_soc"),
-    ("device", "waiting_for_device"), ("read_only", "read_only"),
-    ("vehicle", "waiting_for_device"), ("safety_stop", "waiting_for_device"),
-])
-def test_missing_planning_input_cancels_future_work_without_stopping_charge(monkeypatch: pytest.MonkeyPatch, missing: str, status: str) -> None:
-    async def run() -> None:
-        observer, control, hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=5))
-        control.data.values["charging_current_ems"] = 10.0
-        await observer._evaluate()
-        control.async_cancel_timed_current = AsyncMock()
-        original = observer.goal
-        if missing == "capacity":
-            observer._entry.options.pop("timed_capacity_kwh")
-        elif missing == "soc":
-            hass.states.pop("sensor.soc")
-        elif missing == "device":
-            observer._runtime.coordinator.last_update_success = False
-        elif missing == "read_only":
-            control.read_only = True
-        elif missing == "vehicle":
-            control.data.values.update({"evse_state": EvseState.IDLE, "cp_state": CpState.A1})
-        else:
-            control.energy_goal_stop_requested = True
-        await observer._evaluate()
-        assert observer.status == status
-        control.async_cancel_timed_current.assert_awaited_once_with(observer._command_owner)
-        assert observer.goal is original
-        assert control.commands == [("current", 16.0)]
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("pending_owner", ["same_entry", "manual", "other_entry"])
-def test_reloaded_observer_reclaims_service_queue_after_offline_unload(tmp_path, monkeypatch: pytest.MonkeyPatch, pending_owner: str) -> None:
-    async def run() -> None:
-        observer, _fake_control, hass = setup_observer(monkeypatch)
-        now = datetime.now(UTC)
-        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: now)
-        monkeypatch.setattr(observer_module, "async_track_state_change_event", lambda *_args: lambda: None)
-        monkeypatch.setattr(observer_module, "async_track_time_interval", lambda *_args: lambda: None)
-        service, transport, clock = await service_fixture(tmp_path)
-        release = asyncio.Event()
-        try:
-            await service.heartbeat.async_stop()
-            service.control._sleep = lambda _delay: release.wait()
-            await service.control.async_configure_soc("sensor.soc|")
-            await service.control.async_set_soc_goal(80, source="sensor.soc|", soc=20)
-            async with TestServer(create_app(service)) as server, ClientSession() as session:
-                endpoint = str(server.make_url("/"))
-                remote = ServiceClient(session, endpoint, TOKEN)
-                await remote.async_connect()
-                control = ServiceControl(
-                    remote,                     state=lambda: WallboxData(), request_refresh=None,
-                )
-                observer._runtime.control = control
-                observer.goal.set(now + timedelta(hours=5))
-                saved = observer.goal.snapshot()
-                await control.async_pause_charging()
-                await observer._evaluate()
-                assert service.control._pending.owner == observer._command_owner
-                if pending_owner == "manual":
-                    await control.async_set_charging_current(12)
-                elif pending_owner == "other_entry":
-                    await control.async_cancel_timed_current(observer._command_owner)
-                    await control.async_set_timed_current(
-                        12, deadline=observer.goal.deadline, owner="timed:other_entry",
-                    )
-                task = service.control._flush_task
-                await remote.async_close()
-                await observer.async_stop()
-                assert service.control.pending_action == "set_current"
-
-                fresh = ServiceClient(session, endpoint, TOKEN)
-                await fresh.async_connect()
-                observer._runtime.control = ServiceControl(
-                    fresh,                     state=lambda: WallboxData(), request_refresh=None,
-                )
-                reloaded = observer_module.TimedGoalObserver(hass, observer._entry)
-                reloaded.request_evaluate = lambda: None
-                reloaded._store.async_load = AsyncMock(return_value=DepartureIntent(TimedGoal.restore(saved)))
-                await reloaded.async_start()
-                assert reloaded._command_owner == observer._command_owner
-                await reloaded.async_set_deadline(None)
-                assert reloaded.goal.deadline is None
-                assert (service.control.pending_action is not None) is (pending_owner != "same_entry")
-                clock[0] += 301
-                release.set()
-                await asyncio.wait_for(task, 2)
-                assert current_writes(transport) == ([1] if pending_owner == "same_entry" else [1, 12])
-                await reloaded.async_stop()
-                await fresh.async_close()
-        finally:
-            release.set()
-            await service.stop()
-
-    asyncio.run(run())
-
-
-def test_failed_queue_reclaim_cannot_start_new_observer(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def run() -> None:
-        observer, control, _hass = setup_observer(monkeypatch)
-        control.async_cancel_timed_current = AsyncMock(side_effect=observer_module.HomeAssistantError("service offline"))
-        observer._store.async_load = AsyncMock()
-        with pytest.raises(observer_module.HomeAssistantError, match="service offline"):
-            await observer.async_start()
-        observer._store.async_load.assert_not_awaited()
-        assert observer._task is None
-        assert observer._unsubs == []
-        assert observer._command_submitted
-        await observer.async_stop()
-
-    asyncio.run(run())
-
-
-def test_an_unconfirmed_car_ends_the_plans_pause_and_gets_no_plan(monkeypatch):
-    async def run():
-        observer, control, _hass = setup_observer(monkeypatch)
-        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
-        control.pause_requested = None
-        resumed = []
-
-        async def resume():
-            resumed.append(True)
-            control.pause_requested = False
-
-        control.async_resume_charging = resume
-        observer.goal.set(NOW + timedelta(hours=16))
-        await observer._evaluate()
-        assert observer.status == "paused_until_start"
-        control.pause_requested = True
-        # Another car plugs in after the planned car left.
-        binding = SimpleNamespace(resting=True)
-        observer._runtime.vehicle_binding = binding
-        await observer._evaluate()
-        assert observer.status == "vehicle_unconfirmed"
-        assert observer.planned_start is None
-        assert resumed == [True]
-        # Only the plan's own pause is ended, and only once.
-        control.pause_requested = True
-        await observer._evaluate()
-        assert resumed == [True]
-        # The confirmed car gets its plan back.
-        binding.resting = False
-        await observer._evaluate()
-        assert observer.status == "paused_until_start"
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("withdraw", [False, True])
-def test_only_another_car_ends_the_plans_pause_on_stop(monkeypatch, withdraw):
-    async def run():
-        observer, control, _hass = setup_observer(monkeypatch)
-        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
-        resumed = []
-
-        async def resume():
-            resumed.append(True)
-
-        control.async_resume_charging = resume
-        observer.goal.set(NOW + timedelta(hours=16))
-        await observer._evaluate()
-        assert observer.status == "paused_until_start"
-        control.pause_requested = True
-        # A reload keeps the pause for the same car's plan.
-        await observer.async_stop(withdraw=withdraw)
-        assert resumed == ([True] if withdraw else [])
-
-    asyncio.run(run())
-
-
-def test_a_failed_cancel_still_ends_the_plans_pause_for_another_car(monkeypatch, caplog):
-    async def run():
-        observer, control, _hass = setup_observer(monkeypatch)
-        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
-        resumed = []
-
-        async def resume():
-            resumed.append(True)
-
-        control.async_resume_charging = resume
-        observer.goal.set(NOW + timedelta(hours=16))
-        await observer._evaluate()
-        assert observer.status == "paused_until_start"
-        control.pause_requested = True
-        control.async_cancel_timed_current = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
-        await observer.async_stop(withdraw=True)
-        assert resumed == [True]
-        assert "Departure plan: timed charging not cancelled" in caplog.text
-
-        # A failing resume is logged, never raised into the switch.
-        observer, control, _hass = setup_observer(monkeypatch)
-        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
-        observer.goal.set(NOW + timedelta(hours=16))
-        await observer._evaluate()
-        control.pause_requested = True
-        control.async_resume_charging = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
-        await observer.async_stop(withdraw=True)
-        assert "Departure plan: pause for the previous car not ended" in caplog.text
-
-    asyncio.run(run())
-
-
-def test_a_future_planned_start_is_planned_anew_after_a_gap(monkeypatch):
-    async def run():
-        observer, control, hass = setup_observer(monkeypatch)
-        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
-        observer.goal.set(NOW + timedelta(hours=16))
-        await observer._evaluate()
-        assert observer.status == "paused_until_start"
-        assert observer.planned_start > NOW
-        hass.states.pop("sensor.soc")
-        await observer._evaluate()
-        assert observer.status == "waiting_for_soc"
-        # Not started yet: the refreshed inputs decide the start again.
-        assert observer.planned_start is None
-
-    asyncio.run(run())
-
-
-def test_direct_plan_learns_real_power_with_the_shared_full_current_window(monkeypatch):
-    async def run():
-        observer, control, _hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=4))
-        control.data.values.update(charging_current_ems=16, energy_total=100.0)
-        control.data.energy_read = True
-        control.data.energy_observed_at = NOW.timestamp()
-        await observer._evaluate()
-        assert observer._power_model.car("car").power(3, 16) is None
-        # A car capped at 8 A draws 5.52 kW although the wallbox offers 16 A.
-        control.data.energy_observed_at += 120
-        control.data.values["energy_total"] += 5.52 * 120 / 3600
-        await observer._evaluate()
-        assert observer._power_model.car("car").power(3, 16) == pytest.approx(5.52)
-        # The same cached snapshot is not another measurement.
-        before = observer._power_model.snapshot()
-        await observer._evaluate()
-        assert observer._power_model.snapshot() == before
-        # A goal or telemetry gap discards the partial measurement window.
-        control.data.values["energy_total"] = None
-        await observer._evaluate()
-        assert observer._power_window.start is None
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("missing", ["phase", "source", "timestamp"])
-def test_direct_power_learning_requires_current_context(monkeypatch, missing):
-    observer, control, _hass = setup_observer(monkeypatch)
-    observer._at_full = True
-    observer._power_window.sample(at=1000, total=100, phases=3, current=16, vehicle="car")
-    control.data.energy_read = True
-    control.data.energy_observed_at = 1120
-    control.data.values["energy_total"] = 100.2
-    if missing == "phase":
-        control.data.held = frozenset({"switched_phases"})
-    elif missing == "source":
-        control.soc_goal.source = None
-    else:
-        control.data.energy_observed_at = None
-    observer._learn_power()
-    assert observer._power_window.start is None
-    assert not observer._power_model.cars

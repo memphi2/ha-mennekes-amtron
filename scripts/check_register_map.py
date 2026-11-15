@@ -307,31 +307,15 @@ def check_entity_icons() -> list[str]:
 def _device_classes_with_icon() -> dict[str, dict[str, str]]:
     """Return every entity whose device class already carries an icon."""
 
-    from custom_components.mennekes_amtron_rtu.binary_sensor_descriptions import (
-        BINARY_SENSOR_DESCRIPTIONS,
-    )
-    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-        CONTROL_SENSOR_DESCRIPTIONS,
-        ESTIMATE_SENSOR_DESCRIPTIONS,
-        SENSOR_DESCRIPTIONS,
-    )
-
     classes: dict[str, dict[str, str]] = {
         platform: {} for platform in _entity_keys()
     }
-    for platform, descriptions in (
-        ("sensor", (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS)),
-        ("binary_sensor", BINARY_SENSOR_DESCRIPTIONS),
-    ):
-        for description in descriptions:
-            device_class = description.device_class
+    for platform, rows in _entity_tables().items():
+        for row in rows:
+            device_class = row.device_class
             # The enum device class has no icon of its own.
             if device_class is not None and device_class.value != "enum":
-                classes[platform][description.key] = str(device_class.value)
-    classes["number"]["charging_current_limit"] = "current"
-    classes["number"]["energy_goal"] = "energy"
-    classes["switch"]["charging_release"] = "switch"
-    classes["button"]["restart"] = "restart"
+                classes[platform][row.key] = str(device_class.value)
     return classes
 
 
@@ -384,57 +368,46 @@ def check_enum_states() -> list[str]:
     return failures
 
 
-def _entity_keys() -> dict[str, set[str]]:
-    from custom_components.mennekes_amtron_rtu.binary_sensor_descriptions import (
-        BINARY_SENSOR_DESCRIPTIONS,
-    )
-    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-        CONTROL_SENSOR_DESCRIPTIONS,
-        ESTIMATE_SENSOR_DESCRIPTIONS,
-        SENSOR_DESCRIPTIONS,
-    )
+def _entity_tables() -> dict[str, tuple[Any, ...]]:
+    """Return the table each platform builds its entities from."""
+
+    from custom_components.mennekes_amtron_rtu.binary_sensor import BINARY_SENSORS
+    from custom_components.mennekes_amtron_rtu.button import BUTTONS
+    from custom_components.mennekes_amtron_rtu.number import NUMBERS
+    from custom_components.mennekes_amtron_rtu.select import SELECTS
+    from custom_components.mennekes_amtron_rtu.sensor import SENSORS
+    from custom_components.mennekes_amtron_rtu.switch import SWITCHES
 
     return {
-        "sensor": {
-            description.key
-            for description in (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS)
-        },
-        "binary_sensor": {
-            description.key for description in BINARY_SENSOR_DESCRIPTIONS
-        },
-        "number": {"charging_current_limit", "energy_goal", "soc_goal"},
-        "switch": {"charging_paused", "charging_release", "lock_evse"},
-        "select": {"solar_charging_mode", "requested_phases"},
-        "button": {"recover_from_error", "restart", "cancel_pending_change", "assign_vehicle_charge"},
-        "event": {"control_result"},
+        "sensor": SENSORS,
+        "binary_sensor": BINARY_SENSORS,
+        "number": NUMBERS,
+        "switch": SWITCHES,
+        "select": SELECTS,
+        "button": BUTTONS,
     }
+
+
+def _entity_keys() -> dict[str, set[str]]:
+    keys = {
+        platform: {row.key for row in rows}
+        for platform, rows in _entity_tables().items()
+    }
+    # Entities that are built on their own instead of from a table.
+    keys["select"].add("active_vehicle")
+    keys["datetime"] = {"timed_departure"}
+    keys["event"] = {"activity"}
+    return keys
 
 
 def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
-    from custom_components.mennekes_amtron_rtu.device.enums import (
-        RequestedPhases,
-        SolarChargingMode,
-        enum_options,
-    )
-    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-        CONTROL_SENSOR_DESCRIPTIONS,
-        ESTIMATE_SENSOR_DESCRIPTIONS,
-        SENSOR_DESCRIPTIONS,
-    )
-
-    expected: dict[tuple[str, str], tuple[str, ...]] = {
-        ("select", "solar_charging_mode"): enum_options(SolarChargingMode),
-        ("select", "requested_phases"): enum_options(RequestedPhases),
+    tables = _entity_tables()
+    return {
+        (platform, row.key): tuple(row.options)
+        for platform in ("select", "sensor")
+        for row in tables[platform]
+        if row.options
     }
-    for description in SENSOR_DESCRIPTIONS:
-        if description.enum_class is not None:
-            expected[("sensor", description.key)] = enum_options(
-                description.enum_class
-            )
-    for control_description in (*CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS):
-        if control_description.options is not None:
-            expected[("sensor", control_description.key)] = tuple(control_description.options)
-    return expected
 
 
 def _translation_payloads() -> dict[str, dict[str, Any]]:

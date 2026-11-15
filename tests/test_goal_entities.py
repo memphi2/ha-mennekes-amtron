@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from copy import deepcopy
 from unittest.mock import AsyncMock
 
@@ -11,18 +12,15 @@ from aiohttp import ClientSession
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import (
-    EnergyGoalController,
-)
 from custom_components.mennekes_amtron_rtu.number import (
     async_setup_entry as setup_numbers,
 )
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.sensor import (
     async_setup_entry as setup_sensors,
 )
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.ha_fakes import build_runtime, collect
 from tests.test_modbus_service import TOKEN, service_fixture
 
@@ -31,28 +29,35 @@ def test_goal_entities_never_start_charging_or_override_pause():
     async def run():
         hass, entry, transport = await build_runtime()
         control = entry.runtime_data.control
-        control.pause_requested = True
-        saved = AsyncMock()
-        runner = EnergyGoalController(control, entry.runtime_data.client, saved)
+        await control.async_pause_charging()
+        await entry.runtime_data.coordinator.async_refresh()
+        assert control.pause_requested is True
+        transport.writes.clear()
         numbers, sensors = {}, {}
         await setup_numbers(hass, entry, lambda items: numbers.update(collect(items)))
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
-        target, status = numbers["energy_goal"], sensors["energy_goal_status"]
+        target, waiting = numbers["energy_goal"], sensors["operation_waiting"]
+
+        def status():
+            return waiting.extra_state_attributes["energy_target"]
+
         assert target.available
-        assert status.available
+        assert waiting.available
         assert target.native_value == 0
-        assert status.native_value == "disabled"
+        assert status() == "disabled"
         await target.async_set_native_value(12)
         assert target.native_value == 12
-        assert status.native_value == "active"
+        assert status() == "active"
         assert control.pause_requested is True
         assert transport.writes == []
-        assert saved.await_count == 1
+        # The service keeps the goal across its own restart.
+        saved = json.loads(entry.service.state_path.read_text())
+        assert saved["energy_goal"]["target_kwh"] == 12
         await target.async_set_native_value(0)
-        assert status.native_value == "disabled"
+        assert status() == "disabled"
         assert control.pause_requested is True
         assert transport.writes == []
-        await runner.async_stop()
+        assert json.loads(entry.service.state_path.read_text())["energy_goal"]["status"] == "disabled"
 
     asyncio.run(run())
 
@@ -64,7 +69,7 @@ def test_old_layouts_do_not_get_an_unusable_goal():
         await setup_numbers(hass, entry, lambda items: numbers.update(collect(items)))
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
         assert "energy_goal" not in numbers
-        assert "energy_goal_status" not in sensors
+        assert "energy_target" not in sensors["operation_waiting"].extra_state_attributes
 
     asyncio.run(run())
 

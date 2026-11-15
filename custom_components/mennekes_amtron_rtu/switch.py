@@ -86,7 +86,7 @@ async def async_setup_entry(
     entry: MennekesAmtronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    async_add_entities(AmtronSwitch(entry, description) for description in wanted(hass, entry, SWITCHES))
+    async_add_entities(AmtronSwitch(entry, description) for description in wanted(entry, SWITCHES))
 
 
 class AmtronSwitch(AmtronEntity, SwitchEntity):

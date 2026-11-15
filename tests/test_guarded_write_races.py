@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import (
@@ -16,6 +15,10 @@ from custom_components.mennekes_amtron_rtu.device.enums import (
     CpState,
     EvseState,
     RequestedPhases,
+)
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
+    DeviceValidationError,
 )
 from tests.test_control import Harness
 
@@ -58,7 +61,7 @@ def test_guarded_write_rechecks_state_after_another_bus_user(operation: str) -> 
         harness.transport.bank[R.EVSE_STATE.address] = int(EvseState.CHARGING)
         harness.transport.bank[R.CP_STATE.address] = int(CpState.C2)
         finish_reader.set()
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await asyncio.wait_for(command, 1)
         assert error.value.translation_key == (
             "restart_requires_idle" if operation == "restart" else "phase_pause_state_unknown"
@@ -108,7 +111,7 @@ def test_guarded_write_rejects_reconnect_during_final_status_read(operation: str
             control.async_restart() if operation == "restart"
             else control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         )
-        with pytest.raises(HomeAssistantError):
+        with pytest.raises(DeviceError):
             await command
         assert state_reads == final_read
         assert not harness.written(R.SYSTEM_RESTART)
@@ -155,7 +158,7 @@ def test_guarded_write_rejects_failed_or_invalid_final_status(
             control.async_restart() if operation == "restart"
             else control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         )
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await command
         assert error.value.translation_key == (
             "restart_state_unknown" if operation == "restart" else "phase_pause_state_unknown"
@@ -220,7 +223,7 @@ def test_phase_write_cancels_if_a_vehicle_reconnects_after_confirmed_unplug() ->
         harness.transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
         harness.transport.bank[R.CP_STATE.address] = int(CpState.B1)
         finish_reader.set()
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await asyncio.wait_for(command, 1)
         assert error.value.translation_key == "phase_pause_state_unknown"
         assert extra_reader is not None

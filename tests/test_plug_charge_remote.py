@@ -73,7 +73,6 @@ def test_gate_grant_survives_ha_reconnect_but_not_unplug_and_disable_does_not_re
                 remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 control = remote_control(remote)
-                assert control.supports_plug_charge
                 await control.async_configure_plug_charge(True, policy=POLICY)
                 assert transport.bank[R.CHARGING_RELEASE.address] == 0
                 transport.bank[R.EVSE_STATE.address] = 2
@@ -116,7 +115,6 @@ def test_gate_grant_survives_ha_reconnect_but_not_unplug_and_disable_does_not_re
 
 
 @pytest.mark.parametrize(("key", "value"), [
-    ("supports_plug_charge", 1),
     ("plug_charge", None),
     ("plug_charge", {}),
     ("plug_charge.enabled", 1),
@@ -161,29 +159,16 @@ def test_invalid_gate_snapshot_never_becomes_authoritative(tmp_path, key, value)
     asyncio.run(run())
 
 
-def test_older_app_remains_readable_but_cannot_claim_virtual_authorization(tmp_path):
+def test_a_snapshot_without_the_gate_is_refused(tmp_path):
     async def run():
         service, _, _ = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
                 remote = ServiceClient(session, "http://service:8765", TOKEN)
-                old = service.snapshot()
-                old["control"].pop("supports_plug_charge")
-                old["control"].pop("plug_charge")
-                remote.apply_snapshot(old)
-                control = remote_control(remote)
-                assert not control.supports_plug_charge
-                assert control.plug_charge == {
-                    "enabled": False, "policy": "", "session": None, "since": None,
-                    "authorized": False, "manual": False,
-                }
-                for action in (
-                    control.async_configure_plug_charge(True, policy=POLICY),
-                    control.async_authorize_plug_charge("a" * 32, deadline=datetime.now(UTC) + timedelta(seconds=10)),
-                ):
-                    with pytest.raises(ServiceValidationError) as error:
-                        await action
-                    assert error.value.translation_key == "plug_charge_not_supported"
+                damaged = service.snapshot()
+                damaged["control"].pop("plug_charge")
+                with pytest.raises(ServiceConnectionError, match=r"control\.plug_charge"):
+                    remote.apply_snapshot(damaged)
         finally:
             await service.stop()
 

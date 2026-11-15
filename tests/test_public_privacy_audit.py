@@ -128,7 +128,7 @@ def test_only_public_repos_and_numeric_remote_ids_are_accepted(monkeypatch):
         audit.identifier({"id": "../../elsewhere"})
 
 
-def test_requests_are_explicit_gets_and_remote_errors_are_not_echoed(monkeypatch):
+def test_requests_are_explicit_gets_and_service_errors_are_not_echoed(monkeypatch):
     calls = []
 
     def run(command, **kwargs):

@@ -37,8 +37,8 @@ families.
 
 | Connection | Why choose it? |
 |---|---|
-| **Service app — recommended, optional** | Keeps the heartbeat and last charging state running through HA Core restarts and enforces shared limits and accepted vehicle plans. On HA OS, its URL and token are discovered automatically. |
-| **Direct USB or LAN** | Normal charging, limits and optional vehicle planning without an extra app. Guest charging needs the service. HA restarts interrupt its heartbeat. |
+| **Service app — recommended, optional** | Keeps the heartbeat, last charging state, shared limits and accepted vehicle plans running through HA Core restarts. On HA OS, its URL and token are discovered automatically. |
+| **Direct USB or LAN** | The same features without an extra app: Home Assistant runs the same wallbox service itself. HA restarts interrupt its heartbeat. |
 
 The service app is installed separately from the integration:
 
@@ -58,7 +58,7 @@ Set **Charging current limit** and use **Charging paused** to stop or resume.
 **0 A removes the current limit; it is not a pause.** Add a kWh limit or optional
 vehicle percentage target when needed; setting a target does not start charging.
 
-With the service app, **Start guest charging** releases the connected car now,
+**Start guest charging** releases the connected car now,
 optionally until the first reached kWh limit or stop time. No guest order needs
 to be created. Intelligent vehicle planning is optional and configured in HA.
 

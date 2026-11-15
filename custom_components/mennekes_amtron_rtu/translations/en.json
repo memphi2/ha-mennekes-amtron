@@ -799,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "A charging limit is reached, so charging stays paused. To continue, raise the kWh limit or vehicle percentage target, or set it to 0; after a meter reset, save the limit again. Changing a limit does not start charging by itself."
     },
-    "energy_goal_state_invalid": {
-      "message": "The saved energy target could not be restored. Check the logs before allowing charging again."
-    },
     "energy_goal_not_supported": {
       "message": "This Modbus service does not support energy targets. Update the app or standalone service first."
-    },
-    "cancel_pending_not_supported": {
-      "message": "This Modbus service cannot cancel pending changes. Update the app or standalone service first."
     },
     "soc_goal_invalid": {
       "message": "Enter a target from 0 to 100%, no higher than the vehicle charge limit. 0 disables the percentage target."
@@ -820,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "The vehicle sources have changed. Reload the integration before changing its percentage target."
     },
-    "soc_goal_app_update_required": {
-      "message": "Update the Mennekes Modbus service app before changing the vehicle percentage target. Other wallbox functions remain available."
-    },
     "soc_goal_not_supported": {
       "message": "The Modbus service does not support vehicle percentage targets. Update the app to use this optional feature."
-    },
-    "soc_goal_state_invalid": {
-      "message": "The saved vehicle charge target could not be restored. Check the logs before allowing charging again."
     },
     "loss_source_invalid": {
       "message": "Select a supported charging loss source and configure its matching vehicle or sensor."
@@ -870,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "The vehicle authorization has expired or is no longer valid. Wait for fresh matching vehicle data before trying again."
-    },
-    "plug_charge_not_supported": {
-      "message": "The connected Modbus app or service does not support Virtual Plug & Charge. Update it to a compatible version before enabling this feature."
-    },
-    "app_required": {
-      "message": "This action needs the Modbus app; this wallbox is connected directly."
     },
     "wallbox_target_required": {
       "message": "Several wallboxes are set up; name the wallbox this applies to."

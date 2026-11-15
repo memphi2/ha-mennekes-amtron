@@ -131,7 +131,9 @@ class AmtronActivity(AmtronEntity, EventEntity):
             (event.source, float(value), event.reason)
             if event.action == "set_current" and event.outcome == "executed"
             and event.reason in ("completed", "vehicle_authorized")
-            and isinstance(value, (int, float)) and not isinstance(value, bool)
+            # Only a valid current can repeat; NaN and out-of-range values
+            # are always reported.
+            and isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 32
             else None
         )
         previous, self._last_setpoint = self._last_setpoint, key

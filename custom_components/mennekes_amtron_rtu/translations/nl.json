@@ -799,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "Een laadgrens is bereikt, daarom blijft het laden gepauzeerd. Verhoog om verder te laden de kWh-grens of het procentdoel, of zet deze op 0; sla na een meterreset de grens opnieuw op. Een wijziging alleen start het laden niet."
     },
-    "energy_goal_state_invalid": {
-      "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
-    },
     "energy_goal_not_supported": {
       "message": "Deze Modbus-dienst ondersteunt geen energiedoelen. Werk eerst de app of de zelfstandige dienst bij."
-    },
-    "cancel_pending_not_supported": {
-      "message": "Deze Modbus-dienst kan wachtende wijzigingen niet annuleren. Werk eerst de app of de zelfstandige dienst bij."
     },
     "soc_goal_invalid": {
       "message": "Voer een doel van 0 tot 100% in, niet hoger dan de laadlimiet van het voertuig. 0 schakelt het percentagedoel uit."
@@ -820,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "De voertuigbronnen zijn gewijzigd. Herlaad de integratie voordat je het percentagedoel wijzigt."
     },
-    "soc_goal_app_update_required": {
-      "message": "Werk de Mennekes Modbus-serviceapp bij voordat je het laadpercentage van de auto wijzigt. Andere wallboxfuncties blijven beschikbaar."
-    },
     "soc_goal_not_supported": {
       "message": "De Modbus-dienst ondersteunt geen percentagedoelen voor het voertuig. Werk de app bij om deze optionele functie te gebruiken."
-    },
-    "soc_goal_state_invalid": {
-      "message": "Het opgeslagen laaddoel van het voertuig kon niet worden hersteld. Controleer de logboeken voordat je laden opnieuw toestaat."
     },
     "loss_source_invalid": {
       "message": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in."
@@ -870,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "De voertuigtoestemming is verlopen of niet meer geldig. Wacht op actuele passende voertuiggegevens voordat je opnieuw probeert."
-    },
-    "plug_charge_not_supported": {
-      "message": "De verbonden Modbus-app of dienst ondersteunt virtuele Plug & Charge niet. Werk deze eerst bij naar een compatibele versie."
-    },
-    "app_required": {
-      "message": "Deze actie vereist de Modbus-app; deze wallbox is rechtstreeks verbonden."
     },
     "wallbox_target_required": {
       "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."

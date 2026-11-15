@@ -1,9 +1,16 @@
 # Changes
 
-## Unreleased
+## 0.10.0
 
 - Log lines start with their area, such as `Service:`, `Connection:` or
   `Heartbeat:`. A repeating failure is logged once, and its end once.
+
+- The app and a direct connection in Home Assistant run the same service.
+  This integration requires app 0.10.0; update the app first.
+- The service no longer accepts the commands `solar`, `timed_current` and
+  `cancel_timed_current`; nothing sent them. Its state no longer carries the
+  fields `supports_plug_charge`, `supports_cancel_pending`,
+  `supports_departure_plan` and `soc_transactions_supported`.
 
 ## 0.9.1
 

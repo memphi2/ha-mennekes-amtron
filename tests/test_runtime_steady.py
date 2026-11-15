@@ -12,7 +12,12 @@ from contextlib import suppress
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
+)
 from custom_components.mennekes_amtron_rtu.device.const import (
     CONTROL_MODE_MASTER,
     DOMAIN,
@@ -70,8 +75,8 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                 now = time.monotonic()
                 report.update(elapsed=now - started, recoveries=recoveries,
                               heartbeats=measured.deliveries,
-                              heartbeat_failures=runtime.diagnostics.heartbeats_failed,
-                              heartbeats_late=runtime.diagnostics.heartbeats_late,
+                              heartbeat_failures=service.diagnostics.heartbeats_failed,
+                              heartbeats_late=service.diagnostics.heartbeats_late,
                               heartbeat_max_gap=measured.maximum_gap(now),
                               measurement_changes=changes)
             checkpoint()
@@ -90,7 +95,11 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
             hass.config_entries.async_update_entry(entry, options={"control_mode": CONTROL_MODE_MASTER})
             await hass.async_block_till_done()
             runtime = entry.runtime_data
-            client, coordinator = runtime.client, runtime.coordinator
+            coordinator = runtime.coordinator
+            # The service Home Assistant runs owns the serial bus.
+            service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+            client = service.client
+            owners = (runtime.client, service, client)
             measured = HeartbeatMeasurement(time.monotonic())
             original_write = client.async_write_register
 
@@ -100,6 +109,7 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                     measured.delivered(time.monotonic())
 
             client.async_write_register = observed_write
+            await service.refresh()
             await coordinator.async_refresh()
             await asyncio.sleep(min(5, seconds))
             await recorder.baseline(entry)
@@ -127,12 +137,18 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                         reconnect = transport.ctx.reconnect_task
                         assert reconnect is not None
                     # Avoid pytest retaining expected exception frames as leaks.
+                    with (
+                        patch.object(logging.getLogger(coordinator.__module__), "disabled", True),
+                        pytest.raises(AmtronConnectionError),
+                    ):
+                        await service.refresh()
                     with patch.object(logging.getLogger(coordinator.__module__), "disabled", True):
                         await coordinator.async_refresh()
                     assert not coordinator.last_update_success
                     async with asyncio.timeout(3):
                         await reconnect
                     assert client.connected
+                    await service.refresh()
                     await coordinator.async_refresh()
                     assert coordinator.last_update_success
                     assert client._client is transport
@@ -151,9 +167,10 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                     await server.async_setValues(50, 0x10, spec.address, encode_register(spec, value))
                 # Exercise the real bus locks with concurrent reads and delayed
                 # responses while the periodic heartbeat must meet its deadline.
-                await asyncio.gather(coordinator.async_refresh(), *(
+                await asyncio.gather(service.refresh(), *(
                     client.async_read_register(R.VOLTAGE_L1) for _ in range(6)
                 ))
+                await coordinator.async_refresh()
                 assert coordinator.last_update_success
                 power = coordinator.data.get("power_total")
                 assert power is not None
@@ -161,11 +178,11 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                     changes += 1
                 last_power = power
                 assert entry.runtime_data is runtime
-                assert runtime.heartbeat.running
-                assert len(runtime.diagnostics.timeline.snapshot()) <= 40
+                assert service.heartbeat.running
+                assert len(service.diagnostics.timeline.snapshot()) <= 40
                 assert measured.maximum_gap(time.monotonic()) <= HEARTBEAT_DEADLINE_SECONDS
                 database = await recorder.sample()
-                samples.append(_sample("steady", [], client, coordinator) | database
+                samples.append(_sample("steady", [], owners, coordinator) | database
                                | {"serial_recoveries": recoveries})
                 record_progress()
                 await asyncio.sleep(interval)
@@ -180,10 +197,11 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
             checkpoint()
             assert await hass.config_entries.async_unload(entry.entry_id)
             await hass.async_block_till_done()
+            assert not runtime.client.connected
             assert not client.connected
-            assert not runtime.heartbeat.running
+            assert not service.heartbeat.running
             assert not coordinator._listeners
-            assert runtime.control._flush_task is None
+            assert service.control._flush_task is None
         finally:
             if report["stage"] != "cleanup":
                 record_progress()

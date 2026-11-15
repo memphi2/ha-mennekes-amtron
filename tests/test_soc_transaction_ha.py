@@ -13,9 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.vehicle_soc import VehicleSocObserver
 from tests.test_modbus_service import TOKEN, service_fixture
 from tests.test_vehicle_soc import Coordinator
@@ -105,32 +105,6 @@ def test_lost_target_reply_is_fenced_before_transient_soc_is_forwarded(tmp_path,
             if observer is not None:
                 await observer.async_stop()
             await hass.async_stop()
-            await service.stop()
-
-    asyncio.run(asyncio.wait_for(run(), 20))
-
-
-def test_older_service_requests_app_update_only_for_percentage_target(tmp_path):
-    async def run():
-        service, _transport, _clock = await service_fixture(tmp_path)
-        try:
-            async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
-                await remote.async_connect()
-                control = ServiceControl(
-                    remote,                     state=lambda: service.data, request_refresh=AsyncMock(),
-                )
-                await control.async_configure_soc("sensor.car|")
-                old = deepcopy(remote.snapshot)
-                old["control"].pop("soc_transactions_supported")
-                old["control"].pop("soc_goal_revision")
-                remote.apply_snapshot(old)
-                with pytest.raises(ServiceValidationError) as error:
-                    await control.async_set_soc_goal(80, source="sensor.car|", soc=50)
-                assert error.value.translation_key == "soc_goal_app_update_required"
-                # The legacy service can still accept ordinary vehicle metadata.
-                await control.async_observe_soc(50, source="sensor.car|")
-        finally:
             await service.stop()
 
     asyncio.run(asyncio.wait_for(run(), 20))
@@ -251,8 +225,8 @@ def test_outage_during_resolution_preserves_evidence_and_blocks_replacement(tmp_
     asyncio.run(asyncio.wait_for(run(), 20))
 
 
-@pytest.mark.parametrize("corrupt", ["capability", "missing_revision", "bad_revision"])
-def test_invalid_transaction_capability_never_trusts_snapshot(tmp_path, corrupt):
+@pytest.mark.parametrize("corrupt", ["missing_revision", "bad_revision"])
+def test_an_invalid_goal_revision_never_trusts_the_snapshot(tmp_path, corrupt):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
@@ -260,9 +234,7 @@ def test_invalid_transaction_capability_never_trusts_snapshot(tmp_path, corrupt)
                 remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 snapshot = deepcopy(remote.snapshot)
-                if corrupt == "capability":
-                    snapshot["control"]["soc_transactions_supported"] = "true"
-                elif corrupt == "missing_revision":
+                if corrupt == "missing_revision":
                     snapshot["control"].pop("soc_goal_revision")
                 else:
                     snapshot["control"]["soc_goal_revision"] = "untrusted"

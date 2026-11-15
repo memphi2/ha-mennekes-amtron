@@ -799,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "Un limite di ricarica è raggiunto, quindi la ricarica resta in pausa. Per continuare, aumentare il limite kWh o l’obiettivo percentuale, oppure impostarlo a 0; dopo un azzeramento del contatore, salvare di nuovo il limite. Modificare un limite non avvia la ricarica."
     },
-    "energy_goal_state_invalid": {
-      "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
-    },
     "energy_goal_not_supported": {
       "message": "Questo servizio Modbus non supporta gli obiettivi energetici. Aggiorna prima l’app o il servizio autonomo."
-    },
-    "cancel_pending_not_supported": {
-      "message": "Questo servizio Modbus non può annullare le modifiche in attesa. Aggiorna prima l’app o il servizio autonomo."
     },
     "soc_goal_invalid": {
       "message": "Inserisci un obiettivo da 0 al 100%, senza superare il limite del veicolo. 0 disattiva l’obiettivo percentuale."
@@ -820,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "Le fonti del veicolo sono cambiate. Ricarica l’integrazione prima di modificare l’obiettivo percentuale."
     },
-    "soc_goal_app_update_required": {
-      "message": "Aggiorna l’app del servizio Modbus Mennekes prima di modificare l’obiettivo di carica del veicolo. Le altre funzioni restano disponibili."
-    },
     "soc_goal_not_supported": {
       "message": "Il servizio Modbus non supporta gli obiettivi percentuali del veicolo. Aggiorna l’app per usare questa funzione facoltativa."
-    },
-    "soc_goal_state_invalid": {
-      "message": "Impossibile ripristinare l’obiettivo di carica del veicolo salvato. Controlla i registri prima di consentire nuovamente la ricarica."
     },
     "loss_source_invalid": {
       "message": "Seleziona una fonte supportata per le perdite di ricarica e configura il veicolo o il sensore corrispondente."
@@ -870,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "Il consenso del veicolo è scaduto o non è più valido. Attendi dati recenti e coerenti prima di riprovare."
-    },
-    "plug_charge_not_supported": {
-      "message": "L’app o il servizio Modbus collegato non supporta Plug & Charge virtuale. Aggiornalo a una versione compatibile prima di attivarlo."
-    },
-    "app_required": {
-      "message": "Questa azione richiede l’app Modbus; questa wallbox è collegata direttamente."
     },
     "wallbox_target_required": {
       "message": "Sono configurate più wallbox; indica la wallbox interessata."

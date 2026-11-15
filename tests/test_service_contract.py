@@ -13,15 +13,12 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
-    AmtronWriteRejectedError,
 )
 from custom_components.mennekes_amtron_rtu.device.data import (
     WallboxData,
-    WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.enums import (
     RequestedPhases,
-    SolarChargingMode,
 )
 from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceError,
@@ -63,8 +60,8 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
                 assert not command.done()
                 release_poll.set()
                 await asyncio.wait_for(asyncio.gather(poll, command), 2)
-                assert remote.write_state.pause_requested is True
-                assert remote.write_state.confirmed_current == 1
+                assert remote.snapshot["control"]["pause_requested"] is True
+                assert remote.snapshot["values"]["charging_current_ems"] == 1
                 assert current_writes(transport) == [1]
         finally:
             release_poll.set()
@@ -194,7 +191,6 @@ def test_large_or_streamed_replies_are_bounded():
     [
         ("async_set_charging_release", False),
         ("async_set_lock_evse", True),
-        ("async_set_solar_charging_mode", SolarChargingMode.FAST),
         ("async_set_requested_phases", RequestedPhases.SINGLE_PHASE),
         ("async_restart", None),
         ("async_recover_from_error", None),
@@ -252,7 +248,7 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
                 if unknown_target:
                     service.control.charging_setpoint = None
                     await remote.update()
-                await control.async_resume_charging()
+                await control.async_resume_charging(current_cap=cap)
                 assert current_writes(transport) == [
                     1, cap if unknown_target else min(8, cap)
                 ]
@@ -313,7 +309,7 @@ def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
                 await service.command({"command": "pause", "expected_serial_number": "ABC123456789"})
                 clock[0] += 300
                 assert control.charging_setpoint == cached
-                await control.async_resume_charging()
+                await control.async_resume_charging(current_cap=cap)
                 assert current_writes(transport) == [fresh, 1, expected]
         finally:
             await service.stop()
@@ -331,8 +327,7 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
             ):
                 remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                assert await remote.async_read_register(R.ERROR_CODE) == 0
-                assert await remote.async_read_register(R.CHARGING_CURRENT_EMS) == 8
+                assert await remote.async_read_error_code() == 0
                 block = next(b for b in REGISTER_BLOCKS if b.name == "status")
                 assert (
                     len(
@@ -346,19 +341,8 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
                     AmtronConnectionError, match="unsupported diagnostic"
                 ):
                     await remote.async_read_words(address=123, count=1)
-                with pytest.raises(AmtronWriteRejectedError):
-                    await remote.async_write_register(R.CHARGING_CURRENT_EMS, 16)
-                precondition_called = False
-
-                async def precondition(_read):
-                    nonlocal precondition_called
-                    precondition_called = True
-
-                with pytest.raises(AmtronWriteRejectedError):
-                    await remote.async_write_register(
-                        R.CHARGING_CURRENT_EMS, 16, precondition=precondition,
-                    )
-                assert not precondition_called
+                # The client offers no raw register write at all.
+                assert not hasattr(remote, "async_write_register")
                 await server.close()
                 control = ServiceControl(
                     remote,
@@ -430,7 +414,7 @@ def test_wallbox_failure_is_distinguished_from_a_lost_service_connection(tmp_pat
             ):
                 remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                heartbeat = ServiceHeartbeat(remote, WriteDiagnostics())
+                heartbeat = ServiceHeartbeat(remote)
                 remote.on_update = heartbeat.update
                 service._success = False
                 service.heartbeat._set_healthy(False)

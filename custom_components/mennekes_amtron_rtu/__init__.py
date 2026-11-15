@@ -74,7 +74,6 @@ from .network_tariff_year import (
 )
 from .options_flow import control_mode_is_master
 from .plug_charge import PlugChargeObserver, plug_charge_policy
-from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
 from .service_client import (
     CONF_SERVER_TOKEN,
@@ -83,6 +82,7 @@ from .service_client import (
     server_url,
 )
 from .service_control import ServiceControl, ServiceHeartbeat
+from .service_errors import ServiceConnectionError
 from .service_transport import HttpTransport, ServiceTransport
 from .services import async_setup_services
 from .timed_goal_const import (
@@ -173,6 +173,7 @@ async def async_setup_entry(
     expected_serial = _entry_serial_binding(entry)
     handoff: RuntimeHandoff | None = hass.data.get(f"{DOMAIN}_reload_clients", {}).get(entry.entry_id)
     client: ServiceClient | None = None
+    credentials_rejected: Callable[[], bool] | None = None
     try:
         if remote:
             transport: ServiceTransport = HttpTransport(
@@ -181,7 +182,9 @@ async def async_setup_entry(
                 str(entry.data[CONF_SERVER_TOKEN]),
             )
         else:
-            transport = (await async_acquire(hass, entry)).transport
+            host = await async_acquire(hass, entry, expected_serial)
+            transport = host.transport
+            credentials_rejected = host.credentials_rejected
         client = ServiceClient(transport=transport)
         client.bind_identity(expected_serial)
         await client.async_connect()
@@ -220,6 +223,7 @@ async def async_setup_entry(
 
     coordinator = ServiceCoordinator(
         hass, entry, client=client, scan_interval=_scan_interval(entry),
+        credentials_rejected=credentials_rejected,
     )
 
     def notify_pending() -> None:
@@ -457,6 +461,13 @@ async def _async_cancel_old_trip(
         or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
         or not timed_reset_complete
     ) and timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
+        if entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True:
+            try:
+                # An unload that could not reach the service left it planning
+                # the old trip; withdrawing it also ends that plan's pause.
+                await runtime.control.async_set_departure_trip(None, None, withdraw=True)
+            except (AmtronBusError, HomeAssistantError) as err:
+                _raise_optional_setup_error(runtime.client, err, "timed_goal_unavailable")
         stored_options = dict(entry.options)
         stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
         # Complete both halves of the reset before consuming its

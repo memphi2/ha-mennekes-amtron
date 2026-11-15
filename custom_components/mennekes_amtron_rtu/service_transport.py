@@ -13,7 +13,7 @@ from typing import Any, Protocol
 from aiohttp import ClientSession, ClientTimeout
 
 from .device.service_api import ServiceApi, ServiceBusyError
-from .remote_errors import ServiceConnectionError
+from .service_errors import ServiceConnectionError
 
 _TIMEOUT_SECONDS = 15
 _MAX_RESPONSE_BYTES = 131072

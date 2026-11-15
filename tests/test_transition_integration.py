@@ -13,13 +13,13 @@ from aiohttp.test_utils import TestServer
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.sensor import async_setup_entry
 from custom_components.mennekes_amtron_rtu.service_client import (
     ServiceClient,
     _pending_status,
 )
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.ha_fakes import build_runtime, collect
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
@@ -30,17 +30,19 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
         runtime = entry.runtime_data
         control = runtime.control
         coordinator = runtime.coordinator
-        coordinator.control_status = lambda: (control.pending_action, control.pending_until)
-        control._request_refresh = coordinator.async_refresh
         entities = {}
         await async_setup_entry(hass, entry, lambda items: entities.update(collect(items)))
-        action = entities["pending_change"]
+        waiting = entities["operation_waiting"]
+
+        def pending():
+            return waiting.extra_state_attributes["pending"]
 
         def deadline():
-            return (action.extra_state_attributes or {}).get("due")
+            # An attribute without a value is left out.
+            return waiting.extra_state_attributes.get("pending_at")
 
-        assert action.available
-        assert action.native_value == "none"
+        assert waiting.available
+        assert pending() == "none"
         assert deadline() is None
         notifications = []
         remove = coordinator.async_add_listener(lambda: notifications.append(coordinator.data))
@@ -50,7 +52,7 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
             expected = deadline()
             assert isinstance(expected, datetime)
             assert expected.tzinfo == UTC
-            assert action.native_value == "resume"
+            assert pending() == "resume"
             before = len(notifications)
             for _ in range(4):
                 await coordinator.async_refresh()
@@ -59,15 +61,15 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
             # While still paused, a block switches no charge: it applies at
             # once and replaces the queued start.
             await control.async_set_charging_release(False)
-            assert action.native_value == "none"
+            assert pending() == "none"
             assert deadline() is None
             assert transport.bank[R.CHARGING_RELEASE.address] == 0
             coordinator.last_update_success = False
-            assert not action.available
+            assert not waiting.available
         finally:
             remove()
-            await control.async_shutdown()
             await runtime.client.async_close()
+            await entry.service.stop()
 
     asyncio.run(run())
 
@@ -105,7 +107,6 @@ def test_service_queue_survives_client_restart_and_persists_executed_intent(tmp_
                 )
                 assert remote_control.pending_action == "resume"
                 assert remote_control.pending_until == first.pending_change_until
-                await remote_control.async_shutdown()
                 await remote.async_close()
                 remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()

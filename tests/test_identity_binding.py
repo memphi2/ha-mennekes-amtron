@@ -13,7 +13,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
 
-from custom_components import mennekes_amtron_rtu as integration
+from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
@@ -69,7 +69,7 @@ def test_setup_rejects_another_wallbox_before_starting_controls(
                     def factory(config, **kwargs):
                         return MennekesModbusClient(config, client_factory=lambda _: bus, **kwargs)
 
-                    monkeypatch.setattr(integration, "MennekesModbusClient", factory)
+                    monkeypatch.setattr(service_runtime, "MennekesModbusClient", factory)
                 if binding == "serial_number":
                     data["serial_number"] = SERIAL
                 else:

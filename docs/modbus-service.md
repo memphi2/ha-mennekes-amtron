@@ -159,7 +159,7 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 
 | Event | What happens |
 |---|---|
-| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent; a guest session and a handed-over [departure plan](departure-planning.md#with-the-modbus-service-app) keep running. An already queued command can execute while HA is offline. |
+| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent; a guest session and a handed-over [departure plan](departure-planning.md#how-the-service-plans) keep running. An already queued command can execute while HA is offline. |
 | HA automation is unavailable | No new schedule or surplus calculation runs; the app holds the last chosen state. |
 | App, host, power, USB or LAN/gateway connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
 | HA reconnects | HA reads the current app state; it does not restore old commands. |
@@ -196,7 +196,7 @@ is investigated; changing the token does not resolve a policy denial.
 
 This service profile is not applied automatically to standalone Docker or direct
 HA connections. Standalone deployments need explicit host/profile configuration;
-direct mode uses Home Assistant's own host/container security policy.
+a direct entry uses Home Assistant's own host/container security policy.
 
 ## Updates
 
@@ -231,7 +231,7 @@ For optional vehicle targets, profiles or departure planning, use the
 | App not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
 | Token rejected | During setup, retry discovery confirmation. For an existing connection, HA tries to refresh access automatically; if an authentication notice remains, [renew service access](troubleshooting.md#renew-service-access). No manual app token is needed. |
 | Service API or minimum version is incompatible | Install an app meeting the integration’s minimum version and API, app first; see [Updates](#updates). Changing the token does not fix this. |
-| HA reports that a guest session of the app controls charging | An app guest session runs for the plugged-in car. Stop it with the normal **Pause** control, or unplug the car; see [guest charging](troubleshooting.md#guest-charging-in-the-app). |
+| HA reports that a guest session of the app controls charging | An app guest session runs for the plugged-in car. Stop it with the normal **Pause** control, or unplug the car; see [guest charging](troubleshooting.md#guest-charging). |
 | Controls are unavailable | Check the app's **Read-only** switch and USB/LAN connection. After changing app settings, save and restart the app, then wait for fresh status. |
 | App exits immediately | Look for **Invalid or unreadable service configuration** in its log; the message names the invalid option or startup phase. |
 | App runs but cannot reach the wallbox | Check adapter path, bus settings and exclusive bus ownership. A missing serial device is retried. |

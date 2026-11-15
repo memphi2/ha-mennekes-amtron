@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from copy import deepcopy
 from dataclasses import replace
 from unittest.mock import AsyncMock
 
@@ -17,11 +16,11 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import RequestedPhases
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote_errors import (
-    ServiceConnectionError,
-)
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import (
+    ServiceConnectionError,
+)
 from tests.ha_fakes import build_runtime, collect
 from tests.test_command_events import outcomes
 from tests.test_control import Harness
@@ -35,7 +34,6 @@ def test_cancel_is_readless_idempotent_and_retains_the_remembered_target():
         control = await harness.connect()
         notified = []
         control._notify_pending = lambda: notified.append(control.pending_action)
-        assert control.supports_cancel_pending
         assert not control.can_cancel_pending
         await control.async_set_charging_current(10)
         await control.async_set_charging_current(14)
@@ -116,24 +114,39 @@ def test_button_stays_usable_on_failed_poll_but_follows_write_permission():
         await async_setup_entry(hass, entry, lambda items: buttons.update(collect(items)))
         button = buttons["cancel_pending_change"]
         control = entry.runtime_data.control
-        assert button.entity_category is None
-        assert not button.available
-        await control.async_set_charging_current(10)
-        await control.async_set_charging_current(12)
-        entry.runtime_data.coordinator.last_update_success = False
-        assert button.available
-        control._options = replace(control.options, read_only=True)
-        assert not button.available
-        with pytest.raises(ServiceValidationError) as error:
+        coordinator = entry.runtime_data.coordinator
+        owner = entry.service.control
+
+        async def permission(read_only):
+            # The service owns the permission; HA learns it from its next poll.
+            entry.service.config = replace(entry.service.config, read_only=read_only)
+            owner._options = replace(owner.options, read_only=read_only)
+            await coordinator.async_refresh()
+            coordinator.last_update_success = False
+
+        try:
+            assert button.entity_category is None
+            assert not button.available
+            await control.async_set_charging_current(10)
+            await control.async_set_charging_current(12)
+            coordinator.last_update_success = False
+            assert button.available
+            await permission(True)
+            assert not button.available
+            with pytest.raises(ServiceValidationError) as error:
+                await button.async_press()
+            assert error.value.translation_key == "read_only_mode"
+            assert owner.pending_action == "set_current"
+            await permission(False)
+            assert button.available
+            writes = transport.writes[:]
             await button.async_press()
-        assert error.value.translation_key == "read_only_mode"
-        assert control.pending_action == "set_current"
-        control._options = replace(control.options, read_only=False)
-        writes = transport.writes[:]
-        await button.async_press()
-        assert transport.writes == writes
-        assert not button.available
-        await control.async_shutdown()
+            assert transport.writes == writes
+            assert owner.pending_action is None
+            assert not button.available
+        finally:
+            await entry.runtime_data.client.async_close()
+            await entry.service.stop()
 
     asyncio.run(run())
 
@@ -158,7 +171,6 @@ def test_service_cancel_is_allowed_when_only_the_wallbox_is_unavailable(tmp_path
                 await service.command({**payload, "command": "resume"})
             snapshot = await service.command(payload)
             assert snapshot["available"] is False
-            assert snapshot["control"]["supports_cancel_pending"] is True
             assert snapshot["control"]["pending_action"] is None
             assert control.charging_setpoint == 12
             assert (transport.reads, transport.writes) == before
@@ -205,48 +217,6 @@ def test_remote_cancels_over_http_without_refresh_or_false_availability(tmp_path
             refresh.assert_not_awaited()
             await control.async_cancel_pending_change()
             assert notifications == [None]
-        await service.stop()
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("unsupported", ["missing", "disabled"])
-def test_older_service_capabilities_disable_cancel_without_sending(tmp_path, unsupported):
-    async def run():
-        service, _transport, _clock = await service_fixture(tmp_path)
-        async with ClientSession() as session:
-            remote = ServiceClient(session, "http://localhost", TOKEN)
-            payload = service.snapshot()
-            if unsupported == "missing":
-                del payload["control"]["supports_cancel_pending"]
-            else:
-                payload["control"]["supports_cancel_pending"] = False
-            remote.apply_snapshot(payload)
-            remote.request = AsyncMock(side_effect=AssertionError("unsupported cancel must not send"))
-            control = ServiceControl(
-                remote,                 state=lambda: service.data, request_refresh=AsyncMock(),
-            )
-            assert not control.supports_cancel_pending
-            assert not control.can_cancel_pending
-            with pytest.raises(ServiceValidationError) as error:
-                await control.async_cancel_pending_change()
-            assert error.value.translation_key == "cancel_pending_not_supported"
-            remote.request.assert_not_awaited()
-        await service.stop()
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("invalid", [None, 0, 1, "true", []])
-def test_service_cancel_capability_is_strict_boolean(tmp_path, invalid):
-    async def run():
-        service, _transport, _clock = await service_fixture(tmp_path)
-        async with ClientSession() as session:
-            remote = ServiceClient(session, "http://localhost", TOKEN)
-            payload = deepcopy(service.snapshot())
-            payload["control"]["supports_cancel_pending"] = invalid
-            with pytest.raises(ServiceConnectionError, match=r"control\.supports_cancel_pending"):
-                remote.apply_snapshot(payload)
         await service.stop()
 
     asyncio.run(run())

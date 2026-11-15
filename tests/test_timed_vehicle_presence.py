@@ -6,19 +6,13 @@ import asyncio
 from datetime import datetime, timedelta
 
 import pytest
-from aiohttp import ClientSession
-from aiohttp.test_utils import TestServer
-from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import control as device_control
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
-from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
-from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from tests.fakes import put, raise_connection_error
-from tests.test_modbus_service import TOKEN, current_writes
+from tests.test_modbus_service import current_writes
 from tests.test_timed_control import OWNER, Harness, future, service_fixture
 
 
@@ -176,7 +170,7 @@ def test_timed_precondition_rechecks_goal_and_link_after_live_read(changed, monk
                 harness.client._connection_changed(False)
             release.set()
             if changed == "connection":
-                with pytest.raises(HomeAssistantError):
+                with pytest.raises(DeviceError, match="write_failed"):
                     await writing
             else:
                 await writing
@@ -376,7 +370,7 @@ def test_gateway_configuration_during_timed_guard_prevents_stale_write(rollback)
             await asyncio.wait_for(configuring.wait(), 2)
             finish_configuration.set()
             await asyncio.wait_for(configuration, 2)
-            with pytest.raises(HomeAssistantError):
+            with pytest.raises(DeviceError, match="write_failed"):
                 await asyncio.wait_for(timed, 2)
             # A confirmed rollback reopens the serial port; nothing else does.
             assert harness.client.connected is rollback
@@ -392,7 +386,7 @@ def test_gateway_configuration_during_timed_guard_prevents_stale_write(rollback)
     asyncio.run(run())
 
 
-def test_service_cancels_timed_resume_after_ha_disconnects(tmp_path):
+def test_service_cancels_timed_resume_without_home_assistant_once_the_car_left(tmp_path):
     async def run():
         service, transport, clock = await service_fixture(tmp_path)
         sleeping, release = asyncio.Event(), asyncio.Event()
@@ -406,28 +400,23 @@ def test_service_cancels_timed_resume_after_ha_disconnects(tmp_path):
             put(transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
             put(transport.bank, R.CP_STATE, CpState.B1)
             await service.refresh()
-            service.control._sleep = sleep
-            async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
-                await remote.async_connect()
-                control = ServiceControl(
-                    remote,                     state=lambda: WallboxData(), request_refresh=None,
-                )
-                await control.async_set_timed_current(None, deadline=future(), owner=OWNER)
-                await control.async_set_timed_current(10, deadline=future(), owner=OWNER)
-                task = service.control._flush_task
-                assert service.control.pending_action == "set_current"
-                await asyncio.wait_for(sleeping.wait(), 2)
-                await remote.async_close()  # No HA observer remains to cancel the queue.
-                put(transport.bank, R.EVSE_STATE, EvseState.IDLE)
-                put(transport.bank, R.CP_STATE, CpState.A1)
-                clock[0] += 5
-                release.set()
-                await asyncio.wait_for(task, 2)
-                assert service.control.pending_action is None
-                assert service.control.pause_requested is True
-                assert current_writes(transport) == [1]
-                assert service.control.events.snapshot()["events"][-1]["outcome"] == "cancelled"
+            control = service.control
+            control._sleep = sleep
+            await control.async_set_timed_current(None, deadline=future(), owner=OWNER)
+            await control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+            task = control._flush_task
+            assert control.pending_action == "set_current"
+            await asyncio.wait_for(sleeping.wait(), 2)
+            # No Home Assistant observer remains to cancel the queue.
+            put(transport.bank, R.EVSE_STATE, EvseState.IDLE)
+            put(transport.bank, R.CP_STATE, CpState.A1)
+            clock[0] += 5
+            release.set()
+            await asyncio.wait_for(task, 2)
+            assert control.pending_action is None
+            assert control.pause_requested is True
+            assert current_writes(transport) == [1]
+            assert control.events.snapshot()["events"][-1]["outcome"] == "cancelled"
         finally:
             release.set()
             await service.stop()

@@ -6,9 +6,11 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceValidationError,
+)
 from custom_components.mennekes_amtron_rtu.device.soc_goal_controller import (
     SocGoalController,
 )
@@ -73,7 +75,7 @@ def test_reached_goal_during_bus_or_identity_wait_never_sends_start(goal, wait, 
             if wait == "bus":
                 harness.client._lock.release()
             release.set()
-            with pytest.raises(ServiceValidationError) as error:
+            with pytest.raises(DeviceValidationError) as error:
                 await start
             assert error.value.translation_key == "energy_goal_stop_active"
             if observation is not None:

@@ -19,8 +19,8 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
@@ -83,7 +83,7 @@ def test_optional_current_capability_cannot_block_setup_or_lift_command_limits(
                 await remote.execute("set_current", value=32)
                 limit = min(current_cap, expected) if expected is not None else current_cap
                 assert current_writes(transport) == [float(limit)]
-                assert remote.write_state.charging_setpoint == float(limit)
+                assert remote.snapshot["control"]["charging_setpoint"] == float(limit)
                 assert remote.snapshot["values"][R.MAX_EVSE_CURRENT.key] == float(maximum)
         finally:
             await service.stop()

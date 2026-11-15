@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .data import DeviceIdentity, WallboxData
 from .device.client_errors import AmtronConnectionError
 from .device.const import DOMAIN
-from .remote_errors import ServiceConnectionError
+from .service_errors import ServiceConnectionError
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
@@ -37,6 +37,7 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
         *,
         client: ServiceClient,
         scan_interval: float,
+        credentials_rejected: Callable[[], bool] | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -47,6 +48,7 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
             always_update=False,
         )
         self._client = client
+        self._credentials_rejected = credentials_rejected
         # Estimates follow every poll, a failed one as None.
         self.observe_session: Callable[[WallboxData | None], Awaitable[None]] | None = None
         self._pending_refresh: CALLBACK_TYPE | None = None
@@ -103,6 +105,10 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
         except AmtronConnectionError as err:
             if self.observe_session is not None:
                 await self.observe_session(None)
+            if self._credentials_rejected is not None and self._credentials_rejected():
+                raise ConfigEntryAuthFailed(
+                    translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
+                ) from err
             if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
                 raise ConfigEntryAuthFailed(
                     translation_domain=DOMAIN, translation_key="service_auth_failed"

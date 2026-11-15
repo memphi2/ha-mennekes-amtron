@@ -29,9 +29,8 @@ entry. Integration and app updates are separate.
 
 [Which feature starts or stops charging?](features.md#which-function-may-start-or-stop-charging)
 
-The **optional service app is recommended** for HA Core restart continuity and
-is **required for guest charging**. Normal charging, kWh limits and vehicle
-planning also work directly while HA is running. [Compare the setups](installation.md#1-choose-your-connection).
+The **optional service app is recommended** for HA Core restart continuity. A
+direct connection offers the same features while HA is running. [Compare the setups](installation.md#1-choose-your-connection).
 
 ## Reference
 

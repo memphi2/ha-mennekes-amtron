@@ -15,7 +15,8 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
 )
 from custom_components.mennekes_amtron_rtu.device.connection import SerialConfig
 from custom_components.mennekes_amtron_rtu.device.waveshare_gateway import GatewayError
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.entry_connection import connection_config
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.ha_fakes import FakeHass
 from tests.test_config_flow import IDENTITY, SearchFlow
 from tests.test_gateway_config_flow import SNAPSHOT
@@ -249,20 +250,23 @@ def test_unchanged_connection_probe_failure_preserves_concurrent_updates(monkeyp
         flow = _flow()
         entry = flow.reconfigure_entry
         entry.state = ConfigEntryState.LOADED
-        config = SerialConfig("/dev/fake")
-        entry.runtime_data = SimpleNamespace(client=SimpleNamespace(config=config))
+        config = connection_config(entry)
 
-        async def identity(_client):
+        async def update():
             if entry_changed:
                 _change(flow)
             raise AmtronConnectionError("offline")
 
-        monkeypatch.setattr(config_flow, "async_read_identity", identity)
+        # An unchanged form asks the running service instead of opening the bus.
+        entry.runtime_data = SimpleNamespace(client=SimpleNamespace(update=update))
+        probe = AsyncMock()
+        monkeypatch.setattr(config_flow, "async_test_connection", probe)
         if entry_changed:
             _assert_changed(await flow._async_test_and_finish("serial_reconfigure", {}, config))
         else:
             with pytest.raises(AmtronConnectionError):
                 await flow._async_test_and_finish("serial_reconfigure", {}, config)
+        probe.assert_not_awaited()
 
     asyncio.run(run())
 

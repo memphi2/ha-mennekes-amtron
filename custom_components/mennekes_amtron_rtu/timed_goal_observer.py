@@ -351,12 +351,6 @@ class TimedGoalObserver:
             min(starts), source=None, expected=original,
         )
 
-    @property
-    def vehicle_departure_available(self) -> bool:
-        """Whether the optional adapter has a valid selected vehicle."""
-        source = resolve_departure_source(self._hass, self._options)
-        return source is not None and source.available
-
     async def async_use_vehicle_departure(self) -> None:
         """Copy one enabled local vehicle timer; never arm a recurring schedule."""
         original = self.goal

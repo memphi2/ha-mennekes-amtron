@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -103,12 +103,12 @@ class Projection:
 
 
 def wanted[D: Projection](
-    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, descriptions: tuple[D, ...],
+    entry: MennekesAmtronConfigEntry, descriptions: tuple[D, ...],
 ) -> list[D]:
     """The descriptions this wallbox and its configured vehicles call for."""
     runtime = entry.runtime_data
     identity = runtime.identity
-    features = vehicle_features(hass, entry)
+    features = vehicle_features(entry)
     return [
         description for description in descriptions
         if (

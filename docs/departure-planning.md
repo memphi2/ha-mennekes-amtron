@@ -13,7 +13,7 @@ resumes charging.
 
 The departure belongs to a car's [vehicle profile](vehicle-setup.md).
 
-[First trip](#example-ready-tomorrow-at-0730) · [Choose a time](#choose-a-time-for-this-trip) · [Cancel](#change-or-cancel-a-trip) · [Climate](#climate-before-departure) · [App mode](#with-the-modbus-service-app)
+[First trip](#example-ready-tomorrow-at-0730) · [Choose a time](#choose-a-time-for-this-trip) · [Cancel](#change-or-cancel-a-trip) · [Climate](#climate-before-departure) · [How it plans](#how-the-service-plans)
 
 ## Example: ready tomorrow at 07:30
 
@@ -26,7 +26,7 @@ The departure belongs to a car's [vehicle profile](vehicle-setup.md).
 3. Set **Target time** to tomorrow's full date and **07:30**, or copy that
    trip from a calendar or vehicle timer.
 4. Check the displayed date, time, target and planning status.
-   The `planned_start` attribute of **Timed charging status** shows when
+   The `planned_start` attribute of **Charging wait reason** shows when
    charging starts, or started, for this trip. Unlock and authorize the car as required. The plan cannot bypass those restrictions.
 5. To add climate, install the [preconditioning blueprint](blueprints.md#start-vehicle-climate-before-departure)
    and choose the HA action and lead time you want.
@@ -57,11 +57,11 @@ selection can coexist; choose the source you want for each trip.
 ### Calendar
 
 For a calendar, enable the calendar option in **Next departure**, then select a
-**Departure calendar** and enter the **exact event title**. Press **Use next
-calendar event** to copy the first
+**Departure calendar** and enter the **exact event title**. Run the
+`mennekes_amtron_rtu.use_calendar_departure` action to copy the first
 matching timed event within the next 14 days into **Target time**. All-day
 events are ignored. Calendar changes after selection do not alter the copied
-time; press the button again to import the updated event. The
+time; run the action again to import the updated event. The
 [calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) can
 perform this selection ahead of the next trip using a Toggle helper.
 
@@ -69,8 +69,8 @@ perform this selection ahead of the next trip using a Toggle helper.
 
 To use the active BavarianData profile's timers, enable **Use vehicle departure
 timers** in **Next departure**. You do not need to select the integration and car
-again. Use **Use vehicle departure** when you want to copy the next active climate
-timer. Other vehicle integrations can supply the generic SoC, capacity and dated
+again. Run the `mennekes_amtron_rtu.use_vehicle_departure` action when you want
+to copy the next active climate timer. Other vehicle integrations can supply the generic SoC, capacity and dated
 departure entities described here.
 The adapter reads the vehicle's last locally
 published Home Assistant states; it does not fetch BMW cloud data or change the
@@ -136,8 +136,8 @@ known wallbox limits and phase information. It works in three steps:
 
 1. **Wait.** Charging stays paused until the energy still needed takes the
    remaining time at full current, plus a **30-minute reserve** for a charge
-   slower than estimated. The `planned_start` attribute of **Timed charging
-   status** shows that time.
+   slower than estimated. The `planned_start` attribute of **Charging wait
+   reason** shows that time.
 2. **Full current.** Charging runs at the wallbox's maximum current.
 3. **Finish at 6 A.** Once the rest fits the remaining time at 6 A, the plan
    reduces to 6 A and lands on the target at departure instead of early.
@@ -159,7 +159,7 @@ charges at once at full current and shows **Charging to the minimum level**.
 At the level it pauses and waits for the planned start as usual; the
 `planned_start` attribute keeps showing that start. The level is part of the
 target, not extra, and **0** switches it off. It applies per
-[vehicle profile](vehicle-setup.md), with and without the Modbus service app.
+[vehicle profile](vehicle-setup.md).
 
 The current still changes at most every five minutes, so charging can run a
 little past the level. A car whose charge level drops below it again while it
@@ -205,30 +205,30 @@ minimum, the wallbox's configured transition delay and HA outages can make
 the exact target time impossible. Missing SoC or capacity data leaves the
 current charging state unchanged.
 
-With a direct serial connection the plan needs HA running to recalculate the
-current. Climate actions always need HA.
+With a direct USB or LAN entry the service runs inside HA, so the plan needs
+HA running. Climate actions always need HA.
 
-## With the Modbus service app
+## How the service plans
 
-With the [Modbus service app](modbus-service.md) the app plans the trip
-itself. Home Assistant hands over the departure time, the selected car with
-its usable capacity and remembered phases, and every charge level together with
-the time the car reported it. The percentage target reaches the app as before.
-The entities in Home Assistant show the app's plan; you set, change and clear
-the trip there as described above.
+The wallbox service plans the trip: inside Home Assistant for a direct entry,
+in the [Modbus service app](modbus-service.md) for an app entry. Home Assistant
+hands over the departure time, the selected car with its usable capacity and
+remembered phases, every charge level together with the time the car reported
+it, and the percentage target. The entities in Home Assistant show the
+service's plan; you set, change and clear the trip there as described above.
 
-- **The plan keeps running without Home Assistant.** A restart or outage of HA
-  changes nothing. After an app restart the plan continues when the wallbox
-  proves that the car stayed plugged in; otherwise it waits until Home
-  Assistant confirms the car again.
+- **With the app, the plan keeps running without Home Assistant.** A restart or
+  outage of HA changes nothing. After a service restart the plan continues
+  when the wallbox proves that the car stayed plugged in; otherwise it waits
+  until Home Assistant confirms the car again.
 - **The plan starts only for a confirmed car with a known charge level.** Home
   Assistant confirms the selected car for each plug-in. Without a charge level
   the status is **Waiting for vehicle charge level**.
-- **Between two reports the app projects the charge level**: the last reported
+- **Between two reports the service projects the charge level**: the last reported
   level plus the metered energy since then at the car's transfer efficiency,
-  90% until the app has learned it. Energy charged before a report is not
+  90% until the service has learned it. Energy charged before a report is not
   counted twice, because every report carries its own time.
-- **The app learns each car.** From two reports of the car during one plug-in
+- **The service learns each car.** From two reports of the car during one plug-in
   that lie at least ten percentage points apart, and the energy metered
   between them, it learns how much of the metered energy reaches the battery
   (60% to 100%; a slightly wrong capacity is absorbed as well). Every
@@ -245,12 +245,12 @@ the trip there as described above.
   unreachable target when necessary; it cannot recover time already lost.
   Both values are kept per vehicle profile for up to eight cars and survive a
   restart. This adds no separate charging history or extra Modbus polling.
-- **The forecast runs to the percentage target.** **Timed charging status**
-  shows it as attributes: `estimated_finish`, `estimated_level_at_departure`,
-  `learned_efficiency` and, once metered, `measured_power_kw`. As long as the
+- **The forecast runs to the percentage target.** **Charging wait reason**
+  shows it as the attributes `estimated_finish` and
+  `estimated_level_at_departure`. As long as the
   target is reachable, the plan lands on it at departure. Once it is not, the
   finish time lies after the departure and the level below the target.
-- **At the projected target the app pauses** and shows **Charged to the
+- **At the projected target the service pauses** and shows **Charged to the
   estimated target**. This stop is provisional: a later report more than one
   percentage point below the target charges again, a report at or above it
   ends the trip as **Target reached**. Without another report the trip counts
@@ -270,17 +270,14 @@ until the car is unplugged.
 
 The bus owner also checks for a disconnected vehicle before
 applying a planned command. Confirmed unplugging cancels that command, including
-while HA is offline in service mode. Manual controls remain available.
+while HA is offline with the app. Manual controls remain available.
 
 Current adjustments require at least 1 A difference and are spaced by at least
-five minutes; the status sensor has
-stable states and adds no per-minute history entries.
+five minutes; the plan's status has stable states and adds no per-minute
+history entries.
 
 [Vehicle setup](vehicle-setup.md) · [Calendar and climate blueprints](blueprints.md) · [Troubleshooting](troubleshooting.md#targets-and-departure-planning)
 
-Direct connections use the same two-minute measurement window and power-ceiling
-calculation as the app. They learn from existing energy-counter polls without
-extra bus requests or Recorder entities. Direct-mode power estimates are kept
-in bounded memory and learned again after HA restarts; the app keeps its bounded
-vehicle model across its own restarts. Phase changes, vehicle changes, invalid
-meter readings and pauses end a measurement window.
+The power measurement uses existing energy-counter polls without extra bus
+requests or Recorder entities. Phase changes, vehicle changes, invalid meter
+readings and pauses end a measurement window.

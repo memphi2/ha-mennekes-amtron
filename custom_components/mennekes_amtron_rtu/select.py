@@ -63,7 +63,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     entities: list[SelectEntity] = [
-        AmtronSelect(entry, description) for description in wanted(hass, entry, SELECTS)
+        AmtronSelect(entry, description) for description in wanted(entry, SELECTS)
     ]
     if profiles(entry.options):
         entities.append(AmtronVehicleSelect(entry, _VEHICLE))

@@ -11,11 +11,11 @@ cards:
       {%- if has_value('datetime.mennekes_amtron_zielzeitpunkt') %}{% set p.l = p.l + ['bis ' ~ as_local(as_datetime(states('datetime.mennekes_amtron_zielzeitpunkt'))).strftime('%H:%M')] %}{% endif -%}
       {%- set s = states('number.mennekes_amtron_fahrzeug_ladeziel') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
-      {%- set t = states('sensor.mennekes_amtron_status_des_zeitgesteuerten_ladens') -%}
+      {%- set t = state_attr('sensor.mennekes_amtron_wartegrund_beim_laden', 'departure_plan') -%}
       {{ 'Warte auf erste Messung' if is_state(entity, 'unknown') else 'Verbindung unterbrochen' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_der_sitzung', with_unit=True) if has_value('sensor.mennekes_amtron_energie_der_sitzung') else '—' }}
 
       {{ 'Grenzen: ' ~ p.l | join(' · ') if p.l else 'Keine Ladegrenze' }}
-      {%- if t not in ['disabled', 'none', 'unknown', 'unavailable'] %} · Planung: {{ state_translated('sensor.mennekes_amtron_status_des_zeitgesteuerten_ladens') }}{% endif %}
+      {%- if t not in [none, 'disabled'] %} · Planung: {{ state_attr_translated('sensor.mennekes_amtron_wartegrund_beim_laden', 'departure_plan') }}{% endif %}
     multiline_secondary: true
     icon: mdi:ev-station
     color: >-
@@ -36,11 +36,11 @@ cards:
           type: template
           entity: switch.mennekes_amtron_virtuelles_plug_charge
           content: >-
-            {{ 'P&C bereit' if states('sensor.mennekes_amtron_status_von_virtuellem_plug_charge') in ['authorized', 'manual_release']
+            {{ 'P&C bereit' if state_attr('sensor.mennekes_amtron_wartegrund_beim_laden', 'plug_charge') in ['authorized', 'manual_release']
             else 'P&C wartet' if is_state(entity, 'on') else 'P&C aus' }}
           icon: mdi:car-key
           icon_color: >-
-            {{ 'green' if states('sensor.mennekes_amtron_status_von_virtuellem_plug_charge') in ['authorized', 'manual_release']
+            {{ 'green' if state_attr('sensor.mennekes_amtron_wartegrund_beim_laden', 'plug_charge') in ['authorized', 'manual_release']
             else 'amber' if is_state(entity, 'on') else 'grey' }}
           tap_action:
             action: more-info
@@ -137,8 +137,8 @@ cards:
       - type: conditional
         conditions:
           - condition: state
-            entity: sensor.mennekes_amtron_gastladen
-            state: inactive
+            entity: binary_sensor.mennekes_amtron_gastladen
+            state: "off"
         chip:
           type: template
           content: "Gast starten"
@@ -154,7 +154,7 @@ cards:
       - type: conditional
         conditions:
           - condition: state
-            entity: button.mennekes_amtron_nachsten_kalendertermin_ubernehmen
+            entity: select.mennekes_amtron_aktives_fahrzeug
             state_not: unavailable
         chip:
           type: template
@@ -162,15 +162,13 @@ cards:
           icon: mdi:calendar-import
           tap_action:
             action: perform-action
-            perform_action: button.press
-            target:
-              entity_id: button.mennekes_amtron_nachsten_kalendertermin_ubernehmen
+            perform_action: mennekes_amtron_rtu.use_calendar_departure
             confirmation:
               text: "Abfahrt übernehmen? Ein Abfahrtsplan darf eine manuelle Pause aufheben."
       - type: conditional
         conditions:
           - condition: state
-            entity: button.mennekes_amtron_abfahrt_vom_fahrzeug_ubernehmen
+            entity: select.mennekes_amtron_aktives_fahrzeug
             state_not: unavailable
         chip:
           type: template
@@ -178,8 +176,6 @@ cards:
           icon: mdi:car-clock
           tap_action:
             action: perform-action
-            perform_action: button.press
-            target:
-              entity_id: button.mennekes_amtron_abfahrt_vom_fahrzeug_ubernehmen
+            perform_action: mennekes_amtron_rtu.use_vehicle_departure
             confirmation:
               text: "Abfahrt übernehmen? Ein Abfahrtsplan darf eine manuelle Pause aufheben."

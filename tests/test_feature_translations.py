@@ -24,21 +24,25 @@ def test_new_status_options_and_control_errors_are_translated_in_all_languages()
         for key, options in (
             ("charging_status", DISPLAY_OPTIONS),
             ("connection_quality", CONNECTION_QUALITY_STATES),
-            ("energy_goal_status", ENERGY_GOAL_STATES),
-            ("soc_goal_status", SOC_GOAL_STATES),
         ):
             translated = entity["sensor"][key]
             assert translated["name"], (path.name, key)
             assert set(translated["state"]) == set(options), (path.name, key)
             assert all(translated["state"].values()), (path.name, key)
+        # The target states ride on the waiting reason instead of own sensors.
+        waiting = entity["sensor"]["operation_waiting"]["state_attributes"]
+        for attribute, options in (("energy_target", ENERGY_GOAL_STATES), ("vehicle_target", SOC_GOAL_STATES)):
+            assert waiting[attribute]["name"], (path.name, attribute)
+            assert set(waiting[attribute]["state"]) == set(options), (path.name, attribute)
+            assert all(waiting[attribute]["state"].values()), (path.name, attribute)
         assert entity["number"]["energy_goal"]["name"]
         assert entity["number"]["soc_goal"]["name"]
         assert entity["button"]["cancel_pending_change"]["name"]
         for key in (
             "energy_goal_invalid", "energy_goal_unavailable", "energy_goal_stop_active", "time_limit_reached",
-            "energy_goal_state_invalid", "energy_goal_not_supported", "cancel_pending_not_supported",
+            "energy_goal_not_supported",
             "soc_goal_invalid", "soc_goal_unavailable", "soc_goal_source_changed",
-            "soc_goal_state_invalid", "soc_goal_not_supported", "soc_goal_limit_unavailable",
+            "soc_goal_not_supported", "soc_goal_limit_unavailable",
         ):
             assert payload["exceptions"][key]["message"], (path.name, key)
         for step, key in (
@@ -48,6 +52,6 @@ def test_new_status_options_and_control_errors_are_translated_in_all_languages()
             form = payload["options"]["step"][step]
             assert form["data"][key]
             assert form["data_description"][key]
-        reasons = entity["event"]["control_result"]["state_attributes"]["reason"]["state"]
+        reasons = entity["event"]["activity"]["state_attributes"]["reason"]["state"]
         assert reasons["user_cancelled"]
         assert reasons["energy_goal"]

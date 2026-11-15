@@ -19,8 +19,10 @@ from custom_components.mennekes_amtron_rtu.device.const import (
 from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.embedded import embedded_config
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_modbus_service import TOKEN, service_fixture
@@ -42,7 +44,7 @@ def test_direct_options_store_whole_seconds_and_pass_them_to_control(seconds):
         stored = result["data"]
         assert type(stored[CONF_PHASE_SWITCH_GRACE_SECONDS]) is int
         entry = FakeConfigEntry(options=stored)
-        assert _control_options(entry).phase_switch_grace_seconds == seconds
+        assert embedded_config(entry).phase_switch_grace_seconds == seconds
         grace_field = next(
             marker for marker in advanced_schema(stored, phase_switch=True).schema
             if marker.schema == CONF_PHASE_SWITCH_GRACE_SECONDS
@@ -54,7 +56,7 @@ def test_direct_options_store_whole_seconds_and_pass_them_to_control(seconds):
 
 def test_grace_defaults_to_five_seconds_in_direct_and_service_configuration():
     assert advanced_schema({}, phase_switch=True)({})[CONF_PHASE_SWITCH_GRACE_SECONDS] == 5
-    assert _control_options(FakeConfigEntry()).phase_switch_grace_seconds == 5
+    assert embedded_config(FakeConfigEntry()).phase_switch_grace_seconds == 5
     assert ServerConfig.from_dict(SERVICE_OPTIONS).phase_switch_grace_seconds == 5
 
 
@@ -85,9 +87,9 @@ def test_service_integration_options_do_not_edit_service_owned_grace_setting():
         flow = Flow(entry)
         form = await flow.async_step_wallbox()
         assert form["step_id"] == "wallbox_service"
-        assert not form["data_schema"].schema
-        assert (await flow.async_step_wallbox_service({}))["step_id"] == "init"
-        assert entry.options == {CONF_PHASE_SWITCH_GRACE_SECONDS: 20}
+        assert [marker.schema for marker in form["data_schema"].schema] == [CONF_RELEASE_OFF_ON_UNPLUG]
+        result = await flow.async_step_wallbox_service({})
+        assert result["data"] == {CONF_PHASE_SWITCH_GRACE_SECONDS: 20, CONF_RELEASE_OFF_ON_UNPLUG: False}
 
     asyncio.run(run())
 

@@ -13,9 +13,14 @@ from collections import deque
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.const import (
     CONTROL_MODE_MASTER,
@@ -45,8 +50,11 @@ def _sample(phase, references, current, coordinator):
         "fds": _fds(), "listeners": len(coordinator._listeners),
         "integration_bytes": integration_bytes, "traced_bytes": tracemalloc.get_traced_memory()[0],
         "rss_bytes": int(Path("/proc/self/statm").read_text().split()[1]) * os.sysconf("SC_PAGE_SIZE"),
-        "retained_clients": sum(ref() is not None and ref() is not current for ref in references),
-        "open_clients": int(current.connected),
+        "retained_clients": sum(
+            (owner := ref()) is not None and all(owner is not live for live in current)
+            for ref in references
+        ),
+        "open_clients": sum(int(owner.connected) for owner in current if hasattr(owner, "connected")),
     }
 
 
@@ -87,31 +95,39 @@ def test_lifecycle_resources_stay_bounded(tmp_path):
                 async def cycle(index):
                     runtime = entry.runtime_data
                     client, coordinator = runtime.client, runtime.coordinator
-                    transport = client._client
-                    references.append(weakref.ref(client))
+                    service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+                    transport = service.client._client
+                    # The HA client, the service and its bus owner of every
+                    # cycle must all be released after the unload.
+                    owners = (client, service, service.client)
+                    references.extend(weakref.ref(owner) for owner in owners)
                     if index >= 2:
-                        samples.append(_sample("loaded", references, client, coordinator))
+                        samples.append(_sample("loaded", references, owners, coordinator))
                     transport.read_exceptions[0x0100] = raise_connection_error()
+                    with pytest.raises(AmtronConnectionError):
+                        await service.refresh()
                     await coordinator.async_refresh()
                     assert not coordinator.last_update_success
                     transport.read_exceptions.clear()
+                    await service.refresh()
                     await coordinator.async_refresh()
                     assert coordinator.last_update_success
                     if index >= 2:
-                        samples.append(_sample("recovered", references, client, coordinator))
+                        samples.append(_sample("recovered", references, owners, coordinator))
                     await asyncio.sleep(idle / cycles if index >= 2 else 0)
                     if index >= 2:
-                        samples.append(_sample("idle", references, client, coordinator))
+                        samples.append(_sample("idle", references, owners, coordinator))
                     await runtime.control.async_set_charging_current(8)
                     await runtime.control.async_set_charging_current(9)
-                    assert runtime.control._flush_task is not None
+                    assert service.control._flush_task is not None
                     assert await hass.config_entries.async_unload(entry.entry_id)
                     await hass.async_block_till_done()
                     assert not client.connected
-                    assert not runtime.heartbeat.running
-                    assert runtime.control._flush_task is None
+                    assert not service.client.connected
+                    assert not service.heartbeat.running
+                    assert service.control._flush_task is None
                     if index >= 2:
-                        samples.append(_sample("unloaded", references, client, coordinator))
+                        samples.append(_sample("unloaded", references, owners, coordinator))
 
                 for index in range(cycles + 2):
                     if index:

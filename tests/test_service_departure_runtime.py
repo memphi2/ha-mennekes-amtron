@@ -61,7 +61,6 @@ def test_the_service_charges_and_rests_a_handed_over_departure(departure_service
             assert server.ModbusService is DepartureModbusService
             given, result = await hand_over(s)
             departure = result["control"]["departure"]
-            assert result["control"]["supports_departure_plan"] is True
             assert departure["inputs"] == given.digest
             assert departure["trip"]["source"] == "manual"
             await s.departure.tick()
@@ -150,7 +149,6 @@ def test_departure_commands_are_validated_before_the_plan_sees_them(departure_se
             plan, s.departure = s.departure, None
             with pytest.raises(DeviceError, match="service_unavailable"):
                 await s.command(trip)
-            assert s.snapshot()["control"]["supports_departure_plan"] is True
             assert s.snapshot()["control"]["departure"] is None
             s.departure = plan
     asyncio.run(run())

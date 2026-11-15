@@ -16,12 +16,12 @@ from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.number import (
     async_setup_entry as setup_numbers,
 )
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.sensor import (
     async_setup_entry as setup_sensors,
 )
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_SOC_ENTITY,
 )
@@ -38,7 +38,7 @@ def test_vehicle_entities_are_absent_until_a_source_is_selected():
         await setup_numbers(hass, entry, lambda items: numbers.update(collect(items)))
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
         assert "soc_goal" not in numbers
-        assert "soc_goal_status" not in sensors
+        assert "vehicle_target" not in sensors["operation_waiting"].extra_state_attributes
         await entry.runtime_data.client.async_close()
 
     asyncio.run(run())
@@ -56,9 +56,10 @@ def test_vehicle_number_uses_reported_cap_and_respects_write_permission(read_onl
         numbers, sensors = {}, {}
         await setup_numbers(hass, entry, lambda items: numbers.update(collect(items)))
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
-        target, status = numbers["soc_goal"], sensors["soc_goal_status"]
+        target, waiting = numbers["soc_goal"], sensors["operation_waiting"]
         assert target.available is not read_only
-        assert status.available
+        assert waiting.available
+        assert waiting.extra_state_attributes["vehicle_target"] == "disabled"
         assert target.native_unit_of_measurement == "%"
         assert target.native_max_value == 100
         control.soc_goal.observe(20, 80)
@@ -105,9 +106,8 @@ def test_remote_vehicle_observations_need_no_extra_wallbox_poll_and_old_service_
                 direct_client = entry.runtime_data.client
                 entry.runtime_data.control = wrapper
                 entry.runtime_data.vehicle_soc = SimpleNamespace(async_set_target=AsyncMock(), source=SOURCE)
-                numbers, sensors = {}, {}
+                numbers = {}
                 await setup_numbers(hass, entry, lambda items: numbers.update(collect(items)))
-                await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
                 assert numbers["soc_goal"].available
                 legacy = deepcopy(service.snapshot())
                 legacy["control"].pop("supports_soc_goal")
@@ -115,7 +115,6 @@ def test_remote_vehicle_observations_need_no_extra_wallbox_poll_and_old_service_
                 remote.apply_snapshot(legacy)
                 assert not wrapper.supports_soc_goal
                 assert not numbers["soc_goal"].available
-                assert not sensors["soc_goal_status"].available
                 with pytest.raises(ServiceValidationError) as error:
                     await wrapper.async_set_soc_goal(80, source=SOURCE)
                 assert error.value.translation_key == "soc_goal_not_supported"
@@ -177,14 +176,14 @@ def test_invalid_remote_vehicle_snapshot_is_rejected_atomically(tmp_path, mutate
             async with ClientSession() as session:
                 remote = ServiceClient(session, "http://localhost", TOKEN)
                 remote.apply_snapshot(service.snapshot())
-                previous = remote.write_state.soc_goal.snapshot()
+                previous = remote.soc_goal.snapshot()
                 raw = deepcopy(service.snapshot())
                 mutate(raw["control"])
                 before = current_writes(transport)
                 with pytest.raises(ServiceConnectionError, match="invalid service snapshot"):
                     remote.apply_snapshot(raw)
                 assert not remote.connected
-                assert remote.write_state.soc_goal.snapshot() == previous
+                assert remote.soc_goal.snapshot() == previous
                 assert current_writes(transport) == before
         finally:
             await service.stop()

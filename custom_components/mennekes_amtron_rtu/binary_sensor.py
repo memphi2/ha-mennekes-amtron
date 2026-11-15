@@ -102,7 +102,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     async_add_entities(
-        AmtronBinarySensor(entry, description) for description in wanted(hass, entry, BINARY_SENSORS)
+        AmtronBinarySensor(entry, description) for description in wanted(entry, BINARY_SENSORS)
     )
 
 

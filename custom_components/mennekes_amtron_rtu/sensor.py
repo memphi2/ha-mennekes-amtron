@@ -345,7 +345,7 @@ async def async_setup_entry(
     entry: MennekesAmtronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    async_add_entities(AmtronSensor(entry, description) for description in wanted(hass, entry, SENSORS))
+    async_add_entities(AmtronSensor(entry, description) for description in wanted(entry, SENSORS))
 
 
 class AmtronSensor(AmtronEntity, SensorEntity):

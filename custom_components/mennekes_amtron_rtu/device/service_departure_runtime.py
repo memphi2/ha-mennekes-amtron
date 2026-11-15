@@ -214,7 +214,6 @@ class DepartureModbusService(GuestModbusService):
         # of planning on its own.
         result["control"] = {
             **result["control"],
-            "supports_departure_plan": True,
             "departure": departure.snapshot() if departure is not None and departure.ready else None,
         }
         # Guest permission and shared choices, without a separate order snapshot.

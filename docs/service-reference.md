@@ -17,7 +17,7 @@ The service owns the USB or LAN gateway connection, polling, heartbeat and charg
 HA connects to its authenticated HTTP API and never opens the adapter in service
 mode. This separates the hardware process from HA, as with Z-Wave JS, using HTTP
 instead of WebSocket. The shared driver has no Home Assistant dependency; see
-[Architecture](architecture.md#independent-service).
+[Architecture](architecture.md#one-service-runtime).
 
 The service's read-only flag is authoritative for HA write permission. HA keeps
 control entities registered and checks fresh connection/readiness state before
@@ -337,16 +337,16 @@ acknowledgement from the independently observed charging state.
 ### Departure plan
 
 The service plans a departure itself; see
-[departure planning](departure-planning.md#with-the-modbus-service-app). The
-snapshot's `control` object reports `supports_departure_plan: true` and
-`departure`, which is `null` while the saved plan loads:
+[departure planning](departure-planning.md#how-the-service-plans). The
+snapshot's `control` object reports `departure`, which is `null` while the
+saved plan loads:
 
 | Field | Meaning |
 |---|---|
 | `trip` | `deadline` (ISO timestamp or `null`), `source` and `finished` (`reached`, `late` or `null`) |
 | `edit_revision` | Opaque persisted identifier changed by explicit trip edits, not by automatic completion; HA uses it to reject stale handovers |
 | `editor`, `selection_vehicle` | Last explicit editor (`ha` or `app`) and its vehicle binding; not public vehicle identity labels |
-| `status` | The plan's state, as shown by **Timed charging status** |
+| `status` | The plan's state, as shown by the `departure_plan` attribute of **Charging wait reason** |
 | `planned_start` | When charging starts or started for this trip, or `null` |
 | `estimated_soc` | The projected charge level in percent, or `null` |
 | `inputs` | Digest of the car data last handed over, or `null` |
@@ -402,16 +402,16 @@ The driver also verifies a known serial over Modbus after a reconnection and
 before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
-unavailable until the original device can be verified again. Direct mode uses
-the same driver checks. Normal heartbeats reuse the verified connection;
+unavailable until the original device can be verified again. A direct entry
+runs this same service inside Home Assistant. Normal heartbeats reuse the verified connection;
 reconnects and a detected identity mismatch require verification again.
 
 Stop the bus owner before deliberately changing a gateway route or connected
 wallbox. Modbus serial numbers are not cryptographic authentication, and a
 physical routing change is not an authenticated identity change notification.
 
-The service enforces the same current-write floor, charging transition guards,
-device limits and bounded error-200 recovery as direct mode. All clients share one
+The service enforces the current-write floor, charging transition guards,
+device limits and bounded error-200 recovery for every client. All clients share one
 serialized command path. A command is rejected if the latest wallbox snapshot
 is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request

@@ -5,13 +5,15 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.enums import (
     EvseState,
     RequestedPhases,
+)
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceValidationError,
 )
 from tests.fakes import put, raise_connection_error
 from tests.test_control import Harness
@@ -198,7 +200,7 @@ def test_failed_live_state_read_allows_stop_but_blocks_start(kind, failure):
             harness.transport.read_exceptions[register.address] = raise_connection_error()
         else:
             put(harness.transport.bank, register, 7)
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await method(not stop)
         assert error.value.translation_key == "control_state_unknown"
         await method(stop)

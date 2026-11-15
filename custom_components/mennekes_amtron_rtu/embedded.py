@@ -13,7 +13,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import Event, HomeAssistant
 
 from .device.const import (
     CONF_CURRENT_LIMIT,
@@ -31,6 +32,7 @@ from .device.errors import DeviceError
 from .device.service_api import ServiceApi
 from .device.service_config import ServerConfig
 from .device.service_departure_runtime import DepartureModbusService
+from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .entry_connection import connection_config
 from .options_flow import control_mode_is_master
 from .service_transport import EmbeddedTransport
@@ -78,9 +80,14 @@ def state_directory(hass: HomeAssistant, entry_id: str) -> Path:
 class EmbeddedService:
     """One running service and the way to reach it."""
 
-    def __init__(self, config: ServerConfig, directory: Path) -> None:
+    def __init__(
+        self, config: ServerConfig, directory: Path, expected_serial: str | None = None,
+    ) -> None:
         self.config = config
         self._service = DepartureModbusService(config, directory / "intent.json")
+        # Bound before the first read: another wallbox on this connection is
+        # rejected before the service writes anything to it, heartbeat included.
+        self._service.client.bind_identity(expected_serial)
         self.transport = EmbeddedTransport(ServiceApi(self._service))
 
     async def async_start(self) -> None:
@@ -92,6 +99,10 @@ class EmbeddedService:
         except BaseException:
             await self.async_stop()
             raise
+
+    def credentials_rejected(self) -> bool:
+        """Whether the gateway refused the saved password on the newest poll."""
+        return isinstance(self._service.failure, WaveshareAuthenticationRejectedError)
 
     def fits(self, config: ServerConfig) -> bool:
         """Whether the new settings can be applied without a new connection."""
@@ -114,12 +125,29 @@ class EmbeddedService:
 
 
 def _hosts(hass: HomeAssistant) -> dict[str, EmbeddedService]:
-    hosts: dict[str, EmbeddedService] = hass.data.setdefault(_HOSTS, {})
+    if _HOSTS not in hass.data:
+        hass.data[_HOSTS] = {}
+
+        async def stop_all(_event: Event) -> None:
+            # Home Assistant stops without unloading its entries. Stopping
+            # here lets every service save what it knows and end its heartbeat.
+            hosts = hass.data[_HOSTS]
+            while hosts:
+                _entry_id, host = hosts.popitem()
+                await host.async_stop()
+
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_all)
+    hosts: dict[str, EmbeddedService] = hass.data[_HOSTS]
     return hosts
 
 
-async def async_acquire(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> EmbeddedService:
-    """Return the entry's running service, started or adjusted as needed."""
+async def async_acquire(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, expected_serial: str | None = None,
+) -> EmbeddedService:
+    """Return the entry's running service, started or adjusted as needed.
+
+    ``expected_serial`` binds a new service to the configured wallbox.
+    """
     config = embedded_config(entry)
     hosts = _hosts(hass)
     host = hosts.pop(entry.entry_id, None)
@@ -135,7 +163,7 @@ async def async_acquire(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -
                 return host
         else:
             await host.async_stop()
-    host = EmbeddedService(config, state_directory(hass, entry.entry_id))
+    host = EmbeddedService(config, state_directory(hass, entry.entry_id), expected_serial)
     await host.async_start()
     hosts[entry.entry_id] = host
     return host

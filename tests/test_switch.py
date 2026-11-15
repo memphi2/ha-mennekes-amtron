@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.restore_state import RestoredExtraData
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
+from custom_components.mennekes_amtron_rtu import (
+    CONTROL_PLATFORMS,
+    READ_PLATFORMS,
+    _entry_platforms,
+)
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.switch import async_setup_entry
+from custom_components.mennekes_amtron_rtu.unplug_rule import UnplugRule
 from tests.fakes import device_bank, raise_connection_error
 from tests.ha_fakes import build_runtime, collect
 
@@ -21,27 +25,42 @@ async def _switches(**kwargs: object):
     return added, entry, transport
 
 
+def _currents(transport) -> list[float]:
+    return [
+        decode_register(R.CHARGING_CURRENT_EMS, words)
+        for address, words in transport.writes
+        if address == R.CHARGING_CURRENT_EMS.address
+    ]
+
+
 def test_the_release_and_lock_switches_follow_their_registers() -> None:
     async def run() -> None:
         switches, entry, transport = await _switches()
+        device = entry.service.control
         control = entry.runtime_data.control
         clock = [1000.0]
-        control._monotonic = lambda: clock[0]
+        device._monotonic = lambda: clock[0]
+
+        async def sleep(seconds: float) -> None:
+            clock[0] += seconds
+            await asyncio.sleep(0)
+
+        device._sleep = sleep
         assert switches["charging_release"].is_on is True
         assert switches["lock_evse"].is_on is False
 
         await switches["charging_release"].async_turn_off()
         await switches["lock_evse"].async_turn_on()
+        # The second change waits out the state-change interval in the service.
         assert control.pending_action == "lock"
         assert transport.bank[R.LOCK_EVSE.address] == 0
         assert switches["lock_evse"].is_on is False
-        clock[0] += 300
-        await asyncio.wait_for(control._flush_task, 1)
+        await asyncio.wait_for(device._flush_task, 1)
+        await entry.runtime_data.coordinator.async_refresh()
         assert control.pending_action is None
         written = dict(transport.writes)
         assert written[R.CHARGING_RELEASE.address] == [0]
         assert written[R.LOCK_EVSE.address] == [1]
-        await entry.runtime_data.coordinator.async_refresh()
         assert switches["charging_release"].is_on is False
         assert switches["lock_evse"].is_on is True
 
@@ -49,8 +68,7 @@ def test_the_release_and_lock_switches_follow_their_registers() -> None:
         assert switches["charging_release"].is_on is None
         entry.runtime_data.coordinator.data.values["lock_evse"] = None
         assert switches["lock_evse"].is_on is None
-        await control.async_shutdown()
-        await entry.runtime_data.client.async_close()
+        await device.async_shutdown()
 
     asyncio.run(run())
 
@@ -73,10 +91,7 @@ def test_the_pause_switch_uses_the_documented_pause_value() -> None:
         pause = switches["charging_paused"]
         assert pause.is_on is False
         await pause.async_turn_on()
-        assert any(
-            address == R.CHARGING_CURRENT_EMS.address for address, _ in transport.writes
-        )
-        entry.runtime_data.coordinator.data.values["charging_current_ems"] = 1.0
+        assert _currents(transport) == [1.0]
         assert pause.is_on is True
         assert entry.runtime_data.control.pause_requested is True
 
@@ -88,100 +103,21 @@ def test_resuming_restores_charging() -> None:
         switches, entry, transport = await _switches(
             bank=device_bank(charging_current=1.0)
         )
-        entry.runtime_data.control.charging_setpoint = 12.0
+        entry.service.control.charging_setpoint = 12.0
+        assert switches["charging_paused"].is_on is True
         await switches["charging_paused"].async_turn_off()
         assert entry.runtime_data.control.pause_requested is False
-        assert any(
-            address == R.CHARGING_CURRENT_EMS.address for address, _ in transport.writes
-        )
+        assert _currents(transport) == [12.0]
+        assert switches["charging_paused"].is_on is False
 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("requested", [False, True, None])
-@pytest.mark.parametrize(
-    ("entity_key", "intent_key"),
-    [
-        ("charging_release", "charging_release_requested"),
-        ("charging_paused", "pause_requested"),
-    ],
-)
-def test_control_intent_is_restored_separately_from_fault_readback(
-    requested, entity_key, intent_key
-):
-    async def run():
+def test_an_unknown_current_leaves_the_pause_state_unknown() -> None:
+    async def run() -> None:
         switches, entry, _transport = await _switches()
-        switch = switches[entity_key]
-
-        async def extra():
-            return RestoredExtraData({intent_key: requested})
-
-        switch.async_get_last_extra_data = extra
-        await switch.async_added_to_hass()
-        assert getattr(entry.runtime_data.control, intent_key) is requested
-        assert switch.extra_restore_state_data.as_dict() == {intent_key: requested}
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("old_state", [None, "off", "on", "unavailable"])
-@pytest.mark.parametrize("extra_value", ["absent", "invalid", "missing_key"])
-@pytest.mark.parametrize(
-    ("entity_key", "intent_key", "blocked_state", "intent"),
-    [
-        ("charging_release", "charging_release_requested", "off", False),
-        ("charging_paused", "pause_requested", "on", True),
-    ],
-)
-def test_observed_state_is_not_restored_as_user_intent(
-    old_state, extra_value, entity_key, intent_key, blocked_state, intent
-):
-    async def run():
-        switches, entry, _transport = await _switches()
-        switch = switches[entity_key]
-
-        async def extra():
-            if extra_value == "missing_key":
-                return RestoredExtraData({})
-            return (
-                None
-                if extra_value == "absent"
-                else RestoredExtraData({intent_key: "bad"})
-            )
-
-        async def state():
-            return None if old_state is None else SimpleNamespace(state=old_state)
-
-        switch.async_get_last_extra_data = extra
-        switch.async_get_last_state = state
-        await switch.async_added_to_hass()
-        assert getattr(entry.runtime_data.control, intent_key) is None
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("intent", [False, True])
-@pytest.mark.parametrize(
-    ("entity_key", "intent_key"),
-    [
-        ("charging_release", "charging_release_requested"),
-        ("charging_paused", "pause_requested"),
-    ],
-)
-def test_reload_does_not_override_current_control_intent(
-    entity_key, intent_key, intent
-):
-    async def run():
-        switches, entry, _transport = await _switches()
-        switch = switches[entity_key]
-        setattr(entry.runtime_data.control, intent_key, intent)
-
-        async def extra():
-            return RestoredExtraData({intent_key: not intent})
-
-        switch.async_get_last_extra_data = extra
-        await switch.async_added_to_hass()
-        assert getattr(entry.runtime_data.control, intent_key) is intent
+        entry.runtime_data.client.snapshot["values"]["charging_current_ems"] = None
+        assert switches["charging_paused"].is_on is None
 
     asyncio.run(run())
 
@@ -190,9 +126,10 @@ def test_reload_does_not_override_current_control_intent(
 @pytest.mark.parametrize("failure", ["lost_reply", "cancelled"])
 def test_failed_release_commands_cannot_erase_a_block(released, failure):
     async def run():
-        switches, entry, transport = await _switches()
+        _hass, entry, transport = await build_runtime()
+        device = entry.service.control
         control = entry.runtime_data.control
-        control.charging_release_requested = False if released else None
+        device.charging_release_requested = False if released else None
         transport.write_exceptions[R.CHARGING_RELEASE.address] = (
             asyncio.CancelledError()
             if failure == "cancelled"
@@ -202,73 +139,168 @@ def test_failed_release_commands_cannot_erase_a_block(released, failure):
             asyncio.CancelledError if failure == "cancelled" else HomeAssistantError
         ):
             await control.async_set_charging_release(released)
-        assert control.charging_release_requested is False
-        assert switches["charging_release"].extra_restore_state_data.as_dict() == {
-            "charging_release_requested": False
-        }
-        await control.async_shutdown()
-        await entry.runtime_data.client.async_close()
+        assert device.charging_release_requested is False
+        await device.async_shutdown()
 
     asyncio.run(run())
 
 
-def _plug(entry, connected: bool) -> None:
-    values = entry.runtime_data.coordinator.data.values
-    values["evse_state"] = 2 if connected else 1
-    values["cp_state"] = 11 if connected else 10
-
-
-@pytest.mark.parametrize(("enabled", "plug_charge", "release", "expected"), [
-    (True, False, 1, True), (False, False, 1, False),
-    (True, True, 1, False), (True, False, 0, False),
-])
-def test_release_is_switched_off_after_a_confirmed_unplug(enabled, plug_charge, release, expected) -> None:
+def test_read_only_entries_offer_no_control_platforms() -> None:
     async def run() -> None:
-        switches, entry, _transport = await _switches()
-        switch = switches["release_off_on_unplug"]
-        tasks: list[object] = []
-        switch.hass = SimpleNamespace()
-        tasks = entry.background_tasks
-        switch.async_write_ha_state = lambda: None
-        control = entry.runtime_data.control
-        control.async_set_charging_release = AsyncMock()
-        if plug_charge:
-            control._plug_charge.state.enabled = True
-        await (switch.async_turn_on() if enabled else switch.async_turn_off())
-        entry.runtime_data.coordinator.data.values["charging_release"] = release
-        _plug(entry, True)
-        switch._handle_coordinator_update()
-        # Unknown readings neither count as a disconnect nor forget the plug.
-        entry.runtime_data.coordinator.data.values["evse_state"] = None
-        switch._handle_coordinator_update()
-        _plug(entry, False)
-        switch._handle_coordinator_update()
-        switch._handle_coordinator_update()
-        await asyncio.gather(*tasks)
-        if expected:
-            control.async_set_charging_release.assert_awaited_once_with(False)
-        else:
-            control.async_set_charging_release.assert_not_awaited()
+        _hass, entry, _transport = await build_runtime(read_only=True)
+        assert not entry.runtime_data.controls
+        assert _entry_platforms(entry) == list(READ_PLATFORMS)
+        _hass, entry, _transport = await build_runtime()
+        assert _entry_platforms(entry) == [*READ_PLATFORMS, *CONTROL_PLATFORMS]
 
     asyncio.run(run())
 
 
-def test_a_failed_release_off_is_logged_not_raised(caplog) -> None:
+def test_controls_are_unavailable_while_the_service_allows_no_writes() -> None:
     async def run() -> None:
         switches, entry, _transport = await _switches()
-        switch = switches["release_off_on_unplug"]
-        tasks: list[object] = []
-        switch.hass = SimpleNamespace()
-        tasks = entry.background_tasks
-        switch.async_write_ha_state = lambda: None
-        entry.runtime_data.control.async_set_charging_release = AsyncMock(side_effect=HomeAssistantError("busy"))
+        assert all(switches[key].available for key in ("charging_paused", "charging_release", "lock_evse"))
+        entry.runtime_data.client.snapshot["control"]["read_only"] = True
+        assert not any(switches[key].available for key in ("charging_paused", "charging_release", "lock_evse"))
+        with pytest.raises(ServiceValidationError):
+            await switches["lock_evse"].async_turn_on()
+
+    asyncio.run(run())
+
+
+class _Gate:
+    def __init__(self) -> None:
+        self.calls: list[bool] = []
+
+    async def async_set_enabled(self, enabled: bool) -> None:
+        self.calls.append(enabled)
+
+
+def test_the_plug_and_charge_switch_follows_the_service_gate() -> None:
+    async def run() -> None:
+        hass, entry, _transport = await build_runtime()
+        gate = _Gate()
+        entry.runtime_data.plug_charge = gate
+        added: dict[str, object] = {}
+        await async_setup_entry(hass, entry, lambda items: added.update(collect(items)))
+        switch = added["virtual_plug_charge"]
+        snapshot = entry.runtime_data.client.snapshot["control"]
+        snapshot["plug_charge"] = {"enabled": True}
+        assert switch.is_on is True
+        snapshot["read_only"] = True
+        # Switching the gate off stays possible without write access.
+        assert switch.available
+        snapshot["plug_charge"] = {"enabled": False}
+        assert switch.is_on is False
+        assert not switch.available
         await switch.async_turn_on()
-        _plug(entry, True)
-        switch._handle_coordinator_update()
-        _plug(entry, False)
-        switch._handle_coordinator_update()
-        await asyncio.gather(*tasks)
-        assert "Control: charging release not switched off" in caplog.text
+        await switch.async_turn_off()
+        assert gate.calls == [True, False]
+
+        entry.runtime_data.plug_charge = None
+        with pytest.raises(ServiceValidationError) as error:
+            await switch.async_turn_on()
+        assert error.value.translation_key == "plug_charge_unavailable"
+
+    asyncio.run(run())
+
+
+def test_without_plug_and_charge_there_is_no_gate_switch() -> None:
+    switches, _entry, _transport = asyncio.run(_switches())
+    assert set(switches) == {"charging_paused", "charging_release", "lock_evse"}
+
+
+def _plug(transport, connected: bool) -> None:
+    transport.bank[R.EVSE_STATE.address] = 2 if connected else 1
+    transport.bank[R.CP_STATE.address] = 11 if connected else 10
+
+
+async def _unplug_rule(transport, entry, *, release: int = 1) -> UnplugRule:
+    transport.bank[R.CHARGING_RELEASE.address] = release
+    _plug(transport, True)
+    await entry.runtime_data.coordinator.async_refresh()
+    rule = UnplugRule(entry.runtime_data.coordinator.hass, entry)
+    transport.writes.clear()
+    return rule
+
+
+async def _unplug(transport, entry) -> None:
+    coordinator = entry.runtime_data.coordinator
+    # An unknown reading neither counts as a disconnect nor forgets the plug.
+    coordinator.data.values["evse_state"] = None
+    coordinator.async_update_listeners()
+    _plug(transport, False)
+    await coordinator.async_refresh()
+    await coordinator.async_refresh()
+    await asyncio.gather(*entry.background_tasks)
+
+
+@pytest.mark.parametrize(("plug_charge", "release", "expected"), [
+    (False, 1, True), (True, 1, False), (False, 0, False),
+])
+def test_release_is_switched_off_after_a_confirmed_unplug(monkeypatch, plug_charge, release, expected) -> None:
+    async def run() -> None:
+        _hass, entry, transport = await build_runtime()
+        # With the gate enabled, the gate already owns the release.
+        monkeypatch.setattr(
+            type(entry.runtime_data.control), "plug_charge", property(lambda _self: {"enabled": plug_charge}),
+        )
+        rule = await _unplug_rule(transport, entry, release=release)
+        await _unplug(transport, entry)
+        released = [words for address, words in transport.writes if address == R.CHARGING_RELEASE.address]
+        assert released == ([[0]] if expected else [])
+        rule.stop()
+        rule.stop()
+
+    asyncio.run(run())
+
+
+def test_the_rule_does_nothing_without_write_access_or_after_stopping() -> None:
+    async def run() -> None:
+        _hass, entry, transport = await build_runtime()
+        rule = await _unplug_rule(transport, entry)
+        rule.stop()
+        await _unplug(transport, entry)
+        assert transport.writes == []
+
+        rule = await _unplug_rule(transport, entry)
+        entry.runtime_data.client.snapshot["control"]["read_only"] = True
+        entry.runtime_data.coordinator.data.values.update(evse_state=1, cp_state=10)
+        entry.runtime_data.coordinator.async_update_listeners()
+        assert entry.background_tasks == []
+        rule.stop()
+
+    asyncio.run(run())
+
+
+def test_a_failed_poll_is_no_disconnect() -> None:
+    async def run() -> None:
+        _hass, entry, transport = await build_runtime()
+        rule = await _unplug_rule(transport, entry)
+        coordinator = entry.runtime_data.coordinator
+        coordinator.last_update_success = False
+        coordinator.async_update_listeners()
+        coordinator.last_update_success = True
+        coordinator.async_update_listeners()
+        assert entry.background_tasks == []
+        rule.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("error", [HomeAssistantError("busy"), OSError("port closed")])
+def test_a_failed_release_off_is_logged_not_raised(monkeypatch, caplog, error) -> None:
+    async def run() -> None:
+        _hass, entry, transport = await build_runtime()
+
+        async def release_off(_released: bool) -> None:
+            raise error
+
+        monkeypatch.setattr(entry.runtime_data.control, "async_set_charging_release", release_off)
+        rule = await _unplug_rule(transport, entry)
+        await _unplug(transport, entry)
+        assert "Control: charging release not switched off after unplugging" in caplog.text
+        rule.stop()
 
     asyncio.run(run())
 
@@ -279,43 +311,23 @@ def test_a_failed_release_off_is_logged_not_raised(caplog) -> None:
 ])
 def test_unplugging_also_ends_a_manual_pause(monkeypatch, release, paused, goal_stop, resumed) -> None:
     async def run() -> None:
-        switches, entry, _transport = await _switches()
-        switch = switches["release_off_on_unplug"]
-        tasks: list[object] = []
-        switch.hass = SimpleNamespace()
-        tasks = entry.background_tasks
-        switch.async_write_ha_state = lambda: None
+        _hass, entry, transport = await build_runtime()
         control = entry.runtime_data.control
-        control.async_set_charging_release = AsyncMock()
-        control.async_resume_charging = AsyncMock()
-        control.pause_requested = paused
+        calls: list[str] = []
+
+        async def resume(**_kwargs: object) -> None:
+            calls.append("resume")
+
+        async def release_off(released: bool) -> None:
+            calls.append(f"release {released}")
+
+        monkeypatch.setattr(control, "async_resume_charging", resume)
+        monkeypatch.setattr(control, "async_set_charging_release", release_off)
         monkeypatch.setattr(type(control), "energy_goal_stop_requested", property(lambda _self: goal_stop))
-        await switch.async_turn_on()
-        entry.runtime_data.coordinator.data.values["charging_release"] = release
-        _plug(entry, True)
-        switch._handle_coordinator_update()
-        _plug(entry, False)
-        switch._handle_coordinator_update()
-        await asyncio.gather(*tasks)
-        assert control.async_set_charging_release.await_count == release
-        assert control.async_resume_charging.await_count == int(resumed)
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize(("stored", "expected"), [({"enabled": True}, True), ({"enabled": False}, False), (None, False)])
-def test_release_off_on_unplug_survives_an_unavailable_shutdown(stored, expected) -> None:
-    async def run() -> None:
-        switches, _entry, _transport = await _switches()
-        switch = switches["release_off_on_unplug"]
-
-        async def extra():
-            return None if stored is None else RestoredExtraData(stored)
-
-        switch.async_get_last_extra_data = extra
-        switch.async_get_last_state = AsyncMock(return_value=SimpleNamespace(state="unavailable"))
-        await switch.async_added_to_hass()
-        assert switch.is_on is expected
-        assert switch.extra_restore_state_data.as_dict() == {"enabled": expected}
+        monkeypatch.setattr(type(control), "pause_requested", property(lambda _self: paused))
+        rule = await _unplug_rule(transport, entry, release=release)
+        await _unplug(transport, entry)
+        assert calls == ["release False"] * release + ["resume"] * int(resumed)
+        rule.stop()
 
     asyncio.run(run())

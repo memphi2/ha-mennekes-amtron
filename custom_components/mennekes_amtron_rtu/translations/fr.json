@@ -799,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "Une limite de recharge est atteinte, la recharge reste donc en pause. Pour continuer, augmentez la limite kWh ou l’objectif en pourcentage, ou mettez-la à 0 ; après une remise à zéro du compteur, enregistrez à nouveau la limite. Modifier une limite ne démarre pas la recharge."
     },
-    "energy_goal_state_invalid": {
-      "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
-    },
     "energy_goal_not_supported": {
       "message": "Ce service Modbus ne prend pas en charge les objectifs énergétiques. Mettez d’abord à jour l’application ou le service autonome."
-    },
-    "cancel_pending_not_supported": {
-      "message": "Ce service Modbus ne peut pas annuler les modifications en attente. Mettez d’abord à jour l’application ou le service autonome."
     },
     "soc_goal_invalid": {
       "message": "Saisissez un objectif de 0 à 100 %, sans dépasser la limite du véhicule. 0 désactive cet objectif."
@@ -820,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "Les sources du véhicule ont changé. Rechargez l’intégration avant de modifier son objectif en pourcentage."
     },
-    "soc_goal_app_update_required": {
-      "message": "Mettez à jour l’application du service Modbus Mennekes avant de modifier l’objectif de charge du véhicule. Les autres fonctions restent disponibles."
-    },
     "soc_goal_not_supported": {
       "message": "Le service Modbus ne prend pas en charge les objectifs en pourcentage du véhicule. Mettez l’application à jour pour utiliser cette fonction facultative."
-    },
-    "soc_goal_state_invalid": {
-      "message": "L’objectif de charge du véhicule enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
     },
     "loss_source_invalid": {
       "message": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant."
@@ -870,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "L’autorisation a expiré ou n’est plus valide. Attendez des données actuelles et concordantes avant de réessayer."
-    },
-    "plug_charge_not_supported": {
-      "message": "L’application ou le service Modbus connecté ne prend pas en charge Plug & Charge virtuel. Mettez-le à jour vers une version compatible."
-    },
-    "app_required": {
-      "message": "Cette action nécessite l’application Modbus ; cette borne est connectée directement."
     },
     "wallbox_target_required": {
       "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."

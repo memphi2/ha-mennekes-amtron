@@ -8,32 +8,38 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
-from tests.ha_fakes import build_runtime
+from custom_components.mennekes_amtron_rtu.event import async_setup_entry
+from tests.ha_fakes import build_runtime, collect
 
 
 async def _setup(monkeypatch):
     hass, entry, _transport = await build_runtime()
-    wallbox, raw = AmtronWallboxEvent(entry), AmtronControlResultEvent(entry)
-    wallbox.hass = raw.hass = hass
-    wallbox.entity_id = "event.wallbox"
-    rows, raw_rows = [], []
-    monkeypatch.setattr(wallbox, "async_write_ha_state", lambda: None)
-    monkeypatch.setattr(raw, "async_write_ha_state", lambda: raw_rows.append(raw.state_attributes.copy()))
+    added = {}
+    await async_setup_entry(hass, entry, lambda items: added.update(collect(items)))
+    activity = added["activity"]
+    activity.hass = hass
+    activity.entity_id = "event.activity"
+    rows, triggers = [], []
+
+    async def translations(*_args, **_kwargs):
+        return {}
+
+    monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_get_translations", translations)
+    monkeypatch.setattr(activity, "async_write_ha_state", lambda: triggers.append(activity.state_attributes.copy()))
     monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_log_entry",
                         lambda *args, **_kwargs: rows.append(args[2]))
-    feed = entry.runtime_data.control.events
-    feed.listen(wallbox._log_activity)
-    feed.listen(raw._handle_event)
-    return entry, wallbox, feed, rows, raw_rows
+    await activity.async_added_to_hass()
+    return entry, activity, entry.runtime_data.control.events, rows, triggers
 
 
-def test_repeated_successful_setpoints_keep_full_raw_feed_but_one_activity(monkeypatch):
+def test_repeated_successful_setpoints_keep_the_full_feed_but_one_activity(monkeypatch):
     async def run():
-        _entry, _wallbox, feed, rows, raw_rows = await _setup(monkeypatch)
+        _entry, _activity, feed, rows, triggers = await _setup(monkeypatch)
         for _ in range(5):
             feed.record("executed", "set_current", source="home_assistant", requested_value=8)
         assert len(rows) == 1
-        assert len(raw_rows) == 5
+        assert len(triggers) == 1
+        # The service's own feed keeps every outcome.
         assert len(feed.snapshot()["events"]) == 5
         for source, value, reason in [
             ("departure_plan", 8, "completed"),
@@ -43,7 +49,7 @@ def test_repeated_successful_setpoints_keep_full_raw_feed_but_one_activity(monke
         ]:
             feed.record("executed", "set_current", reason, source=source, requested_value=value)
         assert len(rows) == 5
-        assert len(raw_rows) == 9
+        assert len(triggers) == 5
     asyncio.run(run())
 
 
@@ -58,7 +64,7 @@ def test_repeated_successful_setpoints_keep_full_raw_feed_but_one_activity(monke
 ])
 def test_intervening_actions_and_failures_reset_success_comparison(monkeypatch, action, outcome, reason, visible):
     async def run():
-        _entry, _wallbox, feed, rows, _raw = await _setup(monkeypatch)
+        _entry, _activity, feed, rows, _triggers = await _setup(monkeypatch)
         feed.record("executed", "set_current", requested_value=8)
         for _ in range(2):
             feed.record(outcome, action, reason, requested_value=8)
@@ -71,7 +77,7 @@ def test_intervening_actions_and_failures_reset_success_comparison(monkeypatch, 
 @pytest.mark.parametrize("value", [None, True, float("nan"), float("inf"), -1, 33])
 def test_unknown_or_invalid_requested_values_are_not_silenced(monkeypatch, value):
     async def run():
-        _entry, _wallbox, feed, rows, _raw = await _setup(monkeypatch)
+        _entry, _activity, feed, rows, _triggers = await _setup(monkeypatch)
         for _ in range(2):
             feed.record("executed", "set_current", requested_value=value)
         assert len(rows) == 2
@@ -80,7 +86,7 @@ def test_unknown_or_invalid_requested_values_are_not_silenced(monkeypatch, value
 
 def test_confirming_readbacks_are_quiet_but_external_current_changes_reset(monkeypatch):
     async def run():
-        entry, wallbox, feed, rows, _raw = await _setup(monkeypatch)
+        entry, wallbox, feed, rows, _triggers = await _setup(monkeypatch)
         data = entry.runtime_data.coordinator.data
         data.values["charging_current_ems"] = 6
         wallbox._handle_coordinator_update()
@@ -102,7 +108,7 @@ def test_confirming_readbacks_are_quiet_but_external_current_changes_reset(monke
 @pytest.mark.parametrize("change", ["disconnect", "held", "failed_block", "missing", "physical"])
 def test_reading_gaps_and_physical_changes_allow_a_new_same_value_result(monkeypatch, change):
     async def run():
-        entry, wallbox, feed, rows, _raw = await _setup(monkeypatch)
+        entry, wallbox, feed, rows, _triggers = await _setup(monkeypatch)
         coordinator = entry.runtime_data.coordinator
         coordinator.data = WallboxData(values={
             "evse_state": EvseState.EV_CONNECTED, "cp_state": CpState.B1,

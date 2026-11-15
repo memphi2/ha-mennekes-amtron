@@ -50,7 +50,7 @@ from .const import (
 )
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
 from .energy_goal import EnergyGoal
-from .enums import CpState, EvseState, RequestedPhases, SolarChargingMode
+from .enums import CpState, EvseState, RequestedPhases
 from .errors import DeviceError, DeviceValidationError, device_error, validation_error
 from .plug_charge import PlugChargeController
 from .registers import (
@@ -63,7 +63,6 @@ from .registers import (
     HEARTBEAT,
     LOCK_EVSE,
     REQUESTED_PHASES,
-    SOLAR_CHARGING_MODE,
     SYSTEM_RESTART,
     RegisterSpec,
 )
@@ -201,10 +200,6 @@ class AmtronControl:
         self.guest_confirmation_required: Callable[[], bool] = lambda: False
         self.time_limit_reached: Callable[[], bool] = lambda: False
         self.guest_active: Callable[[], bool] = lambda: False
-
-    @property
-    def supports_plug_charge(self) -> bool:
-        return True
 
     @property
     def plug_charge(self) -> dict[str, object]:
@@ -450,14 +445,9 @@ class AmtronControl:
         return self._pending_until
 
     @property
-    def supports_cancel_pending(self) -> bool:
-        """This controller can remove queued work without touching the wallbox."""
-        return True
-
-    @property
     def can_cancel_pending(self) -> bool:
         """Cancellation needs permission and pending work, not a healthy bus."""
-        return self.supports_cancel_pending and not self.read_only and self.pending_action is not None
+        return not self.read_only and self.pending_action is not None
 
     async def async_cancel_pending_change(self) -> None:
         """Discard future work, retaining any pause or setpoint already applied."""
@@ -755,16 +745,6 @@ class AmtronControl:
         self._require_write_access()
         async with self._current_lock:
             await self._async_submit_locked(_PendingCommand("lock" if locked else "unlock", int(locked)))
-
-    async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
-        """Set the solar charging mode shown on the wallbox HMI (0x0D03)."""
-
-        self._require_write_access()
-        # Command context belongs to the operation holding this lock. An
-        # unrelated solar setting must not inherit a timed current's expiry
-        # or goal cancellation while that current awaits the shared bus.
-        async with self._current_lock:
-            await self._async_write(SOLAR_CHARGING_MODE, int(mode))
 
     async def async_set_requested_phases(self, phases: RequestedPhases) -> None:
         """Request single-phase or all-phase charging through 0x0D04.

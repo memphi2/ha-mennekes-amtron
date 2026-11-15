@@ -34,8 +34,8 @@ from .device.operation import Operation
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE
 from .device.soc_goal import SocGoal
-from .remote_compat import SUPPORTED_API_VERSION, validate_service_version
-from .remote_errors import ServiceConnectionError, ServiceFailure
+from .service_compat import SUPPORTED_API_VERSION, validate_service_version
+from .service_errors import ServiceConnectionError, ServiceFailure
 from .service_transport import HttpTransport, ServiceTransport
 
 CONF_SERVER_URL = "server_url"
@@ -288,9 +288,6 @@ class ServiceClient:
                 raise ValueError("invalid controls")
             section = "control.pending_change"
             pending_action, pending_until = _pending_status(control)
-            section = "control.supports_cancel_pending"
-            if not isinstance(control.get("supports_cancel_pending", False), bool):
-                raise ValueError("invalid cancellation capability")
             section = "control.energy_goal"
             goal_supported = control.get("supports_energy_goal", False)
             if type(goal_supported) is not bool:
@@ -307,21 +304,14 @@ class ServiceClient:
             soc_goal = SocGoal.restore(soc_raw) if soc_raw is not None else SocGoal()
             if soc_supported and soc_raw is None:
                 raise ValueError("missing percentage goal state")
-            transactions = control.get("soc_transactions_supported", False)
-            if type(transactions) is not bool:
-                raise ValueError("invalid percentage transaction capability")
             revision = control.get("soc_goal_revision")
-            if transactions and (
-                not is_hex32(revision)
-            ):
+            if not is_hex32(revision):
                 raise ValueError("invalid percentage goal revision")
             section = "control.soc_maximum_required"
             maximum_required = control.get("soc_maximum_required")
             if maximum_required is not None and type(maximum_required) is not bool:
                 raise ValueError("invalid percentage maximum policy")
             section = "control.departure"
-            if type(control.get("supports_departure_plan", False)) is not bool:
-                raise ValueError("invalid departure plan capability")
             departure_raw = control.get("departure")
             departure = None if departure_raw is None else DepartureState.restore(departure_raw)
             section = "control.operation"
@@ -408,43 +398,38 @@ class ServiceClient:
                 isinstance(value, str) for value in errors
             ):
                 raise ValueError("invalid write errors")
-            section = "control.intent"
-            supports_plug_charge = control.get("supports_plug_charge", False)
-            if type(supports_plug_charge) is not bool:
-                raise ValueError("invalid plug charge capability")
-            if supports_plug_charge:
-                section = "control.plug_charge"
-                gate = control.get("plug_charge")
-                if (
-                    not isinstance(gate, dict)
-                    or gate.keys() != {"enabled", "policy", "session", "since", "authorized"}
-                    or type(gate["enabled"]) is not bool
-                    or type(gate["authorized"]) is not bool
-                    or not isinstance(gate["policy"], str)
-                    or (gate["policy"] != "" and (
-                        len(gate["policy"]) != 64
-                        or any(character not in "0123456789abcdef" for character in gate["policy"])
-                    ))
-                    or (gate["session"] is not None and (
-                        not isinstance(gate["session"], str) or len(gate["session"]) != 32
-                        or any(character not in "0123456789abcdef" for character in gate["session"])
-                    ))
-                    or (gate["authorized"] and (not gate["enabled"] or gate["session"] is None))
-                ):
-                    raise ValueError("invalid plug charge state")
-                since = gate["since"]
-                if gate["session"] is None:
-                    if since is not None:
-                        raise ValueError("unexpected plug charge start")
-                elif (
-                    not isinstance(since, str) or len(since) > 64
-                    or (started := datetime.fromisoformat(since)).tzinfo is None
-                    or started.utcoffset() is None
-                ):
-                    raise ValueError("invalid plug charge start")
-                manual = control["plug_charge_manual"]
-                if type(manual) is not bool or (manual and not gate["enabled"]):
-                    raise ValueError("invalid plug charge release")
+            section = "control.plug_charge"
+            gate = control.get("plug_charge")
+            if (
+                not isinstance(gate, dict)
+                or gate.keys() != {"enabled", "policy", "session", "since", "authorized"}
+                or type(gate["enabled"]) is not bool
+                or type(gate["authorized"]) is not bool
+                or not isinstance(gate["policy"], str)
+                or (gate["policy"] != "" and (
+                    len(gate["policy"]) != 64
+                    or any(character not in "0123456789abcdef" for character in gate["policy"])
+                ))
+                or (gate["session"] is not None and (
+                    not isinstance(gate["session"], str) or len(gate["session"]) != 32
+                    or any(character not in "0123456789abcdef" for character in gate["session"])
+                ))
+                or (gate["authorized"] and (not gate["enabled"] or gate["session"] is None))
+            ):
+                raise ValueError("invalid plug charge state")
+            since = gate["since"]
+            if gate["session"] is None:
+                if since is not None:
+                    raise ValueError("unexpected plug charge start")
+            elif (
+                not isinstance(since, str) or len(since) > 64
+                or (started := datetime.fromisoformat(since)).tzinfo is None
+                or started.utcoffset() is None
+            ):
+                raise ValueError("invalid plug charge start")
+            manual = control["plug_charge_manual"]
+            if type(manual) is not bool or (manual and not gate["enabled"]):
+                raise ValueError("invalid plug charge release")
             section = "control.intent"
             for key in ("pause_requested", "charging_release_requested"):
                 value = control.get(key)
@@ -512,7 +497,6 @@ class ServiceClient:
             failed_blocks=tuple(failed),
             current_write_generation=generation,
             service_read_only=control["read_only"],
-            service_supports_cancel_pending=control.get("supports_cancel_pending", False),
             service_max_charging_current=control["max_charging_current"],
             service_charging_setpoint=current,
             service_soc_maximum_required=maximum_required,
@@ -538,7 +522,7 @@ class ServiceClient:
                 # Permission may have changed while this command waited for a
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.
-                cancelling = command in {"cancel_pending", "cancel_timed_current"}
+                cancelling = command == "cancel_pending"
                 soc_metadata = command in {"soc_source", "soc_observation"}
                 departure = command in {"departure_trip", "departure_inputs"}
                 metadata = soc_metadata or departure or (

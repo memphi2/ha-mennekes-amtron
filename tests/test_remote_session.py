@@ -8,8 +8,8 @@ from copy import deepcopy
 import pytest
 from aiohttp import ClientSession
 
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.test_charging_session import complete
 from tests.test_modbus_service import TOKEN, service_fixture
 
@@ -69,7 +69,7 @@ def test_malformed_session_metadata_rejects_snapshot_without_publishing_controls
                 valid = service.snapshot()
                 client.apply_snapshot(valid)
                 retained = client.snapshot
-                prior_pause = client.write_state.pause_requested
+                prior_pause = client.snapshot["control"]["pause_requested"]
                 invalid = deepcopy(valid)
                 invalid["control"]["pause_requested"] = not prior_pause
                 invalid["charging_session"] = summary
@@ -78,7 +78,7 @@ def test_malformed_session_metadata_rejects_snapshot_without_publishing_controls
                 assert client.failure_reason == "service_invalid_response"
                 assert not client.connected
                 assert client.snapshot is retained
-                assert client.write_state.pause_requested is prior_pause
+                assert client.snapshot["control"]["pause_requested"] is prior_pause
         finally:
             await service.stop()
 

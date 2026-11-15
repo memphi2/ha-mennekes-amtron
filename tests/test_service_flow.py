@@ -164,7 +164,7 @@ def test_reconfiguring_a_real_entry_preserves_entity_ids(tmp_path):
                 await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
             entry_id = entry.entry_id
-            assert entry_id in hass.data[f"{DOMAIN}_write_states"]
+            assert entry_id in hass.data[f"{DOMAIN}_embedded"]
             from homeassistant.helpers import entity_registry as er
 
             registry = er.async_get(hass)
@@ -191,7 +191,7 @@ def test_reconfiguring_a_real_entry_preserves_entity_ids(tmp_path):
                 await hass.async_block_till_done()
                 assert entry.entry_id == entry_id
                 assert isinstance(entry.runtime_data.client, ServiceClient)
-                assert entry_id not in hass.data[f"{DOMAIN}_write_states"]
+                assert entry_id not in hass.data[f"{DOMAIN}_embedded"]
                 assert "port" not in entry.data
                 migrated = {
                     entity.unique_id: (entity.entity_id, entity.device_id)
@@ -199,12 +199,12 @@ def test_reconfiguring_a_real_entry_preserves_entity_ids(tmp_path):
                 }
                 assert entities.items() <= migrated.items()
                 # The direct entry was read-only. The service now owns write
-                # access, so migration exposes all controls, and the app's
-                # status sensors.
+                # access, so migration exposes all controls; both connections
+                # run the same service and so show the same sensors.
                 assert {
                     value[0].split(".", 1)[0]
                     for key, value in migrated.items() if key not in entities
-                } == {"number", "switch", "select", "button", "sensor", "datetime"}
+                } == {"number", "switch", "select", "button", "datetime"}
                 assert not entry.runtime_data.control.read_only
                 assert not current_writes(transport)
         finally:

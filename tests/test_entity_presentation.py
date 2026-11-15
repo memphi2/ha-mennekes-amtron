@@ -11,9 +11,9 @@ from homeassistant.const import EntityCategory
 
 from custom_components.mennekes_amtron_rtu.device.command_events import (
     ACTIONS,
-    EVENT_TYPES,
     OUTCOMES,
     REASONS,
+    SOURCES,
 )
 from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
     ATTRIBUTES as WALLBOX_ATTRIBUTES,
@@ -21,6 +21,7 @@ from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
 from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
     EVENT_TYPES as WALLBOX_EVENT_TYPES,
 )
+from custom_components.mennekes_amtron_rtu.event import EVENT_TYPES as ACTIVITY_TYPES
 from custom_components.mennekes_amtron_rtu.select import (
     async_setup_entry as setup_selects,
 )
@@ -43,25 +44,31 @@ def test_main_feedback_and_controls_remain_primary() -> None:
         await setup_selects(hass, entry, lambda items: selects.update(collect(items)))
 
         assert sensors["charging_status"].entity_category is None
-        assert sensors["pending_change"].entity_category is None
+        assert sensors["operation_waiting"].entity_category is None
         assert sensors["cable_lock_status"].entity_category is EntityCategory.DIAGNOSTIC
         assert sensors["wallbox_settings"].entity_category is EntityCategory.DIAGNOSTIC
         assert selects["requested_phases"].entity_category is None
         assert selects["requested_phases"].extra_state_attributes == {"switched": "all_available"}
-        assert selects["solar_charging_mode"].entity_category is EntityCategory.CONFIG
         # Naming/category changes must keep the established registry identity.
         assert sensors["wallbox_settings"].unique_id.endswith("_wallbox_settings")
-        assert selects["solar_charging_mode"].unique_id.endswith("_solar_charging_mode")
+        assert selects["requested_phases"].unique_id.endswith("_requested_phases")
 
     asyncio.run(run())
 
 
-def test_every_sensor_starts_enabled_and_measurements_keep_their_statistics() -> None:
+def test_only_diagnostics_start_disabled_and_measurements_keep_their_statistics() -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
         sensors = {}
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
-        assert all(entity.entity_registry_enabled_default for entity in sensors.values())
+        disabled = {key for key, entity in sensors.items() if not entity.entity_registry_enabled_default}
+        assert disabled == {
+            "authorization_status", "cable_lock_status", "detected_ev_phases",
+            "connection_quality", "wallbox_settings",
+        }
+        assert all(
+            sensors[key].entity_category is EntityCategory.DIAGNOSTIC for key in disabled
+        )
         assert sensors["power_total"].state_class is SensorStateClass.MEASUREMENT
         assert sensors["energy_total"].state_class is SensorStateClass.TOTAL_INCREASING
         assert sensors["session_energy"].state_class is SensorStateClass.TOTAL_INCREASING
@@ -92,18 +99,28 @@ def test_icon_states_match_translated_states_without_claiming_three_phases() -> 
     assert "numeric-3" not in all_phases
 
 
-def test_wallbox_events_are_fully_translated_in_every_shipped_language() -> None:
+def _activity_attributes(path: Path) -> dict:
+    payload = json.loads(path.read_text())
+    entity = payload["entity"]["event"]["activity"]
+    assert entity["name"], path.name
+    return entity["state_attributes"]
+
+
+def _assert_states(attributes: dict, attribute: str, values: tuple[str, ...], name: str) -> None:
+    assert attributes[attribute]["name"], (name, attribute)
+    assert set(attributes[attribute]["state"]) == set(values), (name, attribute)
+    assert all(attributes[attribute]["state"].values()), (name, attribute)
+
+
+def test_wallbox_changes_are_fully_translated_in_every_shipped_language() -> None:
     for path in [
         INTEGRATION / "strings.json",
         *sorted((INTEGRATION / "translations").glob("*.json")),
     ]:
-        payload = json.loads(path.read_text())
-        entity = payload["entity"]["event"]["wallbox_event"]
-        assert entity["name"], path.name
-        attributes = entity["state_attributes"]
-        assert set(attributes["event_type"]["state"]) == set(WALLBOX_EVENT_TYPES), path.name
-        assert all(attributes["event_type"]["state"].values()), path.name
-        assert set(attributes) == {"event_type", *WALLBOX_ATTRIBUTES}, path.name
+        attributes = _activity_attributes(path)
+        _assert_states(attributes, "event_type", ACTIVITY_TYPES, path.name)
+        _assert_states(attributes, "change", WALLBOX_EVENT_TYPES, path.name)
+        assert set(WALLBOX_ATTRIBUTES) <= set(attributes), path.name
         assert all(attributes[key]["name"] for key in attributes), path.name
 
 
@@ -112,17 +129,13 @@ def test_command_results_are_fully_translated_in_every_shipped_language() -> Non
         INTEGRATION / "strings.json",
         *sorted((INTEGRATION / "translations").glob("*.json")),
     ]:
-        payload = json.loads(path.read_text())
-        attributes = payload["entity"]["event"]["control_result"]["state_attributes"]
+        attributes = _activity_attributes(path)
         for attribute, values in (
-            ("event_type", EVENT_TYPES),
             ("result", OUTCOMES),
             ("action", ACTIONS),
             ("reason", REASONS),
+            ("trigger", SOURCES),
         ):
-            assert attributes[attribute]["name"], (path.name, attribute)
-            assert set(attributes[attribute]["state"]) == set(values), (
-                path.name,
-                attribute,
-            )
-            assert all(attributes[attribute]["state"].values()), (path.name, attribute)
+            _assert_states(attributes, attribute, values, path.name)
+        assert attributes["occurred_at"]["name"], path.name
+        assert attributes["value"]["state"]["0"], path.name

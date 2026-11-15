@@ -14,35 +14,32 @@ even with short history retention.
 
 ## Recorder defaults
 
-Every sensor starts enabled. Readings that only detail another sensor are its
+The main sensors start enabled; most diagnostic sensors and the current-charge
+cost estimate start disabled. Readings that only detail another sensor are its
 attributes rather than entities of their own: the phase voltages under load
 ride on **Total power** (whole volts, and only while power flows, so a
 wobbling mains voltage writes nothing while the wallbox is idle), the
 session duration, maximum current and session count on **Session energy**
 (the duration in minutes, so it changes once a minute), the installation
 settings on **Wallbox settings**. Attributes are stored with the state they
-belong to and never compile long-term statistics of their own. Statistics
-series existing from earlier versions are retained.
+belong to and never compile long-term statistics of their own.
 
-The **Wallbox event** entity is enabled by default. Its state changes on reported
-wallbox changes, such as a plug-in, charge start or fault. It also adds readable
-command results to HA Activity. Consecutive identical successful current settings
-from the same source are shown once; changed requests, errors and intervening
-actions or observations remain visible. Unsent slider values replaced by newer
-ones are omitted from the readable activity.
+The **Activity** event entity is enabled by default. Its state changes on
+reported wallbox changes, such as a plug-in, charge start or fault, and on each
+command outcome; command outcomes also add a readable line to HA Activity.
+Consecutive identical successful current settings from the same source are
+shown once; changed requests, errors and intervening actions or observations
+remain visible. Unsent slider values replaced by newer ones are omitted.
+Heartbeats and polls create no events.
 
 This still allows frequent commands with changing setpoints to grow history:
 one distinct completed current command every five seconds could add **17,280
-activity events per day**, even with **Control result** disabled. The app's
-32-result memory limit does not limit HA's database.
+activity events per day**. The service's 32-result memory limit does not limit
+HA's database.
 
-The optional **Control result** event entity starts disabled. Enable it only for
-automations needing structured outcomes. It adds one state change per observed
-command outcome, including repeated identical requests, alongside the readable
-activity. Heartbeats and polls create no command events.
-
-The new charging/quality/goal status entities use stable enum states and have
-no long-term statistics. The energy target changes only when you set it. Its
+**Charging status**, **Charging wait reason** and **Connection quality** use
+stable enum states and have no long-term statistics; the wait reason's
+attributes hold fixed times, never a countdown. The energy target changes only when you set it. Its
 baseline and stop state are saved outside Recorder, only on changes; ordinary
 meter progress creates no extra storage writes. The existing total-energy sensor
 keeps its normal measurement/history behavior.
@@ -64,7 +61,7 @@ series.
 | Connection | Where to set the intervals |
 |---|---|
 | Direct USB or LAN | Integration entry options: **Status polling interval** and **Measurement interval**. |
-| Service | App or standalone service configuration: status and measurement intervals. HA reads the app’s cached status; configure bus polling in the app’s Runtime page. |
+| Modbus service app | App or standalone service configuration: status and measurement intervals. HA reads the app’s cached status; configure bus polling in the app’s Runtime page. |
 
 Transaction/retry counters are in the diagnostics download, not sensor
 attributes. Repeated retries alone therefore do not add Recorder state rows.
@@ -87,31 +84,27 @@ an entity instead also removes its live state.
 ## Limit command history
 
 The sensor profiles above do not exclude activity events. If you do not need
-the wallbox's persisted command or physical-event timeline:
+the wallbox's persisted command and physical-event timeline:
 
-1. Find the actual **Wallbox event** entity ID under **Settings → Devices &
+1. Find the actual **Activity** entity ID under **Settings → Devices &
    services → Entities**. Add it to your existing `recorder.exclude.entities`.
-2. If **Control result** is enabled, add its actual entity ID too unless you want
-   to retain its separate diagnostic history.
-3. Check the configuration and restart HA to apply it.
+2. Check the configuration and restart HA to apply it.
 
-For example, after replacing these IDs with your own and merging with existing
+For example, after replacing this ID with your own and merging with existing
 Recorder settings:
 
 ```yaml
 recorder:
   exclude:
     entities:
-      - event.mennekes_amtron_wallbox_event
-      - event.mennekes_amtron_control_result
+      - event.mennekes_amtron_activity
 ```
 
-Excluding **Wallbox event** stops recording both its physical state changes and
-its readable command messages. Excluding **Control result** stops its separate
-outcome history. The entities remain usable for live automation triggers; the
-app's recent command results also remain available. Existing database entries
-are retained until normal purging. Do not exclude the whole `event` domain unless
-you intend to remove history for other integrations as well.
+Excluding **Activity** stops recording both its state changes and its readable
+command messages. The entity remains usable for live automation triggers; the
+service's recent command results also remain available. Existing database
+entries are retained until normal purging. Do not exclude the whole `event`
+domain unless you intend to remove history for other integrations as well.
 
 ## Configure history retention and detail exclusions
 
@@ -190,6 +183,6 @@ controlled test results with stated limits, not storage guarantees.
 ### Shared charging controls
 
 Energy, percentage and target-time entities change when their values change.
-Guest status is `active` or `inactive`; it has no ticking countdown, revision
+**Guest charging** is on or off; it has no ticking countdown, revision
 attribute or separate journal. Vehicle planning keeps a bounded learned model;
 its normal status updates do not create a per-second history.

@@ -13,7 +13,7 @@ app also provide German, French, Dutch and Italian labels.
 | Charge normally | Choose a current, enable **Charging release** and turn **Charging paused** off. |
 | Stop for now | Turn **Charging paused** on; wait for confirmation. |
 | Add 12 kWh and stop | Set **Energy target** to 12; start or resume separately. |
-| Charge a visitor's car | With the service app, optionally set kWh/time, then press **Start guest charging**. |
+| Charge a visitor's car | Optionally set kWh/time, then press **Start guest charging**. |
 | Stop your car at 80% | Set up its optional battery source, then set **Vehicle charge target** to 80. |
 | Have your car ready for a trip | Enable [vehicle planning](departure-planning.md), choose a percentage and one departure time. |
 
@@ -57,7 +57,7 @@ explicitly in HA or the app.
 
 ## Guest charging
 
-**Requires the service app and write access.** No vehicle profile is needed.
+**Requires write access.** No vehicle profile is needed.
 
 1. Plug in the car.
 2. Optionally set **Energy target** and/or a future **Target time**. In the app,
@@ -65,18 +65,20 @@ explicitly in HA or the app.
 3. Press **Start guest charging**. This requests release and start together,
    lifts a manual pause and grants this plug-in permission even with virtual
    Plug & Charge enabled. A hardware write interval may still delay execution.
-4. Check **Total power** and **Pending change**. To stop early, use the normal
-   pause switch, the app's **Pause guest charging** button, or unplug.
+4. Check **Total power** and **Charging wait reason**. **Guest charging** is on
+   while the guest charges. To stop early, use the normal pause switch, the
+   app's **Pause guest charging** button, or unplug.
 
 The guest uses the normal current setting. Its vehicle percentage target and
 vehicle plan are ignored. Locks, faults, local RFID authorization and electrical
 limits still apply. Unplugging ends permission; a waiting guest start must not
 release another car.
 
-An HA Core restart leaves the app running. After an app restart, the app restores
-guest permission and limits only when wallbox readings establish the same
-plug-in. A deliberate pause stays paused. Without sufficient evidence, or if the
-saved time is inconsistent, the app stops and needs a new guest start. Check the
+With the app, an HA Core restart leaves the app running; a direct entry's
+service restarts with HA. After a service restart, guest permission and limits
+are restored only when wallbox readings establish the same plug-in. A
+deliberate pause stays paused. Without sufficient evidence, or if the saved
+time is inconsistent, the service stops charging and needs a new guest start. Check the
 limits first. There is no guest-history screen or saved guest-order editor.
 
 ## Where do I enable controls?
@@ -86,16 +88,16 @@ limits first. There is no guest-history screen or saved guest-order editor.
 | Service app | App **Configuration → Read-only** off; save and restart the app |
 | Direct USB/LAN | Integration **Configure → Wallbox → Current limit and polling → Control mode: Modbus master** |
 
-In service mode, HA follows the app's permission; there is no second write
+With the app, HA follows the app's permission; there is no second write
 switch. Read-only disables commands and heartbeat, but still polls the bus.
 Only one owner may use the adapter. Check readings before enabling writes.
 
 ## Understand the activity
 
-In Home Assistant **Activity**, filter by **Wallbox event** to follow control
-commands and physical charging changes together. The trigger explains why a
-command ran; the subsequent wallbox event tells you whether charging started
-or stopped. See [activity details](troubleshooting.md#understand-the-activity-timeline).
+In Home Assistant **Activity**, filter by the **Activity** entity to follow
+control commands and physical charging changes together. The trigger explains
+why a command ran; the subsequent wallbox change tells you whether charging
+started or stopped. See [activity details](troubleshooting.md#understand-the-activity-timeline).
 
 ## Understand the readings
 
@@ -103,8 +105,8 @@ or stopped. See [activity details](troubleshooting.md#understand-the-activity-ti
 offers. **Session energy** counts the current session; **Total energy** is the
 lifetime counter. **Vehicle connected** alone does not mean charging is allowed.
 
-For a waiting charge, start with **Charging status**, **Pending change** and the
-active limits. **Connection quality** includes the `heartbeat` attribute (`ok` or
+For a waiting charge, start with **Charging status** and **Charging wait
+reason**; its attributes show a queued change and the active limits. **Connection quality** includes the `heartbeat` attribute (`ok` or
 `problem`). [All entities and their meanings](entities.md).
 
 The charging status distinguishes **Checking status** (briefly differing readings),
@@ -133,8 +135,8 @@ older waiting current request. [A change did not run](troubleshooting.md#the-cha
 
 ## Configuration and options
 
-Connection settings belong to the connection owner: **Reconfigure** in direct
-mode, or the app's **Connection** page. App current caps, waits and polling live
+Connection settings belong to the connection owner: **Reconfigure** for a direct
+entry, or the app's **Connection** page. App current caps, waits and polling live
 under **Settings → Runtime**. Configure vehicle profiles, costs and optional
 planning in HA. [Settings map and restart requirements](installation.md#change-settings-later).
 
@@ -161,12 +163,13 @@ Wait for completion, then resume explicitly. [Phase-switch help](troubleshooting
 | What happens? | Expected behavior |
 |---|---|
 | HA Core restarts, app keeps running | App heartbeat, accepted limits and handed-over vehicle planning continue |
-| Direct HA connection restarts | Heartbeat stops; wallbox fallback applies |
+| HA restarts with a direct USB/LAN entry | The service inside HA stops with it; heartbeat stops and wallbox fallback applies until HA is back |
 | App, host or adapter fails/restarts | Heartbeat can stop; wallbox fallback applies |
 | App starts again | Ordinary intent/limits are loaded; guest permission needs same-plug-in evidence |
 | HA loses only its link to the app | HA controls are unavailable; this alone does not prove the app heartbeat stopped |
 
-An app restart cancels unsent queued commands. A restart is not permission to
+A restart of the service (the app, or HA for a direct entry) cancels unsent
+queued commands. A restart is not permission to
 undo a deliberate pause. [Configure fallback](safety.md#the-heartbeat-and-what-happens-without-it)
 and use [Repairs help](troubleshooting.md#heartbeat-or-service-connection-repair) when a fault remains.
 

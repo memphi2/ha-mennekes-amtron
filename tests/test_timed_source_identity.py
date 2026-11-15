@@ -53,16 +53,13 @@ def test_naive_candidate_cannot_match_and_source_ingest_canonicalizes_utc():
 @pytest.mark.parametrize("legacy", [False, True])
 def test_equivalent_timestamp_preserves_cancel_manual_or_completed_trip_after_restore(monkeypatch, selection, legacy):
     async def run():
-        observer, control, hass = setup_observer(monkeypatch)
+        observer, _control, hass = setup_observer(monkeypatch)
         observer._entry.options["timed_departure_entity"] = ENTITY
         hass.states[ENTITY] = state(ENTITY, FUTURE.isoformat())
         await observer._evaluate()
         chosen = NOW + timedelta(hours=5)
         if selection == "clear":
             await observer.async_set_deadline(None)
-            # Without a trip the plan's own pause ends.
-            await observer._evaluate()
-            assert control.commands[-1] == ("resume", None)
         elif selection == "manual":
             await observer.async_set_deadline(chosen)
         else:
@@ -73,19 +70,12 @@ def test_equivalent_timestamp_preserves_cancel_manual_or_completed_trip_after_re
         observer.goal = TimedGoal.restore(persisted)
         before = observer.goal.snapshot()
         observer._store.saved.clear()
-        control.commands.clear()
-        control.is_paused = True
         # A changed value must not be mistaken for a new departure when only
-        # its offset representation changed. Disable writes in the manual
-        # case because that deliberately retained active trip may still run.
-        if selection == "manual":
-            control.read_only = True
-        monkeypatch.setattr("custom_components.mennekes_amtron_rtu.timed_goal_observer.time.monotonic", lambda: 301.0)
+        # its offset representation changed.
         hass.states[ENTITY] = state(ENTITY, LOCAL.isoformat())
         await observer._evaluate()
         assert observer.goal.snapshot() == before
         assert observer._store.saved == []
-        assert control.commands == []
 
         # An actually later trip from this same source is still accepted.
         later = FUTURE + timedelta(hours=1)

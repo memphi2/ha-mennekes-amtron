@@ -26,7 +26,7 @@ from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
 from .energy_goal import EnergyGoal
 from .energy_goal_controller import EnergyGoalController
-from .enums import RequestedPhases, SolarChargingMode
+from .enums import RequestedPhases
 from .errors import DeviceError, DeviceValidationError
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
@@ -81,6 +81,8 @@ class ModbusService:
         self.data = WallboxData()
         self.diagnostics = WriteDiagnostics()
         self.connection = ConnectionState(available=False)
+        # Why the newest poll failed; None while the wallbox answers.
+        self.failure: Exception | None = None
         self.heartbeat = HeartbeatTask(self.client, self.diagnostics)
         self.control: AmtronControl | None = None
         self.goal: EnergyGoalController | None = None
@@ -302,8 +304,10 @@ class ModbusService:
                 await self._save_intent()
                 self._wallbox_notice.recovered("wallbox communication restored")
                 self._startup_error = None
+                self.failure = None
             except (AmtronBusError, DeviceError, OSError, ValueError) as err:
                 self._success = False
+                self.failure = err
                 if self.control is None:
                     self._startup_error = err
                 if self.control is not None:
@@ -544,13 +548,11 @@ class ModbusService:
             },
             "command_events": control.events.snapshot() if control else None,
             "control": {
-                "supports_plug_charge": True,
                 "plug_charge": self.client.write_state.plug_charge.snapshot(),
                 # Manual permission is distinct from automatic vehicle authorization.
                 "plug_charge_manual": self.client.write_state.plug_charge.manual,
                 "supports_energy_goal": control.supports_energy_goal if control else False,
                 "supports_soc_goal": control.supports_soc_goal if control else False,
-                "soc_transactions_supported": True,
                 "soc_goal_revision": self._soc_goal_revision,
                 "soc_maximum_required": self._soc_maximum_required,
                 "choice_revision": self.choice_revision,
@@ -558,7 +560,6 @@ class ModbusService:
                 "energy_goal": control.energy_goal.snapshot() if control else None,
                 "read_only": self.config.read_only or self._intent_rejected,
                 "intent_rejected": self._intent_rejected,
-                "supports_cancel_pending": True,
                 "current_cap": self.config.current_cap,
                 "state_change_interval_seconds": self.config.state_change_interval_seconds,
                 "phase_switch_grace_seconds": self.config.phase_switch_grace_seconds,
@@ -654,7 +655,7 @@ class ModbusService:
     ) -> dict[str, Any]:
         if payload.keys() - {
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
-            "source", "soc", "maximum", "deadline", "owner", "expected_soc_revision",
+            "source", "soc", "maximum", "deadline", "expected_soc_revision",
             "session", "policy", "maximum_required", "expected_choice_revision",
         }:
             raise ValueError("unknown command field")
@@ -670,7 +671,7 @@ class ModbusService:
             # A request can age while another command owns the lock. Only admit
             # it against the same current state that the API reports as usable.
             command = payload.get("command")
-            cancelling = command in ("cancel_pending", "cancel_timed_current")
+            cancelling = command == "cancel_pending"
             metadata = command in ("soc_source", "soc_observation") or (
                 command == "plug_charge_config" and payload.get("value") is False
             )
@@ -714,7 +715,6 @@ class ModbusService:
             initial_revision = self._soc_goal_revision
             value = payload.get("value")
             try:
-                owner = payload.get("owner")
                 if command == "plug_charge_config":
                     enabled = payload.get("value")
                     policy = payload.get("policy", "")
@@ -727,22 +727,8 @@ class ModbusService:
                     if not isinstance(session, str) or not isinstance(deadline, str) or len(deadline) > 64:
                         raise ValueError("invalid Plug & Charge authorization")
                     await control.async_authorize_plug_charge(session, deadline=datetime.fromisoformat(deadline))
-                elif command == "cancel_timed_current":
-                    if not isinstance(owner, str):
-                        raise ValueError("invalid timed command owner")
-                    await control.async_cancel_timed_current(owner)
                 elif cancelling:
                     await control.async_cancel_pending_change()
-                elif command == "timed_current":
-                    if not isinstance(owner, str):
-                        raise ValueError("invalid timed command owner")
-                    deadline = payload.get("deadline")
-                    if not isinstance(deadline, str) or len(deadline) > 64:
-                        raise ValueError("invalid timed command deadline")
-                    await control.async_set_timed_current(
-                        None if value is None else number(value, 6, 32),
-                        deadline=datetime.fromisoformat(deadline), owner=owner,
-                    )
                 elif command == "set_current":
                     unlimited = payload.get("allow_unlimited", False)
                     if not isinstance(unlimited, bool):
@@ -821,10 +807,6 @@ class ModbusService:
                         await control.async_set_charging_release(value)
                     else:
                         await control.async_set_lock_evse(value)
-                elif command == "solar":
-                    await control.async_set_solar_charging_mode(
-                        SolarChargingMode(integer(value, 0, 3))
-                    )
                 elif command == "phases":
                     await control.async_set_requested_phases(
                         RequestedPhases(integer(value, 0, 1))

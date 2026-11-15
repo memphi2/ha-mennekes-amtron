@@ -27,6 +27,7 @@ from custom_components.mennekes_amtron_rtu.device.waveshare_gateway import (
     GatewayRollbackError,
     GatewaySnapshot,
 )
+from custom_components.mennekes_amtron_rtu.entry_connection import connection_config
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeHass, build_runtime
 from tests.test_config_flow import IDENTITY, Flow, _suggested
@@ -127,7 +128,7 @@ def test_existing_tcp_authentication_only_checks_connection(monkeypatch, failure
             assert result["data"]["tcp_auth_password"] == PASSWORD
             assert "configure_gateway" not in result["data"]
             flow.reconfigure_entry.data = result["data"]
-            assert _connection_config(flow.reconfigure_entry) == config
+            assert connection_config(flow.reconfigure_entry) == config
             assert "tcp_auth_password" not in flow._suggested_values("network_reconfigure", None)
             assert "tcp_auth_password" not in flow._suggested_values("network", result["data"])
         else:
@@ -414,8 +415,9 @@ def test_real_ha_config_flow_serializes_optional_steps_and_loads_authenticated_e
                 await hass.async_block_till_done()
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
                 assert entry.state is ConfigEntryState.LOADED
-                assert entry.runtime_data.client.config.tcp_auth_password == PASSWORD
-                assert entry.runtime_data.client.config.tcp_authentication
+                connection = hass.data[f"{DOMAIN}_embedded"][entry.entry_id].config.connection
+                assert connection.tcp_auth_password == PASSWORD
+                assert connection.tcp_authentication
                 assert not transport.writes
                 assert receipt.committed is manage
                 assert inspect.await_count == int(manage)

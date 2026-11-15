@@ -49,7 +49,8 @@ def test_real_ha_network_setup_read_only_master_pause_and_unload(tmp_path, proto
                     "host": "127.0.0.1", "tcp_port": port,
                     "connection_type": protocol, "device_id": 50,
                 })
-                assert entry.runtime_data.client.config.connection_type == protocol
+                host = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]
+                assert host.config.connection.connection_type == protocol
                 assert entry.runtime_data.control.read_only
                 assert all(payload[1] == 3 for payload in requests)
                 await async_options(
@@ -64,7 +65,8 @@ def test_real_ha_network_setup_read_only_master_pause_and_unload(tmp_path, proto
                 assert not entry.runtime_data.control.read_only
                 heartbeat = entry.runtime_data.heartbeat
                 assert heartbeat.running
-                assert await heartbeat.async_beat_once()
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+                assert await service.heartbeat.async_beat_once()
                 assert hass.states.get("switch.mennekes_amtron_charging_paused").state == "on"
                 # Choosing a network connection or enabling control must never
                 # send a current/resume command to a deliberately paused box.

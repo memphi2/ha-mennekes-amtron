@@ -116,7 +116,6 @@ def test_real_ha_restart_retains_server_state_without_replaying_commands(
                         assert result["type"] == "create_entry"
                         await hass.async_block_till_done()
                         entry = hass.config_entries.async_entries(DOMAIN)[0]
-                        assert entry.runtime_data.recovery is None
                         dump = await async_get_config_entry_diagnostics(hass, entry)
                         assert dump["bus"] == {
                             "transport": "service",

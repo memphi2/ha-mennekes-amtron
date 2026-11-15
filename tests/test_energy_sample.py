@@ -11,15 +11,15 @@ import pytest
 from aiohttp import ClientSession
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-import custom_components.mennekes_amtron_rtu.service_client as remote_module
+import custom_components.mennekes_amtron_rtu.coordinator as coordinator_module
 from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_charging_session import reading
 from tests.test_modbus_service import TOKEN, service_fixture
@@ -210,7 +210,7 @@ def test_remote_coordinator_reads_a_queued_command_when_it_is_due(tmp_path, monk
             index = len(scheduled) - 1
             return lambda: cancelled.append(index)
 
-        monkeypatch.setattr(remote_module, "async_call_later", call_later)
+        monkeypatch.setattr(coordinator_module, "async_call_later", call_later)
         async with ClientSession() as session:
             client = ServiceClient(session, "http://service:8765", TOKEN)
             coordinator = ServiceCoordinator(

@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.control import _PendingCommand
@@ -21,7 +20,9 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import 
     EnergyGoalController,
 )
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
-from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceValidationError,
+)
 from custom_components.mennekes_amtron_rtu.device.persistence import (
     StorageCommitUncertainError,
     StorageStateUnknownError,
@@ -356,7 +357,7 @@ def test_waiting_resume_is_fenced_by_terminal_evidence_before_worker_gets_lock()
             runner.observe(_snapshot(harness, 1247))
             assert runner.stop_requested
             assert control.energy_goal.status == "active"
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await resume
         assert error.value.translation_key == "energy_goal_stop_active"
         await _settle(runner)
@@ -410,7 +411,7 @@ def test_terminal_evidence_during_guarded_reads_is_rechecked_before_start(action
             put(harness.transport.bank, R.CHARGING_RELEASE, 0)
         elif action == "unlock":
             put(harness.transport.bank, R.LOCK_EVSE, 1)
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await method()
         assert error.value.translation_key == "energy_goal_stop_active"
         await _settle(runner)
@@ -770,7 +771,7 @@ def test_latched_stop_rejects_start_commands_until_explicit_goal_change(command)
             "release": lambda: control.async_set_charging_release(True),
             "unlock": lambda: control.async_set_lock_evse(False),
         }
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await methods[command]()
         assert error.value.translation_key == "energy_goal_stop_active"
         assert harness.transport.writes == before
@@ -792,7 +793,7 @@ def test_stopped_and_unsupported_controllers_refuse_arming():
         harness.identity.layout_version = R.LAYOUT_V01_00
         with pytest.raises(DeviceValidationError, match="energy_goal_not_supported"):
             await EnergyGoalController(control, harness.client, AsyncMock()).async_set_target(12)
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await control.async_set_energy_goal(12)
         assert error.value.translation_key == "energy_goal_not_supported"
         await control.async_pause_for_energy_goal()

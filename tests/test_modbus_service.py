@@ -18,7 +18,6 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
 from custom_components.mennekes_amtron_rtu.device.data import (
     WallboxData,
-    WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
@@ -107,14 +106,15 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
                     state=lambda: data,
                     request_refresh=refresh,
                 )
-                restored.pause_requested = not paused
-                restored.charging_setpoint = 32
-                restored.charging_release_requested = False
+                # The intent comes from the service, never from the client.
+                for name in ("pause_requested", "charging_setpoint", "charging_release_requested"):
+                    with pytest.raises(AttributeError):
+                        setattr(restored, name, None)
                 assert restored.pause_requested is paused
                 assert restored.charging_setpoint == (8 if paused else 10)
                 assert current_writes(transport) == accepted
                 assert service.heartbeat.running
-                heartbeat = ServiceHeartbeat(fresh, WriteDiagnostics())
+                heartbeat = ServiceHeartbeat(fresh)
                 assert heartbeat.healthy is True
                 assert heartbeat.running
                 await fresh.async_close()

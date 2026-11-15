@@ -21,6 +21,13 @@ from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
 
 
+async def _settle_service(hass, entry) -> None:
+    """Wait until the embedded service has written what it queued."""
+    service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+    if pending := service.control._flush_task:
+        await pending
+
+
 @pytest.mark.parametrize("group", [GROUP_ID_READ_ONLY, GROUP_ID_USER, "unknown"])
 @pytest.mark.parametrize("current", [0, 10])
 def test_current_action_respects_user_permissions(
@@ -84,15 +91,13 @@ def test_current_action_respects_user_permissions(
                 )
                 if group == GROUP_ID_USER:
                     await call
-                    if pending := entry.runtime_data.control._flush_task:
-                        await pending
+                    await _settle_service(hass, entry)
                 else:
                     with pytest.raises(
                         UnknownUser if group == "unknown" else Unauthorized
                     ):
                         await call
-                    if pending := entry.runtime_data.control._flush_task:
-                        await pending
+                    await _settle_service(hass, entry)
                 writes = [
                     words
                     for client in clients

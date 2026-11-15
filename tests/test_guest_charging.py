@@ -17,7 +17,7 @@ from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.guest_charging import GuestCharging
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
-from tests.ha_fakes import FakeConfigEntry, build_runtime
+from tests.ha_fakes import FakeConfigEntry, build_runtime, collect
 from tests.test_services import _patch_registry
 
 TOKEN = "guest-api-private-test-credential"  # noqa: S105 - fixture
@@ -71,7 +71,7 @@ class _Guest:
         return call
 
 
-def test_every_action_reaches_the_guest_of_an_app_connection(monkeypatch):
+def test_every_action_reaches_the_guest_of_the_wallbox(monkeypatch):
     async def run():
         hass, entry, _transport = await build_runtime()
         _patch_registry(monkeypatch, {"dev": SimpleNamespace(config_entry_id=entry.entry_id)})
@@ -81,15 +81,10 @@ def test_every_action_reaches_the_guest_of_an_app_connection(monkeypatch):
             handler, schema = hass.services.registered[(DOMAIN, name)]
             await handler(SimpleNamespace(context=Context(), data=schema({"device_id": "dev", **fields})))
 
-        # A direct connection has no app to carry guest out.
-        with pytest.raises(ServiceValidationError) as error:
-            await act("start_guest_charging")
-        assert _key(error) == "app_required"
-
         guest = entry.runtime_data.guest = _Guest()
         await act("start_guest_charging")
         assert guest.calls.pop() == ("async_start_guest", {})
-        assert not {"start_charging_job", "start_boost", "cancel_boost"} & services.GUEST_ACTIONS.keys()
+        assert not {"start_charging_job", "start_boost", "cancel_boost"} & services.DEVICE_ACTIONS.keys()
 
         # With one wallbox the target can be left out; with two it cannot.
         handler, schema = hass.services.registered[(DOMAIN, "start_guest_charging")]
@@ -125,24 +120,25 @@ def test_actions_refuse_values_the_app_would_refuse(name, fields):
 
 
 
-def test_single_guest_button_delegates_and_reports_missing_service():
+def test_the_guest_button_delegates_and_needs_a_known_guest_state():
     from unittest.mock import AsyncMock
 
-    from custom_components.mennekes_amtron_rtu.guest_entities import GuestButton
+    from custom_components.mennekes_amtron_rtu.button import async_setup_entry
+
     async def run():
-        _hass, entry, _transport = await build_runtime()
-        button = GuestButton(entry)
-        assert not button.available
-        with pytest.raises(ServiceValidationError):
-            await button.async_press()
-        guest = SimpleNamespace(active=False, async_start_guest=AsyncMock())
+        hass, entry, _transport = await build_runtime()
+        added = {}
+        await async_setup_entry(hass, entry, lambda items: added.update(collect(items)))
+        button = added["guest_start"]
+        guest = SimpleNamespace(active=None, async_start_guest=AsyncMock())
         entry.runtime_data.guest = guest
+        assert not button.available
+        guest.active = False
         assert button.available
         await button.async_press()
         guest.async_start_guest.assert_awaited_once()
         entry.runtime_data.coordinator.last_update_success = False
         assert not button.available
-        await entry.runtime_data.control.async_shutdown()
     asyncio.run(run())
 
 

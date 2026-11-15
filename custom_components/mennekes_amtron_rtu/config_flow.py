@@ -94,13 +94,13 @@ from .device.waveshare_gateway import (
 from .entry_connection import connection_config
 from .entry_types import MennekesAmtronConfigEntry
 from .options_flow import MennekesAmtronOptionsFlow
-from .remote_errors import ServiceConnectionError
 from .service_client import (
     CONF_SERVER_TOKEN,
     CONF_SERVER_URL,
     ServiceClient,
     server_url,
 )
+from .service_errors import ServiceConnectionError
 from .supervisor_discovery import async_app_discoveries
 
 _LOGGER = logging.getLogger(__name__)
@@ -798,9 +798,13 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
         saved_data: dict[str, Any] | None = None
-        if loaded and entry is not None and gateway is None and config == connection_config(entry):
+        if (
+            loaded and entry is not None and gateway is None
+            and CONF_SERVER_URL not in entry.data and config == connection_config(entry)
+        ):
             # The running service owns the bus connection; an unchanged form
             # needs no second connection, only the service's current answer.
+            # An app entry has no direct connection to compare with.
             try:
                 await entry.runtime_data.client.update()
                 identity = entry.runtime_data.client.identity

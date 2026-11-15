@@ -5,35 +5,62 @@
 For maintainers and technical investigations; normal setup starts with
 [Installation](installation.md).
 
-[Service](#independent-service) · [Code layout](#shape) · [Design](#design-decisions) · [Data flow](#data-flow) · [Tests](#testing)
+[Service](#one-service-runtime) · [Code layout](#shape) · [Design](#design-decisions) · [Data flow](#data-flow) · [Tests](#testing)
 
-## Independent service
+## One service runtime
 
+There is one runtime for the wallbox: the service in `device/`
+(`service_runtime.py`, `service_departure_runtime.py` with
+`DepartureModbusService`, and `service_api.py` with `ServiceApi.dispatch`).
 The `device/` package has no Home Assistant imports. It contains the shared
-register map, USB/LAN transport, poll cadence, heartbeat and control rules.
-`control.py` at integration level adapts its errors into HA translations.
-The same source is packaged as `amtron_device` for the independent service;
-there is no copied driver implementation to keep in sync.
+register map, USB/LAN transport, poll cadence, heartbeat, recovery, control
+rules, goals, sessions and their stores. The same source is packaged as
+`amtron_device` for the independent service; there is no copied driver
+implementation to keep in sync.
 
-The HTTP client checks API 2 and a minimum service version reported in every
-snapshot. A release that changes no service input reuses the published app, so
-updating HA does not restart the service or interrupt its heartbeat. Service
-changes have their own version and publication decision; see
-[publication](service-releasing.md).
+Home Assistant reaches that runtime through one of two transports in
+`service_transport.py`; both answer with the HTTP status and JSON object the
+service API defines:
+
+- `HttpTransport`: an app entry talks to the Modbus service app, or a
+  standalone service, over authenticated HTTP.
+- `EmbeddedTransport`: a direct USB or LAN entry runs the same service inside
+  Home Assistant (`embedded.py`) and calls `ServiceApi` without HTTP. Its
+  saved intent lives under `.storage/mennekes_amtron_rtu.<entry_id>/`. The
+  embedded service is kept through a reload of the entry, so the heartbeat
+  never pauses for a changed option, and stopped when the entry is unloaded
+  for any other reason.
 
 ```mermaid
 flowchart LR
-    HA[Home Assistant integration] <-->|Authenticated HTTP| Service[Modbus service]
+    HA[Home Assistant integration] <-->|Authenticated HTTP| Service[Modbus service app]
+    HA <-->|EmbeddedTransport| Embedded[Service inside HA]
     Service <-->|USB or LAN gateway / RS-485| Wallbox[Mennekes Amtron]
+    Embedded <-->|USB or LAN gateway / RS-485| Wallbox
 ```
 
-`remote.py` maps service snapshots and named commands onto the existing HA
-entities. API reconnects are read-only; HA restore values cannot overwrite
-service intent. The service serializes commands independently of client lifetime
-and keeps heartbeat and polling active without HA. Its state file only changes
-with durable control intent or a completed charging summary, not ordinary meter
-progress. Named commands retain device guards; the API has no raw
-register-write endpoint. Current telemetry retains its existing cadence and
+Above the transport, every entry is assembled the same way in
+`__init__.py::async_setup_entry`: `ServiceClient` (`service_client.py`) keeps
+the last snapshot and the command-event cursor, `ServiceCoordinator`
+(`coordinator.py`) fetches the state, `ServiceControl` and `ServiceHeartbeat`
+(`service_control.py`) send commands and translate service errors into Home
+Assistant errors, and `GuestCharging` starts a guest charge. The entities are a
+projection of that state: each platform is a table of descriptions
+(`entity.py` with `Projection` and `AmtronEntity`); a row says what the
+entity shows, when it exists and when it is available. HA restore values cannot
+overwrite service intent, and HA decides nothing about the wallbox.
+
+The HTTP client checks API 2 and a minimum service version reported in every
+snapshot. A release that changes no service input reuses the published app, so
+updating HA does not restart the app or interrupt its heartbeat. Service
+changes have their own version and publication decision; see
+[publication](service-releasing.md).
+
+The service serializes commands independently of client lifetime and keeps
+heartbeat and polling active; the app does so without HA. Its state file only
+changes with durable control intent or a completed charging summary, not
+ordinary meter progress. Named commands retain device guards; the API has no
+raw register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
 Percentage-target updates reserve a bounded, short-lived service token before
@@ -51,30 +78,29 @@ invalidation must finish with that save. This keeps a cancelled request from
 leaving a different target active until the next restart.
 
 An atomic replacement can succeed before its directory synchronization fails.
-The service records that phase directly; the HA store checks the resulting file.
-A confirmed replacement keeps the visible candidate active while reporting
-unconfirmed durability, and the write cache cannot suppress a retry. If the
-resulting file cannot be read, target controllers block starts and request a
-pause until a successful save resolves the uncertainty; departure planning also
-stays blocked. This process-local protection cannot prove what a damaged
-filesystem will retain after a crash or power loss.
+The service records that phase directly. A confirmed replacement keeps the
+visible candidate active while reporting unconfirmed durability, and the write
+cache cannot suppress a retry. If the resulting file cannot be read, target
+controllers block starts and request a pause until a successful save resolves
+the uncertainty; departure planning also stays blocked. This process-local
+protection cannot prove what a damaged filesystem will retain after a crash or
+power loss.
 
-Direct USB and LAN modes remain available without the service. A service
-entry talks only to the service API; it never opens the USB or gateway Modbus
-connection or starts a local heartbeat/recovery task.
-All entries preserve the domain and entity unique IDs. See
-[setup and migration](modbus-service.md) for the one-owner handover.
+An app entry never opens the USB or gateway Modbus connection itself. Entries
+keep the domain and entity unique IDs. See [the app setup](modbus-service.md)
+for the one-owner handover.
 
-In service mode, the authenticated service snapshot is authoritative for write
-permission. HA has no separate permission selector. Control platforms remain
-loaded, preserving entity IDs, while entity availability and command guards
-follow the service's read-only flag and current connection/readiness state.
-Permission transitions send no charging commands and do not replay HA restore
-data. Direct USB and LAN entries retain their own explicit control mode.
+The service snapshot is authoritative for write permission. For an app entry,
+the app's **Read-only** setting decides; a direct entry passes its **Control
+mode** to the embedded service, and a read-only direct entry loads no control
+platforms. Control platforms of an app entry remain loaded, preserving entity
+IDs, while entity availability and command guards follow the service's
+read-only flag and current connection/readiness state. Permission transitions
+send no charging commands and do not replay HA restore data.
 
 The shared transport supports local USB/serial, transparent RTU frames over TCP
-and Modbus TCP via a translating TCP-to-RTU gateway. Both the service and direct
-HA mode use the same driver and register model. LAN configuration stores protocol,
+and Modbus TCP via a translating TCP-to-RTU gateway. The app and the embedded
+service use the same driver and register model. LAN configuration stores protocol,
 host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
@@ -158,9 +184,10 @@ sibling may import. `__init__.py` is a facade that assembles runtime data and
 tears it down again — no device rule lives there.
 
 Failed setup and normal entry unloading share one ordered cleanup path. Source
-listeners and estimates stop first, followed by goal owners, recovery and the
-heartbeat; control shutdown and connection close come last. Failed platform
-unloading leaves the active runtime intact.
+listeners and estimates stop first, followed by the HA-side goal observers; the
+service client closes last. A direct entry then releases its embedded service,
+which keeps running through a reload. Failed platform unloading leaves the
+active runtime intact.
 
 ```text
 device/registers.py          the register map, single source of truth
@@ -175,17 +202,19 @@ device/client.py             the pymodbus client, the bus lock, the only transpo
 device/transport.py          typed transport and response interfaces
 device/write_state.py        shared write guards retained across entry reloads
 device/identity.py           the read-once device facts
-coordinator.py        the poll
 device/heartbeat.py          the heartbeat task
-recovery.py           bounded recovery of a confirmed heartbeat fault
-device/control.py     the only write path
-device/poller.py      shared cadence-aware polling
-device/service_*.py   service runtime, API, options and intent storage
-device/server.py      standalone process entrypoint
-remote.py             HA service client
-control.py            HA command error adapter
+device/control.py            the only write path
+device/poller.py             shared cadence-aware polling
+device/service_*.py          service runtime, API, options and intent storage
+device/server.py             standalone process entrypoint
+embedded.py           the service inside HA for a direct entry
+service_transport.py  HttpTransport and EmbeddedTransport
+service_client.py     HA service client: snapshot, commands, event cursor
+coordinator.py        ServiceCoordinator, the state fetch
+service_control.py    ServiceControl and ServiceHeartbeat, the HA command boundary
+guest_charging.py     guest start
 exceptions.py         translated Home Assistant errors
-entity.py             entity base: unique id, device info, availability
+entity.py             Projection and AmtronEntity: unique id, device info, availability
 config_flow.py        + _flow_serial.py, _flow_connect.py, config_schemas.py
 options_flow.py       options menu and section routing
 _options_*.py         independent draft, vehicle, departure and estimate steps
@@ -193,12 +222,13 @@ vehicle_profiles.py  bounded profiles and effective vehicle options
 vehicle_sources/     optional provider capabilities and explicit selection
 vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapters
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
-timed_goal_observer.py  departure plan from generic HA sources or a provider
+timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
 charge_loss_observer.py  bounded matching and durable loss aggregate
-sensor.py             + sensor_descriptions.py
-binary_sensor.py      + binary_sensor_descriptions.py
-number.py select.py switch.py button.py
-services.py           explicit current action and service registration
+sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
+number.py select.py switch.py button.py datetime.py  control tables
+event.py              the Activity event entity
+unplug_rule.py        the release-off-on-unplug option
+services.py           actions and their registration
 recorder_profile.py   read-only Recorder suggestions using registered IDs
 diagnostics.py        allowlist dump + raw register image
 repairs.py            + repair_issues.py
@@ -311,12 +341,12 @@ unobserved vehicle change occurred between reads.
 The gate's enabled setting is durable; connection tokens and grants stay in RAM.
 A token belongs to the current observation cycle and cannot authorize a later
 one. A confirmed vehicle disconnect invalidates it. Unknown physical state
-withdraws a grant after 60 seconds, retaining the cycle for renewed permission. The service
+withdraws a grant after 60 seconds, retaining the cycle for renewed permission. The app
 continues enforcing the gate and retains an existing grant while HA restarts;
-the service itself restarting loses that grant. Direct mode loses the grant
-when its physical client closes. A controlled options/profile reload hands over
-the same open client when connection settings match; normal unload, failed
-setup and a changed connection close it. Transport interruption marks the connection suspect; explicit client closure
+the service itself restarting loses that grant, and so does closing its
+physical client. A direct entry's embedded service is kept through an
+options/profile reload when the connection settings match; normal unload,
+failed setup and a changed connection or control mode stop it. Transport interruption marks the connection suspect; explicit client closure
 and owner shutdown invalidate it.
 The policy digest includes vehicle identities and detection sources, but not
 the active-profile label. Changing those sources invalidates grants. Profiles
@@ -380,18 +410,15 @@ were a step in the poll, a slow or failing poll would delay it — and a missing
 heartbeat is exactly how the device reaches error state 200. The heartbeat
 therefore has its own background task and five-second interval.
 
-With a **direct USB or LAN connection**, HA starts that task only in master mode,
-before the first full data poll, and cancels it when the entry unloads. A separate
-deadline timer marks its diagnostic health unhealthy even while a transaction
-is blocked. The Heartbeat problem sensor subscribes only to health transitions
-and remains available when register polling fails. It never exposes per-beat
-timestamps or counters to Recorder. Timer and listener lifetimes follow the entry.
-
-With the **independent service**, initialization first reads the identity, loads
-saved intent and completes the first data poll. The service then starts its own
-heartbeat task if writes are enabled. HA reads the reported health through the
-API; unloading its integration entry does not stop the service's task. Stopping
-the service or its host interrupts that heartbeat.
+Service initialization first reads the identity, loads saved intent and
+completes the first data poll. The service then starts its own heartbeat task
+if writes are enabled. A separate deadline timer marks its diagnostic health
+unhealthy even while a transaction is blocked. HA reads the reported health
+through the service API; the `heartbeat` attribute of **Connection quality**
+follows only health transitions and never exposes per-beat timestamps or
+counters to Recorder. Unloading an app entry does not stop the app's task;
+the embedded service of a direct entry keeps it through a reload and stops
+with the entry. Stopping the service or its host interrupts that heartbeat.
 
 The task *spends* the interval rather than adding it: it sleeps whatever is
 left of the five seconds after the write returned. Sleeping the full interval
@@ -411,8 +438,8 @@ recovery, rather than growing the event history on every retry.
 The recovery worker subscribes to heartbeat health and coordinator changes.
 It runs for a confirmed error 200 and healthy heartbeat delivery in master
 mode, including when charging is paused, locked or not released. Pause and
-release intent are retained in WriteState across reloads and in the switches'
-extra restore data across HA restarts, without Recorder attributes. Fault
+release intent are retained in WriteState across reloads and in the service's
+saved intent across restarts, without Recorder attributes. Fault
 readback cannot overwrite that intent. Release commands and recovery share
 the current-command lock. Recovery reads the error and current again before
 writing heartbeat, the intended release and the preserved current setting.
@@ -434,16 +461,16 @@ retry timer and both listeners. Healthy operation adds no polling or states.
 
 ### One choke point for writes
 
-`control.py` is the only module that may change device state. It exists
+`device/control.py` is the only module that may change device state. It exists
 because `0x0302` is three different commands depending on the value, and two
 of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
 Current writes retain their five-second register floor. A separate `state_change_interval_seconds` option defaults to 300 and
-accepts 0–3600 seconds; zero disables the longer guard. The direct integration
-owns this option in direct mode, while the service configuration owns it in
-service mode. Remote HA commands use the service's policy.
+accepts 0–3600 seconds; zero disables the longer guard. A direct entry passes
+its option to the embedded service; the app's configuration owns it for an app
+entry. HA commands always use the service's policy.
 
 One pending-command slot and worker coordinate both short current-write delays
 and longer state-change waits. A newer command supersedes older pending work.
@@ -475,7 +502,7 @@ visible with no due timestamp; confirmation sets a fixed timestamp for the end
 of the grace period. No per-second state or timestamp writes are required.
 Register readback remains
 separate from requested state. Shutdown cancels pending work, so a new owner
-never silently replays a queued start. The running service and its queue survive
+never silently replays a queued start. The running app and its queue survive
 an HA restart. Entry reloads retain timing in memory; cold process starts use
 a conservative fresh guard because previous timing is unknown.
 
@@ -492,11 +519,11 @@ every poll.
 
 `ACTIVE` contains measurements, signalled current, session values and detected
 vehicle phases. These blocks have a separate configurable cadence, defaulting
-to 30 seconds. While the EVSE reports idle, the cadence is at least 60 seconds. Plugged-in
-vehicles no longer generate five-second voltage history merely by remaining
-connected overnight.
+to 30 seconds. While the EVSE reports idle, the cadence is at least 60 seconds, so a
+plugged-in vehicle does not generate five-second voltage history merely by
+remaining connected overnight.
 
-The coordinator reads `FAST` blocks first. An EVSE state transition forces the
+The service poller reads `FAST` blocks first. An EVSE state transition forces the
 active blocks and lifetime counters to refresh in that same poll, so starting
 and stopping a charge does not leave a stale power reading until the next
 measurement interval. Failed block names remain in diagnostics until the
@@ -552,12 +579,15 @@ a dashboard full of `unknown`.
    heartbeat --> |   transport)      | --- 0x0D00 ------->  wallbox
                  +-------------------+
 
-coordinator -> WallboxData (decoded snapshot) -> entities
-control     -> client                          -> coordinator refresh
+service poller -> WallboxData (decoded snapshot) -> service API
+service API    -> HttpTransport | EmbeddedTransport -> ServiceClient
+coordinator    -> entities (table projections)
+ServiceControl -> named command -> device/control.py -> client
 ```
 
 `WallboxData` is a plain snapshot: a register-key to value mapping plus the
-names of blocks that failed. Entities read from it and never from the bus.
+names of blocks that failed. Entities read from it and never from the bus;
+Home Assistant never holds the bus itself.
 
 ## Testing
 
@@ -614,7 +644,7 @@ types its own signatures against. Home Assistant still aliases the name
 
 ## Importing device-class enums
 
-`switch.py`, `button.py` and `binary_sensor_descriptions.py` keep importing
+`switch.py`, `button.py` and `binary_sensor.py` keep importing
 platform device classes through the public package at runtime. Home Assistant
 2026.9 has no separate `const` module for these enums; 2026.10 moves them there
 without an explicit typed re-export, and 2026.11 fixes the re-export.

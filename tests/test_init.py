@@ -17,6 +17,7 @@ from custom_components.mennekes_amtron_rtu import (
     async_unload_entry,
     repairs,
 )
+from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.connection import (
     NetworkConfig,
@@ -32,15 +33,22 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     DOMAIN,
     SERVICE_SET_CHARGING_CURRENT,
 )
+from custom_components.mennekes_amtron_rtu.embedded import embedded_config
+from custom_components.mennekes_amtron_rtu.entry_connection import (
+    connection_config,
+    serial_config,
+)
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 
 
 def _patch_client(monkeypatch: pytest.MonkeyPatch, transport: FakeModbusClient) -> None:
+    """Let the service a direct entry runs talk to a simulated wallbox."""
+
     def factory(config: object, **kwargs) -> MennekesModbusClient:
         return MennekesModbusClient(config, client_factory=lambda _c: transport, **kwargs)
 
-    monkeypatch.setattr(integration, "MennekesModbusClient", factory)
+    monkeypatch.setattr(service_runtime, "MennekesModbusClient", factory)
 
 
 def _patch_issues(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -57,6 +65,10 @@ def _direct_data(connection_type: str) -> dict[str, str | int]:
         "tcp_port": 1502,
         "device_id": 50,
     }
+
+
+def _host(hass: FakeHass, entry: FakeConfigEntry):
+    return hass.data.get(f"{DOMAIN}_embedded", {}).get(entry.entry_id)
 
 
 def test_setup_registers_the_action() -> None:
@@ -81,26 +93,27 @@ def test_a_read_only_entry_exposes_no_control_platforms() -> None:
 
 def test_entry_data_becomes_the_serial_config() -> None:
     entry = FakeConfigEntry(data={CONF_PORT: "/dev/x", CONF_DEVICE_ID: 11})
-    config = _serial_config(entry)
+    config = serial_config(entry)
     assert config.port == "/dev/x"
     assert config.device_id == 11
     assert config.baudrate == 57600
     assert config.stopbits == 2
-    assert _connection_config(entry) == config
-    assert isinstance(_connection_config(entry), SerialConfig)
+    assert connection_config(entry) == config
+    assert isinstance(connection_config(entry), SerialConfig)
 
 
 @pytest.mark.parametrize("protocol", ["rtu_over_tcp", "modbus_tcp"])
 def test_network_entry_data_becomes_the_connection_config(protocol):
-    config = _connection_config(FakeConfigEntry(data=_direct_data(protocol)))
+    config = connection_config(FakeConfigEntry(data=_direct_data(protocol)))
     assert config == NetworkConfig(host="gateway.local", tcp_port=1502, connection_type=protocol)
 
 
-def test_options_drive_the_interval_and_the_control_options() -> None:
+def test_options_drive_the_interval_and_the_service_settings() -> None:
     entry = FakeConfigEntry()
     assert _scan_interval(entry) == 5.0
-    assert _control_options(entry).read_only is True
-    assert _control_options(entry).current_cap is None
+    assert embedded_config(entry).read_only is True
+    # Without a configured limit the service may use the full 32 A range.
+    assert embedded_config(entry).current_cap == 32.0
 
     entry = FakeConfigEntry(
         options={
@@ -110,30 +123,28 @@ def test_options_drive_the_interval_and_the_control_options() -> None:
         }
     )
     assert _scan_interval(entry) == 30.0
-    options = _control_options(entry)
-    assert options.read_only is False
-    assert options.current_cap == 12.5
+    config = embedded_config(entry)
+    assert config.read_only is False
+    assert config.current_cap == 12.5
+    assert config.scan_interval == 30.0
 
-    # With the app, its settings count: HA adds no cap and keeps its own pace.
+    # With the app, its settings count: HA keeps its own pace.
     entry = FakeConfigEntry(
         data={"server_url": "http://app:8765"},
         options={CONF_SCAN_INTERVAL_SECONDS: 30, CONF_CURRENT_LIMIT: 12.5},
     )
     assert _scan_interval(entry) == 5.0
-    assert _control_options(entry).current_cap is None
 
 
-@pytest.mark.parametrize("title", ["MENNEKES AMTRON", "Garage", "Mennekes Amtron"])
 @pytest.mark.parametrize("connection_type", ["serial", "rtu_over_tcp", "modbus_tcp"])
 def test_a_master_entry_loads_and_unloads_cleanly(
     monkeypatch: pytest.MonkeyPatch,
-    title: str,
     connection_type: str,
 ) -> None:
     async def run() -> None:
         hass = FakeHass()
         entry = FakeConfigEntry(
-            title=title, data=_direct_data(connection_type),
+            data=_direct_data(connection_type),
             options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER},
         )
         transport = FakeModbusClient(device_bank())
@@ -141,8 +152,7 @@ def test_a_master_entry_loads_and_unloads_cleanly(
         _patch_issues(monkeypatch)
 
         assert await async_setup_entry(hass, entry)
-        assert entry.runtime_data.client.config.connection_type == connection_type
-        assert entry.title == ("Mennekes Amtron" if title == "MENNEKES AMTRON" else title)
+        assert _host(hass, entry).config.connection.connection_type == connection_type
         assert entry.runtime_data.identity.serial_number == "ABC123456789"
         assert entry.runtime_data.heartbeat is not None
         assert entry.runtime_data.heartbeat.running
@@ -151,6 +161,7 @@ def test_a_master_entry_loads_and_unloads_cleanly(
 
         assert await async_unload_entry(hass, entry)
         assert not entry.runtime_data.heartbeat.running
+        assert _host(hass, entry) is None
         assert transport.close_calls == 1
 
     asyncio.run(run())
@@ -169,7 +180,8 @@ def test_a_read_only_entry_never_starts_the_heartbeat(
         _patch_issues(monkeypatch)
 
         assert await async_setup_entry(hass, entry)
-        assert entry.runtime_data.heartbeat is None
+        assert not entry.runtime_data.heartbeat.running
+        assert not _host(hass, entry)._service.heartbeat.running
         assert await async_unload_entry(hass, entry)
         assert transport.writes == []
 
@@ -216,6 +228,7 @@ def test_a_dead_bus_defers_the_setup(monkeypatch: pytest.MonkeyPatch, connection
 
         with pytest.raises(ConfigEntryNotReady):
             await async_setup_entry(hass, entry)
+        assert _host(hass, entry) is None
         assert transport.close_calls == 1
 
     asyncio.run(run())
@@ -233,19 +246,17 @@ def test_a_failing_first_poll_closes_the_port(
         _patch_client(monkeypatch, transport)
         _patch_issues(monkeypatch)
 
-        async def failing_refresh() -> None:
-            raise ConfigEntryNotReady("poll failed")
-
-        original = integration.MennekesAmtronCoordinator
+        original = integration.ServiceCoordinator
 
         class Coordinator(original):  # type: ignore[misc, valid-type]
             async def async_config_entry_first_refresh(self) -> None:
-                await failing_refresh()
+                raise ConfigEntryNotReady("poll failed")
 
-        monkeypatch.setattr(integration, "MennekesAmtronCoordinator", Coordinator)
+        monkeypatch.setattr(integration, "ServiceCoordinator", Coordinator)
         with pytest.raises(ConfigEntryNotReady):
             await async_setup_entry(hass, entry)
         assert transport.close_calls == 1
+        assert _host(hass, entry) is None
 
     asyncio.run(run())
 
@@ -267,7 +278,7 @@ def test_tariff_only_option_update_does_not_restart_modbus() -> None:
         hass = FakeHass()
         entry = FakeConfigEntry()
         entry.runtime_data = SimpleNamespace(
-            client=object(), plug_charge=None,
+            client=SimpleNamespace(snapshot={}), plug_charge=None,
             charging_cost=SimpleNamespace(apply_tariff_only_update=lambda: True),
             entry_data=dict(entry.data), vehicle_base_options={},
             vehicle_selection={
@@ -296,6 +307,7 @@ def test_a_failed_unload_keeps_the_connection_and_heartbeat(
             assert not await async_unload_entry(hass, entry)
             assert entry.runtime_data.client.connected
             assert entry.runtime_data.heartbeat.running
+            assert _host(hass, entry) is not None
             assert transport.close_calls == 0
         finally:
             hass.config_entries.unload_result = True
@@ -318,14 +330,11 @@ def test_failed_platform_setup_releases_the_port_and_heartbeat(
             raise RuntimeError("platform setup failed")
 
         monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", fail)
-        try:
-            with pytest.raises(RuntimeError, match="platform setup failed"):
-                await async_setup_entry(hass, entry)
-            assert transport.close_calls == 1
-            assert not entry.runtime_data.heartbeat.running
-        finally:
-            await entry.runtime_data.heartbeat.async_stop()
-            await entry.runtime_data.client.async_close()
+        with pytest.raises(RuntimeError, match="platform setup failed"):
+            await async_setup_entry(hass, entry)
+        assert transport.close_calls == 1
+        assert not entry.runtime_data.heartbeat.running
+        assert _host(hass, entry) is None
 
     asyncio.run(run())
 
@@ -344,7 +353,7 @@ def test_cancelled_identity_read_releases_the_serial_port(
             entered.set()
             await asyncio.Future()
 
-        monkeypatch.setattr(integration, "async_read_identity", blocked_identity)
+        monkeypatch.setattr(service_runtime, "async_read_identity", blocked_identity)
         setup = asyncio.create_task(async_setup_entry(hass, entry))
         await entered.wait()
         setup.cancel()
@@ -352,5 +361,47 @@ def test_cancelled_identity_read_releases_the_serial_port(
             await setup
         assert transport.close_calls == 1
         assert not transport.connected
+        assert _host(hass, entry) is None
 
     asyncio.run(run())
+
+
+def test_a_failed_cleanup_of_deleted_vehicle_storage_does_not_block_setup(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(options={"vehicle_profiles": {}})
+        _patch_client(monkeypatch, FakeModbusClient(device_bank()))
+        _patch_issues(monkeypatch)
+
+        async def fail(*_args: object) -> None:
+            raise OSError("read-only storage")
+
+        monkeypatch.setattr(integration, "async_prune_profile_losses", fail)
+        assert await async_setup_entry(hass, entry)
+        assert "deleted vehicle storage not removed" in caplog.text
+        assert await async_unload_entry(hass, entry)
+
+    asyncio.run(run())
+
+
+def test_optional_setup_failures_keep_reauthentication_and_retry_reasons() -> None:
+    from homeassistant.exceptions import ConfigEntryAuthFailed
+
+    client = SimpleNamespace(failure_reason=None)
+    auth = ConfigEntryAuthFailed("credential rejected")
+    with pytest.raises(ConfigEntryAuthFailed) as caught:
+        integration._raise_optional_setup_error(client, auth, "soc_goal_unavailable")
+    assert caught.value is auth
+    retry = ConfigEntryNotReady("try later")
+    with pytest.raises(ConfigEntryNotReady) as caught:
+        integration._raise_optional_setup_error(client, retry, "soc_goal_unavailable")
+    assert caught.value is retry
+    with pytest.raises(ConfigEntryNotReady) as caught:
+        integration._raise_optional_setup_error(client, RuntimeError("x"), "soc_goal_unavailable")
+    assert caught.value.translation_key == "soc_goal_unavailable"
+    client.failure_reason = "service_auth_failed"
+    with pytest.raises(ConfigEntryAuthFailed) as caught:
+        integration._raise_optional_setup_error(client, RuntimeError("x"), "soc_goal_unavailable")
+    assert caught.value.translation_key == "service_auth_failed"

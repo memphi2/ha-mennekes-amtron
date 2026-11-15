@@ -16,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.test_modbus_service import TOKEN, current_writes
@@ -42,12 +43,17 @@ async def control_path(tmp_path, *, remote):
             await client.async_connect()
             stack.push_async_callback(client.async_close)
             control, owner = remote_control(client), service.control
+            refused = HomeAssistantError
+            # The departure plan runs inside the service, never over HTTP.
+            set_timed_current = owner.async_set_timed_current
         else:
             harness = Harness()
             control = owner = await harness.connect()
             stack.push_async_callback(harness.client.async_close)
             stack.push_async_callback(owner.async_shutdown)
             transport, clock = harness.transport, harness.clock
+            refused = DeviceError
+            set_timed_current = owner.async_set_timed_current
         await control.async_configure_plug_charge(True, policy=POLICY)
         transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
         transport.bank[R.CP_STATE.address] = int(CpState.B1)
@@ -66,7 +72,10 @@ async def control_path(tmp_path, *, remote):
         assert owner.pause_requested is True
         assert owner.plug_charge["session"] is not None
         assert not owner.plug_charge["authorized"]
-        yield SimpleNamespace(control=control, owner=owner, transport=transport, clock=clock)
+        yield SimpleNamespace(
+            control=control, owner=owner, transport=transport, clock=clock,
+            refused=refused, set_timed_current=set_timed_current,
+        )
 
 
 def blocker(path, name, enabled):
@@ -105,11 +114,11 @@ def test_clearing_one_stop_never_overrides_another_or_the_pause(tmp_path, remote
             before = list(path.transport.writes)
             for name in pair:
                 blocker(path, name, True)
-            with pytest.raises(HomeAssistantError):
+            with pytest.raises(path.refused):
                 await authorize(path)
             assert path.transport.writes == before
             blocker(path, first, False)
-            with pytest.raises(HomeAssistantError):
+            with pytest.raises(path.refused):
                 await authorize(path)
             assert path.transport.writes == before
             assert path.owner.pause_requested is True
@@ -136,7 +145,7 @@ def test_reached_target_cancels_queued_departure_even_after_plug_charge_grant(tm
             wake = asyncio.Event()
             path.owner._sleep = lambda _delay: wake.wait()
             try:
-                await path.control.async_set_timed_current(
+                await path.set_timed_current(
                     16, deadline=datetime.now(UTC) + timedelta(hours=1), owner=OWNER,
                 )
                 assert path.owner.pending_action == "set_current"

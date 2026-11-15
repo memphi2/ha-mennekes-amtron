@@ -60,8 +60,8 @@ def async_setup_repairs(
 ) -> None:
     """Evaluate repairs now and when coordinator data or availability changes.
 
-    Control errors also call async_check_repairs directly: a failed write need
-    not change any polled register, and identical polls do not notify listeners.
+    A rejected write shows with the next poll: the service reports it in its
+    state, which the coordinator reads on its own interval.
     """
 
     async_check_repairs(hass, entry)

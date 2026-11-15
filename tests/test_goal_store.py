@@ -25,11 +25,19 @@ from tests.ha_fakes import FakeHass
 from tests.test_home_assistant_smoke import _boot
 
 
-def store_at(path: Path, identity: str = "wallbox") -> GoalStore:
+def energy_store(hass, identity: str = "wallbox") -> goal_store.ModelStore[EnergyGoal]:
+    return goal_store.ModelStore(hass, "entry", identity, kind="energy_goal", model=EnergyGoal)
+
+
+def soc_store(hass, identity: str = "wallbox") -> goal_store.ModelStore[SocGoal]:
+    return goal_store.ModelStore(hass, "entry", identity, kind="soc_goal", model=SocGoal)
+
+
+def store_at(path: Path, identity: str = "wallbox") -> goal_store.ModelStore[EnergyGoal]:
     hass = FakeHass(str(path))
     hass.state = CoreState.running
     hass.async_add_executor_job = asyncio.to_thread
-    return GoalStore(hass, "entry", identity)
+    return energy_store(hass, identity)
 
 
 def test_goal_survives_restart_without_saving_normal_progress(tmp_path):
@@ -308,43 +316,43 @@ def test_goal_files_use_the_home_assistant_storage_envelope(tmp_path):
 
 def test_soc_and_energy_stores_keep_separate_models_files_and_cached_payloads(tmp_path):
     async def run():
-        energy_store = store_at(tmp_path)
-        soc_store = SocGoalStore(energy_store._hass, "entry", "wallbox")
+        energy_file = store_at(tmp_path)
+        soc_file = soc_store(energy_file._hass)
         energy = EnergyGoal()
         energy.set_target(12, 100)
-        soc = await soc_store.async_load()
+        soc = await soc_file.async_load()
         assert isinstance(soc, SocGoal)
         soc.configure_source("sensor.car_soc|number.car_charge_limit")
         soc.set_target(80, soc=20, maximum=90)
-        await asyncio.gather(energy_store.async_save(energy), soc_store.async_save(soc))
-        assert energy_store.path != soc_store.path
-        assert soc_store.path.name == f"{DOMAIN}.soc_goal.entry"
-        original_energy = await asyncio.to_thread(energy_store.path.read_bytes)
+        await asyncio.gather(energy_file.async_save(energy), soc_file.async_save(soc))
+        assert energy_file.path != soc_file.path
+        assert soc_file.path.name == f"{DOMAIN}.soc_goal.entry"
+        original_energy = await asyncio.to_thread(energy_file.path.read_bytes)
 
         # A falling car cap is persistent, even if that entity later disappears.
         soc.observe(40, 70)
-        await soc_store.async_save(soc)
-        restored = await SocGoalStore(energy_store._hass, "entry", "wallbox").async_load()
+        await soc_file.async_save(soc)
+        restored = await soc_store(energy_file._hass).async_load()
         assert restored.target_percent == 70
         assert restored.maximum_percent == 70
         assert restored.observe(75)
         # At the car's own limit, the car ends the charge; nothing is paused.
         assert restored.status == "reached"
         assert not restored.stop_requested
-        await soc_store.async_save(restored)
-        assert (await soc_store.async_load()).status == "reached"
-        assert (await energy_store.async_load()).snapshot() == energy.snapshot()
-        assert await asyncio.to_thread(energy_store.path.read_bytes) == original_energy
+        await soc_file.async_save(restored)
+        assert (await soc_file.async_load()).status == "reached"
+        assert (await energy_file.async_load()).snapshot() == energy.snapshot()
+        assert await asyncio.to_thread(energy_file.path.read_bytes) == original_energy
 
         # The right filename cannot make the wrong model schema acceptable.
-        malformed = json.loads(await asyncio.to_thread(soc_store.path.read_text))
+        malformed = json.loads(await asyncio.to_thread(soc_file.path.read_text))
         malformed["data"]["goal"] = energy.snapshot()
-        await asyncio.to_thread(soc_store.path.write_text, json.dumps(malformed))
+        await asyncio.to_thread(soc_file.path.write_text, json.dumps(malformed))
         with pytest.raises(ValueError, match="percentage goal"):
-            await soc_store.async_load()
-        await soc_store.async_remove()
-        assert (await energy_store.async_load()).target_kwh == 12
-        assert (await soc_store.async_load()).status == "disabled"
+            await soc_file.async_load()
+        await soc_file.async_remove()
+        assert (await energy_file.async_load()).target_kwh == 12
+        assert (await soc_file.async_load()).status == "disabled"
 
     asyncio.run(run())
 
@@ -354,8 +362,8 @@ def test_stopping_save_is_durable_before_final_write_and_failure_is_never_queued
     async def run():
         hass = await _boot(tmp_path)
         try:
-            store_type = GoalStore if kind == "energy" else SocGoalStore
-            store = store_type(hass, "entry", "wallbox")
+            store_type = energy_store if kind == "energy" else soc_store
+            store = store_type(hass)
             if kind == "energy":
                 goal = EnergyGoal()
                 goal.set_target(1, 100)
@@ -369,7 +377,7 @@ def test_stopping_save_is_durable_before_final_write_and_failure_is_never_queued
             # A goal reached during shutdown must be durable immediately.
             goal.observe(101 if kind == "energy" else 80)
             await store.async_save(goal)
-            restarted = store_type(hass, "entry", "wallbox")
+            restarted = store_type(hass)
             assert (await restarted.async_load()).status == "reached"
 
             # The rejected disable must not get written later by HA FINAL_WRITE.

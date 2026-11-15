@@ -104,7 +104,7 @@ def test_annual_import_starts_after_wallbox_setup_and_is_cancelled_on_unload(tmp
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
-@pytest.mark.parametrize("failure", ["timed", "timed_connection", "recovery"])
+@pytest.mark.parametrize("failure", ["timed", "timed_connection"])
 def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_path, monkeypatch, failure):
     async def run():
         hass = FakeHass(str(tmp_path))
@@ -117,19 +117,13 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         _patch_client(monkeypatch, transport)
         _patch_issues(monkeypatch)
         vehicle = Mock(async_start=AsyncMock(), async_stop=AsyncMock())
-        timed_error = {"timed": ValueError("invalid saved trip"), "timed_connection": HomeAssistantError("service offline")}.get(failure)
+        timed_error = {"timed": ValueError("invalid saved trip"), "timed_connection": HomeAssistantError("service offline")}[failure]
         timed = Mock(async_start=AsyncMock(side_effect=timed_error), async_stop=AsyncMock())
-        recovery = Mock(start=Mock(side_effect=RuntimeError("recovery startup failed")), async_stop=AsyncMock())
         monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args, **_kwargs: vehicle)
         monkeypatch.setattr(integration, "TimedGoalObserver", lambda *_args: timed)
-        monkeypatch.setattr(integration, "HeartbeatRecovery", lambda *_args: recovery)
-        with pytest.raises(RuntimeError if failure == "recovery" else ConfigEntryNotReady) as caught:
+        with pytest.raises(ConfigEntryNotReady) as caught:
             await integration.async_setup_entry(hass, entry)
-        if failure != "recovery":
-            assert caught.value.translation_key == ("timed_goal_state_invalid" if failure == "timed" else "timed_goal_unavailable")
-            recovery.async_stop.assert_not_awaited()
-        else:
-            recovery.async_stop.assert_awaited_once()
+        assert caught.value.translation_key == ("timed_goal_state_invalid" if failure == "timed" else "timed_goal_unavailable")
         vehicle.async_start.assert_awaited_once()
         vehicle.async_stop.assert_awaited_once()
         timed.async_start.assert_awaited_once()
@@ -138,5 +132,6 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         assert not runtime.heartbeat.running
         assert not runtime.client.connected
         assert transport.close_calls == 1
+        assert f"{entry.domain}_embedded" not in hass.data or not hass.data[f"{entry.domain}_embedded"]
 
     asyncio.run(run())

@@ -10,19 +10,15 @@ import pytest
 from aiohttp import ClientSession
 from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.mennekes_amtron_rtu.device.control import (
-    AmtronControl,
-)
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureForecast,
     DepartureInputs,
     DepartureState,
 )
-from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.test_modbus_service import TOKEN, service_fixture
 from tests.test_timed_goal import NOW, setup_observer
 
@@ -50,7 +46,6 @@ class Service:
 
     """The service side of the hand-over, as the remote control presents it."""
 
-    supports_departure_plan = True
     read_only = False
 
     def __init__(self) -> None:
@@ -231,19 +226,6 @@ def test_only_another_car_withdraws_the_services_plan(monkeypatch, withdraw):
     asyncio.run(run())
 
 
-def test_the_direct_backend_never_plans_in_a_service():
-    async def run():
-        control = AmtronControl.__new__(AmtronControl)
-        assert control.supports_departure_plan is False
-        assert control.departure is None
-        assert control.operation is None
-        with pytest.raises(DeviceError, match="service_unavailable"):
-            await control.async_set_departure_trip(None, None)
-        with pytest.raises(DeviceError, match="service_unavailable"):
-            await control.async_set_departure_inputs(DepartureInputs(CAR))
-    asyncio.run(run())
-
-
 def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
@@ -251,18 +233,14 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
             async with ClientSession() as session:
                 client = ServiceClient(session, "http://service:8765", TOKEN)
                 control = ServiceControl(
-                    client,                     state=lambda: None, request_refresh=lambda: None, notify_pending=lambda: None,
+                    client, state=lambda: None, request_refresh=lambda: None, notify_pending=lambda: None,
                 )
                 payload = service.snapshot()
                 client.apply_snapshot(payload)
                 client._connected = True
-                assert (control.supports_departure_plan, control.departure) == (False, None)
-                with pytest.raises(HomeAssistantError):
-                    await control.async_set_departure_trip(None, None)
-                payload["control"]["supports_departure_plan"] = True
                 payload["control"]["departure"] = None
                 client.apply_snapshot(payload)
-                assert (control.supports_departure_plan, control.departure) == (True, None)
+                assert control.departure is None
                 payload["control"]["departure"] = plan(estimated_soc=41.5, inputs="b" * 32, forecast=FORECAST)
                 client.apply_snapshot(payload)
                 assert control.departure.estimated_soc == 41.5
@@ -285,7 +263,7 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
                     {"command": "departure_inputs", "origin": "home_assistant", "value": given.snapshot(), "expected_serial_number": serial},
                 ]
                 for broken in (
-                    {"supports_departure_plan": 1}, {"departure": {}},
+                    {"departure": {}},
                     {"departure": plan(status="flying")}, {"departure": plan(scope="x")},
                     {"departure": plan(inputs="x")}, {"departure": plan(confirmed=1)},
                     {"departure": plan(estimated_soc=101)}, {"departure": plan(planned_start="soon")},
@@ -436,4 +414,66 @@ def test_guest_mode_holds_vehicle_handover_but_keeps_explicit_time_editing(monke
         await observer.async_set_deadline(deadline)
         service.async_set_target_time.assert_awaited_once_with(deadline)
         assert observer.goal.snapshot() == original
+    asyncio.run(run())
+
+
+def test_a_new_trip_hides_the_old_planned_start_until_the_service_plans_it(monkeypatch):
+    async def run():
+        observer, service, _hass = handover(monkeypatch)
+        deadline = NOW + timedelta(hours=8)
+        await observer.async_set_deadline(deadline, source="manual")
+        start = NOW + timedelta(hours=5)
+        service.state = {**service.state, "status": "paused_until_start", "planned_start": start.isoformat()}
+        await observer._evaluate()
+        assert observer.planned_start == start
+        # Another trip plans its own start instead of keeping the old one.
+        await observer.async_set_deadline(deadline + timedelta(hours=1), source="manual")
+        assert observer.planned_start is None
+        later = NOW + timedelta(hours=6)
+        service.state = {**service.state, "planned_start": later.isoformat()}
+        await observer._evaluate()
+        assert service.trips[-1] == (deadline + timedelta(hours=1), "manual", False)
+        assert observer.planned_start == later
+        # Without the service's plan nothing is shown as planned.
+        service.state = None
+        await observer._evaluate()
+        assert (observer.status, observer.planned_start, observer.forecast) == ("waiting_for_device", None, None)
+    asyncio.run(run())
+
+
+def test_a_capacity_sensor_in_wh_is_handed_over_in_kwh(monkeypatch):
+    async def run():
+        observer, service, hass = handover(monkeypatch)
+        observer._options.pop("timed_capacity_kwh")
+        observer._options["timed_capacity_entity"] = "sensor.capacity"
+        hass.states["sensor.capacity"] = SimpleNamespace(
+            entity_id="sensor.capacity", state="64000", attributes={"unit_of_measurement": "Wh"},
+        )
+        await observer._evaluate()
+        assert service.inputs[-1].capacity_kwh == 64.0
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("pending", [False, True])
+def test_a_trip_replaced_while_the_app_edit_waits_is_kept(monkeypatch, pending):
+    async def run():
+        observer, service, _hass = handover(monkeypatch)
+        if pending:
+            # An unsent edit here, which a newer app edit would supersede.
+            await observer.async_set_deadline(NOW + timedelta(hours=5), source="manual")
+        newer = TimedGoal()
+        newer.set(NOW + timedelta(hours=7), "manual")
+        service.state = plan(newer, editor="app", selection_vehicle=CAR, edit_revision="b" * 32)
+        replacement = TimedGoal()
+        replacement.set(NOW + timedelta(hours=9), "manual")
+        async with observer._goal_lock:
+            following = asyncio.create_task(observer._follow_service())
+            for _ in range(5):
+                await asyncio.sleep(0)
+            # Another edit takes the trip's place before the app's is adopted.
+            observer.goal = replacement
+        await following
+        assert observer.goal is replacement
+        assert observer._trip_dirty is pending
+        assert service.trips == []
     asyncio.run(run())

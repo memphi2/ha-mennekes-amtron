@@ -89,9 +89,10 @@ See [BavarianData charging history](https://justchr.github.io/BavarianData/docs/
 
 Select **Vehicle energy sensor** and choose the existing entity. It must report
 `kWh` or `Wh`. After unplugging, wait for the vehicle integration to update, then
-press **Assign vehicle charge energy**. Check that the value belongs to this
-charge before assigning it. This button only updates the estimate and also
-works when wallbox controls are read-only.
+run the `mennekes_amtron_rtu.assign_vehicle_charge` action (**Assign vehicle
+charge energy**). Check that the value belongs to this charge before assigning
+it. This action only updates the estimate and also works when wallbox controls
+are read-only.
 
 **Assign changed energy automatically** is optional and off by default.
 It accepts a valid number changing to a different valid number within 30 minutes

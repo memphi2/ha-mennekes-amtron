@@ -4,19 +4,21 @@ import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
+    DOMAIN,
 )
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_init import _patch_client, _patch_issues
 
 
-def test_direct_gate_is_enforced_before_heartbeat_and_stops_observer(tmp_path, monkeypatch):
+def test_direct_gate_is_enforced_at_setup_and_stops_observer(tmp_path, monkeypatch):
     async def run():
         hass = FakeHass(str(tmp_path))
         transport = FakeModbusClient(device_bank())
@@ -25,19 +27,15 @@ def test_direct_gate_is_enforced_before_heartbeat_and_stops_observer(tmp_path, m
         entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER, "virtual_plug_charge": True})
         observer = Mock(async_stop=AsyncMock())
         monkeypatch.setattr(integration, "PlugChargeObserver", lambda *_: observer)
-        start = integration._start_heartbeat
-
-        def heartbeat(*args):
-            assert transport.bank[R.CHARGING_RELEASE.address] == 0
-            return start(*args)
-
-        monkeypatch.setattr(integration, "_start_heartbeat", heartbeat)
         assert await integration.async_setup_entry(hass, entry)
         observer.start.assert_called_once()
         assert entry.runtime_data.control.plug_charge["enabled"]
+        # The gate holds the release until a car is granted.
+        assert transport.bank[R.CHARGING_RELEASE.address] == 0
+        assert _service(hass, entry).control.plug_charge["enabled"]
         assert await integration.async_unload_entry(hass, entry)
         observer.async_stop.assert_awaited_once()
-        assert entry.runtime_data.coordinator.observe_plug_charge is None
+        assert entry.runtime_data.coordinator.observe_session is None
 
     asyncio.run(run())
 
@@ -59,8 +57,39 @@ def test_read_only_configuration_loads_without_enabling_the_gate(tmp_path, monke
     asyncio.run(run())
 
 
+def _host(hass, entry):
+    return hass.data.get(f"{DOMAIN}_embedded", {}).get(entry.entry_id)
+
+
+def _service(hass, entry):
+    return _host(hass, entry)._service
+
+
+async def _setup(hass, entry):
+    """Set the entry up with the states Home Assistant gives it around setup."""
+    entry.state = ConfigEntryState.SETUP_IN_PROGRESS
+    assert await integration.async_setup_entry(hass, entry)
+    entry.state = ConfigEntryState.LOADED
+
+
+async def _unload(hass, entry):
+    assert await integration.async_unload_entry(hass, entry)
+    entry.state = ConfigEntryState.NOT_LOADED
+
+
+async def _plug_in(hass, entry, transport):
+    """A car plugs in; the service gives the connection its session token."""
+    transport.bank[R.EVSE_STATE.address] = 2
+    transport.bank[R.CP_STATE.address] = 11
+    await _service(hass, entry).refresh()
+    await entry.runtime_data.coordinator.async_refresh()
+    gate = entry.runtime_data.control.plug_charge
+    assert isinstance(gate["session"], str)
+    return gate["session"], gate["since"]
+
+
 @pytest.mark.parametrize("outcome", ["loaded", "unload_rejected", "setup_skipped", "connection_changed"])
-def test_profile_reload_hands_over_only_the_same_open_connection(tmp_path, monkeypatch, outcome):
+def test_profile_reload_keeps_only_the_same_running_service(tmp_path, monkeypatch, outcome):
     async def run():
         hass = FakeHass(str(tmp_path))
         transport = FakeModbusClient(device_bank())
@@ -68,33 +97,32 @@ def test_profile_reload_hands_over_only_the_same_open_connection(tmp_path, monke
         _patch_issues(monkeypatch)
         entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER, "virtual_plug_charge": True})
         monkeypatch.setattr(integration, "PlugChargeObserver", lambda *_: Mock(async_stop=AsyncMock()))
-        assert await integration.async_setup_entry(hass, entry)
-        old = entry.runtime_data
-        transport.bank[R.EVSE_STATE.address] = 2
-        transport.bank[R.CP_STATE.address] = 11
-        await old.coordinator.async_refresh()
-        token, since = old.control.plug_charge["session"], old.control.plug_charge["since"]
-        assert isinstance(token, str)
+        await _setup(hass, entry)
+        old, host = entry.runtime_data, _host(hass, entry)
+        token, since = await _plug_in(hass, entry, transport)
 
         async def reload(_entry_id):
             if outcome == "unload_rejected":
                 hass.config_entries.unload_result = False
                 assert not await integration.async_unload_entry(hass, entry)
                 return
-            assert await integration.async_unload_entry(hass, entry)
-            assert old.client.connected
+            await _unload(hass, entry)
+            # The service and its heartbeat outlive the reload.
+            assert _host(hass, entry) is host
+            assert not old.client.connected
             if outcome == "setup_skipped":
                 return
             if outcome == "connection_changed":
                 entry.data = {**entry.data, "port": "/dev/other"}
-            assert await integration.async_setup_entry(hass, entry)
+            await _setup(hass, entry)
+            assert entry.runtime_data.client is not old.client
+            assert entry.runtime_data.control is not old.control
             if outcome == "loaded":
-                assert entry.runtime_data.client is old.client
-                assert entry.runtime_data.control is not old.control
+                assert _host(hass, entry) is host
                 assert entry.runtime_data.control.plug_charge["session"] == token
                 assert entry.runtime_data.control.plug_charge["since"] == since
             else:
-                assert entry.runtime_data.client is not old.client
+                assert _host(hass, entry) is not host
                 assert entry.runtime_data.control.plug_charge["session"] != token
 
         monkeypatch.setattr(hass.config_entries, "async_reload", reload)
@@ -102,11 +130,11 @@ def test_profile_reload_hands_over_only_the_same_open_connection(tmp_path, monke
         monkeypatch.setattr(integration, "_async_switch_vehicle", AsyncMock(return_value=False))
         try:
             await integration.async_reload_entry(hass, entry)
-            assert not old.retain_client_on_unload
-            assert not hass.data.get("mennekes_amtron_rtu_reload_clients", {})
             if outcome == "setup_skipped":
-                assert not old.client.connected
+                # A reload that loaded nothing stops the service it kept.
+                assert _host(hass, entry) is None
             elif outcome == "unload_rejected":
+                assert _host(hass, entry) is host
                 assert old.client.connected
                 assert old.control.plug_charge["session"] == token
         finally:
@@ -114,11 +142,12 @@ def test_profile_reload_hands_over_only_the_same_open_connection(tmp_path, monke
             if outcome != "setup_skipped":
                 assert await integration.async_unload_entry(hass, entry)
             assert not entry.runtime_data.client.connected
+            assert _host(hass, entry) is None
 
     asyncio.run(run())
 
 
-def test_overlapping_profile_reloads_preserve_the_successor_client_and_session(tmp_path, monkeypatch):
+def test_overlapping_profile_reloads_preserve_the_service_and_session(tmp_path, monkeypatch):
     async def run():
         hass = FakeHass(str(tmp_path))
         transport = FakeModbusClient(device_bank())
@@ -126,12 +155,9 @@ def test_overlapping_profile_reloads_preserve_the_successor_client_and_session(t
         _patch_issues(monkeypatch)
         entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER, "virtual_plug_charge": True})
         monkeypatch.setattr(integration, "PlugChargeObserver", lambda *_: Mock(async_stop=AsyncMock()))
-        assert await integration.async_setup_entry(hass, entry)
-        client = entry.runtime_data.client
-        transport.bank[R.EVSE_STATE.address] = 2
-        transport.bank[R.CP_STATE.address] = 11
-        await entry.runtime_data.coordinator.async_refresh()
-        token = entry.runtime_data.control.plug_charge["session"]
+        await _setup(hass, entry)
+        host = _host(hass, entry)
+        token, _since = await _plug_in(hass, entry, transport)
         started, finish = asyncio.Event(), asyncio.Event()
         owners = []
 
@@ -140,10 +166,10 @@ def test_overlapping_profile_reloads_preserve_the_successor_client_and_session(t
             if len(owners) == 1:
                 started.set()
                 await finish.wait()
-            assert await integration.async_unload_entry(hass, entry)
-            assert client.connected
-            assert await integration.async_setup_entry(hass, entry)
-            assert entry.runtime_data.client is client
+            await _unload(hass, entry)
+            assert _host(hass, entry) is host
+            await _setup(hass, entry)
+            assert _host(hass, entry) is host
             assert entry.runtime_data.control.plug_charge["session"] == token
 
         monkeypatch.setattr(hass.config_entries, "async_reload", reload)
@@ -159,11 +185,13 @@ def test_overlapping_profile_reloads_preserve_the_successor_client_and_session(t
             await asyncio.gather(first, second)
             assert len(owners) == 2
             assert owners[0] is not owners[1]
-            assert all(not owner.retain_client_on_unload for owner in owners)
+            assert _host(hass, entry) is host
+            assert transport.close_calls == 0
             assert entry.runtime_data.control.plug_charge["session"] == token
         finally:
             finish.set()
             await integration.async_unload_entry(hass, entry)
-        assert not client.connected
+        assert _host(hass, entry) is None
+        assert not transport.connected
 
     asyncio.run(run())

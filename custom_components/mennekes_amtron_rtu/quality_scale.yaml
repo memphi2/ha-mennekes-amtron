@@ -58,14 +58,14 @@ rules:
   docs-triggers:
     status: exempt
     comment: No integration-specific triggers are registered. [Automation examples](docs/automations.md)
-      use standard state and numeric-state triggers, including state changes of the command-result event entity.
+      use standard state and numeric-state triggers, including state changes of the Activity event entity.
   entity-event-setup:
     status: done
-    comment: The [connection quality sensor](custom_components/mennekes_amtron_rtu/sensor.py#AmtronStateSensor.async_added_to_hass)
+    comment: The [connection quality sensor](custom_components/mennekes_amtron_rtu/sensor.py#AmtronSensor.async_added_to_hass)
       subscribes to heartbeat health only after addition and registers cleanup with async_on_remove;
-      coordinator entities use the HA lifecycle. The [command event entity](custom_components/mennekes_amtron_rtu/event.py#AmtronControlResultEvent.async_added_to_hass)
-      also registers listener cleanup. [Heartbeat tests](tests/test_binary_sensor.py) exercise transitions
-      and removal.
+      coordinator entities use the HA lifecycle. The [Activity event entity](custom_components/mennekes_amtron_rtu/event.py#AmtronActivity.async_added_to_hass)
+      subscribes to the command feed after addition and also registers listener cleanup. [Smoke tests](tests/test_home_assistant_smoke.py)
+      set up and unload the entities in a real Home Assistant.
   entity-unique-id:
     status: done
     comment: The [entity identity helper](custom_components/mennekes_amtron_rtu/entity.py#entry_entity_unique_id)
@@ -73,9 +73,9 @@ rules:
       and fallback identities.
   has-entity-name:
     status: done
-    comment: The [shared entity base](custom_components/mennekes_amtron_rtu/entity.py#MennekesAmtronEntity)
-      and [event entities](custom_components/mennekes_amtron_rtu/event.py#AmtronWallboxEvent)
-      enable contextual entity names.
+    comment: The [shared entity base](custom_components/mennekes_amtron_rtu/entity.py#AmtronEntity),
+      which the [Activity event entity](custom_components/mennekes_amtron_rtu/event.py#AmtronActivity)
+      also uses, enables contextual entity names.
   runtime-data:
     status: done
     comment: Typed [runtime data](custom_components/mennekes_amtron_rtu/data.py) belongs to each [config
@@ -97,13 +97,14 @@ rules:
       preserve existing entries instead of duplicating devices.
   action-exceptions:
     status: done
-    comment: The [HA command boundary](custom_components/mennekes_amtron_rtu/control.py) maps device failures
-      to translated HA errors; [action tests](tests/test_services.py) exercise rejected writes.
+    comment: The [HA command boundary](custom_components/mennekes_amtron_rtu/service_control.py#ha_command) maps service
+      and device failures to translated HA errors; [action tests](tests/test_services.py) exercise rejected writes.
   config-entry-unloading:
     status: done
-    comment: '[Unload](custom_components/mennekes_amtron_rtu/__init__.py#async_unload_entry) stops recovery
-      and heartbeat, shuts down controls and closes the client after unloading the platforms actually
-      loaded. [Lifecycle tests](tests/test_platform_lifecycle.py) cover mode changes.'
+    comment: '[Unload](custom_components/mennekes_amtron_rtu/__init__.py#async_unload_entry) stops the
+      HA-side observers and closes the service client after unloading the platforms actually loaded; a
+      direct entry then releases its embedded service. [Lifecycle tests](tests/test_platform_lifecycle.py)
+      cover mode changes.'
   docs-configuration-parameters:
     status: done
     comment: Direct and service [options](docs/user-guide.md) explain current caps, polling and write
@@ -114,9 +115,9 @@ rules:
       explain every connection field, including protocol, unit ID and separate TCP/API ports.'
   entity-unavailable:
     status: done
-    comment: '[Entity availability](custom_components/mennekes_amtron_rtu/entity.py#MennekesAmtronEntity.available)
-      requires a successful update and its register; controls also require current write permission. [Service-mode
-      tests](tests/test_service_mode_coupling.py) verify permission changes.'
+    comment: '[Entity availability](custom_components/mennekes_amtron_rtu/entity.py#AmtronEntity.available)
+      requires a successful update and its register; controls also require current write permission. [Smoke
+      tests](tests/test_home_assistant_smoke.py) cover availability in a real Home Assistant.'
   integration-owner:
     status: done
     comment: The public project maintainer is listed in the [manifest](custom_components/mennekes_amtron_rtu/manifest.json);
@@ -128,7 +129,7 @@ rules:
       recurring failure behavior.'
   parallel-updates:
     status: done
-    comment: 'All seven [entity platforms](docs/entities.md) declare PARALLEL_UPDATES: reads use coordinator
+    comment: 'All eight [entity platforms](docs/entities.md) declare PARALLEL_UPDATES: reads use coordinator
       updates, controls serialize operations. The [bus client](custom_components/mennekes_amtron_rtu/device/client.py)
       also locks each transaction.'
   reauthentication-flow:
@@ -198,18 +199,19 @@ rules:
       entry.
   entity-category:
     status: done
-    comment: '[Sensor descriptions](custom_components/mennekes_amtron_rtu/sensor_descriptions.py) mark
-      diagnostics and [control platforms](docs/entities.md) identify configuration controls; [entity tests](tests/test_entity.py)
+    comment: '[The sensor table](custom_components/mennekes_amtron_rtu/sensor.py) marks diagnostics
+      and the [control platforms](docs/entities.md) identify configuration controls; [entity tests](tests/test_entity.py)
       cover metadata.'
   entity-device-class:
     status: done
-    comment: '[Sensor descriptions](custom_components/mennekes_amtron_rtu/sensor_descriptions.py) and
+    comment: '[The sensor table](custom_components/mennekes_amtron_rtu/sensor.py) and
       [binary sensors](custom_components/mennekes_amtron_rtu/binary_sensor.py) assign matching HA device
       classes; [sensor tests](tests/test_sensor.py) cover units and statistics.'
   entity-disabled-by-default:
     status: done
-    comment: Low-value diagnostic sensors such as layout version are disabled by default in [sensor descriptions](custom_components/mennekes_amtron_rtu/sensor_descriptions.py),
-      reducing unnecessary entities and history.
+    comment: Low-value diagnostic sensors such as the wallbox settings and the running cost estimate are disabled
+      by default in [the sensor table](custom_components/mennekes_amtron_rtu/sensor.py), reducing unnecessary
+      entities and history.
   entity-translations:
     status: done
     comment: Entity names and enum options are declared in [strings](custom_components/mennekes_amtron_rtu/strings.json)
@@ -217,8 +219,8 @@ rules:
       structures and placeholders.
   exception-translations:
     status: done
-    comment: '[Control exceptions](custom_components/mennekes_amtron_rtu/control.py) use domain translation
-      keys; [register/translation validation](scripts/check_register_map.py) checks descriptions against
+    comment: '[Command exceptions](custom_components/mennekes_amtron_rtu/service_control.py#ha_command) and
+      [the error helpers](custom_components/mennekes_amtron_rtu/exceptions.py) use domain translation keys; [register/translation validation](scripts/check_register_map.py) checks descriptions against
       exposed actions and values.'
   icon-translations:
     status: done
@@ -241,14 +243,15 @@ rules:
   async-dependency:
     status: done
     comment: The [Modbus client](custom_components/mennekes_amtron_rtu/device/client.py) uses async serial/TCP
-      clients; the [remote client](custom_components/mennekes_amtron_rtu/remote.py) uses async aiohttp.
+      clients; the [service client](custom_components/mennekes_amtron_rtu/service_client.py) uses async aiohttp
+      through the [HTTP transport](custom_components/mennekes_amtron_rtu/service_transport.py#HttpTransport).
       Blocking filesystem work is delegated to executor threads.
   inject-websession:
     status: done
     comment: Both [setup](custom_components/mennekes_amtron_rtu/__init__.py#async_setup_entry) and the
       [config flow](custom_components/mennekes_amtron_rtu/config_flow.py) inject Home Assistant shared
-      sessions into [ServiceClient](custom_components/mennekes_amtron_rtu/remote.py#ServiceClient). Raw
-      Modbus transports use no HTTP session.
+      sessions into [ServiceClient](custom_components/mennekes_amtron_rtu/service_client.py#ServiceClient). Raw
+      Modbus transports and the embedded service of a direct entry use no HTTP session.
   strict-typing:
     status: done
     comment: '[Strict typing](scripts/check_typing.py) checks every integration module and validation

@@ -111,6 +111,21 @@ class FakeServices:
         self.registered[(domain, service)] = (handler, schema)
 
 
+class FakeBus:
+    """Record one-time listeners and fire them on request."""
+
+    def __init__(self) -> None:
+        self.once: dict[str, list[Callable[[Any], Any]]] = {}
+
+    def async_listen_once(self, event_type: str, listener: Callable[[Any], Any]) -> Callable[[], None]:
+        self.once.setdefault(event_type, []).append(listener)
+        return lambda: self.once[event_type].remove(listener)
+
+    async def fire(self, event_type: str) -> None:
+        for listener in self.once.pop(event_type, []):
+            await listener(SimpleNamespace(event_type=event_type, data={}))
+
+
 class FakeHass:
     """Everything the integration touches on ``hass``."""
 
@@ -119,9 +134,11 @@ class FakeHass:
         self.config = SimpleNamespace(
             config_dir=self.config_dir,
             components=set(),
+            language="en",
             path=lambda *parts: str(Path(self.config_dir, *parts)),
         )
         self.data: dict[str, Any] = {}
+        self.bus = FakeBus()
         self.is_stopping = False
         self.config_entries = FakeConfigEntries()
         self.services = FakeServices()

@@ -119,7 +119,7 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
                         blocking=True,
                     )
                     await remote.update()
-                    assert remote.write_state.pause_requested is True
+                    assert remote.snapshot["control"]["pause_requested"] is True
                     before = remote.snapshot["diagnostics"]["heartbeats_sent"]
                     commands = remote.snapshot["diagnostics"]["writes_sent"]
                 finally:

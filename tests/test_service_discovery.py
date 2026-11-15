@@ -22,6 +22,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_transport import HttpTransport
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
@@ -47,6 +48,16 @@ def test_invalid_baudrates_remain_rejected(baudrate):
         ServerConfig.from_dict(
             {"serial_port": "/dev/fake", "token": TOKEN, "baudrate": baudrate}
         )
+
+
+def loopback_transport(server):
+    """Reach the test server whatever address the entry stores."""
+
+    class LoopbackTransport(HttpTransport):
+        def __init__(self, session, _url, token):
+            super().__init__(session, str(server.make_url("/")).rstrip("/"), token)
+
+    return LoopbackTransport
 
 
 def discovery_info(**changes):
@@ -228,7 +239,7 @@ def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
                         super().__init__(session, str(server.make_url("/")), token)
 
                 monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "HttpTransport", loopback_transport(server))
                 entry = None
                 if existing not in ("new", "new_from_menu"):
                     flow = await hass.config_entries.flow.async_init(
@@ -367,7 +378,7 @@ def test_discovery_handles_incomplete_setup_and_identity_safely(
                         super().__init__(session, str(server.make_url("/")), token)
 
                 monkeypatch.setattr(config_flow, "ServiceClient", LoopbackRemote)
-                monkeypatch.setattr(integration, "ServiceClient", LoopbackRemote)
+                monkeypatch.setattr(integration, "HttpTransport", loopback_transport(server))
                 serial = service.identity.serial_number
                 if scenario in ("ignored", "ignored_unready"):
                     await hass.config_entries.flow.async_init(
