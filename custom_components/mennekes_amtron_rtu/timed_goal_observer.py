@@ -55,6 +55,8 @@ from .vehicle_sources import resolve_departure_source
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
 
+from .device.notice import FailureNotice
+
 _LOGGER = logging.getLogger(__name__)
 # A service on another host may finish a trip slightly before this clock does.
 _CLOCK_TOLERANCE = timedelta(minutes=5)
@@ -113,7 +115,7 @@ class TimedGoalObserver:
         self._task: asyncio.Task[None] | None = None
         self._pending = False
         self._stopping = False
-        self._last_error: str | None = None
+        self._handover_notice = FailureNotice(_LOGGER, "Departure plan")
         self._goal_lock = asyncio.Lock()
         self._save_dirty = False
         self._save_unknown = False
@@ -203,12 +205,10 @@ class TimedGoalObserver:
             self._pending = False
             try:
                 await self._evaluate()
+                self._handover_notice.recovered("handed to the service")
             except (AmtronBusError, HomeAssistantError) as err:
                 self._set_status("write_pending")
-                message = str(err)
-                if message != self._last_error:
-                    _LOGGER.warning("Departure plan: not handed to the service yet (%s)", message)
-                    self._last_error = message
+                self._handover_notice.failed("not handed to the service yet", str(err))
             except Exception:
                 _LOGGER.exception("Departure plan: evaluation failed")
                 self._set_status("error")

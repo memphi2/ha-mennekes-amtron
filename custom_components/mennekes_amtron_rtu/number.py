@@ -82,7 +82,7 @@ NUMBERS: tuple[AmtronNumberDescription, ...] = (
     ),
     # Limits additional energy; it never starts or resumes a charge.
     AmtronNumberDescription(
-        key="energy_goal", register=ENERGY_TOTAL.key, writes=True,
+        key="energy_goal", capability=ENERGY_TOTAL.key, register="evse_state", writes=True,
         device_class=NumberDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         native_min_value=0.0, native_max_value=MAX_ENERGY_GOAL_KWH,

@@ -45,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   status sensor instead of the Downgrade active binary sensor.
 - Downloaded diagnostics contain the service state, its counters and the raw
   registers.
-- The app must be 0.10.0b1. Update the app first; an older app is refused.
+- The integration and the app must both be 0.10.0b1. Update them together;
+  either one refuses or misreads the other's older version.
 - The wallbox's solar charging mode is shown and no longer changed.
 
 ### Changes

@@ -17,6 +17,10 @@ Reply = tuple[int, dict[str, Any]]
 _UNAVAILABLE: Reply = (503, {"error": "service_unavailable"})
 
 
+class _NotFoundError(Exception):
+    """The service has no such operation."""
+
+
 class ServiceBusyError(Exception):
     """Too many callers already wait for the bus."""
 
@@ -39,7 +43,7 @@ class ServiceApi:
         """
         try:
             return 200, await self._route(method, path, payload)
-        except LookupError:
+        except _NotFoundError:
             return 404, {"error": "not_found"}
         except DeviceError as err:
             return 409, {
@@ -63,9 +67,9 @@ class ServiceApi:
                     "write_transactions": service.client.write_trace.snapshot(),
                     "runtime_events": service.diagnostics.timeline.snapshot(),
                 }
-            raise LookupError(path)
+            raise _NotFoundError(path)
         if method != "POST" or path not in _POSTS:
-            raise LookupError(path)
+            raise _NotFoundError(path)
         if not isinstance(payload, dict):
             raise ValueError("expected an object")
         if path == "/v2/soc-goal/reserve":

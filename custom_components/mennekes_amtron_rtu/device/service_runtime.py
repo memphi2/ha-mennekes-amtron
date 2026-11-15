@@ -119,6 +119,7 @@ class ModbusService:
         # Since when every poll failed; a goal pauses only after a while.
         self._meter_failing_since: float | None = None
         self._intent_notice = FailureNotice(_LOGGER, "Control")
+        self._cap_notice = FailureNotice(_LOGGER, "Control")
         self._intent_rejected = False
         self._stopping = False
         # Set by the first attempt to reach the wallbox, whatever its outcome.
@@ -446,12 +447,13 @@ class ModbusService:
                 lowered = await control.async_enforce_current_cap()
         except (DeviceError, AmtronBusError) as err:
             self._cap_retry_at = time.monotonic() + 30
-            _LOGGER.warning(
-                "Control: charging current above the %.1f A cap not lowered (%s); retrying in 30 seconds",
-                control.max_charging_current,
+            self._cap_notice.failed(
+                f"charging current above the {control.max_charging_current:.1f} A cap not lowered;"
+                " retrying every 30 seconds",
                 err.translation_key if isinstance(err, DeviceError) else type(err).__name__,
             )
             return
+        self._cap_notice.recovered("charging current cap enforced again")
         if lowered:
             _LOGGER.info("Control: charging current lowered to the %.1f A cap", control.max_charging_current)
 

@@ -91,6 +91,7 @@ from .device.waveshare_gateway import (
     GatewaySnapshot,
     inspect_gateway,
 )
+from .embedded import async_release
 from .entry_connection import connection_config
 from .entry_types import MennekesAmtronConfigEntry
 from .options_flow import MennekesAmtronOptionsFlow
@@ -701,10 +702,15 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         interrupted unload, so wait for it and restore only the entry we
         unloaded before propagating cancellation.
         """
-        task = asyncio.create_task(
-            self.hass.config_entries.async_unload(entry.entry_id, _lock=False),
-            name="mennekes_amtron_rtu_probe_unload",
-        )
+        async def unload() -> bool:
+            unloaded = await self.hass.config_entries.async_unload(entry.entry_id, _lock=False)
+            if unloaded:
+                # The probe opens its own connection, so the bus must be free
+                # even while a reload of this entry would keep the service.
+                await async_release(self.hass, entry.entry_id, force=True)
+            return unloaded
+
+        task = asyncio.create_task(unload(), name="mennekes_amtron_rtu_probe_unload")
         try:
             return await asyncio.shield(task)
         except asyncio.CancelledError:

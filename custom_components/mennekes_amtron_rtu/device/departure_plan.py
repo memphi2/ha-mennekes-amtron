@@ -39,6 +39,7 @@ from .departure_step import (
 )
 from .departure_store import DepartureStore
 from .errors import DeviceError
+from .notice import FailureNotice
 from .persistence import finish_goal_save
 from .power_window import PowerWindow
 from .session_mark import SessionMark
@@ -332,7 +333,7 @@ class DepartureController:
         self._trail: list[tuple[float, float]] = []
         self._trail_scope: str | None = None
         self._estimate: float | None = None
-        self._last_error: str | None = None
+        self._command_notice = FailureNotice(_LOGGER, "Departure plan")
         # The time of the latest tick's sample.
         self._now: datetime | None = None
         # What this wallbox's cars taught the plan; kept across trips.
@@ -586,11 +587,9 @@ class DepartureController:
             except (AmtronBusError, DeviceError) as err:
                 self.status = "write_pending"
                 reason = getattr(err, "translation_key", None) or type(err).__name__
-                if reason != self._last_error:
-                    _LOGGER.warning("Departure plan: command deferred (%s)", reason)
-                    self._last_error = reason
+                self._command_notice.failed("command deferred", reason)
             else:
-                self._last_error = None
+                self._command_notice.recovered("command accepted again")
             self._learn_power(sample)
             await self._save()
 

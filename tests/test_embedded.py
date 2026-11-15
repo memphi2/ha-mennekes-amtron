@@ -307,3 +307,113 @@ def test_a_rejected_gateway_password_is_told_apart_from_a_lost_wallbox(monkeypat
             await embedded.async_release(hass, entry.entry_id, force=True)
 
     asyncio.run(run())
+
+
+def test_any_other_failure_while_applying_settings_still_stops_the_service(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        old = await embedded.async_acquire(hass, entry)
+
+        async def broken(_config):
+            raise ValueError("unexpected")
+
+        monkeypatch.setattr(old._service, "apply_runtime_settings", broken)
+        with pytest.raises(ValueError, match="unexpected"):
+            await embedded.async_acquire(hass, entry)
+        # Nothing keeps the port and the heartbeat behind the failed setup.
+        assert _hosts(hass) == {}
+        assert not old._service.heartbeat.running
+
+    asyncio.run(run())
+
+
+def test_settings_that_wait_too_long_are_applied_by_a_restart(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        old = await embedded.async_acquire(hass, entry)
+        monkeypatch.setattr(embedded, "_APPLY_SECONDS", 0.01)
+
+        async def hang(_config):
+            await asyncio.sleep(3600)
+
+        monkeypatch.setattr(old._service, "apply_runtime_settings", hang)
+        new = await embedded.async_acquire(hass, entry)
+        try:
+            assert new is not old
+            assert not old._service.heartbeat.running
+        finally:
+            await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_service_that_ends_on_its_own_is_stopped_and_the_entry_reloaded(
+    monkeypatch, tmp_path, caplog,
+):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        reloads = []
+        hass.config_entries.async_schedule_reload = reloads.append
+        host = await embedded.async_acquire(hass, entry)
+        task = host._service._task
+
+        async def fail():
+            raise RuntimeError("Heartbeat task stopped unexpectedly")
+
+        # The service ends itself rather than run without its heartbeat.
+        broken = asyncio.get_running_loop().create_task(fail())
+        await asyncio.gather(broken, return_exceptions=True)
+        host._ended(broken)
+        for _ in range(20):
+            await asyncio.sleep(0)
+            if reloads:
+                break
+        assert reloads == [entry.entry_id]
+        assert _hosts(hass) == {}
+        assert not host._service.heartbeat.running
+        assert task.done()
+        assert "Service: stopped unexpectedly (RuntimeError); starting it again" in caplog.text
+        # A stop the owner asked for is not an unexpected end.
+        host._ended(broken)
+        await asyncio.sleep(0)
+        assert reloads == [entry.entry_id]
+
+    asyncio.run(run())
+
+
+def test_a_replaced_service_ending_late_does_not_reload_the_entry(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        reloads = []
+        hass.config_entries.async_schedule_reload = reloads.append
+        host = await embedded.async_acquire(hass, entry)
+        ended = host.on_ended
+        await embedded.async_release(hass, entry.entry_id, force=True)
+        ended()
+        await asyncio.sleep(0)
+        assert reloads == []
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("options", "expected"), [(MASTER, 6.0), ({**MASTER, CONF_CURRENT_LIMIT: 10}, 10.0)])
+def test_without_a_limit_from_the_user_or_the_wallbox_only_the_minimum_is_allowed(
+    monkeypatch, tmp_path, options, expected,
+):
+    async def run():
+        # A wallbox that does not report its maximum current.
+        hass, entry, _wallbox = _setup(
+            monkeypatch, tmp_path, options=options, bank=device_bank(max_current=0),
+        )
+        host = await embedded.async_acquire(hass, entry)
+        try:
+            assert host._service.identity.max_evse_current is None
+            assert host._service.control.max_charging_current == expected
+            # A later settings change keeps the same bound.
+            entry.options = {**options, CONF_SCAN_INTERVAL_SECONDS: 30}
+            assert await embedded.async_acquire(hass, entry) is host
+            assert host._service.control.max_charging_current == expected
+        finally:
+            await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())

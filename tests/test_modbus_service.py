@@ -184,7 +184,6 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
         ("set_current", 32, R.CHARGING_CURRENT_EMS, 16),
         ("release", False, R.CHARGING_RELEASE, 0),
         ("lock", True, R.LOCK_EVSE, 1),
-        ("solar", 2, R.SOLAR_CHARGING_MODE, 2),
         ("phases", 1, R.REQUESTED_PHASES, 1),
         ("restart", None, R.SYSTEM_RESTART, 0xBB),
     ],

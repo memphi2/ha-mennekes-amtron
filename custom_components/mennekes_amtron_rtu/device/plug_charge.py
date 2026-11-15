@@ -31,6 +31,9 @@ if TYPE_CHECKING:
     from .client import LockedRegisterReader
     from .control import AmtronControl
 
+
+from .notice import FailureNotice
+
 _LOGGER = logging.getLogger(__name__)
 _POLICY = re.compile(r"(?:[0-9a-f]{64})?")
 # An unknown vehicle state is not an unplug. Brief read gaps and transient
@@ -153,7 +156,7 @@ class PlugChargeController:
         self._control = control
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
-        self._failed = False
+        self._gate_notice = FailureNotice(_LOGGER, "Plug & Charge")
         self._authorizing: tuple[str, datetime] | None = None
 
     @property
@@ -196,11 +199,9 @@ class PlugChargeController:
         try:
             await self.async_sync()
         except (DeviceError, AmtronBusError, OSError) as err:
-            if not self._failed:
-                _LOGGER.warning("Plug & Charge: release gate cannot be enforced (%s)", type(err).__name__)
-                self._failed = True
+            self._gate_notice.failed("release gate cannot be enforced", type(err).__name__)
         else:
-            self._failed = False
+            self._gate_notice.recovered("release gate enforced again")
 
     async def async_sync(self) -> None:
         async with self._control.energy_goal_guard:

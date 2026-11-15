@@ -830,7 +830,7 @@ def test_write_failures_defer_and_log_once(tmp_path, caplog):
     async def go():
         box = Box(tmp_path)
         box.fail = DeviceError("service_unavailable")
-        with caplog.at_level(logging.WARNING, logger=dp.__name__):
+        with caplog.at_level(logging.INFO, logger=dp.__name__):
             plan = await box.start()
             assert plan.status == "write_pending"
             box.clock[0] += 300
@@ -838,13 +838,15 @@ def test_write_failures_defer_and_log_once(tmp_path, caplog):
             box.fail = AmtronBusError("lost")
             box.clock[0] += 300
             await plan.tick()
-        assert caplog.text.count("(service_unavailable)") == 1
-        assert caplog.text.count("(AmtronBusError)") == 1
-        box.fail = None
-        box.clock[0] += 300
-        await plan.tick()
+            # One episode warns once, whatever keeps it going.
+            assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
+                "Departure plan: command deferred (service_unavailable)"
+            ]
+            box.fail = None
+            box.clock[0] += 300
+            await plan.tick()
+        assert caplog.text.count("Departure plan: command accepted again") == 1
         assert plan.status == "charging"
-        assert plan._last_error is None
     run(go())
 
 

@@ -181,6 +181,8 @@ async def async_setup_entry(
                 server_url(str(entry.data[CONF_SERVER_URL])),
                 str(entry.data[CONF_SERVER_TOKEN]),
             )
+            # An entry that was direct until now must give up the bus first.
+            await async_release(hass, entry.entry_id, force=True)
         else:
             host = await async_acquire(hass, entry, expected_serial)
             transport = host.transport
