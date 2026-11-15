@@ -5,6 +5,8 @@
 - Report the trigger, timestamp and requested value of command results. Keep
   the trigger when a command waits, and show it in the app overview.
 - Include automatic Plug & Charge release and denial in command activity.
+- Explain brief status checks, missing readings and persistent ambiguity in
+  the overview, with confirmed wallbox faults shown immediately.
 
 ## 0.9.0
 

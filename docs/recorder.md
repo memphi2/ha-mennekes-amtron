@@ -5,6 +5,8 @@
 For a smaller history, keep the default measurement interval and use the
 **Energy and power statistics only** profile below. All readings remain available
 live, and total energy remains available for the Energy dashboard.
+Frequent current-control automations also create activity; see
+[limit command history](#limit-command-history) for the separate exclusion.
 
 The integration does not set a database size limit. Keep automatic purging
 enabled and monitor free disk space; hourly long-term statistics continue growing
@@ -22,17 +24,22 @@ settings on **Wallbox settings**. Attributes are stored with the state they
 belong to and never compile long-term statistics of their own. Statistics
 series existing from earlier versions are retained.
 
-The **Control result** event entity starts disabled because frequent PV current
-commands can create many outcomes. Enable it only if you need those events for
-automations. Its feed is bounded in memory, but recording an enabled entity adds
-one state change per observed outcome: a command every five seconds could add
-17,280 rows per day. Exclude its actual entity ID from `recorder.exclude.entities`
-if you only need live notifications. Exclusion does not stop automation triggers.
-Heartbeats and polls create no command events.
+The **Wallbox event** entity is enabled by default. Its state changes on reported
+wallbox changes, such as a plug-in, charge start or fault. It also adds readable
+command results to HA Activity. Consecutive identical successful current settings
+from the same source are shown once; changed requests, errors and intervening
+actions or observations remain visible. Unsent slider values replaced by newer
+ones are omitted from the readable activity.
 
-The **Wallbox event** entity is enabled by default. It records one state
-change per reported wallbox change, such as a plug-in, a charge start or a
-fault: a handful of rows per charging session, none while nothing happens.
+This still allows frequent commands with changing setpoints to grow history:
+one distinct completed current command every five seconds could add **17,280
+activity events per day**, even with **Control result** disabled. The app's
+32-result memory limit does not limit HA's database.
+
+The optional **Control result** event entity starts disabled. Enable it only for
+automations needing structured outcomes. It adds one state change per observed
+command outcome, including repeated identical requests, alongside the readable
+activity. Heartbeats and polls create no command events.
 
 The new charging/quality/goal status entities use stable enum states and have
 no long-term statistics. The energy target changes only when you set it. Its
@@ -76,6 +83,35 @@ counter.
 Exclusion stops new history and statistics for the selected sensors. They stay
 available live; their existing history and statistics are not deleted. Disabling
 an entity instead also removes its live state.
+
+## Limit command history
+
+The sensor profiles above do not exclude activity events. If you do not need
+the wallbox's persisted command or physical-event timeline:
+
+1. Find the actual **Wallbox event** entity ID under **Settings → Devices &
+   services → Entities**. Add it to your existing `recorder.exclude.entities`.
+2. If **Control result** is enabled, add its actual entity ID too unless you want
+   to retain its separate diagnostic history.
+3. Check the configuration and restart HA to apply it.
+
+For example, after replacing these IDs with your own and merging with existing
+Recorder settings:
+
+```yaml
+recorder:
+  exclude:
+    entities:
+      - event.mennekes_amtron_wallbox_event
+      - event.mennekes_amtron_control_result
+```
+
+Excluding **Wallbox event** stops recording both its physical state changes and
+its readable command messages. Excluding **Control result** stops its separate
+outcome history. The entities remain usable for live automation triggers; the
+app's recent command results also remain available. Existing database entries
+are retained until normal purging. Do not exclude the whole `event` domain unless
+you intend to remove history for other integrations as well.
 
 ## Configure history retention and detail exclusions
 

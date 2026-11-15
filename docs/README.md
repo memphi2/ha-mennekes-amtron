@@ -10,6 +10,7 @@ when you need it. You do not need a vehicle account or a dashboard card to begin
 | Connect a wallbox for the first time | **[Installation](installation.md)** — choose the app or a direct connection, then connect USB or LAN |
 | Check that charging works | **[First charge](quickstart.md)** — current, pause, resume and heartbeat |
 | Use the wallbox every day | **[Charging](user-guide.md)** — normal charging, limits and guest start |
+| Understand what changed the charge | **[Activity timeline](troubleshooting.md#understand-the-activity-timeline)** — command, trigger, time and observed result |
 | Put the controls on a dashboard | **[Dashboard YAML](app-from-home-assistant.md#dashboard-with-mushroom-cards)** — basic and Mushroom examples in five languages |
 | Something is not working | **[Troubleshooting](troubleshooting.md)** — start with the symptom |
 

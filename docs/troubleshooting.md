@@ -14,6 +14,7 @@ Find the symptom first; collect diagnostics before restarting if the problem is 
 | A control or feature is missing | [Missing entities](#entities-are-missing) |
 | The app is not discovered, not ready, or rejects access | [App connection](#app-connection-and-discovery) |
 | Charging status is unclear | [Status messages](#charging-status-is-being-checked) |
+| Why did the current change or charging stop? | [Activity timeline](#understand-the-activity-timeline) |
 | Charging does not start or current does not change | [Current and pending changes](#the-charging-current-does-not-follow) |
 | Heartbeat warning or error 200 | [Heartbeat](#heartbeat-or-service-connection-repair) |
 | The wrong car is selected | [Vehicle recognition](#vehicle-profiles-and-automatic-selection) |
@@ -288,11 +289,14 @@ distinguish delayed processing, USB/RS-485 trouble or a slow wallbox. See
 
 ## Some sensors became unavailable
 
-A failed group of register reads makes the affected entities unavailable until
-a successful retry. Other readings can keep working. If everything disappears,
-check the connection or app first. If only one group repeatedly fails, include
-the diagnostics field `failed_blocks` when reporting it; the range may reveal a
-firmware-specific limitation.
+A single failed read can briefly retain some previous values, for up to
+30 seconds after their last successful read. Required fresh values are still
+missing for the [charging-status display](#charging-status-is-being-checked).
+Energy counters are not held across a failed read. Repeated or longer failures
+make affected readings unavailable until a successful retry; other readings
+can keep working. If everything disappears, check the connection or app first.
+If only one group repeatedly fails, include the diagnostics field `failed_blocks`
+when reporting it; the range may reveal a firmware-specific limitation.
 
 ## The charging current does not follow
 
@@ -572,13 +576,23 @@ look for the subsequent **Charging started** observation.
 Command messages name the trigger (Plug & Charge, departure plan, target
 protection, app or Home Assistant), outcome and requested current where relevant.
 Home Assistant means a control or automation; it does not identify a person.
-Unknown sources are labelled explicitly. The app overview shows the same command
-results with the original event time. Reconnects establish a fresh cursor and do
-not replay commands that happened while HA was disconnected.
+Unknown sources are labelled explicitly. The original command-event time is
+shown in the app and included in HA's readable message. The HA Activity row and
+native event timestamp mark receipt in HA, which can be later. The optional
+**Control result** also exposes the original time as `occurred_at`.
+Reconnects establish a fresh cursor and do not replay commands that happened
+while HA was disconnected.
 
 Unsent current-slider values superseded by another request are omitted from
 the readable timeline and app overview; the diagnostic feed retains them.
+HA's readable timeline also folds consecutive identical successful current
+settings from the same source. A different value, source, intervening command,
+error or observed wallbox change makes the next result visible again. This does
+not remove results from the app's bounded feed or optional **Control result**.
 Only discrete outcomes and state transitions create activity. Polls, heartbeats
 and countdowns do not. The app keeps at most 32 command results in memory; HA
-retention follows your Recorder configuration. Enabling the optional **Control result** entity adds a structured diagnostic
+retention follows your Recorder configuration. Frequent changing current commands
+can still create substantial history even with **Control result** disabled.
+[Limit command history](recorder.md#limit-command-history) explains the separate
+event exclusions. Enabling **Control result** adds a structured diagnostic
 record of each command alongside the readable activity message.

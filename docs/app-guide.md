@@ -9,6 +9,7 @@ by the service app; a direct integration connection has no app web interface.
 | You want to… | Page |
 |---|---|
 | See whether the car is charging and why it waits | **Overview** |
+| Check what changed the current or stopped charging | **Overview → Recent command results** |
 | Change kWh/time/percentage limits or start a guest | **Charging** |
 | Set up USB or LAN | **Settings → Connection** |
 | Change the current cap, polling or waiting interval | **Settings → Runtime** |
@@ -18,11 +19,6 @@ Configure vehicle profiles, recognition, percentage sources and intelligent
 departure planning in **Home Assistant**. Once handed over, the app can execute
 a vehicle plan while HA is offline. The web interface needs no separate saved
 charging order.
-
-![Charging page with shared limits and the guest-start button](images/charging-de.png)
-
-*German interface with simulated example values. The app also supports English,
-French, Italian and Dutch.*
 
 ## Overview
 
@@ -46,9 +42,30 @@ visible and shows:
 If the app cannot be reached, the page hides old values instead of showing them
 as current. The overview never changes charging.
 
-The command history is collapsed by default. Open it when a command did not
-have the expected result. The overview also gives a suggested action for common
-waiting states; it does not override a pause or authorize a vehicle.
+**Recent command results** is collapsed by default. Open it to see when a command
+finished, what it requested, which function triggered it and its outcome. A failed
+or replaced command includes the reason. For example, a Plug & Charge release is
+distinct from a current change sent through Home Assistant. A Home Assistant
+source can be a control or an automation; it does not identify a person.
+The requested amperes are a setting, not the current actually drawn by the car.
+Check the observed charging state and power above for the physical result.
+
+The time beside each result is the original command-event time. For a longer
+timeline together with plug-in, charging and fault changes, use **Home Assistant
+Activity → Wallbox event**. Its readable messages include that original time;
+the HA timeline itself is dated when HA received the event.
+[Activity details and repeated commands](troubleshooting.md#understand-the-activity-timeline).
+
+The overview also gives a suggested action for common waiting states. Briefly
+differing readings show **Checking status**; missing or persistently conflicting
+readings are explained separately. [Status messages](troubleshooting.md#charging-status-is-being-checked)
+describe when to investigate. These displays do not override a pause or authorize
+a vehicle.
+
+![Overview with charging readings and expanded command results](images/overview-activity-de.png)
+
+*German interface with simulated example values. The app also supports English,
+French, Italian and Dutch.*
 
 ## Charge target
 
@@ -56,6 +73,10 @@ Open **Charging**. Set an optional kWh limit, time or vehicle percentage target 
 the left and save each change. The right side shows the saved choices and the
 **Start guest charging** button. Unsaved edits must be saved or reloaded first.
 The same saved values appear in Home Assistant. Setting a limit does not start charging.
+
+![Charging page with shared limits and the guest-start button](images/charging-de.png)
+
+*German interface with simulated example values.*
 
 ## Plan departure
 

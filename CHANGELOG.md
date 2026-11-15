@@ -12,15 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Distinguish brief status reconciliation, persistent conflicting readings and
   missing data in HA and the app. Dashboard examples explain initial readings
   and connection loss, without new activity events or polling.
-
 - Command activity identifies its trigger, request and outcome in Home Assistant
   and the app, including a timestamp retained through the remote connection.
   Home Assistant adds translated command messages alongside observed
   wallbox changes. Update the app first; this integration requires app 0.9.1.
-
+- Fold consecutive identical successful current settings in HA's readable
+  activity. Keep changed requests and failures visible, and explain separate
+  command-history exclusions in the Recorder guide.
 - Virtual Plug & Charge no longer writes an old resume current when a stale
-  pause intent remains but the wallbox already confirms a running current.
-  If the pause readback is unknown, it waits for a reliable reading.
+  pause intent remains but fresh wallbox readings confirm a running current.
+  If the pause readback is missing or held from an earlier poll, it waits for
+  a reliable reading.
 
 ## 0.9.0
 
