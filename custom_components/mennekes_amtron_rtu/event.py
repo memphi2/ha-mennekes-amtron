@@ -15,8 +15,8 @@ from homeassistant.util import dt as dt_util
 from .coordinator import MennekesAmtronCoordinator
 from .data import WallboxData
 from .device.command_events import EVENT_TYPES, CommandEvent, event_type
-from .device.const import DOMAIN
-from .device.registers import CP_STATE
+from .device.const import CHARGING_CURRENT_DECIMALS, DOMAIN
+from .device.registers import CHARGING_CURRENT_EMS, CP_STATE
 from .device.wallbox_events import EVENT_TYPES as WALLBOX_EVENT_TYPES
 from .device.wallbox_events import WallboxChanges
 from .entity import entry_device_info, entry_entity_unique_id
@@ -47,6 +47,8 @@ class AmtronWallboxEvent(CoordinatorEntity[MennekesAmtronCoordinator], EventEnti
         self._attr_device_info = entry_device_info(entry)
         self._feed = entry.runtime_data.control.events
         self._activity_translations: dict[str, str] = {}
+        self._last_current_activity: tuple[str, float, str] | None = None
+        self._last_observed_current: float | None = None
         self._changes = WallboxChanges(
             cp_supported=entry.runtime_data.identity.layout_version >= CP_STATE.min_layout,
         )
@@ -55,7 +57,9 @@ class AmtronWallboxEvent(CoordinatorEntity[MennekesAmtronCoordinator], EventEnti
         await super().async_added_to_hass()
         # The reading present when the entity appears is the baseline, so a
         # reload reports nothing that happened before it.
-        self._changes.observe(self._reading())
+        reading = self._reading()
+        self._changes.observe(reading)
+        self._last_observed_current = self._current_readback(reading)
         self._activity_translations = await async_get_translations(
             self.hass, self.hass.config.language, "entity", {DOMAIN},
         )
@@ -66,7 +70,16 @@ class AmtronWallboxEvent(CoordinatorEntity[MennekesAmtronCoordinator], EventEnti
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        events = self._changes.observe(self._reading())
+        reading = self._reading()
+        events = self._changes.observe(reading)
+        current = self._current_readback(reading)
+        if events or current is None or (
+            self._last_current_activity is not None
+            and current != self._last_observed_current
+            and current != round(self._last_current_activity[1], CHARGING_CURRENT_DECIMALS)
+        ):
+            self._last_current_activity = None
+        self._last_observed_current = current
         for event in events:
             self._trigger_event(event.type, dict(event.attributes))
             self.async_write_ha_state()
@@ -77,7 +90,30 @@ class AmtronWallboxEvent(CoordinatorEntity[MennekesAmtronCoordinator], EventEnti
         key = f"component.{DOMAIN}.entity.event.control_result.state_attributes.{attribute}.state.{value}"
         return self._activity_translations.get(key, value)
 
+    @staticmethod
+    def _current_readback(reading: WallboxData | None) -> float | None:
+        value = (
+            reading.fresh(CHARGING_CURRENT_EMS.key)
+            if reading is not None and "current_limits" not in reading.failed_blocks else None
+        )
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 32:
+            return round(value, CHARGING_CURRENT_DECIMALS)
+        return None
+
     def _log_activity(self, event: CommandEvent) -> None:
+        # Repeated successful setpoints from a periodic automation add no new
+        # information. Keep one key only; errors and intervening actions reset it.
+        requested = event.requested_value
+        key = (
+            (event.source, requested, event.reason)
+            if event.action == "set_current" and event.outcome == "executed"
+            and event.reason in ("completed", "vehicle_authorized")
+            and isinstance(requested, (int, float)) and not isinstance(requested, bool) and 0 <= requested <= 32
+            else None
+        )
+        previous, self._last_current_activity = self._last_current_activity, key
+        if key is not None and key == previous:
+            return
         # Dragging the current slider can supersede many unsent values.
         # The final outcome is useful activity; the raw feed retains details.
         if event.action == "set_current" and event.outcome == "replaced":
