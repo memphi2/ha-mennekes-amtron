@@ -125,7 +125,7 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
     def native_value(self) -> str | None:
         key = self.entity_description.key
         if key == "charging_status":
-            return charging_status(
+            return self.wallbox_data.charging_display or charging_status(
                 self.wallbox_data,
                 cp_supported=self.runtime_data.identity.layout_version >= CP_STATE.min_layout,
             )

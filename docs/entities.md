@@ -195,7 +195,7 @@ pending target. See
 | `sensor.*_next_charging_step` | Next charging step | — | enum | Modbus service app | What the app expects next; the `at` attribute holds its time. No countdown is recorded. |
 | `sensor.*_guest_charging` | Guest charging | — | enum | Modbus service app | `active` or `inactive`. Shared energy and time controls hold the limits; there is no separate guest progress record. See [Use the app from Home Assistant](app-from-home-assistant.md). |
 | `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability | Shows recognition, permission and release status, or Disabled. **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). **Released by hand** shows a manual release for the current or next connection. No session tokens or ticking timestamps are recorded. |
-| `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. The raw wallbox states behind it are the `evse_state` and `cp_state` attributes (see [Attribute values](#attribute-values)). |
+| `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state, a blocking setting or [missing/conflicting readings](troubleshooting.md#charging-status-is-being-checked). Brief ambiguity is neutral; persistent ambiguity is shown after at least two polls and ten seconds. The raw wallbox states behind it are the `evse_state` and `cp_state` attributes (see [Attribute values](#attribute-values)). |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | always | The queued action, or `none` when no action is reported, with the planned execution time as the `due` attribute. |
 | `sensor.*_authorization` | Authorization |  | enum | always | Whether RFID or the energy manager has released this session. The `enabled` attribute (layout v01.02) tells whether RFID authorization is switched on in the wallbox at all. |
@@ -230,22 +230,25 @@ These sit under *Diagnostic* on the device page.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
-| `event.*_control_result` | Control result | direct connection, or a service supporting command events | Last observed command and its outcome, with `event_type`, `action`, `result` and `reason` attributes. Disabled by default; enable for automations when needed. |
+| `event.*_control_result` | Control result | direct connection, or a service supporting command events | Last observed command and its outcome, with action, reason, source, original time and requested value. Disabled by default; enable for automations when needed. |
 
 The event type names the command and its result, for example `pause_executed`
 or `set_current_failed`, so HA's history and activity show which command it
 was. Error recovery reports `recovery_succeeded`, `recovery_failed` or
 `recovery_uncertain`. The `action` attribute holds the command and `result`
-the outcome alone; filter on `result` to react to every failed command.
+the outcome alone; filter on `result` to react to every failed command. `source`
+names the triggering function, not an authenticated person. `requested_value`
+is the requested setting where relevant, not measured current.
 
-The timestamp is when HA received the event. `executed` means the command was
-accepted by the controller, not that the vehicle has started charging. Use
+The native event timestamp is when HA received the result; `occurred_at` retains
+the original command-event time. `executed` means the controller completed the
+command, not that the vehicle has started charging. Use
 **Charging** and actual power to check that. A queued request creates its result
 when it runs, is replaced, or is cancelled; the pending sensors show the wait.
 
 | Result | Meaning |
 |---|---|
-| `executed` | The controller accepted the command. |
+| `executed` | The controller completed the command. |
 | `replaced` | A newer request replaced a pending action. |
 | `cancelled` | Pending work was cancelled by the user, an energy stop, or controller shutdown. |
 | `failed` | The command failed, including a phase-pause timeout. |
@@ -273,10 +276,13 @@ explains restart behavior, measurement failures and stopping accuracy.
 |---|---|---|---|
 | `event.*_wallbox_event` | Wallbox event | direct connection or service | A change the wallbox itself reported between two polls, with `event_type` and the attributes of that moment. Enabled by default. |
 
-**Control result** tells you what your commands did; **Wallbox event** tells
-you what the wallbox did on its own: a car plugged in, a charge that ended, a
-fault, an RFID decision. Use it for notifications and for automations that
-react to the car rather than to your own commands.
+The native **Wallbox event** state reports observed changes: a car plugged in,
+a charge that ended, a fault or an RFID decision. Use it for notifications and
+automations that react to the wallbox. Readable command messages are also linked
+to this entity in **HA Activity**, giving one combined timeline; they do not
+change its native event state. The optional **Control result** exposes those
+command outcomes separately for automations.
+[Timeline and timestamp details](troubleshooting.md#understand-the-activity-timeline).
 
 | Event type | When | Attributes |
 |---|---|---|

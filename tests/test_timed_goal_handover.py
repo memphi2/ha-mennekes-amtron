@@ -283,9 +283,9 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
                 await control.async_set_departure_inputs(given)
                 serial = client.identity.serial_number
                 assert sent == [
-                    {"command": "departure_trip", "deadline": deadline.isoformat(), "source": "manual",
+                    {"command": "departure_trip", "origin": "home_assistant", "deadline": deadline.isoformat(), "source": "manual",
                      "withdraw": True, "expected_serial_number": serial},
-                    {"command": "departure_inputs", "value": given.snapshot(), "expected_serial_number": serial},
+                    {"command": "departure_inputs", "origin": "home_assistant", "value": given.snapshot(), "expected_serial_number": serial},
                 ]
                 for broken in (
                     {"supports_departure_plan": 1}, {"departure": {}},

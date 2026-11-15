@@ -66,7 +66,7 @@ def test_unknown_or_old_measurements_are_not_live(condition):
         expected = "wallbox_unavailable"
     else:
         result = overview_snapshot(raw, held=frozenset(raw["values"]))
-        expected = "state_unknown"
+        expected = "missing_readings"
     assert result["reason"] == expected
     assert all(value is None for value in result["measurements"].values())
 

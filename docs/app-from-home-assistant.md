@@ -40,8 +40,10 @@ One status tile and two rows of chips, so it fits next to other tiles:
 
 1. **Tile:** `AMTRON · power`, then charging state and session energy, then
    the active limits, for example `Limits: 10 kWh · until 07:30 · 80 %`, and
-   the planning state when vehicle planning is configured. Green means
-   charging, amber paused, red a fault.
+   the planning state when vehicle planning is configured. Green means charging;
+   grey means initialization or status checking. Amber means paused, missing
+   readings or an ambiguous state; red means a wallbox fault or a lost connection.
+   Read the status text for the specific reason.
 2. **Control chips:** **P&C** (green once the car is authorized, amber while
    it waits), the selected vehicle, the current limit (**0 A** removes the
    limit; it does not pause), **Pause** (tap toggles) and **Release**.

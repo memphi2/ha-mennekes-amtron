@@ -19,6 +19,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
 from .device.client_errors import AmtronBusError
+from .device.command_events import attributed
 from .device.const import DOMAIN
 from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
@@ -286,6 +287,15 @@ class PlugChargeObserver:
             ("energy_goal_stop", bool(self._control.energy_goal_stop_requested)),
         )
         reasons = [reason for reason, failed in checks if failed]
+        if (
+            self._control.pause_requested is True
+            and self._plan_status() is None
+            and self._control.pending_action is None
+            and self._control.observed_pause is None
+        ):
+            # Do not open the gate while the actual pause register is unknown:
+            # a stale saved intent cannot tell us which current is active.
+            reasons.append("register_unavailable")
         for key, reason in (
             ("lock_evse", "wallbox_locked"), ("error_code", "error_code"),
             ("authorization_enabled", "authorization_required"),
@@ -415,13 +425,14 @@ class PlugChargeObserver:
         if candidate is not None and self._selection() == candidate:
             self._task = self._hass.async_create_task(self._authorize(candidate))
 
+    @attributed("plug_charge")
     async def _authorize(self, candidate: tuple[str, str]) -> None:
         try:
             if self._selection() == candidate:
                 if (
                     candidate[1] == self._fresh_session
                     and self._control.pause_requested is True and self._control.pending_action is None
-                    and self._plan_status() is None
+                    and self._plan_status() is None and self._control.observed_pause is True
                 ):
                     # The gate keeps the release off until the grant below, so
                     # this resume switches no charge and starts no long guard.

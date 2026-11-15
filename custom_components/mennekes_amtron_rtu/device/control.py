@@ -20,7 +20,7 @@ import math
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -33,7 +33,7 @@ from .client_errors import (
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
 )
-from .command_events import CONTROL_ACTIONS, CommandEvents
+from .command_events import CONTROL_ACTIONS, CommandEvents, command_source
 from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
@@ -112,6 +112,8 @@ class _PendingCommand:
     value: float
     energy_goal_stop: bool = False
     grant_release: bool = False
+    source: str = field(default_factory=command_source.get)
+    completion_reason: str = "completed"
     recovery_generation: int | None = None
     owner: str | None = None
     deadline: datetime | None = None
@@ -241,7 +243,12 @@ class AmtronControl:
         return (
             self.goal_controller.stop_requested if self.goal_controller is not None
             else self.energy_goal.stop_requested
-        ) or (
+        ) or self._soc_stop_requested
+
+    @property
+    def _soc_stop_requested(self) -> bool:
+        """The active SoC fence, including pending evidence and storage faults."""
+        return (
             self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
             else (not self.guest_active() and self.soc_goal.stop_requested)
         )
@@ -329,8 +336,14 @@ class AmtronControl:
                         return
                 else:
                     self._write_state.confirmed_current = None
+            reason = self._stop_reason()
+            source = (
+                "guest" if reason in ("time_limit", "guest_confirmation") else
+                "soc_goal" if self._soc_stop_requested else "energy_goal"
+            )
             await self._async_observe_command(_PendingCommand(
                 "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True,
+                source=source, completion_reason=reason,
             ))
 
     @property
@@ -393,7 +406,7 @@ class AmtronControl:
         elif target != CHARGING_CURRENT_UNLIMITED:
             target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
         await self._async_submit_locked(
-            _PendingCommand("resume", target, recovery_generation=generation), automatic=True,
+            _PendingCommand("resume", target, recovery_generation=generation, source="energy_goal"), automatic=True,
         )
 
     @property
@@ -409,9 +422,9 @@ class AmtronControl:
         ):
             return
         if error_code == 0:
-            self.events.record("recovery_succeeded", "recover")
+            self.events.record("recovery_succeeded", "recover", source="recovery")
         elif self._monotonic() >= self._recovery_deadline:
-            self.events.record("recovery_failed", "recover", "error_still_active")
+            self.events.record("recovery_failed", "recover", "error_still_active", source="recovery")
         else:
             return
         self._recovery_deadline = None
@@ -579,6 +592,20 @@ class AmtronControl:
             return None
         return CHARGING_CURRENT_UNLIMITED < float(value) < CHARGING_CURRENT_MINIMUM
 
+    @property
+    def observed_pause(self) -> bool | None:
+        """Fresh current evidence for automatic starts, never a held UI value."""
+        snapshot = self._state()
+        if (
+            snapshot.current_write_generation != self._write_state.current_write_generation
+            or "current_limits" in snapshot.failed_blocks
+        ):
+            return None
+        value = snapshot.fresh(CHARGING_CURRENT_EMS.key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            return None
+        return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
+
     async def async_set_charging_current(
         self,
         value: float,
@@ -637,7 +664,7 @@ class AmtronControl:
         command = _PendingCommand(
             "pause" if value is None else "set_current",
             CHARGING_PAUSE_CURRENT if value is None else min(value, self.max_charging_current),
-            owner=owner, deadline=deadline,
+            owner=owner, deadline=deadline, source="departure_plan",
         )
         async with self._current_lock:
             # A manual request can arrive while the caller waits for this lock.
@@ -646,7 +673,7 @@ class AmtronControl:
             if reason := self._command_cancellation_reason(command):
                 # Refused plans must not change remembered current or command
                 # intent, or cancel another goal's automatic recovery.
-                self.events.record("cancelled", command.action, reason)
+                self.events.record("cancelled", command.action, reason, source=command.source, requested_value=command.value)
                 await self._async_cancel_pending()
                 return
             await self._async_submit_locked(command)
@@ -692,7 +719,10 @@ class AmtronControl:
                 target = maximum
             elif target != CHARGING_CURRENT_UNLIMITED:
                 target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
-            await self._async_submit_locked(_PendingCommand("resume", target, grant_release=grant_release))
+            await self._async_submit_locked(_PendingCommand(
+                "resume", target, grant_release=grant_release,
+                source="guest" if grant_release else command_source.get(),
+            ))
 
     async def async_set_charging_release(self, released: bool) -> None:
         """Open or close the charging relay through 0x0D05."""
@@ -1255,7 +1285,7 @@ class AmtronControl:
                 self._validate_deferred()
             await self._async_apply_command(command)
         except _TimedCommandCancelledError as err:
-            self.events.record("cancelled", command.action, err.reason)
+            self.events.record("cancelled", command.action, err.reason, source=command.source, requested_value=command.value)
         except (_PhaseWaitError, AmtronRateLimitedError):
             raise
         except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError, asyncio.CancelledError) as err:
@@ -1269,14 +1299,14 @@ class AmtronControl:
                 "time_limit_reached": "time_limit",
             }.get(key, "write_rejected" if not self._uncertain(err) else "connection_error")
             if self._command_acknowledged:
-                self.events.record("executed", command.action, "status_refresh_failed")
+                self.events.record("executed", command.action, "status_refresh_failed", source=command.source, requested_value=command.value)
             else:
                 uncertain = self._guest_release_applied or (self._command_write_started and self._uncertain(err))
-                self.events.record("uncertain" if uncertain else "failed", command.action, reason)
+                self.events.record("uncertain" if uncertain else "failed", command.action, reason, source=command.source, requested_value=command.value)
             raise
         else:
             self._record_replaced(command)
-            self.events.record("executed", command.action)
+            self.events.record("executed", command.action, command.completion_reason, source=command.source, requested_value=command.value)
         finally:
             self._active_command = None
 
@@ -1335,13 +1365,13 @@ class AmtronControl:
 
     def _record_replaced(self, command: _PendingCommand | None) -> None:
         if self._pending is not None and self._pending != command:
-            self.events.record("replaced", self._pending.action, "replaced")
+            self.events.record("replaced", self._pending.action, "replaced", source=self._pending.source, requested_value=self._pending.value)
 
     def _clear_pending(self, *, outcome: str | None = None, reason: str = "completed") -> bool:
         changed = self._pending is not None
         if self._pending is not None:
             if outcome is not None and self._active_command is None:
-                self.events.record(outcome, self._pending.action, reason)
+                self.events.record(outcome, self._pending.action, reason, source=self._pending.source, requested_value=self._pending.value)
             elif self._active_command is not None:
                 self._record_replaced(self._active_command)
         self._pending = None

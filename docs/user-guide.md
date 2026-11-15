@@ -90,6 +90,13 @@ In service mode, HA follows the app's permission; there is no second write
 switch. Read-only disables commands and heartbeat, but still polls the bus.
 Only one owner may use the adapter. Check readings before enabling writes.
 
+## Understand the activity
+
+In Home Assistant **Activity**, filter by **Wallbox event** to follow control
+commands and physical charging changes together. The trigger explains why a
+command ran; the subsequent wallbox event tells you whether charging started
+or stopped. See [activity details](troubleshooting.md#understand-the-activity-timeline).
+
 ## Understand the readings
 
 **Total power** is actual charging power; **Signaled current** is what the wallbox
@@ -99,6 +106,13 @@ lifetime counter. **Vehicle connected** alone does not mean charging is allowed.
 For a waiting charge, start with **Charging status**, **Pending change** and the
 active limits. **Connection quality** includes the `heartbeat` attribute (`ok` or
 `problem`). [All entities and their meanings](entities.md).
+
+The charging status distinguishes **Checking status** (briefly differing readings),
+**State is ambiguous** (still differing after two polls and at least ten seconds)
+and **Waiting for readings** (required values missing). A confirmed fault is
+shown immediately. [What these messages mean](troubleshooting.md#charging-status-is-being-checked).
+The app and Mushroom examples show **Connection interrupted** for lost
+communication; native HA entities remain **Unavailable**.
 
 ## Waiting between charging changes
 

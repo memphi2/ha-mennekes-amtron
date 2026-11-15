@@ -279,7 +279,6 @@ service data rather than maintaining a second queue.
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
-
 | `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
@@ -294,9 +293,10 @@ identity:
 }
 ```
 
-The recovery command `acknowledge_intent_reset` accepts only `command` and
-`expected_serial_number`. It acknowledges a rejected saved control file after
-the user reviews the reset. Normal commands remain blocked while
+The recovery command `acknowledge_intent_reset` needs only `command` and
+`expected_serial_number`, apart from the optional activity `origin`. It
+acknowledges a rejected saved control file after the user reviews the reset.
+Normal commands remain blocked while
 `control.intent_rejected` is true. The acknowledgement durably saves paused,
 release-off, 6 A defaults before lifting that block; it sends no start command.
 If saving fails, the block remains; an atomic replacement that already completed
@@ -318,6 +318,21 @@ last charging state. The integration cancels its owned pending work when a plan
 is cleared, replaced, completed or unloaded. Pending work remains volatile and
 is not restored after a service restart. The integration uses these two
 commands only with a service that does not plan departures itself.
+
+### Command activity metadata
+
+Service 0.9.1 adds `origin` to command requests. It is an allowlisted diagnostic
+source, not an authenticated user identity. The service validates and removes it
+before dispatching the command. It is a common optional field in addition to
+the action-specific fields documented here. A queued command retains its origin
+even if a later request or background task executes it.
+
+Each command event includes `source`, `occurred_at` (timezone-aware UTC), and
+`requested_value` (nullable, not physical current readback), as well as the existing
+sequence/action/outcome/reason fields. The bounded feed retains 32 terminal
+outcomes. P&C gate writes appear only when a release is actually written; polls
+and heartbeat writes do not enter this feed. Consumers must distinguish command
+acknowledgement from the independently observed charging state.
 
 ### Departure plan
 

@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .device.charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
+from .device.command_events import attributed
 from .device.departure_model import DepartureModel
 from .device.departure_plan import DepartureForecast, DepartureInputs, DepartureState
 from .device.departure_step import (
@@ -758,6 +759,7 @@ class TimedGoalObserver:
         await self._end_plan_pause()
         self._set_status("vehicle_unconfirmed")
 
+    @attributed("departure_plan")
     async def _end_plan_pause(self) -> None:
         control = self._runtime.control
         if (

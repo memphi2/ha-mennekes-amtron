@@ -98,3 +98,47 @@ test("waiting guidance follows the current reason and disappears during ordinary
   await flush();
   assert.equal(put(h, "op_advice"), "");
 });
+
+
+test("command activity shows time, current, trigger and reason", async () => {
+  const data = overview(operation());
+  data.commands = [{sequence:7, action:"resume", outcome:"executed", reason:"vehicle_authorized",
+    source:"plug_charge", occurred_at:START, requested_value:16}];
+  const h = setup("de", data); await flush();
+  const row = h.ids.get("command_results").children[0];
+  assert.match(row.children[0].textContent, /2026/);
+  assert.match(row.children[0].textContent, /16 A/);
+  assert.match(row.children[1].textContent, /Virtuelles Plug & Charge/);
+  assert.match(row.children[1].textContent, /Steckvorgang/);
+});
+
+test("uncertain readings are neutral until persistent; an outage stays explicit", async () => {
+  for (const [state, reason, label, style] of [
+    ["checking_status", "checking_status", "Status wird abgeglichen", "state-muted"],
+    ["state_uncertain", "inconsistent_readings", "Zustand nicht eindeutig", "state-wait"],
+    ["data_missing", "missing_readings", "Warte auf Messwerte", "state-wait"],
+    ["connection_lost", "wallbox_unavailable", "Verbindung unterbrochen", "state-error"],
+    ["service_starting", "service_starting", "Service initialisiert", "state-muted"],
+  ]) {
+    const data = {...overview(null), state, reason, available:!["connection_lost", "service_starting"].includes(state)};
+    const h = setup("de", data); await flush();
+    assert.ok(put(h, "charge_state").startsWith(label));
+    assert.ok(h.ids.get("charge_state").className.endsWith(style));
+    assert.equal(h.ids.get("charge_reason").hidden, state === reason);
+    assert.equal(h.ids.get("operation").hidden, true);
+    assert.equal(h.ids.get("command_results").children.length, 0);
+  }
+});
+
+test("successful target stops do not claim that their command was prevented", async () => {
+  for (const [language, label] of [["en", "Stop requested by a charge target"], ["de", "Ladestopp durch ein Ladeziel"],
+    ["fr", "Arrêt demandé par un objectif de charge"], ["nl", "Laadstop door een laaddoel"],
+    ["it", "Arresto richiesto da un obiettivo di ricarica"]]) {
+    const data = overview(null);
+    data.commands = [{sequence:1, action:"pause", outcome:"executed", reason:"energy_goal",
+      source:"soc_goal", occurred_at:START, requested_value:1}];
+    const h = setup(language, data); await flush();
+    const row = h.ids.get("command_results").children[0];
+    assert.ok(row.children[1].textContent.includes(label));
+  }
+});

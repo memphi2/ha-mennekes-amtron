@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import AsyncMock
+from zoneinfo import ZoneInfo
 
 import pytest
+from homeassistant.util import dt as dt_util
 
 from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.command_events import CommandEvent
 from custom_components.mennekes_amtron_rtu.device.enums import (
     AuthorizationStatus,
     CableLockStatus,
@@ -157,7 +161,22 @@ def test_the_entity_reports_changes_after_a_baseline_and_restarts_after_a_failed
             entity, "async_write_ha_state",
             lambda: written.append((entity.state_attributes["event_type"], entity.state)),
         )
+        hass.config.language = "en"
+        entity.hass = hass
+        entity.entity_id = "event.test_wallbox"
+        activity = []
+        monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_get_translations", AsyncMock(return_value={}))
+        monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_log_entry", lambda *args, **kwargs: activity.append(args[2]))
         await entity.async_added_to_hass()
+        entry.runtime_data.control.events.record("executed", "resume", source="plug_charge", requested_value=16)
+        assert len(activity) == 1
+        assert activity[0].startswith("plug_charge: resume_executed (Requested: 16 A). vehicle_authorized. Occurred at: ")
+        entry.runtime_data.control.events.record("replaced", "set_current", "replaced", requested_value=10)
+        assert len(activity) == 1
+        entity._activity_translations["component.mennekes_amtron_rtu.entity.event.control_result.state_attributes.requested_value.state.0"] = "No software current limit"
+        entry.runtime_data.control.events.record("executed", "set_current", requested_value=0)
+        assert "No software current limit" in activity[-1]
+        assert "0 A" not in activity[-1]
         assert entity.state is None
 
         put(transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
@@ -193,5 +212,40 @@ def test_the_entity_reports_changes_after_a_baseline_and_restarts_after_a_failed
         assert {state for _, state in written} == states
         assert written[-1][0] == "error_occurred"
         await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_delayed_command_times_remain_distinct_in_ha_local_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        hass, entry, _transport = await build_runtime()
+        entity = AmtronWallboxEvent(entry)
+        entity.hass = hass
+        entity.entity_id = "event.test_wallbox"
+        entity._activity_translations[
+            "component.mennekes_amtron_rtu.entity.event.control_result.state_attributes.occurred_at.name"
+        ] = "Ereigniszeit"
+        monkeypatch.setattr(dt_util, "DEFAULT_TIME_ZONE", ZoneInfo("Europe/Berlin"))
+        activity = []
+        monkeypatch.setattr(
+            "custom_components.mennekes_amtron_rtu.event.async_log_entry",
+            lambda *args, **kwargs: activity.append((args[2], kwargs)),
+        )
+        for sequence, occurred_at in enumerate((
+            "2026-10-25T00:30:00+00:00", "2026-10-25T01:30:00+00:00", None,
+        ), start=1):
+            entity._log_activity(CommandEvent(
+                sequence, "pause", "executed", "completed", "energy_goal", occurred_at,
+            ))
+        assert [message for message, _metadata in activity] == [
+            "energy_goal: pause_executed. Ereigniszeit: 2026-10-25 02:30:00+02:00.",
+            "energy_goal: pause_executed. Ereigniszeit: 2026-10-25 02:30:00+01:00.",
+            "energy_goal: pause_executed.",
+        ]
+        # Three commands produce exactly three receipt-time logbook entries;
+        # no event timestamp or native wallbox observation is fabricated.
+        assert all(metadata == {"domain": "mennekes_amtron_rtu", "entity_id": entity.entity_id}
+                   for _message, metadata in activity)
+        assert entity.state is None
 
     asyncio.run(run())

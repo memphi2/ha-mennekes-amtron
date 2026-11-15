@@ -21,10 +21,11 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .control import AmtronControl, ControlOptions, ha_command
 from .coordinator import MennekesAmtronCoordinator
+from .device.charging_display import DISPLAY_OPTIONS
 from .device.charging_session import CompletedSession
 from .device.client import MennekesModbusClient, SerialConfig, WritePrecondition
 from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
-from .device.command_events import CommandEvents
+from .device.command_events import CommandEvents, command_source
 from .device.const import (
     DOMAIN,
     MAX_PHASE_SWITCH_GRACE_SECONDS,
@@ -249,6 +250,10 @@ class RemoteClient(MennekesModbusClient):
             if "command_events" not in payload:
                 raise ValueError("missing command events")
             command_events = CommandEvents.parse(payload["command_events"])
+            section = "charging_display"
+            display = payload.get("charging_display")
+            if display is not None and display not in DISPLAY_OPTIONS:
+                raise ValueError("invalid charging display")
             section = "connection_quality"
             quality = payload.get("connection_quality")
             if quality is not None and quality not in CONNECTION_QUALITY_STATES:
@@ -538,6 +543,7 @@ class RemoteClient(MennekesModbusClient):
             values = {**values, "energy_total": observed_energy}
         return WallboxData(
             values=values,
+            charging_display=display,
             failed_blocks=tuple(failed),
             current_write_generation=generation,
             service_read_only=control["read_only"],
@@ -588,7 +594,7 @@ class RemoteClient(MennekesModbusClient):
                 self.apply_snapshot(
                     await self.request(
                         "POST", "/v2/command", {
-                            "command": command, **values,
+                            "command": command, **values, "origin": command_source.get(),
                             "expected_serial_number": self.bound_serial,
                         }
                     ),

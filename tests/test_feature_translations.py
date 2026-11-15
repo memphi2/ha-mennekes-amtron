@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from custom_components.mennekes_amtron_rtu.device.charging_status import (
-    CHARGING_STATUS_OPTIONS,
+from custom_components.mennekes_amtron_rtu.device.charging_display import (
+    DISPLAY_OPTIONS,
 )
 from custom_components.mennekes_amtron_rtu.device.energy_goal import ENERGY_GOAL_STATES
 from custom_components.mennekes_amtron_rtu.device.link_quality import (
@@ -22,7 +22,7 @@ def test_new_status_options_and_control_errors_are_translated_in_all_languages()
         payload = json.loads(path.read_text())
         entity = payload["entity"]
         for key, options in (
-            ("charging_status", CHARGING_STATUS_OPTIONS),
+            ("charging_status", DISPLAY_OPTIONS),
             ("connection_quality", CONNECTION_QUALITY_STATES),
             ("energy_goal_status", ENERGY_GOAL_STATES),
             ("soc_goal_status", SOC_GOAL_STATES),

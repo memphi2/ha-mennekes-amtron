@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable
 
 from .capabilities import supported_blocks
+from .charging_display import ChargingDisplay
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError, AmtronConnectionError, AmtronProtocolError
 from .const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS
@@ -15,6 +16,7 @@ from .data import ConnectionState, DeviceIdentity, WallboxData
 from .decode import RegisterValue
 from .enums import EvseState
 from .register_blocks import SLOW_BLOCK_INTERVAL_SECONDS, BlockCadence
+from .registers import CP_STATE
 from .runtime_events import EventTimeline, EventType
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ class DevicePoller:
         self._empty_polls = 0
         self._block_read_at: dict[str, float] = {}
         self._lost_blocks: set[str] = set()
+        self._charging_display = ChargingDisplay()
 
     def update_measurement_interval(self, interval: float) -> None:
         """Update cadence without discarding block freshness or retry history."""
@@ -87,6 +90,8 @@ class DevicePoller:
     ) -> WallboxData:
         # A poll spans multiple bus transactions. If a current write overlaps
         # any part of it, its old readback must not undo the accepted command.
+        if not last_success:
+            self._charging_display.reset()
         generation = self._client.write_state.current_write_generation
         goal_generation = self._client.write_state.energy_goal_generation
         # Configuration registers change when somebody reconfigures the
@@ -197,7 +202,7 @@ class DevicePoller:
             values.pop(key, None)
         values.update(read)
         self._log_available()
-        return WallboxData(
+        data = WallboxData(
             values=values,
             failed_blocks=tuple(sorted(failed)),
             held=frozenset(held - read.keys()),
@@ -209,6 +214,12 @@ class DevicePoller:
             session_read="session_duration" in read,
             energy_goal_generation=goal_generation,
         )
+
+        data.charging_display = self._charging_display.observe(
+            data, cp_supported=self._identity.layout_version >= CP_STATE.min_layout,
+            now=self._monotonic(),
+        )
+        return data
 
     def _log_unavailable(self, err: Exception) -> None:
         changed = self._connection_state.record(False)

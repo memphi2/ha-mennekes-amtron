@@ -13,6 +13,8 @@ Find the symptom first; collect diagnostics before restarting if the problem is 
 | USB or LAN does not connect | [Connection setup](#the-config-flow-cannot-connect), [LAN](network-gateway.md#network-access-and-troubleshooting) |
 | A control or feature is missing | [Missing entities](#entities-are-missing) |
 | The app is not discovered, not ready, or rejects access | [App connection](#app-connection-and-discovery) |
+| Charging status is unclear | [Status messages](#charging-status-is-being-checked) |
+| Why did the current change or charging stop? | [Activity timeline](#understand-the-activity-timeline) |
 | Charging does not start or current does not change | [Current and pending changes](#the-charging-current-does-not-follow) |
 | Heartbeat warning or error 200 | [Heartbeat](#heartbeat-or-service-connection-repair) |
 | The wrong car is selected | [Vehicle recognition](#vehicle-profiles-and-automatic-selection) |
@@ -55,6 +57,34 @@ your device implements; compare it with the reference.
 Do not delete and re-add an existing wallbox to recover its controls. Using
 **Reconfigure** or confirming its discovered app preserves the matched device
 and entity IDs.
+
+## Charging status is being checked
+
+Plugging in, unplugging or changing charge permission can update the wallbox's
+registers at slightly different times. **Checking status** is a neutral display
+while these readings disagree; it does not mean that a new fault occurred.
+
+- **State is ambiguous:** the readings still disagree on a later poll, after at
+  least ten seconds and two actual bus observations. Open the charging-status
+  entity for EVSE and pilot readings. If it persists, check the adapter connection
+  and collect diagnostics. Opening or refreshing the app does not advance this timer.
+- **Waiting for readings:** values needed to establish the state are missing.
+  A previously valid state is not presented as a current measurement.
+- **Connection interrupted:** no current communication with the wallbox. Native
+  HA entities show **Unavailable**; the app and Mushroom card explain the outage.
+- **Waiting for first reading:** the Mushroom card has not received its initial
+  state yet. This is not an error by itself.
+
+A confirmed wallbox fault appears immediately. The actual control and safety
+checks continue to use the register values, without this presentation delay.
+These display transitions do not create extra command or wallbox events. Recorder
+may still retain a changed sensor state; there is no per-second counter.
+
+An event entity's state is the time of its last event. Before the first event,
+HA may show **Unknown**. No event is invented to fill that timestamp. The app
+shows an empty-results message and the Mushroom example omits event rows.
+Optional, unconfigured controls stay hidden in the dashboard. **Source not reported**
+on a command is retained explicitly: it must not be mistaken for a user action.
 
 ## Writes are refused
 
@@ -259,11 +289,14 @@ distinguish delayed processing, USB/RS-485 trouble or a slow wallbox. See
 
 ## Some sensors became unavailable
 
-A failed group of register reads makes the affected entities unavailable until
-a successful retry. Other readings can keep working. If everything disappears,
-check the connection or app first. If only one group repeatedly fails, include
-the diagnostics field `failed_blocks` when reporting it; the range may reveal a
-firmware-specific limitation.
+A single failed read can briefly retain some previous values, for up to
+30 seconds after their last successful read. Required fresh values are still
+missing for the [charging-status display](#charging-status-is-being-checked).
+Energy counters are not held across a failed read. Repeated or longer failures
+make affected readings unavailable until a successful retry; other readings
+can keep working. If everything disappears, check the connection or app first.
+If only one group repeatedly fails, include the diagnostics field `failed_blocks`
+when reporting it; the range may reveal a firmware-specific limitation.
 
 ## The charging current does not follow
 
@@ -527,3 +560,39 @@ model/firmware; direct or service connection; read-only setting; expected
 behavior and exact error. Attach diagnostics and the relevant log messages.
 Review extra logs before posting: remove tokens, serial numbers, private
 hostnames and adapter identifiers.
+
+
+## Understand the activity timeline
+
+The enabled **Wallbox event** entity combines readable command messages in
+Home Assistant Activity with observed physical changes. **Control result** is an
+optional diagnostic event entity; leave it disabled unless an automation needs
+its structured command outcomes. In Activity, filter by **Wallbox event** for
+the concise wallbox timeline. The unfiltered HA activity also includes ordinary
+entity changes, such as sensors becoming unavailable during an HA reload.
+A command acknowledgement does not prove that the car has started charging;
+look for the subsequent **Charging started** observation.
+
+Command messages name the trigger (Plug & Charge, departure plan, target
+protection, app or Home Assistant), outcome and requested current where relevant.
+Home Assistant means a control or automation; it does not identify a person.
+Unknown sources are labelled explicitly. The original command-event time is
+shown in the app and included in HA's readable message. The HA Activity row and
+native event timestamp mark receipt in HA, which can be later. The optional
+**Control result** also exposes the original time as `occurred_at`.
+Reconnects establish a fresh cursor and do not replay commands that happened
+while HA was disconnected.
+
+Unsent current-slider values superseded by another request are omitted from
+the readable timeline and app overview; the diagnostic feed retains them.
+HA's readable timeline also folds consecutive identical successful current
+settings from the same source. A different value, source, intervening command,
+error or observed wallbox change makes the next result visible again. This does
+not remove results from the app's bounded feed or optional **Control result**.
+Only discrete outcomes and state transitions create activity. Polls, heartbeats
+and countdowns do not. The app keeps at most 32 command results in memory; HA
+retention follows your Recorder configuration. Frequent changing current commands
+can still create substantial history even with **Control result** disabled.
+[Limit command history](recorder.md#limit-command-history) explains the separate
+event exclusions. Enabling **Control result** adds a structured diagnostic
+record of each command alongside the readable activity message.

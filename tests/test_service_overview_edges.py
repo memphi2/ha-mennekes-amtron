@@ -46,8 +46,8 @@ def test_missing_optional_mappings_do_not_leak_untrusted_values(field):
     result = overview_snapshot(raw)
     assert "private" not in str(result)
     if field == "values":
-        assert result["state"] == "unknown"
-        assert result["reason"] == "state_unknown"
+        assert result["state"] == "data_missing"
+        assert result["reason"] == "missing_readings"
 
 
 def test_manual_grant_and_disabled_gate_do_not_claim_vehicle_detection_is_pending():

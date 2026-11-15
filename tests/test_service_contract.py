@@ -457,3 +457,30 @@ def test_wallbox_failure_is_distinguished_from_a_lost_service_connection(tmp_pat
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_service_origin_is_validated_scoped_and_recorded(tmp_path):
+    from custom_components.mennekes_amtron_rtu.device.command_events import (
+        command_source,
+    )
+
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            for invalid in ("private user name", [], None):
+                with pytest.raises(ValueError, match="origin"):
+                    await service.command({"origin": invalid})
+            await service.command({
+                "command": "set_current", "value": 10, "origin": "app",
+                "expected_serial_number": "ABC123456789",
+            })
+            event = service.control.events.snapshot()["events"][-1]
+            assert (event["source"], event["requested_value"]) == ("app", 10)
+            assert command_source.get() == "unknown"
+            with pytest.raises(ValueError, match="expected_serial_number"):
+                await service.command({"origin": "app"})
+            assert command_source.get() == "unknown"
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

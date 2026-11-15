@@ -25,11 +25,13 @@ def charging_status(data: WallboxData, *, cp_supported: bool) -> str | None:
     readback. Otherwise lock, release, pause and authorization are checked in
     that order. A pending command never substitutes for actual readback.
     """
+    error = _integer(data.get("error_code"))
+    if error is not None and error > 0:
+        return "wallbox_error"
     state = _integer(data.get("evse_state"))
     if state is None or state not in EvseState:
         return None
-    error = _integer(data.get("error_code"))
-    if state == EvseState.ERROR or (error is not None and error > 0):
+    if state == EvseState.ERROR:
         return "wallbox_error"
     if state == EvseState.NOT_INITIALIZED:
         return "initializing"

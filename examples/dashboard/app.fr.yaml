@@ -3,7 +3,7 @@ type: vertical-stack
 cards:
   - type: custom:mushroom-template-card
     entity: sensor.mennekes_amtron_etat_de_la_recharge
-    primary: "AMTRON · {{ states('sensor.mennekes_amtron_puissance_totale', with_unit=True) }}"
+    primary: "AMTRON · {{ states('sensor.mennekes_amtron_puissance_totale', with_unit=True) if has_value('sensor.mennekes_amtron_puissance_totale') else '—' }}"
     secondary: >-
       {%- set p = namespace(l=[]) -%}
       {%- set e = states('number.mennekes_amtron_objectif_energetique') | float(0) -%}
@@ -12,7 +12,7 @@ cards:
       {%- set s = states('number.mennekes_amtron_objectif_de_charge_du_vehicule') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
       {%- set t = states('sensor.mennekes_amtron_etat_de_la_charge_programmee') -%}
-      {{ state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_de_la_session', with_unit=True) }}
+      {{ 'En attente de la première mesure' if is_state(entity, 'unknown') else 'Connexion interrompue' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_de_la_session', with_unit=True) if has_value('sensor.mennekes_amtron_energie_de_la_session') else '—' }}
 
       {{ 'Limites: ' ~ p.l | join(' · ') if p.l else 'Aucune limite' }}
       {%- if t not in ['disabled', 'none', 'unknown', 'unavailable'] %} · Planification: {{ state_translated('sensor.mennekes_amtron_etat_de_la_charge_programmee') }}{% endif %}
@@ -20,7 +20,9 @@ cards:
     icon: mdi:ev-station
     color: >-
       {% set s = states(entity) %}{{ 'green' if s == 'charging' else 'amber' if s == 'paused'
-      else 'red' if s in ['wallbox_error', 'unavailable', 'unknown'] else 'blue' }}
+      else 'red' if s in ['wallbox_error', 'unavailable']
+      else 'amber' if s in ['state_uncertain', 'data_missing']
+      else 'grey' if s in ['unknown', 'checking_status', 'initializing'] else 'blue' }}
     tap_action:
       action: more-info
   - type: custom:mushroom-chips-card

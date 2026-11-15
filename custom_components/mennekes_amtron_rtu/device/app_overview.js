@@ -5,6 +5,20 @@
   const language = languages.indexOf(document.documentElement.lang.split("-")[0]);
   const column = language < 0 ? 0 : language;
   const words = {
+    requested_current: ["Requested", "Angefordert", "Demandé", "Gevraagd", "Richiesto"],
+    vehicle_authorized: ["Recognized vehicle released for this connection", "Erkanntes Fahrzeug für diesen Steckvorgang freigegeben", "Véhicule reconnu autorisé pour ce branchement", "Herkend voertuig vrijgegeven voor deze aansluiting", "Veicolo riconosciuto autorizzato per questo collegamento"],
+    vehicle_waiting: ["Waiting for an authorized vehicle", "Warten auf ein freigegebenes Fahrzeug", "En attente d’un véhicule autorisé", "Wachten op een toegestaan voertuig", "In attesa di un veicolo autorizzato"],
+
+    source_unknown: ["Source not reported", "Quelle nicht übermittelt", "Source non transmise", "Bron niet gemeld", "Origine non comunicata"],
+    source_home_assistant: ["Home Assistant (control or automation)", "Home Assistant (Bedienung oder Automation)", "Home Assistant (commande ou automatisation)", "Home Assistant (bediening of automatisering)", "Home Assistant (comando o automazione)"],
+    source_app: ["App interface", "App-Oberfläche", "Interface de l’application", "Appinterface", "Interfaccia app"],
+    source_plug_charge: ["Virtual Plug & Charge", "Virtuelles Plug & Charge", "Plug & Charge virtuel", "Virtuele Plug & Charge", "Plug & Charge virtuale"],
+    source_departure_plan: ["Departure plan", "Abfahrtsplanung", "Plan de départ", "Vertrekplanning", "Pianificazione partenza"],
+    source_energy_goal: ["Energy target protection", "Schutz des Energieziels", "Protection de l’objectif énergétique", "Bescherming energiedoel", "Protezione obiettivo energetico"],
+    source_soc_goal: ["Vehicle percentage target", "Fahrzeug-Prozentziel", "Objectif de charge du véhicule", "Laadniveau voertuig", "Obiettivo percentuale veicolo"],
+    source_recovery: ["Error recovery", "Fehlerbehebung", "Récupération automatique", "Automatisch foutherstel", "Ripristino automatico"],
+    source_guest: ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"],
+
     limits_details: ["Saved limits and queued actions", "Gespeicherte Grenzen und vorgemerkte Aktionen", "Limites enregistrées et actions en attente", "Opgeslagen grenzen en geplande acties", "Limiti salvati e azioni in attesa"],
     guest_help: ["Start now; optional energy and target-time limits apply.", "Jetzt starten; optionale Energie- und Zeitpunktgrenzen gelten.", "Démarrer maintenant ; limites d’énergie et heure cible facultatives.", "Start nu; optionele energiegrens en eindtijd gelden.", "Avvia ora; valgono i limiti facoltativi di energia e orario."],
     departure_help: ["Vehicle departure or guest stop time.", "Fahrzeugabfahrt oder Stoppzeit für Gäste.", "Départ du véhicule ou heure d’arrêt pour l’invité.", "Vertrektijd van het voertuig of stoptijd voor gasten.", "Partenza del veicolo o orario di arresto ospite."],
@@ -81,7 +95,7 @@
     step_plan_start: ["Planned charge starts", "Geplantes Laden startet", "La recharge planifiée démarre", "Gepland laden start", "Inizia la ricarica pianificata"],
     step_target_reached: ["Target expected", "Ziel voraussichtlich erreicht", "Cible attendue", "Doel verwacht", "Obiettivo previsto"],
     step_departure: ["Target time", "Zielzeitpunkt", "Heure cible", "Doeltijd", "Orario obiettivo"],
-    car_unknown: ["Unknown", "Unbekannt", "Inconnu", "Onbekend", "Sconosciuto"],
+    car_unknown: ["Vehicle status not confirmed", "Fahrzeugstatus nicht bestätigt", "État du véhicule non confirmé", "Voertuigstatus niet bevestigd", "Stato del veicolo non confermato"],
     car_none: ["Not connected", "Nicht angeschlossen", "Non connecté", "Niet aangesloten", "Non collegato"],
     car_connected: ["Connected", "Angeschlossen", "Connecté", "Aangesloten", "Collegato"],
     car_confirmed: ["Confirmed", "Bestätigt", "Confirmé", "Bevestigd", "Confermato"],
@@ -90,7 +104,13 @@
     heartbeat: ["Heartbeat", "Heartbeat", "Heartbeat", "Heartbeat", "Heartbeat"],
     ok: ["confirmed", "bestätigt", "confirmé", "bevestigd", "confermato"],
     problem: ["not confirmed in time", "nicht rechtzeitig bestätigt", "non confirmé à temps", "niet op tijd bevestigd", "non confermato in tempo"],
-    unknown: ["Unknown", "Unbekannt", "Inconnu", "Onbekend", "Sconosciuto"],
+    unknown: ["Not yet confirmed", "Noch nicht bestätigt", "Pas encore confirmé", "Nog niet bevestigd", "Non ancora confermato"],
+    checking_status: ["Checking status", "Status wird abgeglichen", "Vérification de l’état", "Status wordt gecontroleerd", "Verifica dello stato"],
+    state_uncertain: ["State is ambiguous", "Zustand nicht eindeutig", "État ambigu", "Status niet eenduidig", "Stato non univoco"],
+    data_missing: ["Waiting for readings", "Warte auf Messwerte", "En attente de mesures", "Wachten op metingen", "In attesa di letture"],
+    connection_lost: ["Connection interrupted", "Verbindung unterbrochen", "Connexion interrompue", "Verbinding verbroken", "Connessione interrotta"],
+    inconsistent_readings: ["Required wallbox readings still disagree. Check the connection and diagnostics if this persists.", "Die benötigten Wallbox-Meldungen passen noch nicht zusammen. Bei anhaltender Anzeige Verbindung und Diagnose prüfen.", "Les mesures nécessaires de la borne divergent encore. Si cela persiste, vérifiez la connexion et le diagnostic.", "De benodigde wallboxmetingen komen nog niet overeen. Controleer bij aanhouden de verbinding en diagnose.", "Le letture necessarie della wallbox non concordano ancora. Se persiste, verificare connessione e diagnostica."],
+    missing_readings: ["Required readings are missing; no previous state is shown as current.", "Benötigte Messwerte fehlen; ein früherer Zustand wird nicht als aktuell angezeigt.", "Des mesures nécessaires manquent ; aucun état précédent n’est affiché comme actuel.", "Benodigde metingen ontbreken; een eerdere status wordt niet als actueel getoond.", "Mancano letture necessarie; uno stato precedente non viene mostrato come attuale."],
     initializing: ["Initializing", "Initialisierung", "Initialisation", "Initialiseren", "Inizializzazione"],
     wallbox_error: ["Wallbox reports a fault", "Wallbox meldet einen Fehler", "La borne signale un défaut", "Wallbox meldt een storing", "La wallbox segnala un guasto"],
     service_mode: ["Wallbox in service mode", "Wallbox im Servicemodus", "Borne en mode maintenance", "Wallbox in servicemodus", "Wallbox in manutenzione"],
@@ -105,7 +125,6 @@
     setup_required: ["Configure the connection first.", "Zuerst die Verbindung einrichten.", "Configurez d’abord la connexion.", "Stel eerst de verbinding in.", "Configurare prima la connessione."],
     service_starting: ["Service is initializing; no current wallbox state yet.", "Service initialisiert; noch kein aktueller Wallbox-Zustand.", "Service en initialisation ; état encore indisponible.", "Service initialiseert; nog geen actuele wallboxstatus.", "Servizio in inizializzazione; stato non ancora disponibile."],
     wallbox_unavailable: ["No current wallbox reading. Saved targets and queued intent are not proof of execution.", "Keine aktuelle Wallbox-Meldung. Gespeicherte Ziele und vorgemerkte Befehle belegen keine Ausführung.", "Aucune mesure actuelle. Les objectifs et commandes en attente ne prouvent pas leur exécution.", "Geen actuele wallboxmeting. Opgeslagen doelen en opdrachten bewijzen geen uitvoering.", "Nessuna lettura attuale. Obiettivi e comandi salvati non provano l’esecuzione."],
-    state_unknown: ["Readings are missing or contradictory; charging state cannot be confirmed.", "Messwerte fehlen oder widersprechen sich; Ladezustand nicht bestätigt.", "Mesures absentes ou contradictoires ; état non confirmé.", "Metingen ontbreken of spreken elkaar tegen; laadstatus niet bevestigd.", "Letture mancanti o contraddittorie; stato non confermato."],
     goal_stop_requested: ["A charge target requires a stop; this is intent, not proof that charging has stopped.", "Ein Ladeziel fordert einen Stopp; das ist eine Anforderung, keine bestätigte Ladeunterbrechung.", "Un objectif demande l’arrêt ; cela ne prouve pas que la recharge est arrêtée.", "Een laaddoel vraagt een stop; dit bewijst niet dat het laden is gestopt.", "Un obiettivo richiede uno stop; non prova che la ricarica sia interrotta."],
     release_stop_requested: ["The service retains a request to disable charging release.", "Im Service ist das Abschalten der Ladefreigabe angefordert.", "Le service conserve une demande de désactivation de la recharge.", "De service bewaart een verzoek om laadvrijgave uit te zetten.", "Il servizio conserva una richiesta di disattivazione del consenso."],
     pause_requested: ["The service retains a pause request. Its source is not supplied by this snapshot.", "Im Service ist eine Pause angefordert. Ihre Herkunft ist in diesem Zustand nicht enthalten.", "Le service conserve une demande de pause. Sa source n’est pas fournie.", "De service bewaart een pauzeverzoek. De bron staat niet in deze status.", "Il servizio conserva una richiesta di pausa. La fonte non è disponibile."],
@@ -120,7 +139,7 @@
     lock: ["Lock wallbox", "Wallbox sperren", "Verrouiller la borne", "Wallbox vergrendelen", "Bloccare wallbox"],
     unlock: ["Unlock wallbox", "Wallbox entsperren", "Déverrouiller la borne", "Wallbox ontgrendelen", "Sbloccare wallbox"],
     recover: ["Recover connection state", "Zustand wiederherstellen", "Restaurer l’état", "Toestand herstellen", "Ripristinare stato"],
-    executed: ["Executed", "Ausgeführt", "Exécuté", "Uitgevoerd", "Eseguito"],
+    executed: ["Command completed", "Befehl abgeschlossen", "Commande terminée", "Opdracht voltooid", "Comando completato"],
     replaced: ["Replaced", "Ersetzt", "Remplacé", "Vervangen", "Sostituito"],
     cancelled: ["Cancelled", "Verworfen", "Annulé", "Geannuleerd", "Annullato"],
     failed: ["Failed", "Fehlgeschlagen", "Échec", "Mislukt", "Fallito"],
@@ -137,7 +156,7 @@
     status_refresh_failed: ["Status refresh failed", "Statusabgleich fehlgeschlagen", "Actualisation échouée", "Statusvernieuwing mislukt", "Aggiornamento stato fallito"],
     error_still_active: ["Fault still active", "Fehler weiterhin aktiv", "Défaut toujours actif", "Storing nog actief", "Guasto ancora attivo"],
     user_cancelled: ["Cancelled by user", "Vom Benutzer verworfen", "Annulé par l’utilisateur", "Door gebruiker geannuleerd", "Annullato dall’utente"],
-    energy_goal: ["Charge target prevents command", "Ladeziel verhindert Befehl", "Objectif empêchant la commande", "Laaddoel voorkomt opdracht", "Obiettivo impedisce comando"],
+    energy_goal: ["Stop requested by a charge target", "Ladestopp durch ein Ladeziel", "Arrêt demandé par un objectif de charge", "Laadstop door een laaddoel", "Arresto richiesto da un obiettivo di ricarica"],
     guest_confirmation: ["Guest start requires confirmation", "Gaststart muss bestätigt werden", "Confirmez le démarrage invité", "Bevestig het starten voor de gast", "Conferma avvio ospite"],
     time_limit: ["Time limit reached", "Zeitgrenze erreicht", "Limite horaire atteinte", "Tijdslimiet bereikt", "Limite orario raggiunto"],
     deadline_expired: ["Deadline expired", "Gültigkeit abgelaufen", "Échéance dépassée", "Deadline verstreken", "Scadenza superata"]
@@ -162,7 +181,7 @@
         || !Array.isArray(data.commands) || data.commands.length > 32
         || (data.operation && !(data.operation.next && data.operation.target))) throw new Error("invalid overview");
     put("charge_state", text(data.state));
-    el("charge_state").className="state charging-state "+(!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle"].includes(data.state)?"state-wait":"state-muted");
+    el("charge_state").className="state charging-state "+(["setup_required","service_starting"].includes(data.state)?"state-muted":!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle","state_uncertain","data_missing"].includes(data.state)?"state-wait":"state-muted");
     put("charge_reason", text(data.reason));
     el("charge_reason").hidden=text(data.reason)===text(data.state);
     put("service_mode", text(data.read_only === true ? "readonly" : data.read_only === false ? "writable" : "unknown"));
@@ -199,13 +218,13 @@
     }
     put("energy_target", data.targets.energy_kwh === 0 ? text("disabled") : format(data.targets.energy_kwh, "kWh", 2));
     put("soc_target", data.targets.soc_percent === 0 ? text("disabled") : format(data.targets.soc_percent, "%"));
-    const rows = data.commands.map(command => {
+    const rows = data.commands.filter(command => !(command.action === "set_current" && command.outcome === "replaced")).map(command => {
       if (!Number.isSafeInteger(command.sequence) || command.sequence <= 0) throw new Error("invalid sequence");
       const item = document.createElement("li");
       const title = document.createElement("strong");
-      title.textContent = `#${command.sequence} · ${text(command.action)} — ${text(command.outcome)}`;
+      title.textContent = `${moment(command.occurred_at) || "—"} · ${text(command.action)}${["resume", "set_current"].includes(command.action) && command.requested_value != null ? ` (${text("requested_current")}: ${command.requested_value === 0 ? text("unlimited") : format(command.requested_value, "A")})` : ""} — ${text(command.outcome)}`;
       const reason = document.createElement("small");
-      reason.textContent = text(command.reason);
+      reason.textContent = `${text(`source_${command.source || "unknown"}`)}${command.reason === "completed" ? "" : ` · ${text(command.reason)}`}`;
       item.appendChild(title); item.appendChild(reason);
       return item;
     });

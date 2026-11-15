@@ -9,6 +9,7 @@ from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
+from .command_events import attributed
 from .control import AmtronControl
 from .departure_plan import (
     DEPARTURE_OWNER,
@@ -97,6 +98,7 @@ class DepartureModbusService(GuestModbusService):
             lambda control: control.async_set_timed_current(value, deadline=deadline, owner=DEPARTURE_OWNER),
         )
 
+    @attributed("departure_plan")
     async def _end_departure_pause(self) -> None:
         cap = self.config.current_cap
         await self._departure_write(lambda control: control.async_resume_charging(current_cap=cap))
@@ -152,13 +154,13 @@ class DepartureModbusService(GuestModbusService):
             with suppress(TimeoutError):
                 await asyncio.wait_for(departure.wake.wait(), _TICK_SECONDS)
 
-    async def command(
+    async def _command_with_origin(
         self, payload: dict[str, Any], *,
         _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None,
     ) -> dict[str, Any]:
         name = payload.get("command")
         if name not in _FIELDS:
-            return await super().command(payload, _soc_outcome=_soc_outcome)
+            return await super()._command_with_origin(payload, _soc_outcome=_soc_outcome)
         if payload.keys() - _FIELDS[name]:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:

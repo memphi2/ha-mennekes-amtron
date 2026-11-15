@@ -21,6 +21,7 @@ from typing import Any
 from .charging_session import SessionHistory
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
+from .command_events import SOURCES, attributed, command_source
 from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
 from .energy_goal import EnergyGoal
@@ -382,6 +383,7 @@ class ModbusService:
         else:
             self._session_history_error_logged = False
 
+    @attributed("recovery")
     async def _recover(self) -> None:
         self._phase = "recovering the wallbox error"
         if self.data.get("error_code") == 0:
@@ -508,6 +510,7 @@ class ModbusService:
             "identity": asdict(self.identity),
             "available": self._is_available(),
             "values": self.data.values,
+            "charging_display": self.data.charging_display,
             "failed_blocks": list(self.data.failed_blocks),
             "current_write_generation": self.data.current_write_generation,
             "connection_quality": self.data.connection_quality,
@@ -618,7 +621,18 @@ class ModbusService:
         raw = [self._soc_goal_revision, self._soc_maximum_required, state.energy_goal_generation]
         return hashlib.sha256(json.dumps(raw).encode()).hexdigest()
 
-    async def command(
+    async def command(self, payload: dict[str, Any], *, _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None) -> dict[str, Any]:
+        payload = dict(payload)
+        origin = payload.pop("origin", "unknown")
+        if origin not in SOURCES:
+            raise ValueError("invalid command origin")
+        token = command_source.set(origin)
+        try:
+            return await self._command_with_origin(payload, _soc_outcome=_soc_outcome)
+        finally:
+            command_source.reset(token)
+
+    async def _command_with_origin(
         self, payload: dict[str, Any], *,
         _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None,
     ) -> dict[str, Any]:

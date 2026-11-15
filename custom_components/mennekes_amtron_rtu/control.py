@@ -7,6 +7,7 @@ from datetime import datetime
 from functools import wraps
 from typing import Any
 
+from .device.command_events import command_source
 from .device.control import AmtronControl as DeviceControl
 from .device.control import ControlOptions as ControlOptions
 from .device.departure_plan import DepartureInputs, DepartureState
@@ -23,6 +24,7 @@ def ha_command[**P, T](
 
     @wraps(method)
     async def call(*args: P.args, **kwargs: P.kwargs) -> T:
+        token = command_source.set(command_source.get() if command_source.get() != "unknown" else "home_assistant")
         try:
             return await method(*args, **kwargs)
         except DeviceError as err:
@@ -34,6 +36,8 @@ def ha_command[**P, T](
             raise factory(
                 err.translation_key, err.translation_placeholders
             ) from err.__cause__
+        finally:
+            command_source.reset(token)
 
     return call
 
