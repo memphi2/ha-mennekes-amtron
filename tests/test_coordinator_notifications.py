@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,6 +20,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     DOMAIN,
 )
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
+from tests.ha_fakes import build_runtime
 from tests.test_home_assistant_smoke import _boot
 
 
@@ -116,3 +118,41 @@ def test_identical_polls_are_quiet_but_changes_failures_and_repairs_are_visible(
                 await hass.async_stop()
 
     asyncio.run(asyncio.wait_for(run(), timeout=60))
+
+
+def test_a_decision_of_the_service_notifies_although_every_register_is_unchanged() -> None:
+    async def run() -> None:
+        _hass, entry, wallbox = await build_runtime()
+        coordinator = entry.runtime_data.coordinator
+        calls: list[None] = []
+        unsubscribe = coordinator.async_add_listener(lambda: calls.append(None))
+        try:
+            await coordinator.async_refresh()
+            calls.clear()
+            # Unchanged polls stay quiet.
+            await coordinator.async_refresh()
+            await coordinator.async_refresh()
+            assert calls == []
+            data = coordinator.data
+            control = entry.runtime_data.client.snapshot["control"]
+            assert control["departure"]["trip"]["deadline"] is None
+            deadline = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=8)
+            await entry.service.command({
+                "command": "departure_choice", "deadline": deadline.isoformat(),
+                "revision": control["target_time_revision"],
+                "expected_serial_number": "ABC123456789",
+            })
+            # Only the service's own decision changed, no register.
+            assert wallbox.writes == []
+            await coordinator.async_refresh()
+            assert len(calls) == 1
+            assert coordinator.data.values == data.values
+            trip = entry.runtime_data.client.snapshot["control"]["departure"]["trip"]
+            assert datetime.fromisoformat(trip["deadline"]) == deadline
+            await coordinator.async_refresh()
+            assert len(calls) == 1
+        finally:
+            unsubscribe()
+            await entry.service.stop()
+
+    asyncio.run(run())

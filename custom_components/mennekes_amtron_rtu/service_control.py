@@ -159,7 +159,7 @@ class ServiceControl:
     @property
     def soc_goal_revision(self) -> str | None:
         """Identify the service goal used when folding vehicle events."""
-        revision = self._client.snapshot.get("control", {}).get("soc_goal_revision")
+        revision = self._control.get("soc_goal_revision")
         return revision if isinstance(revision, str) else None
 
     @property
@@ -222,11 +222,11 @@ class ServiceControl:
 
     @property
     def supports_energy_goal(self) -> bool:
-        return self._client.snapshot.get("control", {}).get("supports_energy_goal") is True
+        return self._control.get("supports_energy_goal") is True
 
     @property
     def plug_charge(self) -> dict[str, Any]:
-        control = self._client.snapshot.get("control", {})
+        control = self._control
         gate = control.get("plug_charge")
         if not isinstance(gate, dict):
             return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False, "manual": False}
@@ -262,7 +262,7 @@ class ServiceControl:
 
     @property
     def supports_soc_goal(self) -> bool:
-        return self._client.snapshot.get("control", {}).get("supports_soc_goal") is True
+        return self._control.get("supports_soc_goal") is True
 
     async def _soc_command(self, command: str, **values: Any) -> None:
         if not self.supports_soc_goal:
@@ -278,11 +278,11 @@ class ServiceControl:
     @property
     def soc_configuration_required(self) -> bool:
         """A new service boot needs HA's optional-cap policy again."""
-        return self._client.snapshot.get("control", {}).get("soc_maximum_required") is None
+        return self._control.get("soc_maximum_required") is None
 
     @ha_command
     async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
-        known = self._client.snapshot.get("control", {}).get("soc_maximum_required")
+        known = self._control.get("soc_maximum_required")
         if source == self.soc_goal.source and known is maximum_required:
             return
         await self._soc_command("soc_source", source=source, maximum_required=maximum_required)
@@ -311,7 +311,7 @@ class ServiceControl:
             self._soc_transaction = (token, previous_revision)
             self._soc_transaction_fenced = False
             result = await self._soc_transaction_request("/v2/soc-goal/commit", {
-                "token": token, "expected_serial_number": self._client._bound_serial or self._client.identity.serial_number,  # noqa: SLF001
+                "token": token, "expected_serial_number": self._client.bound_serial,
                 "value": value, "source": source, "soc": soc, "maximum": maximum,
             })
             outcome = self._apply_soc_transaction_result(result, previous_revision)
@@ -351,7 +351,7 @@ class ServiceControl:
 
     @ha_command
     async def async_set_target_time(self, deadline: datetime | None) -> None:
-        revision = self._client.snapshot.get("control", {}).get("target_time_revision")
+        revision = self._control.get("target_time_revision")
         await self._departure_command(
             "departure_choice", deadline=None if deadline is None else deadline.isoformat(),
             revision=revision,
@@ -375,7 +375,7 @@ class ServiceControl:
     @property
     def pending_action(self) -> str | None:
         """The bus-owning service retains queued work across HA restarts."""
-        value = self._client.snapshot.get("control", {}).get("pending_action")
+        value = self._control.get("pending_action")
         return str(value) if value is not None else None
 
     @property
@@ -386,7 +386,7 @@ class ServiceControl:
     def can_cancel_pending(self) -> bool:
         return (
             self._client.connected
-            and self._client.snapshot.get("control", {}).get("read_only") is False
+            and self._control.get("read_only") is False
             and self.pending_action is not None
         )
 
@@ -403,7 +403,7 @@ class ServiceControl:
         return (
             not self._client.connected
             or self._client.snapshot.get("available") is not True
-            or self._client.snapshot.get("control", {}).get("read_only") is not False
+            or self._control.get("read_only") is not False
         )
 
     def _require_write_access(self) -> None:

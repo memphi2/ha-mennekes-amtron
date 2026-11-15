@@ -8,6 +8,7 @@ import pytest
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 
 from custom_components.mennekes_amtron_rtu import embedded, service_transport
+from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
@@ -22,6 +23,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONTROL_MODE_MASTER,
     DOMAIN,
 )
+from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_api import ServiceBusyError
 from custom_components.mennekes_amtron_rtu.device.waveshare_auth import (
@@ -31,6 +33,7 @@ from custom_components.mennekes_amtron_rtu.service_transport import EmbeddedTran
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_init import _patch_client
+from tests.test_modbus_service import current_writes
 
 MASTER = {CONF_CONTROL_MODE: CONTROL_MODE_MASTER}
 
@@ -347,36 +350,162 @@ def test_settings_that_wait_too_long_are_applied_by_a_restart(monkeypatch, tmp_p
     asyncio.run(run())
 
 
-def test_a_service_that_ends_on_its_own_is_stopped_and_the_entry_reloaded(
+def test_a_service_whose_heartbeat_dies_is_stopped_and_the_entry_reloaded(
     monkeypatch, tmp_path, caplog,
 ):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        reloads = []
+        hass.config_entries.async_schedule_reload = reloads.append
+        tasks = []
+        create_task = hass.async_create_task
+
+        def record(target, name=None, **kwargs):
+            task = create_task(target, name, **kwargs)
+            tasks.append(task)
+            return task
+
+        hass.async_create_task = record
+        host = await embedded.async_acquire(hass, entry)
+        service_task = host._service._task
+        # The service ends itself rather than run without its heartbeat.
+        host._service._heartbeat_task.cancel()
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if reloads:
+                break
+        assert reloads == [entry.entry_id]
+        assert _hosts(hass) == {}
+        assert service_task.done()
+        assert service_task.exception() is not None
+        assert not host._service.heartbeat.running
+        assert wallbox.close_calls == 1
+        assert "Heartbeat: task stopped unexpectedly (cancelled)" in caplog.text
+        assert "Service: stopped unexpectedly (" in caplog.text
+        # The restart itself finished without an error.
+        assert len(tasks) == 1
+        await tasks[0]
+        # Its end was reported once; nothing that stops it later fails on it.
+        await host.async_stop()
+        await embedded.async_release(hass, entry.entry_id, force=True)
+        await hass.bus.fire(EVENT_HOMEASSISTANT_STOP)
+        # A stop the owner asked for is not an unexpected end.
+        host._ended(service_task)
+        await asyncio.sleep(0)
+        assert reloads == [entry.entry_id]
+
+    asyncio.run(run())
+
+
+def test_a_service_stopped_by_its_owner_is_not_reported_as_ended(monkeypatch, tmp_path):
     async def run():
         hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
         reloads = []
         hass.config_entries.async_schedule_reload = reloads.append
         host = await embedded.async_acquire(hass, entry)
-        task = host._service._task
+        service = host._service
 
-        async def fail():
-            raise RuntimeError("Heartbeat task stopped unexpectedly")
+        async def broken_stop():
+            raise RuntimeError("save failed")
 
-        # The service ends itself rather than run without its heartbeat.
-        broken = asyncio.get_running_loop().create_task(fail())
-        await asyncio.gather(broken, return_exceptions=True)
-        host._ended(broken)
-        for _ in range(20):
+        monkeypatch.setattr(service, "stop", broken_stop)
+        # A failure while stopping a healthy service still reaches its owner.
+        with pytest.raises(RuntimeError, match="save failed"):
+            await embedded.async_release(hass, entry.entry_id, force=True)
+        monkeypatch.undo()
+        await service.stop()
+        assert reloads == []
+
+    asyncio.run(run())
+
+
+def test_a_command_in_progress_finishes_its_writes_before_the_connection_closes(
+    monkeypatch, tmp_path,
+):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        service = host._service
+        events = []
+        between = asyncio.Event()
+        gate = asyncio.Event()
+        close = wallbox.close
+
+        async def two_writes(_payload):
+            # A command with two writes whose caller gives up between them.
+            await service.client.async_write_register(R.CHARGING_RELEASE, 0)
+            events.append("first write")
+            between.set()
+            await gate.wait()
+            await service.client.async_write_register(R.CHARGING_RELEASE, 1)
+            events.append("second write")
+            return service.snapshot()
+
+        def record_close():
+            events.append("close")
+            close()
+
+        monkeypatch.setattr(service, "command", two_writes)
+        monkeypatch.setattr(wallbox, "close", record_close)
+        monkeypatch.setattr(service_transport, "_TIMEOUT_SECONDS", 0.05)
+        with pytest.raises(TimeoutError):
+            await host.transport.call("POST", "/v2/command", {"command": "pause"})
+        assert between.is_set()
+        release = asyncio.create_task(embedded.async_release(hass, entry.entry_id, force=True))
+        for _ in range(10):
             await asyncio.sleep(0)
-            if reloads:
-                break
-        assert reloads == [entry.entry_id]
+        # The service is not stopped under the command.
+        assert events == ["first write"]
+        assert not release.done()
+        assert service.heartbeat.running
+        gate.set()
+        await release
+        assert events == ["first write", "second write", "close"]
+        assert wallbox.bank[R.CHARGING_RELEASE.address] == 1
+        assert not service.heartbeat.running
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("stopped_service_refuses", [False, True])
+def test_a_shutdown_while_settings_are_applied_never_returns_a_stopped_service(
+    monkeypatch, tmp_path, stopped_service_refuses,
+):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        entered = asyncio.Event()
+        gate = asyncio.Event()
+        apply = host._service.apply_runtime_settings
+
+        async def slow_apply(config):
+            entered.set()
+            await gate.wait()
+            if stopped_service_refuses:
+                # The stopped service refuses the settings; that must not
+                # start a new service behind the shutdown.
+                await apply(config)
+            # Otherwise accepted just before the shutdown reached the service.
+
+        monkeypatch.setattr(host._service, "apply_runtime_settings", slow_apply)
+        entry.options = {**MASTER, CONF_SCAN_INTERVAL_SECONDS: 30}
+        acquiring = asyncio.create_task(embedded.async_acquire(hass, entry))
+        await entered.wait()
+        # The running service is still registered, so the shutdown finds it.
+        assert _hosts(hass) == {entry.entry_id: host}
+        await hass.bus.fire(EVENT_HOMEASSISTANT_STOP)
         assert _hosts(hass) == {}
         assert not host._service.heartbeat.running
-        assert task.done()
-        assert "Service: stopped unexpectedly (RuntimeError); starting it again" in caplog.text
-        # A stop the owner asked for is not an unexpected end.
-        host._ended(broken)
-        await asyncio.sleep(0)
-        assert reloads == [entry.entry_id]
+        assert wallbox.close_calls == 1
+        gate.set()
+        with pytest.raises(DeviceError) as err:
+            await acquiring
+        assert err.value.translation_key == "service_unavailable"
+        # Nothing was started behind the shutdown.
+        assert _hosts(hass) == {}
+        assert wallbox.close_calls == 1
+        assert not wallbox.connected
+        assert not host._service.heartbeat.running
 
     asyncio.run(run())
 
@@ -413,6 +542,47 @@ def test_without_a_limit_from_the_user_or_the_wallbox_only_the_minimum_is_allowe
             entry.options = {**options, CONF_SCAN_INTERVAL_SECONDS: 30}
             assert await embedded.async_acquire(hass, entry) is host
             assert host._service.control.max_charging_current == expected
+        finally:
+            await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_running_charge_at_the_wallbox_maximum_is_not_lowered_at_start(monkeypatch, tmp_path):
+    async def run():
+        bank = device_bank(max_current=16, evse_state=EvseState.CHARGING, charging_current=16)
+        bank[R.CP_STATE.address] = CpState.C2
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path, bank=bank)
+        host = await embedded.async_acquire(hass, entry)
+        try:
+            # Without a limit of its own the entry follows the wallbox.
+            assert host._service.config.current_cap == 16
+            assert host._service.control.max_charging_current == 16
+            await asyncio.sleep(0.2)
+            entry.options = {**MASTER, CONF_SCAN_INTERVAL_SECONDS: 30}
+            assert await embedded.async_acquire(hass, entry) is host
+            assert host._service.config.current_cap == 16
+            assert host._service.config.cap_from_wallbox is True
+            assert host._service.control.max_charging_current == 16
+            assert all(value >= 16 for value in current_writes(wallbox))
+        finally:
+            await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_limit_of_the_user_above_the_wallbox_maximum_allows_only_the_wallbox_maximum(
+    monkeypatch, tmp_path,
+):
+    async def run():
+        hass, entry, _wallbox = _setup(
+            monkeypatch, tmp_path, options={**MASTER, CONF_CURRENT_LIMIT: 32},
+        )
+        host = await embedded.async_acquire(hass, entry)
+        try:
+            assert host._service.config.cap_from_wallbox is False
+            assert host._service.config.current_cap == 32
+            assert host._service.control.max_charging_current == 16
         finally:
             await embedded.async_release(hass, entry.entry_id, force=True)
 

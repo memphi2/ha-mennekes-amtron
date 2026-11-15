@@ -29,6 +29,7 @@ from .charge_loss_const import (
 )
 from .device.charge_loss import LossStatistics
 from .device.charging_session import CompletedSession
+from .device.notice import FailureNotice
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
@@ -107,6 +108,7 @@ class ChargeLossObserver:
         self._lock = asyncio.Lock()
         self._stopping = False
         self._storage_ok = True
+        self._storage_notice = FailureNotice(_LOGGER, "Charging loss")
         self._storage_corrupt = False
         self._last_storage_attempt = float("-inf")
 
@@ -311,8 +313,7 @@ class ChargeLossObserver:
             # The replacement is visible or its state could not be read.
             # Retain the candidate for a retry and make estimates unavailable.
             self.statistics = candidate
-            if self._storage_ok:
-                _LOGGER.warning("Charging loss: estimate not saved; retrying without affecting charging")
+            self._storage_notice.failed("estimate not saved; retrying without affecting charging")
             self._storage_ok = False
             try:
                 self._coordinator.async_update_listeners()
@@ -320,14 +321,14 @@ class ChargeLossObserver:
                 _LOGGER.error("Charging loss: unable to publish an uncertain update")
             return
         except (OSError, ValueError):
-            if self._storage_ok:
-                _LOGGER.warning("Charging loss: estimate not saved; retrying without affecting charging")
+            self._storage_notice.failed("estimate not saved; retrying without affecting charging")
             changed = self._storage_ok
             self._storage_ok = False
         else:
             changed = not self._storage_ok or candidate.snapshot() != self.statistics.snapshot()
             self.statistics = candidate
             self._storage_ok = True
+            self._storage_notice.recovered("estimate saved again")
         if changed:
             self._coordinator.async_update_listeners()
 

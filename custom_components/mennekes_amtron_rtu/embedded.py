@@ -51,7 +51,6 @@ _RELOADING = f"{DOMAIN}_reloading"
 _START_SECONDS = 60
 # Changed limits wait for the command in progress, not for a hung bus.
 _APPLY_SECONDS = 5
-_UNCAPPED_AMPERE = 32.0
 
 
 def embedded_config(entry: MennekesAmtronConfigEntry) -> ServerConfig:
@@ -66,7 +65,10 @@ def embedded_config(entry: MennekesAmtronConfigEntry) -> ServerConfig:
         connection_config(entry),
         token="",
         read_only=not control_mode_is_master(dict(options)),
-        current_cap=float(cap) if isinstance(cap, (int, float)) else _UNCAPPED_AMPERE,
+        # Without a limit of its own the entry follows the wallbox's maximum,
+        # and only the minimum until the wallbox has said what that is.
+        current_cap=float(cap) if isinstance(cap, (int, float)) else CHARGING_CURRENT_MINIMUM,
+        cap_from_wallbox=not isinstance(cap, (int, float)),
         scan_interval=seconds(CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS),
         measurement_interval=seconds(
             CONF_MEASUREMENT_INTERVAL_SECONDS, DEFAULT_MEASUREMENT_INTERVAL_SECONDS
@@ -97,6 +99,7 @@ class EmbeddedService:
         self._service.client.bind_identity(expected_serial)
         self.transport = EmbeddedTransport(ServiceApi(self._service))
         self._stopping = False
+        self._died = False
         # Called when the service ends on its own, which it does rather than
         # carry on without its heartbeat.
         self.on_ended: Callable[[], None] | None = None
@@ -107,9 +110,6 @@ class EmbeddedService:
         try:
             async with asyncio.timeout(_START_SECONDS):
                 await self._service.wait_started()
-            bounded = self._bounded(self.config)
-            if bounded != self.config:
-                await self._service.apply_runtime_settings(bounded)
         except BaseException:
             await self.async_stop()
             raise
@@ -118,22 +118,16 @@ class EmbeddedService:
     def _ended(self, task: asyncio.Task[None]) -> None:
         if self._stopping or task.cancelled():
             return
+        self._died = True
         error = task.exception()
+        while isinstance(error, BaseExceptionGroup) and error.exceptions:
+            error = error.exceptions[0]
         _LOGGER.error(
             "Service: stopped unexpectedly (%s); starting it again",
             type(error).__name__ if error is not None else "no error",
         )
         if self.on_ended is not None:
             self.on_ended()
-
-    def _bounded(self, config: ServerConfig) -> ServerConfig:
-        """Without a limit from the user or the wallbox, allow the minimum only."""
-        if (
-            config.current_cap >= _UNCAPPED_AMPERE
-            and self._service.identity.max_evse_current is None
-        ):
-            return replace(config, current_cap=CHARGING_CURRENT_MINIMUM)
-        return config
 
     def credentials_rejected(self) -> bool:
         """Whether the gateway refused the saved password on the newest poll."""
@@ -147,7 +141,7 @@ class EmbeddedService:
         )
 
     async def async_apply(self, config: ServerConfig) -> None:
-        await self._service.apply_runtime_settings(self._bounded(config))
+        await self._service.apply_runtime_settings(config)
         self.config = replace(
             config, connection=self.config.connection, read_only=self.config.read_only
         )
@@ -155,9 +149,17 @@ class EmbeddedService:
     async def async_stop(self) -> None:
         self._stopping = True
         try:
-            await self._service.stop()
-        finally:
+            # A command whose caller gave up still finishes all its writes
+            # before the connection closes under it.
             await self.transport.async_drain()
+        finally:
+            try:
+                await self._service.stop()
+            except Exception:
+                # Its end was reported when it happened; everything was
+                # still saved and closed.
+                if not self._died:
+                    raise
 
 
 def _hosts(hass: HomeAssistant) -> dict[str, EmbeddedService]:
@@ -186,28 +188,37 @@ async def async_acquire(
     """
     config = embedded_config(entry)
     hosts = _hosts(hass)
-    host = hosts.pop(entry.entry_id, None)
+    entry_id = entry.entry_id
+    # The running service stays registered while it is adjusted, so a
+    # shutdown or its own end in the meantime still finds it.
+    host = hosts.get(entry_id)
     if host is not None:
         if host.fits(config):
             try:
                 async with asyncio.timeout(_APPLY_SECONDS):
                     await host.async_apply(config)
             except (DeviceError, TimeoutError):
-                # Not ready for new limits: a fresh start applies them.
-                await host.async_stop()
+                # Not ready for new limits: a fresh start applies them, unless
+                # Home Assistant is stopping and the service went with it.
+                if hosts.get(entry_id) is not host:
+                    raise DeviceError("service_unavailable") from None
             except BaseException:
                 # Never leave a running service that nothing can stop.
-                await host.async_stop()
+                if hosts.get(entry_id) is host:
+                    del hosts[entry_id]
+                    await host.async_stop()
                 raise
             else:
-                hosts[entry.entry_id] = host
+                if hosts.get(entry_id) is not host:
+                    # Stopped meanwhile, by a shutdown or by its own end.
+                    raise DeviceError("service_unavailable")
                 return host
-        else:
+        if hosts.get(entry_id) is host:
+            del hosts[entry_id]
             await host.async_stop()
     host = EmbeddedService(config, state_directory(hass, entry.entry_id), expected_serial)
     await host.async_start()
-    hosts[entry.entry_id] = host
-    entry_id = entry.entry_id
+    hosts[entry_id] = host
 
     def ended() -> None:
         if hosts.get(entry_id) is not host:
@@ -215,8 +226,10 @@ async def async_acquire(
         del hosts[entry_id]
 
         async def restart() -> None:
-            await host.async_stop()
-            hass.config_entries.async_schedule_reload(entry_id)
+            try:
+                await host.async_stop()
+            finally:
+                hass.config_entries.async_schedule_reload(entry_id)
 
         hass.async_create_task(restart(), "amtron_service_restart")
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -14,7 +15,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.switch import async_setup_entry
 from custom_components.mennekes_amtron_rtu.unplug_rule import UnplugRule
-from tests.fakes import device_bank, raise_connection_error
+from tests.fakes import device_bank, put, raise_connection_error
 from tests.ha_fakes import build_runtime, collect
 
 
@@ -328,6 +329,83 @@ def test_unplugging_also_ends_a_manual_pause(monkeypatch, release, paused, goal_
         rule = await _unplug_rule(transport, entry, release=release)
         await _unplug(transport, entry)
         assert calls == ["release False"] * release + ["resume"] * int(resumed)
+        rule.stop()
+
+    asyncio.run(run())
+
+
+def _records(caplog, text: str) -> list[int]:
+    return [record.levelno for record in caplog.records if text in record.getMessage()]
+
+
+async def _poll(transport, entry) -> None:
+    """A poll in which some reading moved, so the coordinator notifies."""
+    words = [transport.bank[R.MAX_CURRENT_HOUSE.address + offset] for offset in range(2)]
+    put(transport.bank, R.MAX_CURRENT_HOUSE, decode_register(R.MAX_CURRENT_HOUSE, words) - 0.5)
+    await entry.runtime_data.coordinator.async_refresh()
+
+
+def test_a_failed_release_off_is_retried_with_the_next_poll_and_reported_once(
+    monkeypatch, caplog,
+) -> None:
+    async def run() -> None:
+        caplog.set_level(logging.DEBUG, logger="custom_components.mennekes_amtron_rtu.unplug_rule")
+        _hass, entry, transport = await build_runtime()
+        calls: list[bool] = []
+
+        async def release_off(released: bool) -> None:
+            calls.append(released)
+            if len(calls) < 3:
+                raise HomeAssistantError("busy")
+
+        monkeypatch.setattr(entry.runtime_data.control, "async_set_charging_release", release_off)
+        rule = await _unplug_rule(transport, entry)
+        await _unplug(transport, entry)
+        assert calls == [False]
+        for expected in (2, 3, 3):
+            await _poll(transport, entry)
+            await asyncio.gather(*entry.background_tasks)
+            assert len(calls) == expected
+        failed = "Control: charging release not switched off after unplugging; retrying with the next poll"
+        assert _records(caplog, failed) == [logging.WARNING, logging.DEBUG]
+        assert _records(caplog, "Control: charging release switched off after unplugging") == [logging.INFO]
+        rule.stop()
+
+    asyncio.run(run())
+
+
+def test_a_retry_waits_for_the_running_switch_off_and_ends_when_the_car_is_back(monkeypatch) -> None:
+    async def run() -> None:
+        _hass, entry, transport = await build_runtime()
+        gate = asyncio.Event()
+        calls: list[bool] = []
+
+        async def release_off(released: bool) -> None:
+            calls.append(released)
+            if len(calls) == 2:
+                await gate.wait()
+            raise HomeAssistantError("busy")
+
+        monkeypatch.setattr(entry.runtime_data.control, "async_set_charging_release", release_off)
+        rule = await _unplug_rule(transport, entry)
+        await _unplug(transport, entry)
+        assert calls == [False]
+        await _poll(transport, entry)
+        await asyncio.sleep(0)
+        assert len(calls) == 2
+        # Polls while the switch-off still runs start no second one.
+        await _poll(transport, entry)
+        await _poll(transport, entry)
+        await asyncio.sleep(0)
+        assert len(calls) == 2
+        gate.set()
+        await asyncio.gather(*entry.background_tasks)
+        # The car is back: nothing is owed any more.
+        _plug(transport, True)
+        await _poll(transport, entry)
+        await _poll(transport, entry)
+        await asyncio.gather(*entry.background_tasks)
+        assert len(calls) == 2
         rule.stop()
 
     asyncio.run(run())

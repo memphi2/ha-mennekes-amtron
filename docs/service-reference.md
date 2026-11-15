@@ -304,24 +304,9 @@ may have made the safe defaults visible on disk. HA exposes this through
 **Settings → System → Repairs**. Repeated acknowledgements after a successful
 reset leave the current intent unchanged.
 
-Timed plans use two additional commands:
-
-| Command | Additional fields | Behavior |
-|---|---|---|
-| `timed_current` | `value`: requested amperes ≥6 (limited to the configured maximum), or `null` for pause; `owner`: nonempty string up to 128 characters; `deadline`: timezone-aware ISO timestamp up to 64 characters | Applies or queues this plan's requested current/pause only before its deadline. |
-| `cancel_timed_current` | `owner`: the same owner string | Removes only an unsent queued command belonging to that plan; manual queued work is preserved. |
-
-Both require `expected_serial_number` as above. The deadline is checked inside
-the service, so an obsolete queued request expires even while HA is offline.
-Expiry and cancellation do not reverse a command already applied or alter the
-last charging state. The integration cancels its owned pending work when a plan
-is cleared, replaced, completed or unloaded. Pending work remains volatile and
-is not restored after a service restart. The integration uses these two
-commands only with a service that does not plan departures itself.
-
 ### Command activity metadata
 
-Service 0.9.1 adds `origin` to command requests. It is an allowlisted diagnostic
+Command requests may carry `origin`. It is an allowlisted diagnostic
 source, not an authenticated user identity. The service validates and removes it
 before dispatching the command. It is a common optional field in addition to
 the action-specific fields documented here. A queued command retains its origin
@@ -384,7 +369,7 @@ access no bus:
 | `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
 | `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
 
-The plan writes through the same guarded path as `timed_current`, with the
+The plan writes through the same guarded path as other commands, with the
 owner `departure`. It is saved in `/data/departure-plan.json`, together with
 what the plan learned about up to eight cars, at most 8 KiB and bound to the
 wallbox identity. An unreadable file only clears the plan, and what it learned,

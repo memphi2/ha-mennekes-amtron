@@ -46,6 +46,9 @@ class WallboxData:
     # Fixed queue metadata changes only when intent changes, never each second.
     pending_change: str | None = field(default=None, repr=False)
     pending_change_until: datetime | None = field(default=None, repr=False)
+    # What the service decided apart from registers: departure, operation,
+    # guest charging, Plug & Charge. Entities show it, so a change notifies.
+    service_control: dict[str, Any] | None = field(default=None, repr=False)
     # Only quality transitions notify entities. Cumulative transaction counts
     # remain fresh for diagnostics without waking every entity on each retry.
     connection_quality: str | None = None

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any, Protocol
 
 from aiohttp import ClientSession, ClientTimeout
@@ -20,6 +21,8 @@ _MAX_RESPONSE_BYTES = 131072
 
 Reply = tuple[int, dict[str, Any]]
 
+
+_LOGGER = logging.getLogger(__name__)
 
 class ServiceTransport(Protocol):
     async def call(self, method: str, path: str, payload: dict[str, Any] | None) -> Reply:
@@ -87,6 +90,10 @@ class EmbeddedTransport:
             return await self._api.dispatch(method, path, payload)
         except ServiceBusyError:
             return 503, {"error": "service_unavailable"}
+        except Exception:
+            # The answer a web server gives for a fault inside an operation.
+            _LOGGER.exception("Service: request failed unexpectedly")
+            return 500, {"error": "internal_error"}
 
     def _finished(self, task: asyncio.Task[Reply]) -> None:
         self._running.discard(task)

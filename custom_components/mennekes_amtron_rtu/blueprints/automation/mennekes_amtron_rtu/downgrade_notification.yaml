@@ -46,7 +46,7 @@ conditions:
 
 actions:
   - variables:
-      limit: "{{ trigger.to_state.attributes.downgraded_to }}"
+      limit: "{{ trigger.to_state.attributes.get('downgraded_to') }}"
   - choose:
       - conditions: "{{ limit is not none }}"
         sequence:
@@ -54,7 +54,7 @@ actions:
             data:
               title: Wallbox downgraded
               message: The grid operator limited the wallbox to {{ limit }} A.
-      - conditions: "{{ trigger.from_state.attributes.downgraded_to is not none }}"
+      - conditions: "{{ trigger.from_state.attributes.get('downgraded_to') is not none }}"
         sequence:
           - action: "{{ notify_service }}"
             data:

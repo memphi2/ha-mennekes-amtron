@@ -112,8 +112,10 @@ def test_options_drive_the_interval_and_the_service_settings() -> None:
     entry = FakeConfigEntry()
     assert _scan_interval(entry) == 5.0
     assert embedded_config(entry).read_only is True
-    # Without a configured limit the service may use the full 32 A range.
-    assert embedded_config(entry).current_cap == 32.0
+    # Without a configured limit the service follows the wallbox's maximum
+    # and allows only the minimum until the wallbox has reported it.
+    assert embedded_config(entry).current_cap == 6.0
+    assert embedded_config(entry).cap_from_wallbox is True
 
     entry = FakeConfigEntry(
         options={
@@ -126,6 +128,7 @@ def test_options_drive_the_interval_and_the_service_settings() -> None:
     config = embedded_config(entry)
     assert config.read_only is False
     assert config.current_cap == 12.5
+    assert config.cap_from_wallbox is False
     assert config.scan_interval == 30.0
 
     # With the app, its settings count: HA keeps its own pace.

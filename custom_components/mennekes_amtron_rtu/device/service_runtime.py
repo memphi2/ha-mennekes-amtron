@@ -196,6 +196,7 @@ class ModbusService:
         self._saved_session_history = self.client.write_state.session_history.snapshot()
         self.identity = identity
         self._store = store
+        self.config = self.resolved_config(self.config)
         self._poller = DevicePoller(
             self.client,
             identity,
@@ -595,6 +596,12 @@ class ModbusService:
             },
             "write_errors": sorted(self.diagnostics.write_errors),
         }
+
+    def resolved_config(self, config: ServerConfig) -> ServerConfig:
+        """Settings with the wallbox's maximum as the cap where asked for."""
+        if not config.cap_from_wallbox or self.identity.max_evse_current is None:
+            return config
+        return replace(config, current_cap=self.identity.max_evse_current)
 
     async def stable_snapshot(self, *, patient: bool = False) -> dict[str, Any]:
         """Publish a goal only after its enclosing command has completed.

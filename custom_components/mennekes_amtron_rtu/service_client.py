@@ -502,6 +502,7 @@ class ServiceClient:
             service_soc_maximum_required=maximum_required,
             pending_change=pending_action,
             pending_change_until=pending_until,
+            service_control=control,
             connection_quality=quality,
             connection_failures=failures,
             connection_retries=retried,

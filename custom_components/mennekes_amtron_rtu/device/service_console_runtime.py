@@ -38,6 +38,7 @@ class ConsoleModbusService(ModbusService):
         control = self.control
         if self._stopping or control is None:
             raise DeviceError("service_unavailable")
+        candidate = self.resolved_config(candidate)
         cap = number(candidate.current_cap, 6, 32)
         options = ControlOptions(
             control.options.read_only, cap,
@@ -54,7 +55,7 @@ class ConsoleModbusService(ModbusService):
             self._poller.update_measurement_interval(measurement)
         self.config = replace(
             self.config, scan_interval=scan, measurement_interval=measurement,
-            current_cap=cap,
+            current_cap=cap, cap_from_wallbox=candidate.cap_from_wallbox,
             state_change_interval_seconds=options.state_change_interval_seconds,
             phase_switch_grace_seconds=options.phase_switch_grace_seconds,
         )

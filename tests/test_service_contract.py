@@ -26,6 +26,7 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
 )
 from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
 from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
+from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
@@ -456,6 +457,39 @@ def test_service_origin_is_validated_scoped_and_recorded(tmp_path):
             with pytest.raises(ValueError, match="expected_serial_number"):
                 await service.command({"origin": "app"})
             assert command_source.get() == "unknown"
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hidden(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            api = ServiceApi(service)
+            for method, path in (
+                ("GET", "/v2/unknown"), ("POST", "/v2/unknown"),
+                ("PUT", "/v2/command"), ("GET", "/v2/command"),
+            ):
+                assert await api.dispatch(method, path, {}) == (404, {"error": "not_found"})
+
+            async def broken(_payload):
+                raise KeyError("internal")
+
+            service.read = broken
+            # A programming error is no missing operation.
+            with pytest.raises(KeyError, match="internal"):
+                await api.dispatch("POST", "/v2/read", {"register": "error_code"})
+            # Over HTTP it is a server error, and the server keeps answering.
+            headers = {"Authorization": f"Bearer {TOKEN}"}
+            async with TestServer(create_app(service)) as server, ClientSession() as session:
+                async with session.post(
+                    server.make_url("/v2/read"), json={"register": "error_code"}, headers=headers,
+                ) as response:
+                    assert response.status == 500
+                async with session.get(server.make_url("/v2/state"), headers=headers) as response:
+                    assert response.status == 200
         finally:
             await service.stop()
 
