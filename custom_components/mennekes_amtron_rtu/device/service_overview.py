@@ -7,6 +7,7 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from .charging_display import DISPLAY_OPTIONS
 from .charging_status import charging_status
 from .command_events import CONTROL_ACTIONS, CommandEvents
 from .data import WallboxData
@@ -78,6 +79,9 @@ def overview_snapshot(
         WallboxData(values=values),
         cp_supported=type(layout) is int and layout >= CP_STATE.min_layout,
     ) if available else None
+    display = raw.get("charging_display")
+    if available and isinstance(display, str) and display in DISPLAY_OPTIONS:
+        status = display
     gate = _mapping(control.get("plug_charge"))
     read_only = control.get("read_only")
     read_only = read_only if type(read_only) is bool else None
@@ -93,8 +97,12 @@ def overview_snapshot(
         reason = "intent_rejected"
     elif not available:
         reason = "wallbox_unavailable"
-    elif status in (None, "initializing", "wallbox_error", "service_mode", "no_vehicle"):
-        reason = status or "state_unknown"
+    elif status in (None, "data_missing"):
+        reason = "missing_readings"
+    elif status == "state_uncertain":
+        reason = "inconsistent_readings"
+    elif status in ("initializing", "wallbox_error", "service_mode", "no_vehicle", "checking_status"):
+        reason = status
     elif goal_stop:
         reason = "goal_stop_requested"
     elif control.get("charging_release_requested") is False:
@@ -114,7 +122,10 @@ def overview_snapshot(
         "schema": 1,
         "configured": configured,
         "available": available,
-        "state": status or "unknown",
+        "state": (
+            "setup_required" if not configured else "service_starting" if not ready else
+            status or ("data_missing" if available else "connection_lost")
+        ),
         "reason": reason,
         "read_only": read_only,
         "heartbeat": (

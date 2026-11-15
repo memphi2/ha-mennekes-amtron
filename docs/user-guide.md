@@ -107,6 +107,13 @@ For a waiting charge, start with **Charging status**, **Pending change** and the
 active limits. **Connection quality** includes the `heartbeat` attribute (`ok` or
 `problem`). [All entities and their meanings](entities.md).
 
+The charging status distinguishes **Checking status** (briefly differing readings),
+**State is ambiguous** (still differing after two polls and at least ten seconds)
+and **Waiting for readings** (required values missing). A confirmed fault is
+shown immediately. [What these messages mean](troubleshooting.md#charging-status-is-being-checked).
+The app and Mushroom examples show **Connection interrupted** for lost
+communication; native HA entities remain **Unavailable**.
+
 ## Waiting between charging changes
 
 The default state-change wait is **300 seconds**, configurable from 0–3600.

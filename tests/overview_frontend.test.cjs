@@ -111,3 +111,21 @@ test("command activity shows time, current, trigger and reason", async () => {
   assert.match(row.children[1].textContent, /Virtuelles Plug & Charge/);
   assert.match(row.children[1].textContent, /Steckvorgang/);
 });
+
+test("uncertain readings are neutral until persistent; an outage stays explicit", async () => {
+  for (const [state, reason, label, style] of [
+    ["checking_status", "checking_status", "Status wird abgeglichen", "state-muted"],
+    ["state_uncertain", "inconsistent_readings", "Zustand nicht eindeutig", "state-wait"],
+    ["data_missing", "missing_readings", "Warte auf Messwerte", "state-wait"],
+    ["connection_lost", "wallbox_unavailable", "Verbindung unterbrochen", "state-error"],
+    ["service_starting", "service_starting", "Service initialisiert", "state-muted"],
+  ]) {
+    const data = {...overview(null), state, reason, available:!["connection_lost", "service_starting"].includes(state)};
+    const h = setup("de", data); await flush();
+    assert.ok(put(h, "charge_state").startsWith(label));
+    assert.ok(h.ids.get("charge_state").className.endsWith(style));
+    assert.equal(h.ids.get("charge_reason").hidden, state === reason);
+    assert.equal(h.ids.get("operation").hidden, true);
+    assert.equal(h.ids.get("command_results").children.length, 0);
+  }
+});

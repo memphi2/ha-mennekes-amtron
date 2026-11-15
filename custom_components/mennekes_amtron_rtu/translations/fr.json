@@ -357,7 +357,10 @@
           "paused": "Recharge en pause",
           "authorization_required": "Autorisation requise",
           "preparing": "Préparation de la recharge",
-          "waiting_for_vehicle": "En attente du véhicule"
+          "waiting_for_vehicle": "En attente du véhicule",
+          "checking_status": "Vérification de l’état",
+          "state_uncertain": "État ambigu",
+          "data_missing": "En attente de mesures"
         }
       },
       "connection_quality": {

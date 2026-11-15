@@ -95,7 +95,7 @@
     step_plan_start: ["Planned charge starts", "Geplantes Laden startet", "La recharge planifiée démarre", "Gepland laden start", "Inizia la ricarica pianificata"],
     step_target_reached: ["Target expected", "Ziel voraussichtlich erreicht", "Cible attendue", "Doel verwacht", "Obiettivo previsto"],
     step_departure: ["Target time", "Zielzeitpunkt", "Heure cible", "Doeltijd", "Orario obiettivo"],
-    car_unknown: ["Unknown", "Unbekannt", "Inconnu", "Onbekend", "Sconosciuto"],
+    car_unknown: ["Vehicle status not confirmed", "Fahrzeugstatus nicht bestätigt", "État du véhicule non confirmé", "Voertuigstatus niet bevestigd", "Stato del veicolo non confermato"],
     car_none: ["Not connected", "Nicht angeschlossen", "Non connecté", "Niet aangesloten", "Non collegato"],
     car_connected: ["Connected", "Angeschlossen", "Connecté", "Aangesloten", "Collegato"],
     car_confirmed: ["Confirmed", "Bestätigt", "Confirmé", "Bevestigd", "Confermato"],
@@ -104,7 +104,13 @@
     heartbeat: ["Heartbeat", "Heartbeat", "Heartbeat", "Heartbeat", "Heartbeat"],
     ok: ["confirmed", "bestätigt", "confirmé", "bevestigd", "confermato"],
     problem: ["not confirmed in time", "nicht rechtzeitig bestätigt", "non confirmé à temps", "niet op tijd bevestigd", "non confermato in tempo"],
-    unknown: ["Unknown", "Unbekannt", "Inconnu", "Onbekend", "Sconosciuto"],
+    unknown: ["Not yet confirmed", "Noch nicht bestätigt", "Pas encore confirmé", "Nog niet bevestigd", "Non ancora confermato"],
+    checking_status: ["Checking status", "Status wird abgeglichen", "Vérification de l’état", "Status wordt gecontroleerd", "Verifica dello stato"],
+    state_uncertain: ["State is ambiguous", "Zustand nicht eindeutig", "État ambigu", "Status niet eenduidig", "Stato non univoco"],
+    data_missing: ["Waiting for readings", "Warte auf Messwerte", "En attente de mesures", "Wachten op metingen", "In attesa di letture"],
+    connection_lost: ["Connection interrupted", "Verbindung unterbrochen", "Connexion interrompue", "Verbinding verbroken", "Connessione interrotta"],
+    inconsistent_readings: ["Required wallbox readings still disagree. Check the connection and diagnostics if this persists.", "Die benötigten Wallbox-Meldungen passen noch nicht zusammen. Bei anhaltender Anzeige Verbindung und Diagnose prüfen.", "Les mesures nécessaires de la borne divergent encore. Si cela persiste, vérifiez la connexion et le diagnostic.", "De benodigde wallboxmetingen komen nog niet overeen. Controleer bij aanhouden de verbinding en diagnose.", "Le letture necessarie della wallbox non concordano ancora. Se persiste, verificare connessione e diagnostica."],
+    missing_readings: ["Required readings are missing; no previous state is shown as current.", "Benötigte Messwerte fehlen; ein früherer Zustand wird nicht als aktuell angezeigt.", "Des mesures nécessaires manquent ; aucun état précédent n’est affiché comme actuel.", "Benodigde metingen ontbreken; een eerdere status wordt niet als actueel getoond.", "Mancano letture necessarie; uno stato precedente non viene mostrato come attuale."],
     initializing: ["Initializing", "Initialisierung", "Initialisation", "Initialiseren", "Inizializzazione"],
     wallbox_error: ["Wallbox reports a fault", "Wallbox meldet einen Fehler", "La borne signale un défaut", "Wallbox meldt een storing", "La wallbox segnala un guasto"],
     service_mode: ["Wallbox in service mode", "Wallbox im Servicemodus", "Borne en mode maintenance", "Wallbox in servicemodus", "Wallbox in manutenzione"],
@@ -119,7 +125,6 @@
     setup_required: ["Configure the connection first.", "Zuerst die Verbindung einrichten.", "Configurez d’abord la connexion.", "Stel eerst de verbinding in.", "Configurare prima la connessione."],
     service_starting: ["Service is initializing; no current wallbox state yet.", "Service initialisiert; noch kein aktueller Wallbox-Zustand.", "Service en initialisation ; état encore indisponible.", "Service initialiseert; nog geen actuele wallboxstatus.", "Servizio in inizializzazione; stato non ancora disponibile."],
     wallbox_unavailable: ["No current wallbox reading. Saved targets and queued intent are not proof of execution.", "Keine aktuelle Wallbox-Meldung. Gespeicherte Ziele und vorgemerkte Befehle belegen keine Ausführung.", "Aucune mesure actuelle. Les objectifs et commandes en attente ne prouvent pas leur exécution.", "Geen actuele wallboxmeting. Opgeslagen doelen en opdrachten bewijzen geen uitvoering.", "Nessuna lettura attuale. Obiettivi e comandi salvati non provano l’esecuzione."],
-    state_unknown: ["Readings are missing or contradictory; charging state cannot be confirmed.", "Messwerte fehlen oder widersprechen sich; Ladezustand nicht bestätigt.", "Mesures absentes ou contradictoires ; état non confirmé.", "Metingen ontbreken of spreken elkaar tegen; laadstatus niet bevestigd.", "Letture mancanti o contraddittorie; stato non confermato."],
     goal_stop_requested: ["A charge target requires a stop; this is intent, not proof that charging has stopped.", "Ein Ladeziel fordert einen Stopp; das ist eine Anforderung, keine bestätigte Ladeunterbrechung.", "Un objectif demande l’arrêt ; cela ne prouve pas que la recharge est arrêtée.", "Een laaddoel vraagt een stop; dit bewijst niet dat het laden is gestopt.", "Un obiettivo richiede uno stop; non prova che la ricarica sia interrotta."],
     release_stop_requested: ["The service retains a request to disable charging release.", "Im Service ist das Abschalten der Ladefreigabe angefordert.", "Le service conserve une demande de désactivation de la recharge.", "De service bewaart een verzoek om laadvrijgave uit te zetten.", "Il servizio conserva una richiesta di disattivazione del consenso."],
     pause_requested: ["The service retains a pause request. Its source is not supplied by this snapshot.", "Im Service ist eine Pause angefordert. Ihre Herkunft ist in diesem Zustand nicht enthalten.", "Le service conserve une demande de pause. Sa source n’est pas fournie.", "De service bewaart een pauzeverzoek. De bron staat niet in deze status.", "Il servizio conserva una richiesta di pausa. La fonte non è disponibile."],
@@ -176,7 +181,7 @@
         || !Array.isArray(data.commands) || data.commands.length > 32
         || (data.operation && !(data.operation.next && data.operation.target))) throw new Error("invalid overview");
     put("charge_state", text(data.state));
-    el("charge_state").className="state charging-state "+(!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle"].includes(data.state)?"state-wait":"state-muted");
+    el("charge_state").className="state charging-state "+(["setup_required","service_starting"].includes(data.state)?"state-muted":!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle","state_uncertain","data_missing"].includes(data.state)?"state-wait":"state-muted");
     put("charge_reason", text(data.reason));
     el("charge_reason").hidden=text(data.reason)===text(data.state);
     put("service_mode", text(data.read_only === true ? "readonly" : data.read_only === false ? "writable" : "unknown"));

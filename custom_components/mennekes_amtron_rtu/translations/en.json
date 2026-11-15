@@ -357,7 +357,10 @@
           "paused": "Charging paused",
           "authorization_required": "Authorization required",
           "preparing": "Preparing to charge",
-          "waiting_for_vehicle": "Waiting for vehicle"
+          "waiting_for_vehicle": "Waiting for vehicle",
+          "checking_status": "Checking status",
+          "state_uncertain": "State is ambiguous",
+          "data_missing": "Waiting for readings"
         }
       },
       "connection_quality": {

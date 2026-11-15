@@ -25,7 +25,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 
-from .device.charging_status import CHARGING_STATUS_OPTIONS
+from .device.charging_display import DISPLAY_OPTIONS
 from .device.control import PENDING_ACTIONS
 from .device.decode import RegisterValue
 from .device.departure_plan import DEPARTURE_STATES
@@ -109,7 +109,7 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         key="charging_status",
         translation_key="charging_status",
         device_class=SensorDeviceClass.ENUM,
-        options=list(CHARGING_STATUS_OPTIONS),
+        options=list(DISPLAY_OPTIONS),
     ),
     SensorEntityDescription(
         key="connection_quality",

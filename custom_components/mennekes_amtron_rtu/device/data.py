@@ -29,6 +29,8 @@ class WallboxData:
 
     values: dict[str, RegisterValue] = field(default_factory=dict)
     failed_blocks: tuple[str, ...] = ()
+    # Presentation only; controllers continue to use register values.
+    charging_display: str | None = None
     # Internal ordering only: never make a poll notify entities merely because
     # its generation changed, and never expose this in entity attributes.
     current_write_generation: int = field(default=0, compare=False, repr=False)

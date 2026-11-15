@@ -357,7 +357,10 @@
           "paused": "Laden pausiert",
           "authorization_required": "Autorisierung erforderlich",
           "preparing": "Laden wird vorbereitet",
-          "waiting_for_vehicle": "Warten auf das Fahrzeug"
+          "waiting_for_vehicle": "Warten auf das Fahrzeug",
+          "checking_status": "Status wird abgeglichen",
+          "state_uncertain": "Zustand nicht eindeutig",
+          "data_missing": "Warte auf Messwerte"
         }
       },
       "connection_quality": {

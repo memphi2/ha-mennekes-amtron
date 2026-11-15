@@ -357,7 +357,10 @@
           "paused": "Laden gepauzeerd",
           "authorization_required": "Autorisatie vereist",
           "preparing": "Laden voorbereiden",
-          "waiting_for_vehicle": "Wachten op het voertuig"
+          "waiting_for_vehicle": "Wachten op het voertuig",
+          "checking_status": "Status wordt gecontroleerd",
+          "state_uncertain": "Status niet eenduidig",
+          "data_missing": "Wachten op metingen"
         }
       },
       "connection_quality": {

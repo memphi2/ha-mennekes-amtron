@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.9.1
 
+- Distinguish brief status reconciliation, persistent conflicting readings and
+  missing data in HA and the app. Dashboard examples explain initial readings
+  and connection loss, without new activity events or polling.
+
 - Command activity identifies its trigger, request and outcome in Home Assistant
   and the app, including a timestamp retained through the remote connection.
   Home Assistant adds translated command messages alongside observed

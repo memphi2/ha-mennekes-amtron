@@ -3,7 +3,7 @@ type: vertical-stack
 cards:
   - type: custom:mushroom-template-card
     entity: sensor.mennekes_amtron_laadstatus
-    primary: "AMTRON · {{ states('sensor.mennekes_amtron_totaal_vermogen', with_unit=True) }}"
+    primary: "AMTRON · {{ states('sensor.mennekes_amtron_totaal_vermogen', with_unit=True) if has_value('sensor.mennekes_amtron_totaal_vermogen') else '—' }}"
     secondary: >-
       {%- set p = namespace(l=[]) -%}
       {%- set e = states('number.mennekes_amtron_energiedoel') | float(0) -%}
@@ -12,7 +12,7 @@ cards:
       {%- set s = states('number.mennekes_amtron_laaddoel_van_voertuig') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
       {%- set t = states('sensor.mennekes_amtron_status_geplande_lading') -%}
-      {{ state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_laadsessie', with_unit=True) }}
+      {{ 'Wachten op eerste meting' if is_state(entity, 'unknown') else 'Verbinding verbroken' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_laadsessie', with_unit=True) if has_value('sensor.mennekes_amtron_energie_laadsessie') else '—' }}
 
       {{ 'Grenzen: ' ~ p.l | join(' · ') if p.l else 'Geen laadgrens' }}
       {%- if t not in ['disabled', 'none', 'unknown', 'unavailable'] %} · Planning: {{ state_translated('sensor.mennekes_amtron_status_geplande_lading') }}{% endif %}
@@ -20,7 +20,9 @@ cards:
     icon: mdi:ev-station
     color: >-
       {% set s = states(entity) %}{{ 'green' if s == 'charging' else 'amber' if s == 'paused'
-      else 'red' if s in ['wallbox_error', 'unavailable', 'unknown'] else 'blue' }}
+      else 'red' if s in ['wallbox_error', 'unavailable']
+      else 'amber' if s in ['state_uncertain', 'data_missing']
+      else 'grey' if s in ['unknown', 'checking_status', 'initializing'] else 'blue' }}
     tap_action:
       action: more-info
   - type: custom:mushroom-chips-card

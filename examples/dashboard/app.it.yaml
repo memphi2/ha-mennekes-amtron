@@ -3,7 +3,7 @@ type: vertical-stack
 cards:
   - type: custom:mushroom-template-card
     entity: sensor.mennekes_amtron_stato_di_ricarica
-    primary: "AMTRON · {{ states('sensor.mennekes_amtron_potenza_totale', with_unit=True) }}"
+    primary: "AMTRON · {{ states('sensor.mennekes_amtron_potenza_totale', with_unit=True) if has_value('sensor.mennekes_amtron_potenza_totale') else '—' }}"
     secondary: >-
       {%- set p = namespace(l=[]) -%}
       {%- set e = states('number.mennekes_amtron_obiettivo_energetico') | float(0) -%}
@@ -12,7 +12,7 @@ cards:
       {%- set s = states('number.mennekes_amtron_obiettivo_di_carica_del_veicolo') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
       {%- set t = states('sensor.mennekes_amtron_stato_ricarica_programmata') -%}
-      {{ state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energia_della_sessione', with_unit=True) }}
+      {{ 'In attesa della prima lettura' if is_state(entity, 'unknown') else 'Connessione interrotta' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energia_della_sessione', with_unit=True) if has_value('sensor.mennekes_amtron_energia_della_sessione') else '—' }}
 
       {{ 'Limiti: ' ~ p.l | join(' · ') if p.l else 'Nessun limite' }}
       {%- if t not in ['disabled', 'none', 'unknown', 'unavailable'] %} · Pianificazione: {{ state_translated('sensor.mennekes_amtron_stato_ricarica_programmata') }}{% endif %}
@@ -20,7 +20,9 @@ cards:
     icon: mdi:ev-station
     color: >-
       {% set s = states(entity) %}{{ 'green' if s == 'charging' else 'amber' if s == 'paused'
-      else 'red' if s in ['wallbox_error', 'unavailable', 'unknown'] else 'blue' }}
+      else 'red' if s in ['wallbox_error', 'unavailable']
+      else 'amber' if s in ['state_uncertain', 'data_missing']
+      else 'grey' if s in ['unknown', 'checking_status', 'initializing'] else 'blue' }}
     tap_action:
       action: more-info
   - type: custom:mushroom-chips-card

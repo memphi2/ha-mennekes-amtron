@@ -13,6 +13,7 @@ Find the symptom first; collect diagnostics before restarting if the problem is 
 | USB or LAN does not connect | [Connection setup](#the-config-flow-cannot-connect), [LAN](network-gateway.md#network-access-and-troubleshooting) |
 | A control or feature is missing | [Missing entities](#entities-are-missing) |
 | The app is not discovered, not ready, or rejects access | [App connection](#app-connection-and-discovery) |
+| Charging status is unclear | [Status messages](#charging-status-is-being-checked) |
 | Charging does not start or current does not change | [Current and pending changes](#the-charging-current-does-not-follow) |
 | Heartbeat warning or error 200 | [Heartbeat](#heartbeat-or-service-connection-repair) |
 | The wrong car is selected | [Vehicle recognition](#vehicle-profiles-and-automatic-selection) |
@@ -55,6 +56,34 @@ your device implements; compare it with the reference.
 Do not delete and re-add an existing wallbox to recover its controls. Using
 **Reconfigure** or confirming its discovered app preserves the matched device
 and entity IDs.
+
+## Charging status is being checked
+
+Plugging in, unplugging or changing charge permission can update the wallbox's
+registers at slightly different times. **Checking status** is a neutral display
+while these readings disagree; it does not mean that a new fault occurred.
+
+- **State is ambiguous:** the readings still disagree on a later poll, after at
+  least ten seconds and two actual bus observations. Open the charging-status
+  entity for EVSE and pilot readings. If it persists, check the adapter connection
+  and collect diagnostics. Opening or refreshing the app does not advance this timer.
+- **Waiting for readings:** values needed to establish the state are missing.
+  A previously valid state is not presented as a current measurement.
+- **Connection interrupted:** no current communication with the wallbox. Native
+  HA entities show **Unavailable**; the app and Mushroom card explain the outage.
+- **Waiting for first reading:** the Mushroom card has not received its initial
+  state yet. This is not an error by itself.
+
+A confirmed wallbox fault appears immediately. The actual control and safety
+checks continue to use the register values, without this presentation delay.
+These display transitions do not create extra command or wallbox events. Recorder
+may still retain a changed sensor state; there is no per-second counter.
+
+An event entity's state is the time of its last event. Before the first event,
+HA may show **Unknown**. No event is invented to fill that timestamp. The app
+shows an empty-results message and the Mushroom example omits event rows.
+Optional, unconfigured controls stay hidden in the dashboard. **Source not reported**
+on a command is retained explicitly: it must not be mistaken for a user action.
 
 ## Writes are refused
 

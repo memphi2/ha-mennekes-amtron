@@ -92,7 +92,10 @@
           "paused": "mdi:pause-circle",
           "authorization_required": "mdi:card-account-details-outline",
           "preparing": "mdi:timer-sand",
-          "waiting_for_vehicle": "mdi:car-clock"
+          "waiting_for_vehicle": "mdi:car-clock",
+          "checking_status": "mdi:progress-clock",
+          "state_uncertain": "mdi:help-circle-outline",
+          "data_missing": "mdi:database-clock-outline"
         }
       },
       "connection_quality": {

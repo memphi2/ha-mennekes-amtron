@@ -9,6 +9,7 @@ import pytest
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import EntityCategory
 
+from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.charging_status import (
     CHARGING_STATUS_OPTIONS,
     charging_status,
@@ -17,6 +18,7 @@ from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.registers import LAYOUT_V01_00
 from custom_components.mennekes_amtron_rtu.sensor import async_setup_entry
+from tests.fakes import put
 from tests.ha_fakes import build_runtime, collect
 
 
@@ -118,7 +120,7 @@ def test_pending_intent_and_measurement_fluctuations_do_not_change_observed_stat
 @pytest.mark.parametrize("read_only", [False, True])
 def test_derived_entities_are_available_without_control_and_record_no_counters(layout, read_only):
     async def run():
-        hass, entry, _transport = await build_runtime(
+        hass, entry, transport = await build_runtime(
             read_only=read_only, **({"layout": layout} if layout else {}),
         )
         added = {}
@@ -126,13 +128,22 @@ def test_derived_entities_are_available_without_control_and_record_no_counters(l
         status = added["charging_status"]
         quality = added["connection_quality"]
         coordinator = entry.runtime_data.coordinator
-        coordinator.data.values.update(evse_state=EvseState.READY_TO_CHARGE, cp_state=CpState.B2)
+        put(transport.bank, R.EVSE_STATE, EvseState.READY_TO_CHARGE)
+        put(transport.bank, R.CP_STATE, CpState.B2)
+        await coordinator.async_refresh()
         assert status.available
         assert status.native_value == "waiting_for_vehicle"
         assert status.entity_category is None
         assert status.device_class is SensorDeviceClass.ENUM
         assert status.state_class is None
-        assert status.extra_state_attributes == {"evse_state": "ready_to_charge", "cp_state": "b2"}
+        assert status.extra_state_attributes == {
+            "evse_state": "ready_to_charge",
+            **({"cp_state": "b2"} if layout != LAYOUT_V01_00 else {}),
+        }
+        for display in ("checking_status", "state_uncertain", "data_missing"):
+            coordinator.data.charging_display = display
+            assert status.native_value == display
+            assert display in status.options
         assert status.unique_id.endswith("_charging_status")
         assert quality.entity_category is EntityCategory.DIAGNOSTIC
         assert quality.state_class is None
@@ -151,7 +162,7 @@ def test_derived_entities_are_available_without_control_and_record_no_counters(l
         assert not status.available
         assert not quality.available
         coordinator.last_update_success = True
-        coordinator.data.values.clear()
+        coordinator.data = type(coordinator.data)()
         assert status.available
         assert status.native_value is None
 

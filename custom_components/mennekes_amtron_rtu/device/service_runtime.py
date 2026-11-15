@@ -510,6 +510,7 @@ class ModbusService:
             "identity": asdict(self.identity),
             "available": self._is_available(),
             "values": self.data.values,
+            "charging_display": self.data.charging_display,
             "failed_blocks": list(self.data.failed_blocks),
             "current_write_generation": self.data.current_write_generation,
             "connection_quality": self.data.connection_quality,
