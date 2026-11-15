@@ -115,7 +115,7 @@ def test_storage_problems_only_cost_the_remembered_targets(tmp_path, monkeypatch
             memory._store.path.write_text("not json")
             await memory.async_load()
             assert memory.recall("car") is None
-            assert "Ignoring saved vehicle charge targets" in caplog.text
+            assert "Vehicle charge target: ignoring saved targets" in caplog.text
 
             async def fail(_goal):
                 raise OSError("disk full")
@@ -124,7 +124,7 @@ def test_storage_problems_only_cost_the_remembered_targets(tmp_path, monkeypatch
             assert memory.remember("car", 80)
             await memory.async_save()
             assert memory.recall("car") == 80
-            assert "Vehicle charge target not saved" in caplog.text
+            assert "Vehicle charge target: not saved" in caplog.text
         finally:
             await hass.async_stop()
 
@@ -208,7 +208,7 @@ def test_an_unconfirmed_car_neither_reaches_nor_keeps_a_reached_target(tmp_path,
             await hass.async_block_till_done()
             assert control.soc_goal.status == "active"
             control.async_resume_charging.assert_awaited_once()
-            assert "Reached charge target released" in caplog.text
+            assert "Vehicle charge target: reached target released" in caplog.text
             assert observer.latest_soc is None
             # The resting car's reports change nothing.
             hass.states.async_set("sensor.first", "95", {"unit_of_measurement": "%"})

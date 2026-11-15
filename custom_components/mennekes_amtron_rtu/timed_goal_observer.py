@@ -163,7 +163,7 @@ class TimedGoalObserver:
         try:
             self._plan_paused = (await self._pause_store.async_load()).paused
         except (OSError, ValueError) as err:
-            _LOGGER.warning("Saved departure plan pause unavailable: %s", type(err).__name__)
+            _LOGGER.warning("Departure plan: saved pause unavailable (%s)", type(err).__name__)
         if (profile := self._options.get(CONF_VEHICLE_PROFILE_ID)) is not None:
             self._known_phases = await self._phase_memory().async_phases(profile)
         options = self._options
@@ -210,7 +210,7 @@ class TimedGoalObserver:
             # The independent service still expires the queued command at its
             # deadline. A disconnected service must not abort HA teardown.
             _LOGGER.warning(
-                "Could not cancel timed charging during unload: %s",
+                "Departure plan: timed charging not cancelled during unload (%s)",
                 getattr(err, "translation_key", None) or type(err).__name__,
             )
         if withdraw:
@@ -225,7 +225,7 @@ class TimedGoalObserver:
                 await self._end_plan_pause()
             except (AmtronBusError, HomeAssistantError, OSError) as err:
                 _LOGGER.warning(
-                    "Could not end the departure plan pause for the previous car: %s",
+                    "Departure plan: pause for the previous car not ended (%s)",
                     getattr(err, "translation_key", None) or type(err).__name__,
                 )
 
@@ -256,10 +256,10 @@ class TimedGoalObserver:
                 self._set_status("write_pending")
                 message = str(err)
                 if message != self._last_error:
-                    _LOGGER.warning("Timed charging command deferred: %s", message)
+                    _LOGGER.warning("Departure plan: command deferred (%s)", message)
                     self._last_error = message
             except Exception:
-                _LOGGER.exception("Timed charging evaluation failed")
+                _LOGGER.exception("Departure plan: evaluation failed")
                 self._set_status("error")
 
     async def async_set_deadline(
@@ -379,7 +379,7 @@ class TimedGoalObserver:
             try:
                 publish()
             except Exception:  # noqa: BLE001 - preserve the storage failure
-                _LOGGER.error("Unable to publish an uncertain departure update")
+                _LOGGER.error("Departure plan: unable to publish an uncertain update")
 
     async def async_use_next_calendar_event(self) -> None:
         """Select a single matching future event; later events never roll in."""
@@ -768,7 +768,7 @@ class TimedGoalObserver:
             and not control.energy_goal_stop_requested
         ):
             await control.async_resume_charging()
-            _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
+            _LOGGER.info("Departure plan: pause ended, the plan no longer applies to the car")
         await self._set_plan_paused(False)
 
     async def _observe_plan_pause(self) -> None:
@@ -799,7 +799,7 @@ class TimedGoalObserver:
         except (OSError, ValueError) as err:
             # The plan keeps it in memory; it is lost only with a restart.
             self._pause_store_current = False
-            _LOGGER.warning("Departure plan pause could not be saved: %s", type(err).__name__)
+            _LOGGER.warning("Departure plan: pause not saved (%s)", type(err).__name__)
         else:
             self._pause_store_current = True
 

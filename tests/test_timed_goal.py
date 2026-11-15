@@ -696,7 +696,7 @@ def test_an_unreadable_saved_pause_counts_as_none(monkeypatch: pytest.MonkeyPatc
         observer._pause_store.async_load = AsyncMock(side_effect=ValueError("damaged"))
         restarted = await _restart(monkeypatch, observer)
         assert not restarted._plan_paused
-        assert "Saved departure plan pause unavailable" in caplog.text
+        assert "Departure plan: saved pause unavailable" in caplog.text
         # A failing save keeps the pause in memory and is tried again.
         restarted._pause_store.async_save = AsyncMock(side_effect=OSError("disk"))
         await restarted._set_plan_paused(True)

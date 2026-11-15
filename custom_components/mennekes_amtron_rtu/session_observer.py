@@ -15,6 +15,7 @@ from .charging_cost_const import CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED
 from .coordinator import MennekesAmtronCoordinator
 from .device.charging_session import SessionHistory
 from .device.data import DeviceIdentity, WallboxData
+from .device.notice import FailureNotice
 from .device.registers import CP_STATE, ENERGY_TOTAL
 from .goal_store import SessionHistoryStore
 from .vehicle_profiles import profiles, vehicle_options
@@ -69,7 +70,7 @@ class SessionObserver:
         self._dirty = False
         self._closed = False
         self._retry_at = 0.0
-        self._storage_failed = False
+        self._storage_notice = FailureNotice(_LOGGER, "Charging session")
 
     def rebind(self, coordinator: MennekesAmtronCoordinator) -> None:
         """Continue the same observed cycle after a logical profile reload."""
@@ -91,16 +92,11 @@ class SessionObserver:
                 restored.snapshot(), cp_supported=self._cp_supported,
             )
             self._loaded = True
-            self._storage_failed = False
+            self._storage_notice.recovered("storage available again")
 
     def _storage_error(self, err: OSError | ValueError) -> None:
         self._retry_at = self._monotonic() + _RETRY_SECONDS
-        if not self._storage_failed:
-            _LOGGER.warning(
-                "Optional charging-session storage is unavailable (%s); retrying in 60 seconds",
-                type(err).__name__,
-            )
-            self._storage_failed = True
+        self._storage_notice.failed("optional storage unavailable; retrying in 60 seconds", type(err).__name__)
 
     async def _async_save(self) -> None:
         try:
@@ -109,7 +105,7 @@ class SessionObserver:
             self._storage_error(err)
         else:
             self._dirty = False
-            self._storage_failed = False
+            self._storage_notice.recovered("storage available again")
 
     async def async_observe(self, data: WallboxData | None) -> None:
         """Capture only complete cycles and publish stable session metadata."""

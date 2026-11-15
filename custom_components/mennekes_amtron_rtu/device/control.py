@@ -625,7 +625,7 @@ class AmtronControl:
         if current == CHARGING_CURRENT_UNLIMITED:
             if not allow_unlimited:
                 raise validation_error("charging_current_zero")
-            _LOGGER.info("Disabling the EMS current limit (0 A)")
+            _LOGGER.info("Control: disabling the EMS current limit (0 A)")
         elif not math.isfinite(current) or current < CHARGING_CURRENT_MINIMUM:
             raise validation_error(
                 "charging_current_invalid",
@@ -1437,7 +1437,7 @@ class AmtronControl:
                             # One attempt only. A lost acknowledgement must
                             # never produce an automatic duplicate start.
                             _LOGGER.warning(
-                                "Queued %s command cancelled (%s)", command.action,
+                                "Control: queued %s command cancelled (%s)", command.action,
                                 err.translation_key if isinstance(err, DeviceError)
                                 else type(err).__name__,
                             )
@@ -1454,7 +1454,7 @@ class AmtronControl:
             # A failing refresh/persistence callback must not leave an
             # unobserved task or a queued start with no owner. Never retry it.
             self._clear_pending()
-            _LOGGER.warning("Deferred command cancelled after %s", type(err).__name__)
+            _LOGGER.warning("Control: deferred command cancelled (%s)", type(err).__name__)
         finally:
             self._flush_task = None
 

@@ -172,12 +172,12 @@ def test_session_storage_failure_does_not_make_wallbox_unavailable_and_retries_b
                 service._session_history_retry_at = 0
                 await service.refresh()
                 assert len(attempts) == 3
-                assert caplog.text.count("Cannot save completed charging session") == 1
+                assert caplog.text.count("Charging session: completed session not saved") == 1
                 service._store.save = real_save
                 service._session_history_retry_at = 0
                 await service.refresh()
                 assert not service._session_history_dirty
-                assert not service._session_history_error_logged
+                assert not service._history_notice.failing
                 saved = json.loads(await asyncio.to_thread(service.state_path.read_text))
                 assert saved["charging_session_history"]["latest"]["wallbox_kwh"] == 12
                 assert service.snapshot()["available"]
@@ -274,7 +274,7 @@ def test_store_discards_only_invalid_optional_history(tmp_path, caplog, history)
     assert state.energy_goal.snapshot() == energy_goal.snapshot()
     assert state.soc_goal.snapshot() == soc_goal.snapshot()
     assert state.session_history.snapshot() == SessionHistory().snapshot()
-    assert caplog.messages == ["Ignoring invalid completed charging session history"]
+    assert caplog.messages == ["Charging session: ignoring invalid saved history"]
     assert "private-corrupt-history" not in caplog.text
     # The next ordinary intent save repairs the optional data once. A later
     # restart must not repeatedly warn or lose any accepted charging limits.
@@ -347,7 +347,7 @@ def test_invalid_optional_history_does_not_block_service_heartbeat(tmp_path, cap
             assert replacement.diagnostics.heartbeats_sent > 0
             assert transport.writes
             assert all(address == R.HEARTBEAT.address for address, _ in transport.writes)
-            assert caplog.text.count("Ignoring invalid completed charging session history") == 1
+            assert caplog.text.count("Charging session: ignoring invalid saved history") == 1
             assert "private-corrupt-history" not in caplog.text
         finally:
             await replacement.stop()

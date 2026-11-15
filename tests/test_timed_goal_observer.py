@@ -888,7 +888,7 @@ def test_a_failed_cancel_still_ends_the_plans_pause_for_another_car(monkeypatch,
         control.async_cancel_timed_current = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
         await observer.async_stop(withdraw=True)
         assert resumed == [True]
-        assert "Could not cancel timed charging" in caplog.text
+        assert "Departure plan: timed charging not cancelled" in caplog.text
 
         # A failing resume is logged, never raised into the switch.
         observer, control, _hass = setup_observer(monkeypatch)
@@ -898,7 +898,7 @@ def test_a_failed_cancel_still_ends_the_plans_pause_for_another_car(monkeypatch,
         control.pause_requested = True
         control.async_resume_charging = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
         await observer.async_stop(withdraw=True)
-        assert "Could not end the departure plan pause" in caplog.text
+        assert "Departure plan: pause for the previous car not ended" in caplog.text
 
     asyncio.run(run())
 

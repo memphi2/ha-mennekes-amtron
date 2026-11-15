@@ -88,7 +88,7 @@ async def async_refresh_tariff_year(
     ):
         return False
     if values is None:
-        _LOGGER.warning("No unambiguous published Module 3 tariff found for the new year; cost estimates remain unavailable until updated")
+        _LOGGER.warning("Network tariff: no unambiguous published Module 3 tariff for the new year; cost estimates remain unavailable until updated")
         return False
     try:
         previous = options[CONF_CHARGING_NETWORK_TARIFF]
@@ -98,7 +98,7 @@ async def async_refresh_tariff_year(
             timezone="Europe/Berlin",
         )
     except (KeyError, TypeError, ValueError):
-        _LOGGER.warning("Published Module 3 tariff could not be validated; keeping the existing estimate settings")
+        _LOGGER.warning("Network tariff: published Module 3 tariff could not be validated; keeping the existing estimate settings")
         return False
     if tariff[CONF_TARIFF_YEAR] != datetime.now(ZoneInfo("Europe/Berlin")).year:
         return False
@@ -109,7 +109,7 @@ async def async_refresh_tariff_year(
     options[CONF_CHARGING_NETWORK_TARIFF] = tariff
     hass.config_entries.async_update_entry(entry, options=options)
     if values.get("_source_status") == "vorlaeufig":
-        _LOGGER.warning("Applied provisional Module 3 prices for %s; review the operator's final price sheet when published", tariff[CONF_TARIFF_YEAR])
+        _LOGGER.warning("Network tariff: applied provisional Module 3 prices for %s; review the operator's final price sheet when published", tariff[CONF_TARIFF_YEAR])
     else:
-        _LOGGER.info("Updated Module 3 prices for %s from the published price sheet", tariff[CONF_TARIFF_YEAR])
+        _LOGGER.info("Network tariff: updated Module 3 prices for %s from the published price sheet", tariff[CONF_TARIFF_YEAR])
     return True

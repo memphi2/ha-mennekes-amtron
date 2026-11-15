@@ -104,10 +104,10 @@ async def publish_discovery(config: ServerConfig, supervisor_token: str) -> None
             except ClientError, TimeoutError, ValueError:
                 if not warned:
                     _LOGGER.warning(
-                        "Supervisor discovery unavailable; retrying in the background"
+                        "Service: Supervisor discovery unavailable; retrying in the background"
                     )
                     warned = True
                 await asyncio.sleep(RETRY_SECONDS)
             else:
-                _LOGGER.info("Modbus service registered with Home Assistant discovery")
+                _LOGGER.info("Service: registered with Home Assistant discovery")
                 return

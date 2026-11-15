@@ -131,7 +131,7 @@ class Child:
             require(self.process.returncode == 0, "service exited unsuccessfully")
             require(not self.overflow, "service emitted excessive output")
             require(b"SIGTERM received" in self.output, "shutdown signal was not handled")
-            require(b"Modbus service shutdown complete" in self.output, "shutdown was incomplete")
+            require(b"Service: shutdown complete" in self.output, "shutdown was incomplete")
 
 
 def denied_files() -> None:
@@ -379,7 +379,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
             check_temporary_files()
             for instance in children:
                 require(token.encode() not in instance.output and SUPERVISOR_TOKEN.encode() not in instance.output, "service logs exposed a credential")
-                require(b"Heartbeat started" in instance.output and b"Heartbeat stopped" in instance.output, "heartbeat lifecycle logging is incomplete")
+                require(b"Heartbeat: started" in instance.output and b"Heartbeat: stopped" in instance.output, "heartbeat lifecycle logging is incomplete")
         return {"status": "passed", "mode": mode, "profile": profile, "enforcing": True,
                 "discovery": True, "heartbeat": True, "pause_restart": True,
                 "token_preserved": True, "denials": 4, "shutdown": True,

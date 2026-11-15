@@ -74,12 +74,12 @@ def test_storage_problems_only_forget_parked_trips(tmp_path, caplog):
         memory = m.VehicleTripMemory(hass, "entry", "serial")
         with patch.object(m.VehicleTripStore, "async_save", AsyncMock(side_effect=OSError("disk"))):
             await memory.async_swap("a", trip(), None)
-        assert "not remembered" in caplog.text
+        assert "Departure plan: vehicle departure not saved" in caplog.text
         await memory.async_swap("a", trip(), None)
         # Another wallbox's file is ignored instead of resuming its trip.
         other = m.VehicleTripMemory(hass, "entry", "other")
         assert await other.async_swap(None, None, "a") is None
-        assert "Ignoring saved vehicle departures" in caplog.text
+        assert "Departure plan: ignoring saved vehicle departures" in caplog.text
 
     asyncio.run(run())
 

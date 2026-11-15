@@ -870,7 +870,7 @@ def test_the_plan_survives_storage_failures(tmp_path, caplog, monkeypatch):
                 await box.plan.set_trip(NOW + timedelta(hours=2), "manual")
             await box.plan.set_inputs(inputs())
         assert box.plan.storage_error
-        assert caplog.text.count("could not be saved") == 1
+        assert caplog.text.count("Departure plan: not saved") == 1
         monkeypatch.undo()
         await box.plan.tick()
         assert not box.plan.storage_error
@@ -901,7 +901,7 @@ def test_an_unreadable_plan_waits_for_home_assistant(tmp_path, caplog, content):
             await box.plan.initialize()
         assert box.plan.ready
         assert box.plan.trip.deadline is None
-        assert "Saved departure plan unavailable" in caplog.text
+        assert "Departure plan: saved plan unavailable" in caplog.text
     run(go())
 
 

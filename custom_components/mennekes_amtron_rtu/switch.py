@@ -166,7 +166,7 @@ class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, 
             if control.pause_requested is True and not control.energy_goal_stop_requested:
                 await control.async_resume_charging()
         except (HomeAssistantError, DeviceError, OSError) as err:
-            _LOGGER.warning("Cannot switch off the charging release after unplugging (%s)", err)
+            _LOGGER.warning("Control: charging release not switched off after unplugging (%s)", err)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         self._attr_is_on = True

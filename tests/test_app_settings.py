@@ -543,9 +543,9 @@ def test_setup_server_runs_both_listeners_without_modbus_and_stops_cleanly(tmp_p
 
     caplog.set_level(logging.INFO)
     asyncio.run(check())
-    assert "Connection setup required" in caplog.text
+    assert "Service: connection setup required" in caplog.text
     assert "SIGTERM received" in caplog.text
-    assert "Modbus service shutdown complete" in caplog.text
+    assert "Service: shutdown complete" in caplog.text
     assert TOKEN not in caplog.text
 
 

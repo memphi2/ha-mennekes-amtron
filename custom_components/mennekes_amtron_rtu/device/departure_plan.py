@@ -378,7 +378,7 @@ class DepartureController:
             except (OSError, ValueError, ArithmeticError, RecursionError) as err:
                 # Home Assistant hands the trip over again; nothing is
                 # planned until then. An oversized number is as damaged.
-                _LOGGER.warning("Saved departure plan unavailable (%s); waiting for Home Assistant", type(err).__name__)
+                _LOGGER.warning("Departure plan: saved plan unavailable (%s); waiting for Home Assistant", type(err).__name__)
                 self._reset()
             self._durable = self._decision()
             self.ready = True
@@ -437,7 +437,7 @@ class DepartureController:
             await finish_goal_save(asyncio.to_thread(self.store.save, self._state()))
         except (OSError, ValueError) as err:
             if not self.storage_error:
-                _LOGGER.warning("Departure plan could not be saved (%s); it continues in memory", type(err).__name__)
+                _LOGGER.warning("Departure plan: not saved (%s); it continues in memory", type(err).__name__)
             self.storage_error = True
             return
         self._durable = decision
@@ -587,7 +587,7 @@ class DepartureController:
                 self.status = "write_pending"
                 reason = getattr(err, "translation_key", None) or type(err).__name__
                 if reason != self._last_error:
-                    _LOGGER.warning("Departure plan command deferred (%s)", reason)
+                    _LOGGER.warning("Departure plan: command deferred (%s)", reason)
                     self._last_error = reason
             else:
                 self._last_error = None
@@ -907,7 +907,7 @@ class DepartureController:
                 if s.pending:
                     return
                 await self._resume()
-                _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
+                _LOGGER.info("Departure plan: pause ended, the plan no longer applies to the car")
                 if self.sample().pause_requested is not False:
                     return
         self.plan_paused = self._pause_seen = False

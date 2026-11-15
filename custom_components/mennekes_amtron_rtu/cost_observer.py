@@ -43,6 +43,7 @@ from .device.charging_session import CompletedSession, PresenceGap
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
 from .device.enums import EvseState
+from .device.notice import FailureNotice
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .device.vehicle import snapshot_metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry
@@ -152,7 +153,7 @@ class ChargingCostObserver:
         self._expiry: CALLBACK_TYPE | None = None
         self._live_price: float | None = None
         self._closed = False
-        self._storage_failed = False
+        self._storage_notice = FailureNotice(_LOGGER, "Charging cost")
         self._storage_corrupt = False
         self._dirty = False
         self._retry_at = 0.0
@@ -237,7 +238,7 @@ class ChargingCostObserver:
             self.last = await self._store.async_load()
         except (ValueError, OSError):
             self._storage_corrupt = True
-            _LOGGER.warning("Charging-cost storage cannot be read; optional cost estimates are unavailable")
+            _LOGGER.warning("Charging cost: storage cannot be read; optional cost estimates are unavailable")
         if self._fixed:
             self._accumulator.set_price(self._started_at, self._price())
         if not self._fixed and self._entity:
@@ -369,12 +370,11 @@ class ChargingCostObserver:
         try:
             await self._store.async_save(self.last)
         except (ValueError, OSError):
-            if not self._storage_failed:
-                _LOGGER.warning("Charging-cost estimate could not be saved; retrying without affecting charging")
-            self._storage_failed = True
+            self._storage_notice.failed("estimate not saved; retrying without affecting charging")
             self._retry_at = time.monotonic() + 60
         else:
-            self._dirty = self._storage_failed = False
+            self._dirty = False
+            self._storage_notice.recovered("estimate saved again")
 
     async def async_stop(self) -> None:
         self._closed = True

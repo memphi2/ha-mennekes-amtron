@@ -335,7 +335,7 @@ def test_a_rejected_saved_state_does_not_keep_the_service_down(tmp_path, caplog)
             assert service.control is not None
             assert service.client.write_state.pause_requested is True
             assert service.control.read_only
-            assert caplog.text.count("Saved control intent rejected") == 1
+            assert caplog.text.count("Control: saved intent rejected") == 1
             # Rejected evidence survives until an explicit acknowledgement.
             assert json.loads(path.read_text())["identity"] == "another-wallbox"
         finally:
@@ -352,7 +352,7 @@ def test_a_failing_disk_does_not_block_the_start(tmp_path, monkeypatch, caplog):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             assert service.control is not None
-            assert "Cannot save control intent" in caplog.text
+            assert "Control: intent not saved" in caplog.text
         finally:
             monkeypatch.undo()
             await service.stop()
@@ -434,7 +434,7 @@ def test_a_failing_intent_save_keeps_the_wallbox_available(tmp_path, monkeypatch
             monkeypatch.setattr(service, "_persist", fail)
             await service._save_intent()
             await service._save_intent()
-            assert caplog.text.count("Cannot save control intent") == 1
+            assert caplog.text.count("Control: intent not saved") == 1
             assert service._is_available()
             monkeypatch.undo()
         finally:

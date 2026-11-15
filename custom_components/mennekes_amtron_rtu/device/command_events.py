@@ -120,7 +120,7 @@ class CommandEvents:
             try:
                 listener(event)
             except Exception:  # noqa: BLE001 - observers must never alter a bus command's result
-                _LOGGER.error("Unable to publish a command result to an observer")
+                _LOGGER.error("Control: unable to publish a command result to an observer")
 
     def snapshot(self) -> dict[str, object]:
         """Include a boot-scoped cursor so repeated snapshots are harmless."""

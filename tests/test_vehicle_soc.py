@@ -603,7 +603,7 @@ def test_reconfiguration_failure_retries_on_next_update_without_spinning(tmp_pat
                 assert control.async_configure_soc.await_count == count + 1
                 assert observer._task is None
                 assert not observer._configured
-            assert caplog.text.count("Cannot configure vehicle charge target") == 1
+            assert caplog.text.count("Vehicle charge target: cannot be configured") == 1
             control.async_configure_soc.side_effect = control.configure
             coordinator.update()
             await hass.async_block_till_done()

@@ -616,7 +616,7 @@ def test_bus_failure_is_bounded_and_later_poll_retries_pause(caplog):
         await _settle(soc)
         soc.retry_stop()
         await _settle(soc)
-        assert caplog.text.count("Cannot enforce percentage goal") == 1
+        assert caplog.text.count("Vehicle charge target: cannot be enforced") == 1
         control.async_pause_for_energy_goal = original_pause
         soc.retry_stop()
         await _settle(soc)
@@ -736,7 +736,7 @@ def test_a_cleared_target_names_its_reason(caplog, source, reason):
         await control.async_set_soc_goal(70, source=SOURCE, soc=20)
         with caplog.at_level("INFO"):
             await control.async_configure_soc(source)
-        assert f"Vehicle charge target 70% cleared: {reason}" in caplog.text
+        assert f"Vehicle charge target: 70% cleared, {reason}" in caplog.text
         await energy.async_stop()
 
     asyncio.run(run())

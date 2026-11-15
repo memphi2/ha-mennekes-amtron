@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+- Log lines start with their area, such as `Service:`, `Connection:` or
+  `Heartbeat:`. A repeating failure is logged once, and its end once.
+
 ## 0.9.1
 
 - Report the trigger, timestamp and requested value of command results. Keep

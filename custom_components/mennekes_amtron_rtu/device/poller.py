@@ -163,7 +163,7 @@ class DevicePoller:
                     if _PRESENCE_KEYS & set(block.keys) and block.name not in self._lost_blocks:
                         self._lost_blocks.add(block.name)
                         _LOGGER.warning(
-                            "Block %s unreadable for over %.0f seconds (%s); vehicle state unknown",
+                            "Connection: block %s unreadable for over %.0f seconds (%s); vehicle state unknown",
                             block.name, _BLOCK_HOLD_SECONDS, type(err).__name__,
                         )
                 else:
@@ -176,7 +176,7 @@ class DevicePoller:
                 self._block_read_at[block.name] = self._monotonic()
                 if block.name in self._lost_blocks:
                     self._lost_blocks.discard(block.name)
-                    _LOGGER.info("Block %s readable again", block.name)
+                    _LOGGER.info("Connection: block %s readable again", block.name)
                 total = result.get("energy_total") if block.name == "statistics" else None
                 invalid_meter = block.name == "statistics" and (
                     isinstance(total, bool) or not isinstance(total, (int, float))
@@ -227,7 +227,7 @@ class DevicePoller:
             self._timeline.record(EventType.CONNECTION_LOST)
         if changed and not self._connection_state.logged_unavailable:
             _LOGGER.warning(
-                "Lost the connection to %s: %s", self._client.config.port, str(err)
+                "Connection: lost %s (%s)", self._client.config.port, str(err)
             )
             self._connection_state.logged_unavailable = True
 
@@ -236,5 +236,5 @@ class DevicePoller:
         if changed and self._timeline is not None:
             self._timeline.record(EventType.CONNECTION_RECOVERED)
         if changed and self._connection_state.logged_unavailable:
-            _LOGGER.info("Reconnected to %s", self._client.config.port)
+            _LOGGER.info("Connection: reconnected to %s", self._client.config.port)
             self._connection_state.logged_unavailable = False

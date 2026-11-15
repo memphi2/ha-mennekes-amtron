@@ -454,7 +454,7 @@ def test_a_bad_status_listener_cannot_stop_heartbeats(caplog):
         await client.async_close()
 
     asyncio.run(run())
-    assert "Heartbeat status listener failed" in caplog.text
+    assert "Heartbeat: status listener failed" in caplog.text
 
 
 def test_an_unexpected_writer_exit_marks_heartbeat_unhealthy():

@@ -132,7 +132,7 @@ class VehicleBinding:
         try:
             self._state = await self._store.async_load()
         except (OSError, ValueError) as err:
-            _LOGGER.warning("Ignoring saved vehicle binding: %s", err)
+            _LOGGER.warning("Vehicle: ignoring saved binding (%s)", err)
         self._unsubs.append(self._evidence.subscribe(self._changed))
         self._unsubs.append(self._entry.runtime_data.coordinator.async_add_listener(self._changed))
         self._update()
@@ -211,7 +211,7 @@ class VehicleBinding:
                 profile is not None and profile.detection is not None
                 and self._state.vehicle != profile.id and self._fresh(profile.id)
             ):
-                _LOGGER.info("Vehicle %s confirmed at the wallbox; its rules apply", profile.name)
+                _LOGGER.info("Vehicle: %s confirmed at the wallbox; its rules apply", profile.name)
                 self._state.vehicle = profile.id
                 self._reset_check(now)
                 changed = True
@@ -221,7 +221,7 @@ class VehicleBinding:
                     self._reset_check(now)
                 if (reason := self._contradiction(profile, now)) is not None:
                     _LOGGER.warning(
-                        "The car at the wallbox does not behave like %s: %s; its charge target "
+                        "Vehicle: the car at the wallbox does not behave like %s: %s; its charge target "
                         "and departure plan rest until it reports itself plugged in again",
                         profile.name, reason,
                     )
@@ -242,7 +242,7 @@ class VehicleBinding:
         if resting != self._resting:
             if resting and profile is not None:
                 _LOGGER.info(
-                    "The car at the wallbox is not confirmed as %s; its charge target and "
+                    "Vehicle: the car at the wallbox is not confirmed as %s; its charge target and "
                     "departure plan rest until it reports itself plugged in", profile.name,
                 )
             # Without a car, nothing rests; the start needs no announcement.
@@ -334,7 +334,7 @@ class VehicleBinding:
         ):
             self._stale_warned = True
             _LOGGER.warning(
-                "%s still reports itself plugged in at home although the wallbox has been "
+                "Vehicle: %s still reports itself plugged in at home although the wallbox has been "
                 "empty for %.0f minutes; its plug signal looks stale",
                 profile.name, (now - self._first_empty).total_seconds() / 60,
             )
@@ -343,4 +343,4 @@ class VehicleBinding:
         try:
             await self._store.async_save(VehicleBindingState(self._state.absent_at, self._state.vehicle))
         except OSError as err:
-            _LOGGER.warning("Vehicle binding not saved: %s", err)
+            _LOGGER.warning("Vehicle: binding not saved (%s)", err)

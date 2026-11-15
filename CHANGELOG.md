@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Log lines of the integration and the app now start with their area, such as
+  `Connection:`, `Heartbeat:`, `Departure plan:` or `Charging cost:`, followed
+  by what happened and the reason in parentheses. A failure that repeats on
+  every poll or retry is logged once as a warning, its repeats at debug level
+  and its end once. Log filters that match the old wording need updating.
+
 ## 0.9.1
 
 - Distinguish brief status reconciliation, persistent conflicting readings and

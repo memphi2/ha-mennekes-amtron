@@ -570,7 +570,7 @@ def test_denial_retries_without_repeated_logs_and_stops_on_unload(caplog):
         for _ in range(2):
             unplugged(c)
             await c._plug_charge._task
-        assert caplog.text.count("Cannot enforce Plug & Charge release gate") == 1
+        assert caplog.text.count("Plug & Charge: release gate cannot be enforced") == 1
         h.transport.write_exceptions.clear()
         unplugged(c)
         await c._plug_charge._task
@@ -780,7 +780,7 @@ def test_unknown_vehicle_state_keeps_the_grant_until_the_grace_ends(caplog):
         await authorize(c)
         assert c.plug_charge["authorized"]
         unplugged(c)
-        assert "grant ended: vehicle unplugged" in caplog.text
+        assert "Plug & Charge: grant ended, vehicle unplugged" in caplog.text
         assert c.plug_charge["session"] is None
         await c.async_shutdown()
 

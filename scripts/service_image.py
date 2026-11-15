@@ -192,11 +192,11 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
             if token in lifecycle_log or any(
                 message not in lifecycle_log
                 for message in (
-                    "Starting Mennekes Amtron Modbus service",
-                    "Service API ready",
-                    "Opening serial connection",
+                    "Service: starting Mennekes Amtron Modbus service",
+                    "Service: API ready",
+                    "Connection: opening serial connection",
                     "SIGTERM received",
-                    "Modbus service shutdown complete",
+                    "Service: shutdown complete",
                 )
             ):
                 raise ValueError("container lifecycle logs are missing or expose credentials")

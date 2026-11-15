@@ -268,7 +268,7 @@ def test_a_failed_release_off_is_logged_not_raised(caplog) -> None:
         _plug(entry, False)
         switch._handle_coordinator_update()
         await asyncio.gather(*tasks)
-        assert "Cannot switch off the charging release" in caplog.text
+        assert "Control: charging release not switched off" in caplog.text
 
     asyncio.run(run())
 

@@ -242,8 +242,8 @@ def test_storage_problems_only_forget_the_binding(tmp_path, caplog):
             coordinator.plug(False)
             coordinator.plug(True)
             await settle(hass)
-        assert "Ignoring saved vehicle binding" in caplog.text
-        assert "Vehicle binding not saved" in caplog.text
+        assert "Vehicle: ignoring saved binding" in caplog.text
+        assert "Vehicle: binding not saved" in caplog.text
         binding.stop()
         await hass.async_stop()
 

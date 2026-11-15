@@ -73,7 +73,7 @@ class IntentStore:
         except ValueError:
             # Optional measurements must not block valid control intent
             # or heartbeat startup. Do not expose stored data in the log.
-            _LOGGER.warning("Ignoring invalid completed charging session history")
+            _LOGGER.warning("Charging session: ignoring invalid saved history")
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current

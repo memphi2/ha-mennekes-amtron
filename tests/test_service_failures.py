@@ -150,7 +150,7 @@ def test_service_retries_initial_connection_and_preserves_live_tasks(tmp_path):
         unready._initialize = AsyncMock(side_effect=AmtronConnectionError("no port"))
         unready.start()
         await asyncio.sleep(0.02)
-        assert unready._logged_unavailable
+        assert unready._wallbox_notice.failing
         await unready.stop()
 
     asyncio.run(run())
@@ -378,7 +378,7 @@ def test_fatal_cli_error_is_actionable_and_does_not_echo_private_details(
     with pytest.raises(SystemExit) as error:
         server.main()
     assert error.value.code == 1
-    assert "Modbus service terminated (OSError, errno=98)" in caplog.text
+    assert "Service: terminated (OSError, errno=98)" in caplog.text
     assert TOKEN not in caplog.text
 
 

@@ -88,7 +88,7 @@ class GatewayRollbackError(GatewayError):
 def _log_failure(phase: str, error: BaseException) -> None:
     """Record bounded setup context without exception text or native data."""
     reason = error.reason if isinstance(error, GatewayError) and error.reason in _FAILURE_REASONS else "unclassified"
-    _LOGGER.warning("LAN adapter %s failed: %s (%s)", phase, type(error).__name__, reason)
+    _LOGGER.warning("LAN adapter: %s failed, %s (%s)", phase, type(error).__name__, reason)
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,7 +277,7 @@ async def _verify_model(snapshot: GatewaySnapshot) -> str:
 
 async def inspect_gateway(host: str) -> GatewaySnapshot:
     """Read one configured endpoint; no scan, credentials or mutation."""
-    _LOGGER.info("LAN adapter inspection: reading management settings")
+    _LOGGER.info("LAN adapter: inspection, reading management settings")
     try:
         address = await _resolve_address(host)
         snapshot = await _query_native(address)
@@ -290,7 +290,7 @@ async def inspect_gateway(host: str) -> GatewaySnapshot:
     except Exception as err:
         _log_failure("inspection", err)
         raise
-    _LOGGER.info("LAN adapter detected: %s (firmware %s); automatic setup available: %s", current.model, current.firmware, current.can_configure)
+    _LOGGER.info("LAN adapter: detected %s (firmware %s); automatic setup available: %s", current.model, current.firmware, current.can_configure)
     return current
 
 
@@ -468,7 +468,7 @@ class GatewayReceipt:
             if _stable(current._native) != _stable(self.after._native):
                 raise GatewayConflictError
             self._release()
-            _LOGGER.info("LAN adapter setup committed")
+            _LOGGER.info("LAN adapter: setup committed")
 
     async def rollback(self) -> None:
         """Complete one bounded restoration task independently of cancellation."""
@@ -491,7 +491,7 @@ class GatewayReceipt:
         async with self._completion_lock:
             if self._finished:
                 return
-            _LOGGER.info("LAN adapter rollback: restoring changes from this setup")
+            _LOGGER.info("LAN adapter: rollback, restoring changes from this setup")
             try:
                 async with asyncio.timeout(_ROLLBACK_TIMEOUT):
                     if self._attempted:
@@ -517,7 +517,7 @@ class GatewayReceipt:
                             # arriving after this best-effort restoration.
                             raise GatewayRollbackError
                     self.rollback_verified = True
-                    _LOGGER.info("LAN adapter rollback verified")
+                    _LOGGER.info("LAN adapter: rollback verified")
             except Exception as err:  # noqa: BLE001 - Every failed restoration must prevent reconnect.
                 _log_failure("rollback", err)
                 raise GatewayRollbackError from None
@@ -547,7 +547,7 @@ async def configure_gateway(
         validate_gateway_settings(before, settings, password)
         native, masks = _desired(before, settings)
         phase = "initial authentication"
-        _LOGGER.info("LAN adapter setup: checking existing authentication")
+        _LOGGER.info("LAN adapter: setup, checking existing authentication")
         await _verify_auth(before, password)
         phase = "pre-write settings check"
         current = replace(await _query_native(address), model=before.model)
@@ -559,20 +559,20 @@ async def configure_gateway(
         receipt = GatewayReceipt(current, replace(_snapshot(address, native), model=before.model), masks, password, lock)
         if _stable(native) != _stable(current._native):
             phase = "parameter write"
-            _LOGGER.info("LAN adapter setup: applying selected settings and passive profile")
+            _LOGGER.info("LAN adapter: setup, applying selected settings and passive profile")
             receipt._attempted = True
             await _send_parameters(current, native)
             phase = "settings readback"
             receipt.after = await _wait_readback(current, native)
             receipt._apply_confirmed = True
-            _LOGGER.info("LAN adapter setup: changed settings confirmed by readback")
+            _LOGGER.info("LAN adapter: setup, changed settings confirmed by readback")
         phase = "connection verification"
-        _LOGGER.info("LAN adapter setup: checking connection after settings verification")
+        _LOGGER.info("LAN adapter: setup, checking connection after settings verification")
         if receipt._apply_confirmed:
             await _verify_restarted_connection(receipt.after, password)
         else:
             await _verify_auth(receipt.after, password)
-        _LOGGER.info("LAN adapter setup verified; waiting for connection settings to be saved")
+        _LOGGER.info("LAN adapter: setup verified; waiting for connection settings to be saved")
         return receipt
     except BaseException as err:
         _log_failure(phase, err)

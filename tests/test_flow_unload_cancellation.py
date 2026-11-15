@@ -346,7 +346,7 @@ def test_cancelled_unload_failure_never_starts_a_probe_or_restore(
                     else ConfigEntryState.LOADED
                 )
                 if failure == "ha_unload_api":
-                    assert "Unable to complete cancelled connection probe cleanup" in caplog.text
+                    assert "Setup: cleanup after a cancelled connection probe failed" in caplog.text
                 assert not bus.writes
             finally:
                 release.set()
@@ -426,7 +426,7 @@ def test_cancelled_restore_preserves_retry_or_reports_ha_api_failure(
                     entry.async_cancel_retry_setup()
                 else:
                     assert entry.state is ConfigEntryState.NOT_LOADED
-                    assert "Unable to restore the entry after a cancelled connection probe" in caplog.text
+                    assert "Setup: entry not restored after a cancelled connection probe" in caplog.text
                     monkeypatch.setattr(hass.config_entries, "async_setup", original_setup)
                     assert await hass.config_entries.async_setup(entry.entry_id)
                     assert entry.state is ConfigEntryState.LOADED

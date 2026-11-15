@@ -65,7 +65,7 @@ class VehicleTargetMemory:
         try:
             self._targets = await self._store.async_load()
         except (OSError, ValueError) as err:
-            _LOGGER.warning("Ignoring saved vehicle charge targets: %s", err)
+            _LOGGER.warning("Vehicle charge target: ignoring saved targets (%s)", err)
 
     def recall(self, source: str) -> float | None:
         return self._targets.targets.get(source)
@@ -78,4 +78,4 @@ class VehicleTargetMemory:
         try:
             await self._store.async_save(VehicleTargets(self._targets.targets))
         except OSError as err:
-            _LOGGER.warning("Vehicle charge target not saved: %s", err)
+            _LOGGER.warning("Vehicle charge target: not saved (%s)", err)

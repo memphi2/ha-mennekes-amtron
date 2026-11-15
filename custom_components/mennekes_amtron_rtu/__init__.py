@@ -211,7 +211,7 @@ async def async_setup_entry(
             try:
                 await async_prune_profile_losses(hass, entry.entry_id, catalog)
             except OSError:
-                _LOGGER.warning("Deleted vehicle loss storage could not be removed; cleanup will retry on setup")
+                _LOGGER.warning("Charging loss: deleted vehicle storage not removed; cleanup retries on setup")
     remote = CONF_SERVER_URL in entry.data
     expected_serial = _entry_serial_binding(entry)
     handoff: RuntimeHandoff | None = hass.data.get(f"{DOMAIN}_reload_clients", {}).get(entry.entry_id)
@@ -370,7 +370,7 @@ async def async_setup_entry(
         if plug_enabled and control.read_only:
             # Enabling needs write access; retrying setup would never get it.
             # The gate keeps its last state until writing is allowed again.
-            _LOGGER.warning("Virtual Plug & Charge is not applied while the wallbox is read-only")
+            _LOGGER.warning("Plug & Charge: not applied while the wallbox is read-only")
         elif not _service_intent_rejected(client) and (plug_enabled or (
             CONF_VIRTUAL_PLUG_CHARGE in entry.options and control.supports_plug_charge
             and control.plug_charge.get("enabled") is True
@@ -608,7 +608,7 @@ async def _async_resume_trip(
     try:
         await TimedGoalStore(hass, entry.entry_id, identity).async_save(DepartureIntent(trip, pending=True))
     except OSError as err:
-        _LOGGER.warning("Vehicle departure not resumed: %s", err)
+        _LOGGER.warning("Departure plan: vehicle departure not resumed (%s)", err)
 
 
 async def _async_cancel_old_trip(
@@ -819,7 +819,7 @@ async def _async_reset_disabled_trip(hass: HomeAssistant, entry: MennekesAmtronC
             hass.config_entries.async_update_entry(
                 entry, options={**entry.options, CONF_TIMED_GOAL_RESET_PENDING: True},
             )
-        _LOGGER.warning("Departure planning remains disabled because its old trip could not be cleared")
+        _LOGGER.warning("Departure plan: stays disabled because its old trip could not be cleared")
         return False
     return True
 

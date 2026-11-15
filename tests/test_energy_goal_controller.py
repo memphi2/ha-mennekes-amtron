@@ -727,12 +727,12 @@ def test_failed_stop_save_still_pauses_and_does_not_spam_logs(caplog):
         assert current_writes(harness.transport) == [1]
         assert control.energy_goal.stop_requested
         assert control.pause_requested is True
-        assert sum("Cannot enforce energy goal" in record.message for record in caplog.records) == 1
+        assert sum("Energy target: cannot be enforced" in record.message for record in caplog.records) == 1
         assert "private details" not in caplog.text
         runner._persist = AsyncMock()
         runner.observe(_snapshot(harness, 1247))
         await _settle(runner)
-        assert not runner._failure_logged
+        assert not runner._notice.failing
         await runner.async_stop()
     asyncio.run(run())
 
@@ -831,7 +831,7 @@ def test_shutdown_retains_terminal_evidence_queued_behind_another_command(save_f
         assert control.pause_requested is True
         assert harness.transport.writes == []
         if save_failed:
-            assert "Cannot save energy goal stop on shutdown" in caplog.text
+            assert "Energy target: stop not saved on shutdown" in caplog.text
             assert "private details" not in caplog.text
         else:
             assert saved[-1]["status"] == "meter_unavailable"
@@ -856,7 +856,7 @@ def test_ui_observer_errors_do_not_undo_the_goal(caplog):
         _harness, control, runner, _saved = await _runner(notify=broken)
         await runner.async_set_target(12)
         assert control.energy_goal.status == "active"
-        assert "Unable to publish an energy goal update" in caplog.text
+        assert "Energy target: unable to publish an update" in caplog.text
         assert "private details" not in caplog.text
         await runner.async_stop()
     asyncio.run(run())

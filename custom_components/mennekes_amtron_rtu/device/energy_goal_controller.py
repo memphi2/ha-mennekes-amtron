@@ -14,6 +14,7 @@ from .control import AmtronControl
 from .data import WallboxData
 from .energy_goal import EnergyGoal
 from .errors import DeviceError, validation_error
+from .notice import FailureNotice
 from .persistence import (
     StorageCommitUncertainError,
     StorageStateUnknownError,
@@ -52,7 +53,7 @@ class EnergyGoalController:
         self._pending_intent_generation = 0
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
-        self._failure_logged = False
+        self._notice = FailureNotice(_LOGGER, "Energy target")
         self._storage_unknown = False
         self._dirty = False
         control.goal_controller = self
@@ -86,7 +87,7 @@ class EnergyGoalController:
             try:
                 self._control.cancel_goal_resume()
             except Exception as err:  # noqa: BLE001 - retain the storage error
-                _LOGGER.error("Cannot publish cancelled goal recovery (%s)", type(err).__name__)
+                _LOGGER.error("Energy target: cannot publish cancelled goal recovery (%s)", type(err).__name__)
             raise
         self._storage_unknown = False
         self._dirty = False
@@ -147,7 +148,7 @@ class EnergyGoalController:
                 try:
                     self._control.cancel_goal_resume()
                 except Exception as err:  # noqa: BLE001 - retain the storage error
-                    _LOGGER.error("Cannot publish cancelled goal recovery (%s)", type(err).__name__)
+                    _LOGGER.error("Energy target: cannot publish cancelled goal recovery (%s)", type(err).__name__)
                 self._notify_changed()
                 raise
             except StorageCommitUncertainError:
@@ -156,7 +157,7 @@ class EnergyGoalController:
                 try:
                     self._control.cancel_goal_resume()
                 except Exception as err:  # noqa: BLE001 - retain the storage error
-                    _LOGGER.error("Cannot publish cancelled goal recovery (%s)", type(err).__name__)
+                    _LOGGER.error("Energy target: cannot publish cancelled goal recovery (%s)", type(err).__name__)
                 self._notify_changed()
                 raise
             except Exception:
@@ -198,7 +199,7 @@ class EnergyGoalController:
                     self._pending = copy(self.model)
                     self._pending_generation = self._client.write_state.energy_goal_generation
                     self._ensure_task()
-                _LOGGER.error("Cannot save cancelled goal recovery (%s)", type(err).__name__)
+                _LOGGER.error("Energy target: cannot save cancelled goal recovery (%s)", type(err).__name__)
         # The deliberate command takes the place of a queued automatic one.
         self._control.cancel_goal_resume(replaced=True)
 
@@ -289,27 +290,21 @@ class EnergyGoalController:
                     await self._async_pause()
                 if persistence_error is not None:
                     if isinstance(persistence_error, StorageStateUnknownError):
-                        if not self._failure_logged:
-                            _LOGGER.error("Cannot verify energy goal storage")
-                            self._failure_logged = True
+                        self._notice.failed("storage cannot be verified", level=logging.ERROR)
                         self._notify_changed()
                         return
                     raise persistence_error
-                self._failure_logged = False
+                self._notice.recovered("enforced again")
         except StorageStateUnknownError:
             self._storage_unknown = True
             self._control.pause_requested = True
-            if not self._failure_logged:
-                _LOGGER.error("Cannot verify energy goal storage")
-                self._failure_logged = True
+            self._notice.failed("storage cannot be verified", level=logging.ERROR)
             # A later poll retries the fenced stop after a command failure.
             with suppress(DeviceError, AmtronBusError, OSError, RuntimeError, ValueError):
                 await self._async_pause()
             self._notify_changed()
         except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError) as err:
-            if not self._failure_logged:
-                _LOGGER.error("Cannot enforce energy goal (%s)", type(err).__name__)
-                self._failure_logged = True
+            self._notice.failed("cannot be enforced", type(err).__name__, level=logging.ERROR)
             self._notify_changed()
         finally:
             self._task = None
@@ -330,7 +325,7 @@ class EnergyGoalController:
             try:
                 self._notify()
             except Exception:  # noqa: BLE001 - UI observers must not affect the stop
-                _LOGGER.error("Unable to publish an energy goal update")
+                _LOGGER.error("Energy target: unable to publish an update")
 
     async def async_stop(self) -> None:
         """Stop this owner without discarding the durable ceiling or stop latch."""
@@ -353,4 +348,4 @@ class EnergyGoalController:
                 try:
                     await self._save_state()
                 except (OSError, RuntimeError, ValueError) as err:
-                    _LOGGER.error("Cannot save energy goal stop on shutdown (%s)", type(err).__name__)
+                    _LOGGER.error("Energy target: stop not saved on shutdown (%s)", type(err).__name__)

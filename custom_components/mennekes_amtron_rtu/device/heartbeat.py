@@ -86,7 +86,7 @@ class HeartbeatTask:
                 listener()
             except Exception:
                 # A UI observer must never kill the time-critical writer.
-                _LOGGER.exception("Heartbeat status listener failed")
+                _LOGGER.exception("Heartbeat: status listener failed")
 
     def _cancel_deadline(self) -> None:
         if self._deadline_handle is not None:
@@ -208,8 +208,8 @@ class HeartbeatTask:
         self._diagnostics.heartbeats_late += 1
         self._diagnostics.timeline.record(EventType.HEARTBEAT_LATE)
         _LOGGER.warning(
-            "Heartbeat acknowledgements from %s were %.1f s apart, more than the "
-            "%.0f s heartbeat deadline; delivery during the gap is uncertain",
+            "Heartbeat: acknowledgements from %s were %.1f s apart, more than the "
+            "%.0f s deadline; delivery during the gap is uncertain",
             self._client.config.port,
             gap,
             self._deadline,

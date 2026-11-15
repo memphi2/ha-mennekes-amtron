@@ -546,7 +546,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 finally:
                     await client.async_close()
             except ServiceConnectionError as err:
-                _LOGGER.warning("Modbus service setup: %s", err)
+                _LOGGER.warning("Setup: Modbus service rejected (%s)", err)
                 errors["base"] = err.reason
             except ValueError, AmtronBusError:
                 errors["base"] = "cannot_connect_service"
@@ -657,7 +657,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                         data=complete,
                     )
         except ServiceConnectionError as err:
-            _LOGGER.warning("Discovered Modbus app: %s", err)
+            _LOGGER.warning("Setup: discovered Modbus app rejected (%s)", err)
             errors["base"] = err.reason
         except AmtronBusError:
             errors["base"] = "cannot_connect_service"
@@ -707,7 +707,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 if unloaded:
                     await self._async_restore_after_probe(entry, original_data)
             except Exception:
-                _LOGGER.exception("Unable to complete cancelled connection probe cleanup")
+                _LOGGER.exception("Setup: cleanup after a cancelled connection probe failed")
             raise
 
     async def _async_restore_after_probe(
@@ -726,7 +726,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 await _async_finish_cleanup(task)
             except Exception:
-                _LOGGER.exception("Unable to restore the entry after a cancelled connection probe")
+                _LOGGER.exception("Setup: entry not restored after a cancelled connection probe")
             raise
 
     async def _async_serial_step(

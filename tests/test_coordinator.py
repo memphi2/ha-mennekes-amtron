@@ -166,12 +166,12 @@ def test_availability_is_logged_once_per_change(
             for _ in range(3):
                 with pytest.raises(UpdateFailed):
                     await coordinator._async_update_data()
-            assert sum("Lost the connection" in r.message for r in caplog.records) == 1
+            assert sum("Connection: lost" in r.message for r in caplog.records) == 1
 
             transport.read_exceptions.clear()
             await coordinator._async_update_data()
             await coordinator._async_update_data()
-            assert sum("Reconnected" in r.message for r in caplog.records) == 1
+            assert sum("Connection: reconnected" in r.message for r in caplog.records) == 1
 
     asyncio.run(run())
 
@@ -283,11 +283,11 @@ def test_losing_the_vehicle_status_block_is_logged_once(caplog) -> None:
             clock[0] += 31
             coordinator.data = await coordinator._async_update_data()
         assert not coordinator.data.has("evse_state")
-        assert caplog.text.count("Block status unreadable for over 30 seconds") == 1
+        assert caplog.text.count("Connection: block status unreadable for over 30 seconds") == 1
         transport.read_exceptions.clear()
         clock[0] += 5
         coordinator.data = await coordinator._async_update_data()
-        assert "Block status readable again" in caplog.text
+        assert "Connection: block status readable again" in caplog.text
 
     caplog.set_level(logging.INFO)
     asyncio.run(run())

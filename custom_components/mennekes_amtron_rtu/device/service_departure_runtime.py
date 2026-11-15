@@ -149,7 +149,7 @@ class DepartureModbusService(GuestModbusService):
             except Exception:
                 # The bus owner shares this task group; an unforeseen failure
                 # must not stop the service. The plan writes nothing meanwhile.
-                _LOGGER.exception("Departure plan tick failed")
+                _LOGGER.exception("Departure plan: tick failed")
                 departure.status = "error"
             with suppress(TimeoutError):
                 await asyncio.wait_for(departure.wake.wait(), _TICK_SECONDS)

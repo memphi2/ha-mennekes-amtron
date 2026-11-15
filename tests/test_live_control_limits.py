@@ -214,7 +214,7 @@ def test_the_service_lowers_after_each_poll_and_backs_off_after_a_failure(caplog
         assert "lowered to the 10.0 A cap" in caplog.text
         control.async_enforce_current_cap.side_effect = DeviceError("time_limit_reached")
         await service._enforce_current_cap()
-        assert "could not be lowered (time_limit_reached)" in caplog.text
+        assert "cap not lowered (time_limit_reached)" in caplog.text
         assert service._cap_retry_at == 130
         control.async_enforce_current_cap.side_effect = AmtronBusError("lost")
         clock[0] = 129

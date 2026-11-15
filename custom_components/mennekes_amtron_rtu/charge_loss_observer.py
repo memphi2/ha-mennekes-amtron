@@ -137,7 +137,7 @@ class ChargeLossObserver:
         except (ValueError, OSError):
             self._storage_ok = False
             self._storage_corrupt = True
-            _LOGGER.warning("Charging-loss storage cannot be read; optional loss estimates are unavailable")
+            _LOGGER.warning("Charging loss: storage cannot be read; optional loss estimates are unavailable")
         self._source_ready = self._configure_source()
         self._history_available = (
             self._history_source is not None and self._history_source.available
@@ -258,7 +258,7 @@ class ChargeLossObserver:
                     # exception types. Keep the wallbox and its setup usable;
                     # the same bounded retry policy applies to this provider.
                     # Do not log exception messages that may contain VINs.
-                    _LOGGER.warning("Vehicle charging history failed (%s)", type(err).__name__)
+                    _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
                     match = None
                 energy = match.vehicle_kwh if match is not None else None
                 association = "history"
@@ -312,16 +312,16 @@ class ChargeLossObserver:
             # Retain the candidate for a retry and make estimates unavailable.
             self.statistics = candidate
             if self._storage_ok:
-                _LOGGER.warning("Charging-loss estimate could not be saved; retrying without affecting charging")
+                _LOGGER.warning("Charging loss: estimate not saved; retrying without affecting charging")
             self._storage_ok = False
             try:
                 self._coordinator.async_update_listeners()
             except Exception:  # noqa: BLE001 - preserve the storage failure
-                _LOGGER.error("Unable to publish an uncertain charging-loss update")
+                _LOGGER.error("Charging loss: unable to publish an uncertain update")
             return
         except (OSError, ValueError):
             if self._storage_ok:
-                _LOGGER.warning("Charging-loss estimate could not be saved; retrying without affecting charging")
+                _LOGGER.warning("Charging loss: estimate not saved; retrying without affecting charging")
             changed = self._storage_ok
             self._storage_ok = False
         else:

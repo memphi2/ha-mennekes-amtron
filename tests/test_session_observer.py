@@ -196,7 +196,7 @@ def test_failed_load_retries_bounded_and_cannot_erase_existing_state(tmp_path, c
         assert data.session_summary_supported
         assert data.charging_session == saved.latest.as_dict()
         observer._store.async_save.assert_not_awaited()
-        assert caplog.text.count("Optional charging-session storage") == 1
+        assert caplog.text.count("Charging session: optional storage unavailable") == 1
         assert "private" not in caplog.text
         await observer.async_close()
 
@@ -234,7 +234,7 @@ def test_failed_save_does_not_fail_poll_and_retries_only_latest_state(tmp_path, 
         assert observer._store.async_save.await_count == 1
         await observe(observer, clock, 1090, total=110)
         assert observer._store.async_save.await_count == 2
-        assert caplog.text.count("Optional charging-session storage") == 1
+        assert caplog.text.count("Charging session: optional storage unavailable") == 1
         observer._store.async_save = AsyncMock(wraps=real_save)
         # A second finished cycle while retrying replaces the unsaved first.
         second = await cycle(observer, clock, offset=100, baseline=110)
