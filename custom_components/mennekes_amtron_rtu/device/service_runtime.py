@@ -479,6 +479,10 @@ class ModbusService:
         control = self.control
         if control is None or control.read_only or time.monotonic() < self._cap_retry_at:
             return
+        if self.config.cap_from_wallbox and self.identity.max_evse_current is None:
+            # The wallbox cannot say its maximum and nobody set a cap: the
+            # placeholder bounds new requests but lowers no running charge.
+            return
         self._phase = "applying the current cap"
         try:
             async with self._command_lock:

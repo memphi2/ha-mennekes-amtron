@@ -635,6 +635,29 @@ def test_a_car_plugged_in_again_keeps_its_release_and_its_pause(monkeypatch) -> 
         assert (len(calls), resumed, cancelled) == (3, [], [1])
         assert rule._owed
         assert len(_waiting(timers)) == 1
+        # The car returns before the queue has run: the switch-off is
+        # withdrawn then, however the rule learns of it.
+        connected[0] = True
+        rule._observe()
+        await asyncio.gather(*entry.background_tasks)
+        assert cancelled == [1, 1]
+        assert not rule._owed
+        rule._observe()
+        await asyncio.gather(*entry.background_tasks)
+        assert cancelled == [1, 1]
+        rule._queued = rule._debt = True
+        rule._retry_now(None)
+        await asyncio.gather(*entry.background_tasks)
+        assert cancelled == [1, 1, 1]
+
+        async def refused() -> None:
+            raise HomeAssistantError("busy")
+
+        monkeypatch.setattr(control, "async_cancel_pending_change", refused)
+        rule._queued = True
+        rule._withdraw_soon()
+        await asyncio.gather(*entry.background_tasks)
+        assert not rule._queued
         rule.stop()
 
     asyncio.run(run())

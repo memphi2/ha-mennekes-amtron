@@ -1125,3 +1125,26 @@ def test_an_unforeseen_end_while_starting_is_reported_and_tried_again(monkeypatc
         assert report.exc_info is not None
 
     asyncio.run(run())
+
+
+def test_a_wallbox_that_cannot_say_its_maximum_keeps_its_running_current(monkeypatch, tmp_path):
+    async def run():
+        bank = device_bank(max_current=0, evse_state=EvseState.CHARGING, charging_current=16)
+        bank[R.CP_STATE.address] = CpState.C2
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path, bank=bank)
+        host = await embedded.async_acquire(hass, entry)
+        try:
+            service = host._service
+            assert service.identity.max_evse_current is None
+            # Nobody set a cap: the placeholder bounds new requests only.
+            assert service.control.max_charging_current == 6
+            await service.refresh()
+            await service._enforce_current_cap()
+            # Neither written nor queued for the end of the write interval.
+            assert service.control.pending_action is None
+            assert current_writes(wallbox) == []
+            assert service.data.get("charging_current_ems") == 16
+        finally:
+            await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())

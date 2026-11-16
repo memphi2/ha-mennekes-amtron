@@ -80,6 +80,8 @@ class UnplugRule:
         self._debt = False
         self._busy = False
         self._stopped = False
+        # Our switch-off waits in the service's queue.
+        self._queued = False
         self._retry: CALLBACK_TYPE | None = None
         self._notice = FailureNotice(_LOGGER, "Control")
         self._unsubscribe: CALLBACK_TYPE | None = (
@@ -172,8 +174,32 @@ class UnplugRule:
             # The car is back: nothing is owed for the charge that ended.
             self._owed = False
             self._cancel_retry()
+            self._withdraw_soon()
         if unplugged:
             self._start()
+
+    async def _withdraw(self) -> None:
+        """Take our queued switch-off back; it would close the release of a car that is there."""
+        if self._queued:
+            self._queued = False
+            if self._runtime.control.pending_action == "disable_charging":
+                await self._runtime.control.async_cancel_pending_change()
+
+    def _withdraw_soon(self) -> None:
+        # A switch-off still under way withdraws it itself.
+        if self._queued and not self._busy:
+            self._entry.async_create_background_task(
+                self._hass, self._withdraw_reported(), "amtron_release_off_withdrawn",
+            )
+
+    async def _withdraw_reported(self) -> None:
+        try:
+            await self._withdraw()
+        except (HomeAssistantError, DeviceError, OSError) as err:
+            _LOGGER.warning(
+                "Control: queued switch-off of the charging release not withdrawn (%s)",
+                type(err).__name__,
+            )
 
     def _owe(self) -> None:
         if self._stopped or self._vehicle_connected() is True:
@@ -212,11 +238,11 @@ class UnplugRule:
             if wrote:
                 await control.async_set_charging_release(False)
             queued = wrote and control.pending_action == "disable_charging"
+            self._queued = queued
             if self._vehicle_connected() is not False:
-                if queued:
-                    # With a car the switch-off only waits in the queue: it
-                    # must not close the release of the car that is back.
-                    await control.async_cancel_pending_change()
+                # With a car the switch-off only waits in the queue: it
+                # must not close the release of the car that is back.
+                await self._withdraw()
                 raise _NotAwayError
             if queued:
                 # Not written yet: ending the pause now would replace it, and
@@ -255,6 +281,7 @@ class UnplugRule:
         if self._vehicle_connected() is True:
             # The car is back, although no changed poll said so yet.
             self._owed = False
+            self._withdraw_soon()
             return
         control = self._runtime.control
         if control.plug_charge.get("enabled") is True:
