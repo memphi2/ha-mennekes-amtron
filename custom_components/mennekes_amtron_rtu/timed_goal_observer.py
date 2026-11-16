@@ -513,9 +513,9 @@ class TimedGoalObserver:
         )
 
     def _set_status(self, status: str) -> None:
-        self.planned_start = None
-        if status != self.status:
-            self.status = status
+        if (status, None) != (self.status, self.planned_start):
+            # A start that no longer holds leaves the display with the status.
+            self.status, self.planned_start = status, None
             self._notify()
 
     def _notify(self) -> None:

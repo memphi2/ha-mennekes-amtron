@@ -167,6 +167,9 @@ class UnplugRule:
     def _start(self) -> None:
         control = self._runtime.control
         if control.plug_charge.get("enabled") is True:
+            # The gate owns the release now, also for what was owed.
+            self._owed = False
+            self._cancel_retry()
             return
         if self._busy or control.read_only:
             # Not possible right now, but owed: the release must not stay

@@ -67,6 +67,14 @@ class HttpTransport:
             return response.status, data
 
 
+def _as_json(value: Any) -> Any:
+    try:
+        return json.loads(json.dumps(value))
+    except TypeError as err:
+        # What HTTP could not carry is an invalid message here too.
+        raise ValueError("not a JSON value") from err
+
+
 class EmbeddedTransport:
     """The same service running inside Home Assistant, for a direct connection.
 
@@ -85,13 +93,13 @@ class EmbeddedTransport:
             # A closed web server refuses the connection.
             return 503, {"error": "service_unavailable"}
         # JSON in both directions keeps the types and isolation HTTP gives.
-        request = None if payload is None else json.loads(json.dumps(payload))
+        request = None if payload is None else _as_json(payload)
         task = asyncio.create_task(self._dispatch(method, path, request))
         self._running.add(task)
         task.add_done_callback(self._finished)
         async with asyncio.timeout(_TIMEOUT_SECONDS):
             status, body = await asyncio.shield(task)
-        return status, json.loads(json.dumps(body))
+        return status, _as_json(body)
 
     async def _dispatch(self, method: str, path: str, payload: dict[str, Any] | None) -> Reply:
         try:

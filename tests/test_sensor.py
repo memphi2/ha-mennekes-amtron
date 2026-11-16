@@ -333,6 +333,11 @@ def test_one_failed_meter_read_leaves_no_gap_in_the_energy_total() -> None:
         runtime.coordinator.data.values["energy_total"] = None
         assert energy.available
         assert energy.native_value == pytest.approx(1234.5)
+        # One low misread is not carried forward as a meter reset.
+        snapshot = entry.service.snapshot()
+        snapshot["energy_sample"] = {"observed_at": 1.0, "value": 12.0}
+        runtime.client.apply_snapshot(snapshot)
+        assert runtime.client.last_energy_total == pytest.approx(1234.5)
         # Nothing was ever read: there is nothing to show.
         runtime.client.last_energy_total = None
         assert not energy.available

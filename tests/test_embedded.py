@@ -280,6 +280,12 @@ def test_requests_and_replies_cross_as_independent_json():
         assert body is not reply
         assert api.calls[0][2] == payload
         assert api.calls[0][2] is not payload
+        # What HTTP could not carry is an invalid message, not a crash.
+        with pytest.raises(ValueError, match="not a JSON value"):
+            await transport.call("POST", "/v2/command", {"value": {1, 2}})
+        api.reply = (200, {"at": object()})
+        with pytest.raises(ValueError, match="not a JSON value"):
+            await transport.call("GET", "/v2/state", None)
 
     asyncio.run(run())
 

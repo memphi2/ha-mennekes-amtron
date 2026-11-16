@@ -235,6 +235,15 @@ def test_observer_lifecycle_and_write_failure_status(
         observer.request_evaluate()
         await observer._task
         assert observer.status == "write_pending"
+        # A start that no longer holds leaves the display together with the status.
+        notified = []
+        monkeypatch.setattr(observer, "_notify", lambda: notified.append(observer.planned_start))
+        observer.planned_start = datetime(2026, 11, 16, tzinfo=UTC)
+        observer._set_status("write_pending")
+        observer._set_status("write_pending")
+        assert notified == [None]
+        monkeypatch.undo()
+        monkeypatch.setattr(observer, "_evaluate", failed)
         # The cause is named, not its text, which may differ every time.
         waiting = [r for r in caplog.records if "not handed to the service yet" in r.getMessage()]
         assert [(r.levelname, r.getMessage()) for r in waiting] == [

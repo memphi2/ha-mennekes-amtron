@@ -558,6 +558,14 @@ def test_an_unplug_during_a_running_switch_off_is_owed_and_not_lost(monkeypatch)
         rule._start()
         assert rule._owed
         assert len(_waiting(timers)) == 1
+        # With the gate enabled the debt is gone, not kept for later.
+        with monkeypatch.context() as gate:
+            gate.setattr(control, "plug_charge", property(lambda _self: {"enabled": True}))
+            rule._start()
+        assert not rule._owed
+        assert not _waiting(timers)
+        rule._start()
+        assert len(_waiting(timers)) == 1
         rule._busy = False
         await _fire(timers, entry)
         assert calls == [False, False]
