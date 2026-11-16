@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import Callable
+from copy import deepcopy
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -287,7 +288,7 @@ class ServiceClient:
             ):
                 raise ValueError("invalid controls")
             section = "control.pending_change"
-            pending_action, pending_until = _pending_status(control)
+            pending_until = _pending_status(control)[1]
             section = "control.energy_goal"
             goal_supported = control.get("supports_energy_goal", False)
             if type(goal_supported) is not bool:
@@ -496,13 +497,9 @@ class ServiceClient:
             charging_display=display,
             failed_blocks=tuple(failed),
             current_write_generation=generation,
-            service_read_only=control["read_only"],
-            service_max_charging_current=control["max_charging_current"],
-            service_charging_setpoint=current,
-            service_soc_maximum_required=maximum_required,
-            pending_change=pending_action,
             pending_change_until=pending_until,
-            service_control=control,
+            # A copy: what entities compare never changes under them.
+            service_control=deepcopy(control),
             connection_quality=quality,
             connection_failures=failures,
             connection_retries=retried,

@@ -4,6 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
@@ -90,9 +91,17 @@ def test_changed_vehicle_aborts_setup_before_old_trip_can_start(tmp_path, monkey
             # The wallbox is fine: its service and heartbeat stay for the
             # retry, and stop only when none comes.
             assert transport.connected
-            ((seconds, release, waiting),) = timers
-            assert (seconds, waiting) == (120, True)
-            await release(None)
+            ((seconds, check, waiting),) = timers
+            assert (seconds, waiting) == (30, True)
+            # Home Assistant still plans its retry: the service stays.
+            entry.state = ConfigEntryState.SETUP_RETRY
+            timers.clear()
+            await check(None)
+            assert transport.close_calls == 0
+            ((seconds, check, waiting),) = timers
+            # No retry is coming any more.
+            entry.state = ConfigEntryState.NOT_LOADED
+            await check(None)
             assert not transport.connected
         finally:
             await real.async_stop()

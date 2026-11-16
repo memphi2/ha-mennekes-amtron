@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 
 from custom_components.mennekes_amtron_rtu import embedded, service_transport
@@ -675,31 +676,153 @@ def test_a_half_initialized_service_starts_over_and_then_starts_its_heartbeat(
     asyncio.run(run())
 
 
-def test_a_setup_that_will_be_retried_keeps_the_service_until_the_retry_stays_away(
+def test_a_setup_that_will_be_retried_keeps_the_service_while_a_retry_is_planned(
     monkeypatch, tmp_path,
 ):
     async def run():
         timers = capture_timers(monkeypatch, embedded)
         hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
         host = await embedded.async_acquire(hass, entry)
-        embedded.async_release_unless_retried(hass, entry.entry_id)
+        embedded.async_release_unless_retried(hass, entry)
         assert host._service.heartbeat.running
         # The retry takes the running service over and nothing stops it later.
         assert await embedded.async_acquire(hass, entry) is host
         assert [timer[2] for timer in timers] == [False]
         # Asked twice, only the newest wait counts.
-        embedded.async_release_unless_retried(hass, entry.entry_id)
-        embedded.async_release_unless_retried(hass, entry.entry_id)
+        embedded.async_release_unless_retried(hass, entry)
+        embedded.async_release_unless_retried(hass, entry)
         assert [timer[2] for timer in timers] == [False, False, True]
+        # However long Home Assistant waits with its retry, the service stays.
+        entry.state = ConfigEntryState.SETUP_RETRY
+        for _ in range(30):
+            seconds, check, waiting = timers[-1]
+            assert (seconds, waiting) == (30, True)
+            timers[-1][2] = False
+            await check(None)
+        assert host._service.heartbeat.running
+        # Disabled, or failed for good: nobody comes back for it.
+        entry.state = ConfigEntryState.NOT_LOADED
+        timers[-1][2] = False
         await timers[-1][1](None)
+        assert not any(timer[2] for timer in timers)
         assert _hosts(hass) == {}
         assert not host._service.heartbeat.running
         # A release of its own ends the wait as well.
         host = await embedded.async_acquire(hass, entry)
-        embedded.async_release_unless_retried(hass, entry.entry_id)
+        embedded.async_release_unless_retried(hass, entry)
         await embedded.async_release(hass, entry.entry_id, force=True)
         assert not timers[-1][2]
         assert not host._service.heartbeat.running
+
+    asyncio.run(run())
+
+
+def test_a_service_that_keeps_ending_is_restarted_ever_later(monkeypatch, tmp_path, caplog):
+    async def run():
+        timers = capture_timers(monkeypatch, embedded)
+        clock = [1000.0]
+        monkeypatch.setattr(embedded, "monotonic", lambda: clock[0])
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        reloads = []
+        hass.config_entries.async_schedule_reload = reloads.append
+
+        async def die():
+            host = await embedded.async_acquire(hass, entry)
+            host._service._heartbeat_task.cancel()
+            for _ in range(200):
+                await asyncio.sleep(0.01)
+                if entry.entry_id not in _hosts(hass) and (reloads or timers):
+                    break
+            await asyncio.sleep(0.05)
+
+        await die()
+        # The first end is restarted at once.
+        assert (reloads, timers) == ([entry.entry_id], [])
+        waits = []
+        for _ in range(8):
+            reloads.clear()
+            timers.clear()
+            await die()
+            assert reloads == []
+            ((seconds, reload, _waiting),) = timers
+            waits.append(seconds)
+            clock[0] += seconds
+            reload(None)
+            assert reloads == [entry.entry_id]
+        assert waits == [10, 20, 40, 80, 160, 320, 600, 600]
+        assert "Service: stopped again soon after its start; next start in 10 seconds" in caplog.text
+        # A delayed restart that someone else already made is not repeated.
+        reloads.clear()
+        timers.clear()
+        await die()
+        host = await embedded.async_acquire(hass, entry)
+        timers[0][1](None)
+        assert reloads == []
+        # After a long quiet run the next end is restarted at once again.
+        clock[0] += 600 + 601
+        timers.clear()
+        host._service._heartbeat_task.cancel()
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if reloads:
+                break
+        assert (reloads, timers) == ([entry.entry_id], [])
+        # A removed entry forgets how often its service ended.
+        await embedded.async_forget(hass, entry.entry_id)
+        assert entry.entry_id not in hass.data[f"{DOMAIN}_restarts"]
+
+    asyncio.run(run())
+
+
+def test_a_shutdown_during_a_slow_start_stops_the_service(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        read_identity = service_runtime.async_read_identity
+
+        async def slow(client):
+            entered.set()
+            await release.wait()
+            return await read_identity(client)
+
+        monkeypatch.setattr(service_runtime, "async_read_identity", slow)
+        starting = asyncio.create_task(embedded.async_acquire(hass, entry))
+        await entered.wait()
+        # Home Assistant stops while the wallbox has not answered yet.
+        await hass.bus.fire(EVENT_HOMEASSISTANT_STOP)
+        release.set()
+        with pytest.raises((DeviceError, AmtronConnectionError, asyncio.CancelledError)):
+            await starting
+        assert _hosts(hass) == {}
+        assert wallbox.close_calls >= 1
+        assert not wallbox.connected
+
+    asyncio.run(run())
+
+
+def test_a_failing_poll_listener_does_not_stop_the_service(monkeypatch, tmp_path, caplog):
+    async def run():
+        hass, entry, _wallbox = _setup(
+            monkeypatch, tmp_path, options={**MASTER, "scan_interval_seconds": 0.01},
+        )
+        host = await embedded.async_acquire(hass, entry)
+        calls = []
+
+        def broken():
+            calls.append(1)
+            raise RuntimeError("display failed")
+
+        host.async_on_polled(broken)
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if len(calls) >= 2:
+                break
+        assert len(calls) >= 2
+        assert not host._service._task.done()
+        assert host._service.heartbeat.running
+        assert "Service: poll listener failed" in caplog.text
+        await embedded.async_release(hass, entry.entry_id, force=True)
 
     asyncio.run(run())
 

@@ -116,10 +116,15 @@ class UnplugRule:
         self._retry = None
         if not self._owed:
             return
-        if self._vehicle_connected() is False:
+        control = self._runtime.control
+        if control.plug_charge.get("enabled") is True:
+            # The gate owns the release now.
+            self._owed = False
+        elif self._vehicle_connected() is False and not control.read_only and not self._busy:
             self._start()
         else:
-            # Unknown for now; a returned car clears the debt in ``_observe``.
+            # Unknown or not writable for now; a returned car clears the debt
+            # in ``_observe``.
             self._retry = async_call_later(self._hass, _RETRY_SECONDS, self._retry_now)
 
     def _cancel_retry(self) -> None:

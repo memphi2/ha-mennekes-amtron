@@ -443,3 +443,32 @@ def test_a_retry_waits_while_the_plug_state_is_unknown(monkeypatch) -> None:
         rule.stop()
 
     asyncio.run(run())
+
+
+def test_an_owed_switch_off_waits_out_a_write_lock_and_ends_when_the_gate_takes_over(
+    monkeypatch,
+) -> None:
+    async def run() -> None:
+        timers = _retry_timers(monkeypatch)
+        _hass, entry, transport = await build_runtime()
+        calls = _busy_release(monkeypatch, entry)
+        rule = await _unplug_rule(transport, entry)
+        await _unplug(transport, entry)
+        assert calls == [False]
+        control = type(entry.runtime_data.control)
+        # Not writable for the moment: the debt stays and is asked for again.
+        monkeypatch.setattr(control, "read_only", property(lambda _self: True))
+        await _fire(timers, entry)
+        await _fire(timers, entry)
+        assert calls == [False]
+        monkeypatch.setattr(control, "read_only", property(lambda _self: False))
+        await _fire(timers, entry)
+        assert len(calls) == 2
+        # With the gate enabled the release is the gate's.
+        monkeypatch.setattr(control, "plug_charge", property(lambda _self: {"enabled": True}))
+        await _fire(timers, entry)
+        assert len(calls) == 2
+        assert not _waiting(timers)
+        rule.stop()
+
+    asyncio.run(run())

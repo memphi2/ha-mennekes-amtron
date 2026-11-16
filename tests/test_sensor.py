@@ -20,7 +20,13 @@ from custom_components.mennekes_amtron_rtu.device.enums import (
 from custom_components.mennekes_amtron_rtu.sensor import _enum, async_setup_entry
 from custom_components.mennekes_amtron_rtu.service_control import ServiceHeartbeat
 from tests.fakes import device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass, build_runtime, collect
+from tests.ha_fakes import (
+    FakeConfigEntry,
+    FakeHass,
+    build_runtime,
+    collect,
+    heartbeat_running,
+)
 
 
 async def _sensors(**kwargs: object) -> dict[str, object]:
@@ -161,7 +167,7 @@ def test_heartbeat_health_rides_on_connection_quality_and_writes_only_transition
         for _ in range(100):
             heartbeat.update()
         assert writes == [{"heartbeat": "ok"}]
-        assert heartbeat.running
+        assert heartbeat_running(heartbeat)
 
         # Read retries stay download diagnostics, never an attribute.
         for _ in range(10):

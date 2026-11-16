@@ -108,7 +108,7 @@ def test_old_layout_uses_its_evse_state_without_a_pilot_register():
 
 def test_pending_intent_and_measurement_fluctuations_do_not_change_observed_state():
     data = _data(charging_current_ems=1.0)
-    data.pending_change = "resume"
+    data.service_control = {"pending_action": "resume"}
     data.pending_change_until = datetime(2026, 11, 6, tzinfo=UTC)
     assert charging_status(data, cp_supported=True) == "paused"
     data.values.update(power_total=0.3, voltage_l1=230.01, session_duration=61)

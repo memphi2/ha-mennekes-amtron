@@ -22,6 +22,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
 from .device.enums import EvseState
+from .device.notice import FailureNotice
 from .device.registers import EVSE_STATE, SESSION_ENERGY
 from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
@@ -119,7 +120,7 @@ class VehicleBinding:
         # The latest empty poll; the persisted time is updated at plug-in.
         self._last_empty: datetime | None = None
         self._first_empty: datetime | None = None
-        self._stale_warned = False
+        self._stale_notice = FailureNotice(_LOGGER, "Vehicle")
         self._resting: bool | None = None
         # When this process saw the binding confirmed, and its charge check.
         self._confirmed_at: datetime | None = None
@@ -194,7 +195,6 @@ class VehicleBinding:
             self._last_empty = now
             if self._first_empty is None:
                 self._first_empty = now
-                self._stale_warned = False
             if self._state.vehicle is not None:
                 _LOGGER.debug("Vehicle binding ended: the wallbox is empty")
                 self._state.vehicle = None
@@ -203,6 +203,7 @@ class VehicleBinding:
             self._warn_stale(profile, now)
         elif wallbox is True:
             self._first_empty = None
+            self._warn_stale(profile, now)
             if self._last_empty is not None:
                 self._state.absent_at = self._last_empty
                 self._last_empty = None
@@ -322,22 +323,25 @@ class VehicleBinding:
         return level, state.last_reported
 
     def _warn_stale(self, profile: VehicleProfile | None, now: datetime) -> None:
+        stale = False
         if (
-            self._stale_warned or profile is None or profile.detection is None
-            or self._first_empty is None or now - self._first_empty < STALE_AFTER
+            profile is not None and profile.detection is not None
+            and self._first_empty is not None and now - self._first_empty >= STALE_AFTER
         ):
-            return
-        evidence = self._evidence.snapshot(profile.id)
-        if (
-            evidence.connected is True and evidence.home is True and evidence.connected_at is not None
-            and evidence.connected_at - self._first_empty >= STALE_AFTER
-        ):
-            self._stale_warned = True
-            _LOGGER.warning(
-                "Vehicle: %s still reports itself plugged in at home although the wallbox has been "
-                "empty for %.0f minutes; its plug signal looks stale",
-                profile.name, (now - self._first_empty).total_seconds() / 60,
+            evidence = self._evidence.snapshot(profile.id)
+            stale = (
+                evidence.connected is True and evidence.home is True
+                and evidence.connected_at is not None
+                and evidence.connected_at - self._first_empty >= STALE_AFTER
             )
+        if stale and profile is not None and self._first_empty is not None:
+            self._stale_notice.failed(
+                f"{profile.name} still reports itself plugged in at home although the wallbox "
+                "is empty; its plug signal looks stale",
+                f"empty for {(now - self._first_empty).total_seconds() / 60:.0f} minutes",
+            )
+        else:
+            self._stale_notice.recovered("plug signal agrees with the wallbox again")
 
     async def _async_save(self) -> None:
         try:

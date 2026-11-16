@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, NoReturn
 
 from homeassistant.config_entries import ConfigEntryState
@@ -259,7 +260,9 @@ async def async_setup_entry(
         # Cancelling queued work or changing a goal is not a successful poll.
         # Notify entities without clearing a connection failure or reading the bus.
         if coordinator.data is not None:
-            coordinator.data.pending_change = control.pending_action
+            coordinator.data.service_control = deepcopy(
+                client.snapshot.get("control", coordinator.data.service_control)
+            )
             coordinator.data.pending_change_until = control.pending_until
         coordinator.async_update_listeners()
 
@@ -659,7 +662,7 @@ async def _async_release_after_failure(
     car's settings, keeps the heartbeat until then.
     """
     if healthy and isinstance(err, ConfigEntryNotReady):
-        async_release_unless_retried(hass, entry.entry_id)
+        async_release_unless_retried(hass, entry)
     else:
         await async_release(hass, entry.entry_id, force=True)
 

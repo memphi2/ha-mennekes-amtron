@@ -332,7 +332,11 @@ class ModbusService:
                 )
             self._attempted.set()
             if self.on_polled is not None:
-                self.on_polled()
+                try:
+                    self.on_polled()
+                except Exception:
+                    # Whoever shows the state never stops the bus owner.
+                    _LOGGER.exception("Service: poll listener failed")
             await asyncio.sleep(self.config.scan_interval)
 
     async def _save_intent(self) -> None:

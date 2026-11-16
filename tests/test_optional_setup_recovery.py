@@ -17,6 +17,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from tests.fakes import FakeModbusClient, device_bank
+from tests.ha_fakes import heartbeat_running
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import current_writes, service_fixture
 from tests.test_service_reauth import add_entry
@@ -66,7 +67,7 @@ def test_optional_remote_setup_retries_or_requests_reauthentication(
                 assert not failed_runtime.client.connected
                 assert failed_runtime.client.on_auth_failed is None
                 if failed_runtime.heartbeat is not None:
-                    assert not failed_runtime.heartbeat.running
+                    assert not heartbeat_running(failed_runtime.heartbeat)
                 if failed_runtime.vehicle_soc is not None:
                     assert failed_runtime.vehicle_soc._stopping
                 assert current_writes(transport) == writes_before
@@ -174,7 +175,7 @@ def test_vehicle_source_storage_failure_defers_direct_setup(tmp_path, monkeypatc
                 assert entry._async_cancel_retry_setup is not None
                 assert entry.runtime_data.vehicle_soc._stopping
                 assert not entry.runtime_data.client.connected
-                assert not entry.runtime_data.heartbeat.running
+                assert not heartbeat_running(entry.runtime_data.heartbeat)
                 monkeypatch.setattr(IntentStore, "save", original_save)
                 entry.async_cancel_retry_setup()
                 await entry.async_setup_locked(hass)

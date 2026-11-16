@@ -146,6 +146,13 @@ class ControlOptions:
             raise ValueError("phase_switch_grace_seconds must be between 0 and 30")
 
 
+def pause_state(value: object) -> bool | None:
+    """Whether a signalled current is a pause; None without a valid reading."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        return None
+    return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
+
+
 class AmtronControl:
     """Validated, rate-limited write access to one wallbox."""
 
@@ -577,10 +584,7 @@ class AmtronControl:
             current = snapshot.get(CHARGING_CURRENT_EMS.key)
             if isinstance(current, (int, float)) and math.isfinite(current) and current >= 0:
                 self._write_state.confirmed_current = float(current)
-        value = self._write_state.confirmed_current
-        if value is None:
-            return None
-        return CHARGING_CURRENT_UNLIMITED < float(value) < CHARGING_CURRENT_MINIMUM
+        return pause_state(self._write_state.confirmed_current)
 
     @property
     def observed_pause(self) -> bool | None:
@@ -592,9 +596,7 @@ class AmtronControl:
         ):
             return None
         value = snapshot.fresh(CHARGING_CURRENT_EMS.key)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
-            return None
-        return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
+        return pause_state(value)
 
     async def async_set_charging_current(
         self,

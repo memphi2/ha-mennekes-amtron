@@ -38,6 +38,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     SEARCH_OFF,
 )
 from tests.fakes import device_bank, put
+from tests.ha_fakes import heartbeat_running
 from tests.options_flow_helpers import async_options
 from tests.test_blueprints import EXPECTED as EXPECTED_BLUEPRINTS
 from tests.test_serial_loopback import (
@@ -208,7 +209,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             host = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]
             assert host.config.measurement_interval == 60
             assert entry.runtime_data.heartbeat is not None
-            assert entry.runtime_data.heartbeat.running
+            assert heartbeat_running(entry.runtime_data.heartbeat)
 
             number = next(
                 entity.entity_id for entity in entities if entity.domain == "number"
@@ -266,7 +267,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
 
             heartbeat = entry.runtime_data.heartbeat
             assert await hass.config_entries.async_unload(entry.entry_id)
-            assert not heartbeat.running
+            assert not heartbeat_running(heartbeat)
         finally:
             await hass.async_stop()
             await server.shutdown()

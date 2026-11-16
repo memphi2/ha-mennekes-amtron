@@ -16,7 +16,8 @@ from typing import Any
 from .data import WallboxData
 from .device.client_errors import AmtronConnectionError
 from .device.command_events import CommandEvents, command_source
-from .device.const import CHARGING_CURRENT_MINIMUM, CHARGING_CURRENT_UNLIMITED
+from .device.const import CHARGING_CURRENT_MINIMUM
+from .device.control import pause_state
 from .device.decode import is_hex32
 from .device.departure_plan import DepartureInputs, DepartureState
 from .device.energy_goal import EnergyGoal
@@ -62,13 +63,6 @@ class ServiceHeartbeat:
         self._healthy: bool | None = None
         self._listeners: set[Callable[[], None]] = set()
         self.update()
-
-    @property
-    def running(self) -> bool:
-        return (
-            self._client.connected
-            and self._client.snapshot.get("heartbeat", {}).get("running") is True
-        )
 
     @property
     def healthy(self) -> bool | None:
@@ -132,29 +126,19 @@ class ServiceControl:
     @property
     def is_paused(self) -> bool | None:
         """Whether the last confirmed current is a pause; None while unknown."""
-        value = self._client.snapshot.get("values", {}).get(CHARGING_CURRENT_EMS.key)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
-            return None
-        return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
+        return pause_state(self._client.snapshot.get("values", {}).get(CHARGING_CURRENT_EMS.key))
 
     @property
     def observed_pause(self) -> bool | None:
         """Fresh current evidence for automatic starts, never a held value."""
         data = self._state()
-        if "current_limits" in data.failed_blocks:
+        if (
+            # A command answered since: this reading is older than its writes.
+            data.current_write_generation != self._client.snapshot.get("current_write_generation")
+            or "current_limits" in data.failed_blocks
+        ):
             return None
-        value = data.fresh(CHARGING_CURRENT_EMS.key)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
-            return None
-        return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
-
-    @property
-    def state_change_interval_seconds(self) -> float:
-        return float(self._control.get("state_change_interval_seconds", 0))
-
-    @property
-    def phase_switch_grace_seconds(self) -> float:
-        return float(self._control.get("phase_switch_grace_seconds", 0))
+        return pause_state(data.fresh(CHARGING_CURRENT_EMS.key))
 
     @property
     def soc_goal_revision(self) -> str | None:

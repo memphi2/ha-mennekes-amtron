@@ -37,7 +37,7 @@ from custom_components.mennekes_amtron_rtu.goal_store import (
 )
 from custom_components.mennekes_amtron_rtu.loss_store import LossStore
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass
+from tests.ha_fakes import FakeConfigEntry, FakeHass, heartbeat_running
 from tests.test_modbus_service import TOKEN, service_fixture
 
 
@@ -176,7 +176,7 @@ def test_partial_setup_failure_closes_every_created_estimate_owner_and_transport
         if "loss" in instances:
             instances["loss"].async_stop.assert_awaited_once()
         if runtime.heartbeat is not None:
-            assert not runtime.heartbeat.running
+            assert not heartbeat_running(runtime.heartbeat)
         assert not runtime.client.connected
         # The embedded service is stopped, not kept for a reload.
         assert not hass.data.get(f"{DOMAIN}_embedded")

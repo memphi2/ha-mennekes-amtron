@@ -289,8 +289,6 @@ def test_the_control_reads_the_service_state_it_was_given() -> None:
     async def run() -> None:
         _hass, entry, _transport = await build_runtime()
         control = entry.runtime_data.control
-        assert control.state_change_interval_seconds == 300
-        assert control.phase_switch_grace_seconds == 5
         assert control.energy_goal_stop_requested is False
         assert control.charging_release_requested is None
         assert control.observed_pause is False
@@ -519,5 +517,19 @@ def test_a_command_keeps_the_source_that_asked_for_it(caller, recorded) -> None:
         finally:
             command_source.reset(token)
         assert sources == [recorded]
+
+    asyncio.run(run())
+
+
+def test_a_reading_older_than_the_newest_command_is_no_evidence_of_a_pause() -> None:
+    async def run() -> None:
+        _hass, entry, _transport = await build_runtime()
+        runtime = entry.runtime_data
+        await runtime.coordinator.async_refresh()
+        assert runtime.control.observed_pause is not None
+        # A command answered since the poll: its writes are newer than the reading.
+        runtime.client.snapshot["current_write_generation"] += 1
+        assert runtime.control.observed_pause is None
+        await runtime.client.async_close()
 
     asyncio.run(run())

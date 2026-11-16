@@ -17,6 +17,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     DOMAIN,
 )
 from tests.fakes import FakeModbusClient, device_bank
+from tests.ha_fakes import heartbeat_running
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_soc_goal_ha_lifecycle import _entry
 
@@ -62,7 +63,7 @@ def test_saved_minute_precision_module_three_tariff_survives_ha_restart(tmp_path
                 await hass.async_block_till_done()
                 assert entry.state is ConfigEntryState.LOADED
                 runtime = entry.runtime_data
-                assert runtime.heartbeat.running
+                assert heartbeat_running(runtime.heartbeat)
                 assert runtime.coordinator.last_update_success
                 assert runtime.client.connected
                 assert runtime.charging_cost._tariff.windows[0].start == 361

@@ -44,7 +44,7 @@ from custom_components.mennekes_amtron_rtu.entry_connection import (
 )
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass
+from tests.ha_fakes import FakeConfigEntry, FakeHass, heartbeat_running
 
 
 def _patch_client(monkeypatch: pytest.MonkeyPatch, transport: FakeModbusClient) -> None:
@@ -163,12 +163,12 @@ def test_a_master_entry_loads_and_unloads_cleanly(
         assert _host(hass, entry).config.connection.connection_type == connection_type
         assert entry.runtime_data.identity.serial_number == "ABC123456789"
         assert entry.runtime_data.heartbeat is not None
-        assert entry.runtime_data.heartbeat.running
+        assert heartbeat_running(entry.runtime_data.heartbeat)
         assert hass.config_entries.forwarded[0][1] == _entry_platforms(entry)
         assert entry.update_listeners
 
         assert await async_unload_entry(hass, entry)
-        assert not entry.runtime_data.heartbeat.running
+        assert not heartbeat_running(entry.runtime_data.heartbeat)
         assert _host(hass, entry) is None
         assert transport.close_calls == 1
 
@@ -188,7 +188,7 @@ def test_a_read_only_entry_never_starts_the_heartbeat(
         _patch_issues(monkeypatch)
 
         assert await async_setup_entry(hass, entry)
-        assert not entry.runtime_data.heartbeat.running
+        assert not heartbeat_running(entry.runtime_data.heartbeat)
         assert not _host(hass, entry)._service.heartbeat.running
         assert await async_unload_entry(hass, entry)
         assert transport.writes == []
@@ -314,7 +314,7 @@ def test_a_failed_unload_keeps_the_connection_and_heartbeat(
             hass.config_entries.unload_result = False
             assert not await async_unload_entry(hass, entry)
             assert entry.runtime_data.client.connected
-            assert entry.runtime_data.heartbeat.running
+            assert heartbeat_running(entry.runtime_data.heartbeat)
             assert _host(hass, entry) is not None
             assert transport.close_calls == 0
         finally:
@@ -341,7 +341,7 @@ def test_failed_platform_setup_releases_the_port_and_heartbeat(
         with pytest.raises(RuntimeError, match="platform setup failed"):
             await async_setup_entry(hass, entry)
         assert transport.close_calls == 1
-        assert not entry.runtime_data.heartbeat.running
+        assert not heartbeat_running(entry.runtime_data.heartbeat)
         assert _host(hass, entry) is None
 
     asyncio.run(run())

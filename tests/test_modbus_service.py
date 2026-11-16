@@ -34,6 +34,7 @@ from custom_components.mennekes_amtron_rtu.service_control import (
     ServiceHeartbeat,
 )
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
+from tests.ha_fakes import heartbeat_running
 
 TOKEN = "service-test-credential-32-characters"  # noqa: S105 - test fixture
 
@@ -116,11 +117,11 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
                 assert service.heartbeat.running
                 heartbeat = ServiceHeartbeat(fresh)
                 assert heartbeat.healthy is True
-                assert heartbeat.running
+                assert heartbeat_running(heartbeat)
                 await fresh.async_close()
                 heartbeat.update()
                 assert heartbeat.healthy is None
-                assert not heartbeat.running
+                assert not heartbeat_running(heartbeat)
             finally:
                 await service.stop()
 

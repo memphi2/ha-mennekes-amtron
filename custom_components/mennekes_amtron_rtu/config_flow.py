@@ -245,6 +245,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 return False
             if loaded and not await self._async_unload_for_probe(entry, original_data):
                 raise AmtronConnectionError("cannot release the active connection")
+            await self._async_free_bus(entry, loaded)
             try:
                 identity = await async_test_connection(config)
                 await self.async_set_unique_id(identity.serial_number or f"{DOMAIN}_{config.port}_{config.device_id}")
@@ -693,6 +694,15 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             original = self._reconfigure_data = dict(entry.data)
         return original
 
+    async def _async_free_bus(self, entry: ConfigEntry, loaded: bool) -> None:
+        """Stop a service kept for a setup that Home Assistant will try again.
+
+        An entry that is not loaded can still own the bus; the retry starts
+        its service again.
+        """
+        if not loaded:
+            await async_release(self.hass, entry.entry_id, force=True)
+
     async def _async_unload_for_probe(
         self, entry: ConfigEntry, original_data: dict[str, Any],
     ) -> bool:
@@ -823,6 +833,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 raise
         if loaded and entry is not None and not await self._async_unload_for_probe(entry, original_data):
             raise AmtronConnectionError("cannot release the active connection")
+        if entry is not None:
+            await self._async_free_bus(entry, loaded)
         async def finish() -> ConfigFlowResult:
             nonlocal saved_data
             identity = await async_test_connection(config)
@@ -884,6 +896,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         loaded = entry.state is ConfigEntryState.LOADED
         if loaded and not await self._async_unload_for_probe(entry, original_data):
             raise AmtronConnectionError("cannot release the active serial port")
+        await self._async_free_bus(entry, loaded)
         try:
             result = await async_search(base, all_parameters=all_parameters)
             if dict(entry.data) != original_data:

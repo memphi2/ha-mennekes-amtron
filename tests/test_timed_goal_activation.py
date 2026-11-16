@@ -34,6 +34,7 @@ from custom_components.mennekes_amtron_rtu.timed_goal_const import (
     timed_goal_is_enabled,
 )
 from tests.fakes import FakeModbusClient, device_bank
+from tests.ha_fakes import heartbeat_running
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_modbus_service import TOKEN, current_writes
 from tests.test_service_reauth import add_entry
@@ -233,7 +234,7 @@ def test_failed_trip_cleanup_stops_planner_and_survives_restart_and_reenable(tmp
                     assert runtime.timed_goal._stopping
                     assert entry.state is ConfigEntryState.LOADED
                     assert entry.runtime_data.timed_goal is None
-                    assert entry.runtime_data.heartbeat.running
+                    assert heartbeat_running(entry.runtime_data.heartbeat)
                     assert stored.exists()
                     assert entry.options[CONF_TIMED_GOAL_RESET_PENDING] is True
             finally:
@@ -248,7 +249,7 @@ def test_failed_trip_cleanup_stops_planner_and_survives_restart_and_reenable(tmp
                     assert await hass.config_entries.async_setup(entry.entry_id)
                     await hass.async_block_till_done()
                     assert entry.runtime_data.timed_goal is None
-                    assert entry.runtime_data.heartbeat.running
+                    assert heartbeat_running(entry.runtime_data.heartbeat)
                     assert entry.runtime_data.control.soc_goal.target_percent == 80
                     assert entry.runtime_data.control.is_paused
                     assert stored.exists()

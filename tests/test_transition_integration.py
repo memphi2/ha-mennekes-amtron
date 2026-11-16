@@ -100,7 +100,7 @@ def test_service_queue_survives_client_restart_and_persists_executed_intent(tmp_
                 remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 first = await remote.update()
-                assert first.pending_change == "resume"
+                assert first.service_control["pending_action"] == "resume"
                 assert first.pending_change_until.isoformat() == deadline
                 remote_control = ServiceControl(
                     remote,                     state=lambda: first, request_refresh=remote.update,
@@ -115,7 +115,7 @@ def test_service_queue_survives_client_restart_and_persists_executed_intent(tmp_
                 wake.set()
                 await asyncio.wait_for(service.control._flush_task, 2)
                 data = await remote.update()
-                assert data.pending_change is None
+                assert data.service_control["pending_action"] is None
                 assert data.pending_change_until is None
                 assert current_writes(transport) == [1, 8]
                 saved = json.loads((tmp_path / "intent.json").read_text())

@@ -143,7 +143,7 @@ def test_waiting_for_vehicle_has_unknown_deadline_across_service_api(tmp_path, t
                 await remote.async_connect()
                 data = await remote.update()
                 assert remote.connected
-                assert data.pending_change == action
+                assert data.service_control["pending_action"] == action
                 assert data.pending_change_until is None
                 assert remote.snapshot["control"]["pending_until"] is None
                 await remote.async_close()

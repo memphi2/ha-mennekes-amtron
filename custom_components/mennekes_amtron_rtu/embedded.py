@@ -14,8 +14,10 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from time import monotonic
 from typing import TYPE_CHECKING
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
@@ -50,8 +52,11 @@ _LOGGER = logging.getLogger(__name__)
 _HOSTS = f"{DOMAIN}_embedded"
 _RELOADING = f"{DOMAIN}_reloading"
 _DEFERRED = f"{DOMAIN}_deferred_release"
-# Longer than Home Assistant waits before it tries a failed setup again.
-_RETRY_GRACE_SECONDS = 120
+_RESTARTS = f"{DOMAIN}_restarts"
+# How often a service kept for a retried setup asks whether the retry is still due.
+_RETRY_CHECK_SECONDS = 30
+# A service that ran this long before it ended starts again at once.
+_STABLE_SECONDS = 600
 # Reading the identity over a slow serial line with retries takes a while.
 _START_SECONDS = 60
 # Changed limits wait for the command in progress, not for a hung bus.
@@ -241,24 +246,63 @@ async def async_acquire(
             del hosts[entry_id]
             await host.async_stop()
     host = EmbeddedService(config, state_directory(hass, entry.entry_id), expected_serial)
-    await host.async_start()
+    # Registered before it starts: a shutdown during a slow start stops it.
     hosts[entry_id] = host
+    try:
+        await host.async_start()
+    except BaseException:
+        if hosts.get(entry_id) is host:
+            del hosts[entry_id]
+        raise
+    if hosts.get(entry_id) is not host:
+        # Home Assistant stopped it while it started.
+        raise DeviceError("service_unavailable")
 
     def ended() -> None:
         if hosts.get(entry_id) is not host:
             return
         del hosts[entry_id]
+        delay = _restart_delay(hass, entry_id)
+
+        @callback
+        def reload(_now: datetime | None = None) -> None:
+            # Whoever started a service meanwhile has reloaded already.
+            if entry_id not in hosts and not hass.is_stopping:
+                hass.config_entries.async_schedule_reload(entry_id)
 
         async def restart() -> None:
             try:
                 await host.async_stop()
             finally:
-                hass.config_entries.async_schedule_reload(entry_id)
+                if delay:
+                    _LOGGER.warning(
+                        "Service: stopped again soon after its start; next start in %.0f seconds",
+                        delay,
+                    )
+                    async_call_later(hass, delay, reload)
+                else:
+                    reload()
 
         hass.async_create_task(restart(), "amtron_service_restart")
 
     host.on_ended = ended
     return host
+
+
+def _restart_delay(hass: HomeAssistant, entry_id: str) -> float:
+    """Wait longer before each restart of a service that keeps ending.
+
+    A reload succeeds whatever ends the service afterwards, so Home
+    Assistant's own retry delay never applies.
+    """
+    restarts: dict[str, tuple[int, float]] = hass.data.setdefault(_RESTARTS, {})
+    now = monotonic()
+    count, restarted_at = restarts.get(entry_id, (0, now))
+    if now - restarted_at > _STABLE_SECONDS:
+        count = 0
+    delay = 0.0 if count == 0 else float(min(5 * 2**count, _STABLE_SECONDS))
+    restarts[entry_id] = (count + 1, now + delay)
+    return delay
 
 
 def _cancel_deferred_release(hass: HomeAssistant, entry_id: str) -> None:
@@ -268,22 +312,31 @@ def _cancel_deferred_release(hass: HomeAssistant, entry_id: str) -> None:
 
 
 @callback
-def async_release_unless_retried(hass: HomeAssistant, entry_id: str) -> None:
+def async_release_unless_retried(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     """Keep a healthy service through a setup that will be tried again.
 
     A setup can fail for reasons that have nothing to do with the wallbox.
-    The heartbeat carries on for the retry; a retry that never comes, as for
-    an entry disabled meanwhile, stops the service.
+    The heartbeat carries on for as long as Home Assistant has a retry
+    planned, however long it waits; an entry that is disabled or otherwise
+    out of retries stops the service.
     """
+    entry_id = entry.entry_id
     _cancel_deferred_release(hass, entry_id)
 
-    async def release(_now: datetime) -> None:
-        hass.data[_DEFERRED].pop(entry_id, None)
-        await async_release(hass, entry_id, force=True)
+    def wait() -> None:
+        hass.data.setdefault(_DEFERRED, {})[entry_id] = async_call_later(
+            hass, _RETRY_CHECK_SECONDS, check
+        )
 
-    hass.data.setdefault(_DEFERRED, {})[entry_id] = async_call_later(
-        hass, _RETRY_GRACE_SECONDS, release
-    )
+    async def check(_now: datetime) -> None:
+        hass.data[_DEFERRED].pop(entry_id, None)
+        # The failed setup itself is still in progress when this is asked first.
+        if entry.state in (ConfigEntryState.SETUP_RETRY, ConfigEntryState.SETUP_IN_PROGRESS):
+            wait()
+        else:
+            await async_release(hass, entry_id, force=True)
+
+    wait()
 
 
 def mark_reloading(hass: HomeAssistant, entry_id: str, reloading: bool) -> None:
@@ -305,6 +358,7 @@ async def async_forget(hass: HomeAssistant, entry_id: str) -> None:
     """Stop the service of a removed entry and delete what it saved."""
     await async_release(hass, entry_id, force=True)
     hass.data.get(_RELOADING, set()).discard(entry_id)
+    hass.data.get(_RESTARTS, {}).pop(entry_id, None)
     await hass.async_add_executor_job(
         lambda: shutil.rmtree(state_directory(hass, entry_id), ignore_errors=True)
     )

@@ -31,7 +31,7 @@ from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceHeartbeat
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
-from tests.ha_fakes import build_runtime
+from tests.ha_fakes import build_runtime, heartbeat_running
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_repairs import _patch
 from tests.test_soc_goal_ha_lifecycle import _entry
@@ -376,7 +376,7 @@ def test_real_ha_reports_disconnected_bus_and_clears_when_heartbeat_returns(monk
                 hass.config_entries.async_update_entry(entry, options={})
                 await hass.async_block_till_done()
                 await asyncio.sleep(0.04)
-                assert not entry.runtime_data.heartbeat.running
+                assert not heartbeat_running(entry.runtime_data.heartbeat)
                 assert not hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service.heartbeat.running
                 assert registry.async_get_issue(DOMAIN, issue_id) is None
             finally:

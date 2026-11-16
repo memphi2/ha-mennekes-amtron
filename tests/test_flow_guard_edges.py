@@ -316,3 +316,35 @@ def test_search_conflict_is_reported_and_a_unchanged_result_remains_accessible()
         assert result["step_id"] == "serial_reconfigure"
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("probe", ["test", "search"])
+def test_a_service_kept_for_a_retried_setup_gives_up_the_bus_before_a_probe(monkeypatch, probe):
+    async def run():
+        flow = _flow()
+        entry = flow.reconfigure_entry
+        # Not loaded, yet its service may still run for Home Assistant's retry.
+        entry.state = ConfigEntryState.SETUP_RETRY
+        order = []
+
+        async def release(_hass, entry_id, *, force):
+            order.append(("release", entry_id, force))
+
+        async def connect(_config):
+            order.append("probe")
+            raise AmtronConnectionError("no answer")
+
+        async def search(_base, *, all_parameters):
+            order.append("probe")
+
+        monkeypatch.setattr(config_flow, "async_release", release)
+        monkeypatch.setattr(config_flow, "async_test_connection", connect)
+        monkeypatch.setattr(config_flow, "async_search", search)
+        if probe == "test":
+            with pytest.raises(AmtronConnectionError):
+                await flow._async_test_and_finish("serial_reconfigure", {}, SerialConfig("/dev/other"))
+        else:
+            await flow._async_search_bus_locked(entry, dict(entry.data), SerialConfig("/dev/other"), False)
+        assert order == [("release", entry.entry_id, True), "probe"]
+
+    asyncio.run(run())

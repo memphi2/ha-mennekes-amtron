@@ -322,3 +322,9 @@ def capture_timers(monkeypatch: Any, module: Any) -> list[list[Any]]:
 
     monkeypatch.setattr(module, "async_call_later", call_later)
     return timers
+
+
+def heartbeat_running(heartbeat: Any) -> bool:
+    """Whether the service Home Assistant talks to reports a running heartbeat."""
+    client = heartbeat._client
+    return bool(client.connected and client.snapshot.get("heartbeat", {}).get("running") is True)
