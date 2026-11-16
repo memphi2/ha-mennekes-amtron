@@ -269,7 +269,9 @@ def test_the_rule_does_nothing_without_write_access_or_after_stopping() -> None:
         entry.runtime_data.client.snapshot["control"]["read_only"] = True
         entry.runtime_data.coordinator.data.values.update(evse_state=1, cp_state=10)
         entry.runtime_data.coordinator.async_update_listeners()
-        assert entry.background_tasks == []
+        # Only the plug state is saved; nothing is written to the wallbox.
+        await asyncio.gather(*entry.background_tasks)
+        assert transport.writes == []
         rule.stop()
 
     asyncio.run(run())
@@ -469,6 +471,64 @@ def test_an_owed_switch_off_waits_out_a_write_lock_and_ends_when_the_gate_takes_
         await _fire(timers, entry)
         assert len(calls) == 2
         assert not _waiting(timers)
+        rule.stop()
+
+    asyncio.run(run())
+
+
+def current_release_writes(transport) -> int:
+    return len([1 for address, _words in transport.writes if address == R.CHARGING_RELEASE.address])
+
+
+def test_an_unplug_while_home_assistant_was_away_still_closes_the_release(monkeypatch) -> None:
+    async def run() -> None:
+        hass, entry, transport = await build_runtime()
+        rule = await _unplug_rule(transport, entry)
+        await rule.async_start()
+        await asyncio.gather(*entry.background_tasks)
+        rule.stop()
+        assert current_release_writes(transport) == 0
+        # Home Assistant restarts; the car leaves meanwhile.
+        _plug(transport, False)
+        await entry.runtime_data.coordinator.async_refresh()
+        await entry.runtime_data.coordinator.async_refresh()
+        restarted = UnplugRule(hass, entry)
+        await restarted.async_start()
+        await asyncio.gather(*entry.background_tasks)
+        assert current_release_writes(transport) == 1
+        restarted.stop()
+        # The next start remembers an empty wallbox: nothing is owed twice.
+        again = UnplugRule(hass, entry)
+        await again.async_start()
+        await asyncio.gather(*entry.background_tasks)
+        assert current_release_writes(transport) == 1
+        again.stop()
+
+    asyncio.run(run())
+
+
+def test_a_plug_state_that_cannot_be_read_or_saved_never_stops_the_rule(
+    monkeypatch, caplog,
+) -> None:
+    async def run() -> None:
+        _hass, entry, transport = await build_runtime()
+
+        async def unreadable(_self):
+            raise ValueError("corrupt")
+
+        async def full(_self, _memory):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(unplug_rule.PlugMemoryStore, "async_load", unreadable)
+        monkeypatch.setattr(unplug_rule.PlugMemoryStore, "async_save", full)
+        rule = await _unplug_rule(transport, entry)
+        await rule.async_start()
+        await asyncio.gather(*entry.background_tasks)
+        assert "Control: ignoring the saved plug state (ValueError)" in caplog.text
+        assert caplog.text.count("Control: plug state not saved") == 1
+        # The rule itself works as before.
+        await _unplug(transport, entry)
+        assert current_release_writes(transport) == 1
         rule.stop()
 
     asyncio.run(run())

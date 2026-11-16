@@ -48,7 +48,7 @@ from .soc_transactions import SocTransactions
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
-API_VERSION = 2
+API_VERSION = 3
 # A state poll waits this long for a running command, then takes the last
 # published state unless that is older than the second value.
 _PATIENCE_SECONDS = 2.0
@@ -96,6 +96,7 @@ class ModbusService:
         self._session_history_retry_at = 0.0
         self._history_notice = FailureNotice(_LOGGER, "Charging session")
         self._wallbox_notice = FailureNotice(_LOGGER, "Connection")
+        self._listener_notice = FailureNotice(_LOGGER, "Service")
         self._command_lock = asyncio.Lock()
         # The last state published after a completed command, and when.
         self._published: tuple[float, dict[str, Any]] | None = None
@@ -334,9 +335,14 @@ class ModbusService:
             if self.on_polled is not None:
                 try:
                     self.on_polled()
-                except Exception:
+                except Exception as err:  # noqa: BLE001 - a listener never stops the bus owner
                     # Whoever shows the state never stops the bus owner.
-                    _LOGGER.exception("Service: poll listener failed")
+                    self._listener_notice.failed(
+                        "poll listener failed", type(err).__name__,
+                        level=logging.ERROR, exc_info=True,
+                    )
+                else:
+                    self._listener_notice.recovered("poll listener works again")
             await asyncio.sleep(self.config.scan_interval)
 
     async def _save_intent(self) -> None:

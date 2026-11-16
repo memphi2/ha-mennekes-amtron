@@ -99,7 +99,7 @@ from .timed_goal_const import (
     timed_goal_is_enabled,
 )
 from .timed_goal_observer import TimedGoalObserver
-from .unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG, UnplugRule
+from .unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG, PlugMemoryStore, UnplugRule
 from .vehicle_binding import VehicleBinding, VehicleBindingStore
 from .vehicle_detection import (
     VehicleDetectionObserver,
@@ -412,6 +412,11 @@ async def async_setup_entry(
         async_setup_repairs(hass, entry)
         if entry.runtime_data.controls and entry.options.get(CONF_RELEASE_OFF_ON_UNPLUG) is True:
             entry.runtime_data.unplug_rule = UnplugRule(hass, entry)
+            await entry.runtime_data.unplug_rule.async_start()
+        else:
+            # A plug state from before the rule was switched off says nothing
+            # about now.
+            await PlugMemoryStore(hass, entry.entry_id, "").async_remove()
     except BaseException as err:
         try:
             try:
@@ -871,6 +876,7 @@ async def async_remove_entry(
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
     await VehicleBindingStore(hass, entry.entry_id, "").async_remove()
+    await PlugMemoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())
     await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()

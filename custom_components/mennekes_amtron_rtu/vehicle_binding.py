@@ -338,7 +338,6 @@ class VehicleBinding:
             self._stale_notice.failed(
                 f"{profile.name} still reports itself plugged in at home although the wallbox "
                 "is empty; its plug signal looks stale",
-                f"empty for {(now - self._first_empty).total_seconds() / 60:.0f} minutes",
             )
         else:
             self._stale_notice.recovered("plug signal agrees with the wallbox again")

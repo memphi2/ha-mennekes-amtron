@@ -296,18 +296,23 @@ def test_unchanged_network_settings_reuse_the_active_client(monkeypatch):
         flow.reconfigure_entry.data = {**NETWORK_INPUT, "serial_number": IDENTITY.serial_number}
         flow.reconfigure_entry.state = ConfigEntryState.LOADED
 
-        async def update():
+        async def refresh():
             client.identity = IDENTITY
 
-        # The running service answers; no second connection is opened.
-        client = SimpleNamespace(update=AsyncMock(side_effect=update), identity=None)
-        flow.reconfigure_entry.runtime_data = SimpleNamespace(client=client)
+        # The running service answers; no second connection is opened, and
+        # the poll goes through the coordinator that owns it.
+        client = SimpleNamespace(update=AsyncMock(), identity=None)
+        coordinator = SimpleNamespace(
+            async_refresh=AsyncMock(side_effect=refresh), last_update_success=True,
+        )
+        flow.reconfigure_entry.runtime_data = SimpleNamespace(client=client, coordinator=coordinator)
         hass.config_entries.async_unload = AsyncMock()
         probe = AsyncMock()
         monkeypatch.setattr(config_flow, "async_test_connection", probe)
         result = await flow.async_step_network_reconfigure(dict(NETWORK_INPUT))
         assert result["reason"] == "reconfigure_successful"
-        client.update.assert_awaited_once_with()
+        coordinator.async_refresh.assert_awaited_once_with()
+        client.update.assert_not_awaited()
         probe.assert_not_awaited()
         hass.config_entries.async_unload.assert_not_awaited()
 

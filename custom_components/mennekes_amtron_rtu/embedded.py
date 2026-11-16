@@ -113,6 +113,8 @@ class EmbeddedService:
         self.transport = EmbeddedTransport(ServiceApi(self._service))
         self._stopping = False
         self._died = False
+        self._stop_lock = asyncio.Lock()
+        self._stopped = False
         # Called when the service ends on its own, which it does rather than
         # carry on without its heartbeat.
         self.on_ended: Callable[[], None] | None = None
@@ -152,6 +154,11 @@ class EmbeddedService:
 
         return remove
 
+    @property
+    def ending(self) -> bool:
+        """Whether it ended on its own or is being stopped."""
+        return self._stopping or self._died
+
     def credentials_rejected(self) -> bool:
         """Whether the gateway refused the saved password on the newest poll."""
         return isinstance(self._service.failure, WaveshareAuthenticationRejectedError)
@@ -170,23 +177,45 @@ class EmbeddedService:
         )
 
     async def async_stop(self) -> None:
+        """Stop once; whoever else asks waits until the connection is closed."""
         self._stopping = True
-        try:
-            # A command whose caller gave up still finishes all its writes
-            # before the connection closes under it.
-            await self.transport.async_drain()
-        finally:
+        async with self._stop_lock:
+            if self._stopped:
+                return
             try:
-                await self._service.stop()
-            except (OSError, ValueError) as err:
-                # The last save failed. The connection is closed all the
-                # same, and an unload must not fail over a full disk.
-                _LOGGER.warning("Service: state not saved while stopping (%s)", type(err).__name__)
-            except Exception:
-                # Its end was reported when it happened; everything was
-                # still saved and closed.
-                if not self._died:
-                    raise
+                # A command whose caller gave up still finishes all its writes
+                # before the connection closes under it.
+                await self.transport.async_drain()
+            finally:
+                try:
+                    await self._service.stop()
+                except (OSError, ValueError) as err:
+                    # The last save failed. The connection is closed all the
+                    # same, and an unload must not fail over a full disk.
+                    _LOGGER.warning(
+                        "Service: state not saved while stopping (%s)", type(err).__name__
+                    )
+                except Exception:
+                    # Its end was reported when it happened; everything was
+                    # still saved and closed.
+                    if not self._died:
+                        raise
+                finally:
+                    self._stopped = True
+
+
+async def _async_stop_registered(
+    hosts: dict[str, EmbeddedService], entry_id: str, host: EmbeddedService,
+) -> None:
+    """Stop a service and only then give up its place.
+
+    Until its connection is closed, nobody else may open the bus.
+    """
+    try:
+        await host.async_stop()
+    finally:
+        if hosts.get(entry_id) is host:
+            del hosts[entry_id]
 
 
 def _hosts(hass: HomeAssistant) -> dict[str, EmbeddedService]:
@@ -197,10 +226,9 @@ def _hosts(hass: HomeAssistant) -> dict[str, EmbeddedService]:
             # Home Assistant stops without unloading its entries. Stopping
             # here lets every service save what it knows and end its heartbeat.
             hosts = hass.data[_HOSTS]
-            while hosts:
-                _entry_id, host = hosts.popitem()
+            for entry_id, host in list(hosts.items()):
                 try:
-                    await host.async_stop()
+                    await _async_stop_registered(hosts, entry_id, host)
                 except Exception:
                     # The other wallboxes still get their orderly stop.
                     _LOGGER.exception("Service: stop failed")
@@ -221,9 +249,13 @@ async def async_acquire(
     hosts = _hosts(hass)
     entry_id = entry.entry_id
     _cancel_deferred_release(hass, entry_id)
-    # The running service stays registered while it is adjusted, so a
-    # shutdown or its own end in the meantime still finds it.
+    # A service stays registered while it is adjusted or stopped, so a
+    # shutdown still finds it and nobody opens the bus beside it.
     host = hosts.get(entry_id)
+    if host is not None and host.ending:
+        # It ended or is being stopped: wait until its connection is closed.
+        await _async_stop_registered(hosts, entry_id, host)
+        host = None
     if host is not None:
         if host.fits(config):
             try:
@@ -232,22 +264,18 @@ async def async_acquire(
             except (DeviceError, TimeoutError):
                 # Not ready for new limits: a fresh start applies them, unless
                 # Home Assistant is stopping and the service went with it.
-                if hosts.get(entry_id) is not host:
+                if host.ending:
                     raise DeviceError("service_unavailable") from None
             except BaseException:
                 # Never leave a running service that nothing can stop.
-                if hosts.get(entry_id) is host:
-                    del hosts[entry_id]
-                    await host.async_stop()
+                await _async_stop_registered(hosts, entry_id, host)
                 raise
             else:
-                if hosts.get(entry_id) is not host:
+                if host.ending:
                     # Stopped meanwhile, by a shutdown or by its own end.
                     raise DeviceError("service_unavailable")
                 return host
-        if hosts.get(entry_id) is host:
-            del hosts[entry_id]
-            await host.async_stop()
+        await _async_stop_registered(hosts, entry_id, host)
     host = EmbeddedService(config, state_directory(hass, entry.entry_id), expected_serial)
     # Registered before it starts: a shutdown during a slow start stops it.
     hosts[entry_id] = host
@@ -257,14 +285,13 @@ async def async_acquire(
         if hosts.get(entry_id) is host:
             del hosts[entry_id]
         raise
-    if hosts.get(entry_id) is not host:
+    if host.ending or hosts.get(entry_id) is not host:
         # Home Assistant stopped it while it started.
         raise DeviceError("service_unavailable")
 
     def ended() -> None:
         if hosts.get(entry_id) is not host:
             return
-        del hosts[entry_id]
         delay = _restart_delay(hass, entry_id)
 
         @callback
@@ -281,7 +308,7 @@ async def async_acquire(
 
         async def restart() -> None:
             try:
-                await host.async_stop()
+                await _async_stop_registered(hosts, entry_id, host)
             finally:
                 if delay:
                     _LOGGER.warning(
@@ -384,9 +411,10 @@ async def async_release(hass: HomeAssistant, entry_id: str, *, force: bool = Fal
         return
     _cancel_deferred_release(hass, entry_id)
     _cancel_restart(hass, entry_id)
-    host = _hosts(hass).pop(entry_id, None)
+    hosts = _hosts(hass)
+    host = hosts.get(entry_id)
     if host is not None:
-        await host.async_stop()
+        await _async_stop_registered(hosts, entry_id, host)
 
 
 async def async_forget(hass: HomeAssistant, entry_id: str) -> None:

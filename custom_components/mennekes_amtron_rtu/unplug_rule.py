@@ -6,13 +6,16 @@ release. With the gate enabled, the gate already owns the release.
 
 A manual pause ends with it: the release now holds the next car, and a
 left-over pause would keep the wallbox showing it. A reached target stays.
+
+Whether a car was plugged in is remembered across restarts, so an unplug
+while Home Assistant was away still closes the release.
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Self
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -22,6 +25,7 @@ from .device.errors import DeviceError
 from .device.notice import FailureNotice
 from .device.registers import CHARGING_RELEASE
 from .device.vehicle import snapshot_vehicle_connected
+from .goal_store import ModelStore
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
@@ -33,11 +37,40 @@ _LOGGER = logging.getLogger(__name__)
 _RETRY_SECONDS = 30
 
 
+class PlugMemory:
+    """Whether a car was plugged in when the wallbox was last read."""
+
+    def __init__(self, connected: bool | None = None) -> None:
+        self.connected = connected
+
+    def snapshot(self) -> dict[str, Any]:
+        return {"connected": self.connected}
+
+    @classmethod
+    def restore(cls, raw: object) -> Self:
+        if (
+            not isinstance(raw, dict) or raw.keys() != {"connected"}
+            or raw["connected"] not in (None, True, False)
+        ):
+            raise ValueError("invalid saved plug state")
+        return cls(raw["connected"])
+
+
+class PlugMemoryStore(ModelStore[PlugMemory]):
+    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
+        super().__init__(hass, entry_id, identity, kind="plug_memory", model=PlugMemory)
+
+
 class UnplugRule:
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
         self._runtime = entry.runtime_data
+        self._store = PlugMemoryStore(
+            hass, entry.entry_id, self._runtime.identity.serial_number or "",
+        )
+        self._memory_notice = FailureNotice(_LOGGER, "Control")
+        self._saving = False
         self._connected = self._vehicle_connected()
         # A switch-off that failed is retried while the car stays away.
         self._owed = False
@@ -47,6 +80,46 @@ class UnplugRule:
         self._unsubscribe: CALLBACK_TYPE | None = (
             self._runtime.coordinator.async_add_listener(self._observe)
         )
+
+    async def async_start(self) -> None:
+        """Act on an unplug that happened while Home Assistant was away."""
+        try:
+            remembered = (await self._store.async_load()).connected
+        except (OSError, ValueError) as err:
+            _LOGGER.warning("Control: ignoring the saved plug state (%s)", type(err).__name__)
+            remembered = None
+        if self._connected is None:
+            # Unknown for now: the next reading is compared with the last known.
+            self._connected = remembered
+        elif remembered is True and self._connected is False:
+            self._start()
+        self._remember()
+
+    def _remember(self) -> None:
+        if not self._saving:
+            self._saving = True
+            self._entry.async_create_background_task(
+                self._hass, self._save(), "amtron_plug_memory",
+            )
+
+    async def _save(self) -> None:
+        try:
+            # Whatever changed while a save ran is saved by the next round.
+            saved: bool | None = None
+            first = True
+            while first or saved != self._connected:
+                first, saved = False, self._connected
+                try:
+                    await self._store.async_save(PlugMemory(saved))
+                except (OSError, ValueError) as err:
+                    self._memory_notice.failed(
+                        "plug state not saved; an unplug during a restart may go unnoticed",
+                        type(err).__name__,
+                    )
+                    return
+                self._memory_notice.recovered("plug state saved again")
+        finally:
+            self._saving = False
 
     def stop(self) -> None:
         self._cancel_retry()
@@ -67,8 +140,9 @@ class UnplugRule:
         connected = self._vehicle_connected()
         # An unknown reading never counts as a disconnect.
         unplugged = connected is False and self._connected is True
-        if connected is not None:
+        if connected is not None and connected is not self._connected:
             self._connected = connected
+            self._remember()
         if connected is True:
             # The car is back: nothing is owed for the charge that ended.
             self._owed = False

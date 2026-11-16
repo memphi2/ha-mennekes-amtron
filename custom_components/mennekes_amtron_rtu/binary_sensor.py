@@ -20,8 +20,7 @@ from .device.enums import (
     enum_option,
     error_category,
 )
-from .device.registers import CP_STATE
-from .device.vehicle import vehicle_connected
+from .device.vehicle import snapshot_vehicle_connected
 from .entity import AmtronEntity, Projection, Runtime, wanted
 from .entry_types import MennekesAmtronConfigEntry
 
@@ -40,10 +39,8 @@ class AmtronBinarySensorDescription(Projection, BinarySensorEntityDescription):
 
 def _connected(runtime: Runtime) -> bool | None:
     # The pilot state keeps the car present during a wallbox fault.
-    data = runtime.coordinator.current_data()
-    return vehicle_connected(
-        data.get("evse_state"), data.get(CP_STATE.key),
-        cp_supported=runtime.identity.layout_version >= CP_STATE.min_layout,
+    return snapshot_vehicle_connected(
+        runtime.coordinator.current_data().get, runtime.identity.layout_version,
     )
 
 

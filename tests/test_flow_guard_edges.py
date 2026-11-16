@@ -252,13 +252,16 @@ def test_unchanged_connection_probe_failure_preserves_concurrent_updates(monkeyp
         entry.state = ConfigEntryState.LOADED
         config = connection_config(entry)
 
-        async def update():
+        async def refresh():
             if entry_changed:
                 _change(flow)
-            raise AmtronConnectionError("offline")
 
-        # An unchanged form asks the running service instead of opening the bus.
-        entry.runtime_data = SimpleNamespace(client=SimpleNamespace(update=update))
+        # An unchanged form asks the running service instead of opening the
+        # bus, through the coordinator that owns the poll.
+        entry.runtime_data = SimpleNamespace(
+            client=SimpleNamespace(identity=None),
+            coordinator=SimpleNamespace(async_refresh=refresh, last_update_success=False),
+        )
         probe = AsyncMock()
         monkeypatch.setattr(config_flow, "async_test_connection", probe)
         if entry_changed:

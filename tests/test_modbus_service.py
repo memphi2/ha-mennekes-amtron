@@ -159,6 +159,9 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                 assert transport.writes == []
                 async with session.get(server.make_url("/health")) as response:
                     assert response.status == 200
+                # A probe that asks with HEAD gets the answer of GET, without a body.
+                async with session.head(server.make_url("/v2/state"), headers=headers) as response:
+                    assert response.status == 200
                 for payload in (
                     [],
                     {"command": "write_register", "expected_serial_number": "ABC123456789"},

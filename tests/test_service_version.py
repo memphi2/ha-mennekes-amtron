@@ -24,7 +24,7 @@ from tests.test_service_reauth import add_entry
 
 
 @pytest.mark.parametrize("phase", ["flow", "setup", "poll"])
-@pytest.mark.parametrize("version", [1, 3, "missing_route", True, "2"])
+@pytest.mark.parametrize("version", [1, 2, "missing_route", True, "3"])
 def test_api_mismatch_is_distinct_from_auth_failure_and_recovers(
     tmp_path, phase, version
 ):

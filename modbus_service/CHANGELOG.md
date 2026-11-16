@@ -6,7 +6,9 @@
   `Heartbeat:`. A repeating failure is logged once, and its end once.
 
 - The app and a direct connection in Home Assistant run the same service.
-  Integration and app must both be 0.10.0b1; update them together.
+  Integration and app must both be 0.10.0b1; update them together. The API
+  is version 3, so an older integration reports a version mismatch instead of
+  sending commands the service no longer has.
 - The service no longer accepts the commands `solar`, `timed_current` and
   `cancel_timed_current`; nothing sent them. Its state no longer carries the
   fields `supports_plug_charge`, `supports_cancel_pending`,

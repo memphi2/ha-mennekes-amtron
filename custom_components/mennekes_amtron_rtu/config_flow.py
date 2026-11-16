@@ -822,7 +822,12 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             # needs no second connection, only the service's current answer.
             # An app entry has no direct connection to compare with.
             try:
-                await entry.runtime_data.client.update()
+                # Through the coordinator: the poll's meter sample and its
+                # outcome belong to the entities, not to this form.
+                coordinator = entry.runtime_data.coordinator
+                await coordinator.async_refresh()
+                if not coordinator.last_update_success:
+                    raise AmtronConnectionError("the wallbox does not answer")
                 identity = entry.runtime_data.client.identity
                 return await self._async_finish(
                     step_id, user_input, identity, config=config, expected_data=original_data,

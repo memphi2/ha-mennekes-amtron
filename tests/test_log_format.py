@@ -86,3 +86,30 @@ def test_failure_level_without_a_reason(caplog, level):
     assert [(record.levelno, record.getMessage()) for record in caplog.records] == [
         (level, "Energy target: cannot be enforced"),
     ]
+
+
+def test_a_notice_reports_a_changed_cause_again_and_its_traceback_once(caplog):
+    logger = logging.getLogger("tests.notice")
+    notice = FailureNotice(logger, "Control")
+    caplog.set_level(logging.DEBUG, logger="tests.notice")
+    assert notice.failed("command deferred", "phase_pause_state_unknown")
+    assert not notice.failed("command deferred", "phase_pause_state_unknown")
+    # The cause changed: the log must not keep naming the old one.
+    assert not notice.failed("command deferred", "read_only_mode")
+    assert not notice.failed("command deferred", "read_only_mode")
+    assert [(record.levelno, record.getMessage()) for record in caplog.records] == [
+        (logging.WARNING, "Control: command deferred (phase_pause_state_unknown)"),
+        (logging.DEBUG, "Control: command deferred (phase_pause_state_unknown)"),
+        (logging.WARNING, "Control: command deferred (read_only_mode)"),
+        (logging.DEBUG, "Control: command deferred (read_only_mode)"),
+    ]
+    assert notice.recovered("command accepted again")
+    caplog.clear()
+    for _ in range(2):
+        try:
+            raise RuntimeError("display failed")
+        except RuntimeError as err:
+            notice.failed("listener failed", type(err).__name__, level=logging.ERROR, exc_info=True)
+    first, repeat = caplog.records
+    assert (first.levelno, first.exc_info is not None) == (logging.ERROR, True)
+    assert (repeat.levelno, repeat.exc_info) == (logging.DEBUG, False)

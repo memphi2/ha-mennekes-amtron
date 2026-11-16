@@ -935,3 +935,69 @@ def test_a_kept_service_is_released_at_once_when_the_entry_is_disabled(monkeypat
         assert not any(timer[2] for timer in timers)
 
     asyncio.run(run())
+
+
+def test_nobody_opens_the_bus_while_an_ended_service_still_closes_it(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        hass.config_entries.async_schedule_reload = lambda _entry_id: None
+        host = await embedded.async_acquire(hass, entry)
+        service = host._service
+        closing = asyncio.Event()
+        closed = asyncio.Event()
+        stop = service.stop
+
+        async def slow_stop():
+            closing.set()
+            await closed.wait()
+            await stop()
+
+        monkeypatch.setattr(service, "stop", slow_stop)
+        connects = wallbox.connect_calls if hasattr(wallbox, "connect_calls") else None
+        # The service ends on its own and is still closing its connection.
+        service._heartbeat_task.cancel()
+        await asyncio.wait_for(closing.wait(), 5)
+        assert _hosts(hass) == {entry.entry_id: host}
+        # A setup in that moment waits instead of opening the same line.
+        retry = asyncio.create_task(embedded.async_acquire(hass, entry))
+        await asyncio.sleep(0.05)
+        assert not retry.done()
+        assert _hosts(hass) == {entry.entry_id: host}
+        if connects is not None:
+            assert wallbox.connect_calls == connects
+        closed.set()
+        replacement = await asyncio.wait_for(retry, 10)
+        assert replacement is not host
+        assert _hosts(hass) == {entry.entry_id: replacement}
+        await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_release_keeps_the_place_until_the_connection_is_closed(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        service = host._service
+        closing = asyncio.Event()
+        closed = asyncio.Event()
+        stop = service.stop
+
+        async def slow_stop():
+            closing.set()
+            await closed.wait()
+            await stop()
+
+        monkeypatch.setattr(service, "stop", slow_stop)
+        releasing = asyncio.create_task(embedded.async_release(hass, entry.entry_id, force=True))
+        await asyncio.wait_for(closing.wait(), 5)
+        assert _hosts(hass) == {entry.entry_id: host}
+        # A second stop waits for the first instead of closing twice.
+        second = asyncio.create_task(host.async_stop())
+        await asyncio.sleep(0.01)
+        assert not second.done()
+        closed.set()
+        await asyncio.gather(releasing, second)
+        assert _hosts(hass) == {}
+
+    asyncio.run(run())

@@ -36,6 +36,7 @@ from .device.charging_display import DISPLAY_OPTIONS
 from .device.charging_status import charging_status
 from .device.decode import enum_option
 from .device.enums import DowngradeStatus
+from .device.link_quality import CONNECTION_QUALITY_STATES
 from .device.operation import WAITING
 from .device.registers import CP_STATE, EVSE_STATE, REGISTERS_BY_KEY, layout_label
 from .entity import AmtronEntity, Projection, Runtime, wanted
@@ -306,7 +307,7 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
     AmtronSensorDescription(
         key="connection_quality",
         value=lambda runtime: runtime.coordinator.current_data().connection_quality,
-        device_class=SensorDeviceClass.ENUM, options=["good", "degraded"],
+        device_class=SensorDeviceClass.ENUM, options=list(CONNECTION_QUALITY_STATES),
         entity_category=EntityCategory.DIAGNOSTIC, entity_registry_enabled_default=False,
         attributes=_connection_details, follows_heartbeat=True,
     ),

@@ -838,10 +838,14 @@ def test_write_failures_defer_and_log_once(tmp_path, caplog):
             box.fail = AmtronBusError("lost")
             box.clock[0] += 300
             await plan.tick()
-            # One episode warns once, whatever keeps it going.
+            # One episode warns once per cause, so the log names the current one.
             assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
-                "Departure plan: command deferred (service_unavailable)"
+                "Departure plan: command deferred (service_unavailable)",
+                "Departure plan: command deferred (AmtronBusError)",
             ]
+            box.clock[0] += 300
+            await plan.tick()
+            assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 2
             box.fail = None
             box.clock[0] += 300
             await plan.tick()

@@ -28,7 +28,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.departure_plan import DepartureInputs
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
-from tests.ha_fakes import build_runtime
+from tests.ha_fakes import FakeConfigEntry, build_runtime
 
 
 class FakeDeviceRegistry:
@@ -229,12 +229,21 @@ def _user(*, admin: bool = False, allowed: bool = False) -> SimpleNamespace:
 
 
 class _EntityRegistry:
-    def __init__(self, entity_id: str | None) -> None:
+    def __init__(self, entity_id: str | None, status_id: str | None = None) -> None:
         self.entity_id = entity_id
+        self.status_id = status_id
+        self.asked: list[str] = []
 
     def async_get_entity_id(self, domain: str, platform: str, unique_id: str) -> str | None:
-        assert (domain, platform, unique_id) == ("number", DOMAIN, "ABC123456789_charging_current_limit")
-        return self.entity_id
+        assert platform == DOMAIN
+        self.asked.append(domain)
+        # The control stands for the wallbox; without controls, its status does.
+        if (domain, unique_id) == ("number", "ABC123456789_charging_current_limit"):
+            return self.entity_id
+        assert (domain, unique_id) == ("sensor", "ABC123456789_charging_status")
+        assert self.asked == ["number", "sensor"]
+        assert self.entity_id is None
+        return self.status_id
 
 
 @pytest.mark.parametrize("service", [SERVICE_SET_CHARGING_CURRENT, "start_guest_charging"])
@@ -531,5 +540,67 @@ def test_a_reading_older_than_the_newest_command_is_no_evidence_of_a_pause() -> 
         runtime.client.snapshot["current_write_generation"] += 1
         assert runtime.control.observed_pause is None
         await runtime.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_a_read_only_wallbox_is_authorized_by_its_status_sensor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass, entry, _transport = await build_runtime()
+        _patch_registry(monkeypatch, {"dev": SimpleNamespace(config_entry_id=entry.entry_id)})
+        registry = _EntityRegistry(None, "sensor.amtron_status")
+        monkeypatch.setattr(services.er, "async_get", lambda _hass: registry)
+        user = _user(allowed=True)
+
+        async def get_user(_user_id: str):
+            return user
+
+        hass.auth = SimpleNamespace(async_get_user=get_user)
+        assigned: list[str] = []
+
+        async def assign() -> None:
+            assigned.append("loss")
+
+        entry.runtime_data.charge_loss = SimpleNamespace(async_assign=assign)
+        services.async_setup_services(hass)
+        handler, schema = hass.services.registered[(DOMAIN, "assign_vehicle_charge")]
+        await handler(SimpleNamespace(context=Context(user_id="user-1"), data=schema({"device_id": "dev"})))
+        assert assigned == ["loss"]
+        assert user.permissions.checked == [("sensor.amtron_status", "control")]
+
+    asyncio.run(run())
+
+
+def test_an_action_for_several_wallboxes_acts_on_none_when_one_cannot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass, first, _transport = await build_runtime()
+        second = FakeConfigEntry(entry_id="entry-2")
+        hass.config_entries.entries[second.entry_id] = second
+        _patch_registry(monkeypatch, {
+            "one": SimpleNamespace(config_entry_id=first.entry_id),
+            "two": SimpleNamespace(config_entry_id=second.entry_id),
+        })
+        used: list[str] = []
+
+        async def use() -> None:
+            used.append("first")
+
+        first.runtime_data.timed_goal = SimpleNamespace(async_use_next_calendar_event=use)
+        # The second wallbox has no departure planning.
+        second.runtime_data = SimpleNamespace(timed_goal=None)
+        services.async_setup_services(hass)
+        handler, schema = hass.services.registered[(DOMAIN, "use_calendar_departure")]
+        call = SimpleNamespace(context=Context(), data=schema({"device_id": ["one", "two"]}))
+        with pytest.raises(ServiceValidationError) as error:
+            await handler(call)
+        assert error.value.translation_key == "timed_goal_unavailable"
+        assert used == []
+        second.runtime_data.timed_goal = SimpleNamespace(async_use_next_calendar_event=use)
+        await handler(call)
+        assert used == ["first", "first"]
 
     asyncio.run(run())

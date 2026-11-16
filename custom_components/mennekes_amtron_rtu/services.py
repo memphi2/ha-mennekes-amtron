@@ -9,7 +9,7 @@ Pausing uses the dedicated charging-pause switch.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Coroutine
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import probatio
 from homeassistant.auth.models import User
@@ -34,6 +34,10 @@ from .exceptions import service_validation_error
 from .recorder_profile import async_setup_recorder_service
 from .service_control import ServiceControl
 
+if TYPE_CHECKING:
+    from .charge_loss_observer import ChargeLossObserver
+    from .timed_goal_observer import TimedGoalObserver
+
 SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
     {
         probatio.Required(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string]),
@@ -48,22 +52,28 @@ SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
 _DEVICE = {probatio.Optional(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string])}
 
 
-async def _use_calendar_departure(runtime: MennekesAmtronRuntimeData) -> None:
+def _departure_planning(runtime: MennekesAmtronRuntimeData) -> TimedGoalObserver:
     if runtime.timed_goal is None:
         raise service_validation_error("timed_goal_unavailable")
-    await runtime.timed_goal.async_use_next_calendar_event()
+    return runtime.timed_goal
+
+
+def _loss_estimate(runtime: MennekesAmtronRuntimeData) -> ChargeLossObserver:
+    if runtime.charge_loss is None:
+        raise service_validation_error("loss_unavailable")
+    return runtime.charge_loss
+
+
+async def _use_calendar_departure(runtime: MennekesAmtronRuntimeData) -> None:
+    await _departure_planning(runtime).async_use_next_calendar_event()
 
 
 async def _use_vehicle_departure(runtime: MennekesAmtronRuntimeData) -> None:
-    if runtime.timed_goal is None:
-        raise service_validation_error("timed_goal_unavailable")
-    await runtime.timed_goal.async_use_vehicle_departure()
+    await _departure_planning(runtime).async_use_vehicle_departure()
 
 
 async def _assign_vehicle_charge(runtime: MennekesAmtronRuntimeData) -> None:
-    if runtime.charge_loss is None:
-        raise service_validation_error("loss_unavailable")
-    await runtime.charge_loss.async_assign()
+    await _loss_estimate(runtime).async_assign()
 
 
 # Actions on a wallbox that have no state of their own. Each takes what it
@@ -73,6 +83,13 @@ DEVICE_ACTIONS: dict[str, Callable[[MennekesAmtronRuntimeData], Awaitable[None]]
     "use_calendar_departure": _use_calendar_departure,
     "use_vehicle_departure": _use_vehicle_departure,
     "assign_vehicle_charge": _assign_vehicle_charge,
+}
+# What a wallbox needs for an action. Every target is checked before the
+# first one acts, so a call never does half its work.
+_ACTION_NEEDS: dict[str, Callable[[MennekesAmtronRuntimeData], object]] = {
+    "use_calendar_departure": _departure_planning,
+    "use_vehicle_departure": _departure_planning,
+    "assign_vehicle_charge": _loss_estimate,
 }
 
 
@@ -111,7 +128,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
 
     def device_handler(
-        run: Callable[[MennekesAmtronRuntimeData], Awaitable[None]],
+        name: str, run: Callable[[MennekesAmtronRuntimeData], Awaitable[None]],
     ) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
         async def handle(call: ServiceCall) -> None:
             user = None
@@ -119,15 +136,19 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 user = await hass.auth.async_get_user(call.context.user_id)
                 if user is None:
                     raise UnknownUser(context=call.context)
-            # Resolve and authorize every target before the first one acts.
-            for runtime in _resolve_runtimes(hass, call.data.get(ATTR_DEVICE_ID), user):
+            # Resolve, authorize and check every target before the first one acts.
+            runtimes = _resolve_runtimes(hass, call.data.get(ATTR_DEVICE_ID), user)
+            if (needs := _ACTION_NEEDS.get(name)) is not None:
+                for runtime in runtimes:
+                    needs(runtime)
+            for runtime in runtimes:
                 await run(runtime)
 
         return handle
 
     for name, run in DEVICE_ACTIONS.items():
         hass.services.async_register(
-            DOMAIN, name, device_handler(run), schema=probatio.Schema(_DEVICE),
+            DOMAIN, name, device_handler(name, run), schema=probatio.Schema(_DEVICE),
         )
 
 
@@ -170,8 +191,12 @@ def _resolve_runtimes(
                 "entry_not_loaded", {"device": device_id}
             )
         if user is not None and not user.is_admin:
-            entity_id = er.async_get(hass).async_get_entity_id(
+            entities = er.async_get(hass)
+            # A read-only wallbox has no controls; its status stands for it.
+            entity_id = entities.async_get_entity_id(
                 "number", DOMAIN, entry_entity_unique_id(entry, "charging_current_limit")
+            ) or entities.async_get_entity_id(
+                "sensor", DOMAIN, entry_entity_unique_id(entry, "charging_status")
             )
             if entity_id is None or not user.permissions.check_entity(
                 entity_id, POLICY_CONTROL

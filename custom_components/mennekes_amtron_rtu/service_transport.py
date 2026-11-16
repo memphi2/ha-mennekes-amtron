@@ -13,6 +13,7 @@ from typing import Any, Protocol
 
 from aiohttp import ClientSession, ClientTimeout
 
+from .device.notice import FailureNotice
 from .device.service_api import ServiceApi, ServiceBusyError
 from .service_errors import ServiceConnectionError
 
@@ -75,6 +76,7 @@ class EmbeddedTransport:
         self._api = api
         self._running: set[asyncio.Task[Reply]] = set()
         self._closed = False
+        self._fault_notice = FailureNotice(_LOGGER, "Service")
 
     async def call(self, method: str, path: str, payload: dict[str, Any] | None) -> Reply:
         if self._closed:
@@ -91,13 +93,19 @@ class EmbeddedTransport:
 
     async def _dispatch(self, method: str, path: str, payload: dict[str, Any] | None) -> Reply:
         try:
-            return await self._api.dispatch(method, path, payload)
+            reply = await self._api.dispatch(method, path, payload)
         except ServiceBusyError:
             return 503, {"error": "service_unavailable"}
-        except Exception:
+        except Exception as err:  # noqa: BLE001 - a fault inside an operation is answered, not raised
             # The answer a web server gives for a fault inside an operation.
-            _LOGGER.exception("Service: request failed unexpectedly")
+            # The state is asked for after every poll: report it once.
+            self._fault_notice.failed(
+                "request failed unexpectedly", type(err).__name__,
+                level=logging.ERROR, exc_info=True,
+            )
             return 500, {"error": "internal_error"}
+        self._fault_notice.recovered("requests are answered again")
+        return reply
 
     def _finished(self, task: asyncio.Task[Reply]) -> None:
         self._running.discard(task)

@@ -42,7 +42,9 @@ def create_app(service: ModbusService) -> web.Application:
             except (ValueError, RecursionError):
                 return web.json_response({"error": "invalid_request"}, status=400)
         try:
-            status, body = await api.dispatch(request.method, request.path, payload)
+            # A route for GET answers HEAD as well.
+            method = "GET" if request.method == "HEAD" else request.method
+            status, body = await api.dispatch(method, request.path, payload)
         except ServiceBusyError:
             raise web.HTTPServiceUnavailable from None
         return web.json_response(body, status=status)

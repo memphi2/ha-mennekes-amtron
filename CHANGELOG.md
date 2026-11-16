@@ -46,7 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Downloaded diagnostics contain the service state, its counters and the raw
   registers.
 - The integration and the app must both be 0.10.0b1. Update them together;
-  either one refuses or misreads the other's older version.
+  the service API is now version 3, and each side refuses the other's older
+  version.
 - The wallbox's solar charging mode is shown and no longer changed.
 
 ### Changes
