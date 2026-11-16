@@ -210,7 +210,12 @@ class TimedGoalObserver:
                 self._evaluation_notice.recovered("evaluation works again")
             except (AmtronBusError, HomeAssistantError) as err:
                 self._set_status("write_pending")
-                self._handover_notice.failed("not handed to the service yet", str(err))
+                # The cause, not its text: a text that varies would be
+                # reported with every evaluation.
+                self._handover_notice.failed(
+                    "not handed to the service yet",
+                    getattr(err, "translation_key", None) or type(err).__name__,
+                )
             except Exception as err:  # noqa: BLE001 - one car's plan never stops the others
                 self._evaluation_notice.failed(
                     "evaluation failed", type(err).__name__, level=logging.ERROR, exc_info=True,

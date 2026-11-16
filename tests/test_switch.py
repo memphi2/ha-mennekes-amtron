@@ -564,3 +564,75 @@ def test_an_unplug_during_a_running_switch_off_is_owed_and_not_lost(monkeypatch)
         rule.stop()
 
     asyncio.run(run())
+
+
+def test_a_car_plugged_in_again_keeps_its_release_and_its_pause(monkeypatch) -> None:
+    async def run() -> None:
+        timers = _retry_timers(monkeypatch)
+        _hass, entry, transport = await build_runtime()
+        calls = _busy_release(monkeypatch, entry)
+        resumed: list[int] = []
+
+        async def resume() -> None:
+            resumed.append(1)
+
+        control = entry.runtime_data.control
+        monkeypatch.setattr(control, "async_resume_charging", resume)
+        monkeypatch.setattr(type(control), "pause_requested", property(lambda _self: True))
+        rule = await _unplug_rule(transport, entry)
+        await _unplug(transport, entry)
+        assert calls == [False]
+        # The car is back, but no changed poll has told the rule yet.
+        connected = [True]
+        monkeypatch.setattr(rule, "_vehicle_connected", lambda: connected[0])
+        await _fire(timers, entry)
+        assert (calls, resumed) == ([False], [])
+        assert not rule._owed
+        assert not _waiting(timers)
+        # It comes back while the switch-off is under way: with a car that
+        # write only waits in the queue, and ending the pause would replace it.
+        connected[0] = False
+        rule._connected = True
+        rule._observe()
+
+        async def plugged_meanwhile(released: bool) -> None:
+            calls.append(released)
+            connected[0] = True
+
+        monkeypatch.setattr(control, "async_set_charging_release", plugged_meanwhile)
+        await asyncio.gather(*entry.background_tasks)
+        assert (calls, resumed) == ([False, False], [])
+        assert not rule._owed
+        rule.stop()
+
+    asyncio.run(run())
+
+
+def test_a_stopped_rule_plans_nothing_more(monkeypatch) -> None:
+    async def run() -> None:
+        timers = _retry_timers(monkeypatch)
+        _hass, entry, transport = await build_runtime()
+        rule = await _unplug_rule(transport, entry)
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def closing(_released: bool) -> None:
+            entered.set()
+            await release.wait()
+            raise HomeAssistantError("service is stopping")
+
+        monkeypatch.setattr(entry.runtime_data.control, "async_set_charging_release", closing)
+        _plug(transport, False)
+        await entry.runtime_data.coordinator.async_refresh()
+        await entry.runtime_data.coordinator.async_refresh()
+        await asyncio.wait_for(entered.wait(), 5)
+        # The entry is unloaded while the switch-off is still on its way.
+        rule.stop()
+        release.set()
+        await asyncio.gather(*entry.background_tasks)
+        assert not _waiting(timers)
+        rule._owed = True
+        rule._retry_now(None)
+        rule._owe()
+        assert not _waiting(timers)
+
+    asyncio.run(run())

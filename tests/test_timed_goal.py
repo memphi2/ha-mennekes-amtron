@@ -235,6 +235,12 @@ def test_observer_lifecycle_and_write_failure_status(
         observer.request_evaluate()
         await observer._task
         assert observer.status == "write_pending"
+        # The cause is named, not its text, which may differ every time.
+        waiting = [r for r in caplog.records if "not handed to the service yet" in r.getMessage()]
+        assert [(r.levelname, r.getMessage()) for r in waiting] == [
+            ("WARNING", "Departure plan: not handed to the service yet (HomeAssistantError)"),
+            ("DEBUG", "Departure plan: not handed to the service yet (HomeAssistantError)"),
+        ]
 
         async def broken() -> None:
             raise RuntimeError("unexpected")

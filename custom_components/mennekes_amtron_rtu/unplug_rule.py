@@ -61,6 +61,10 @@ class PlugMemoryStore(ModelStore[PlugMemory]):
         super().__init__(hass, entry_id, identity, kind="plug_memory", model=PlugMemory)
 
 
+class _NotAwayError(Exception):
+    """The car is not known to be away any more."""
+
+
 class UnplugRule:
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
@@ -75,6 +79,7 @@ class UnplugRule:
         # A switch-off that failed is retried while the car stays away.
         self._owed = False
         self._busy = False
+        self._stopped = False
         self._retry: CALLBACK_TYPE | None = None
         self._notice = FailureNotice(_LOGGER, "Control")
         self._unsubscribe: CALLBACK_TYPE | None = (
@@ -122,6 +127,7 @@ class UnplugRule:
             self._saving = False
 
     def stop(self) -> None:
+        self._stopped = True
         self._cancel_retry()
         if self._unsubscribe is not None:
             self._unsubscribe()
@@ -150,6 +156,14 @@ class UnplugRule:
         if unplugged:
             self._start()
 
+    def _owe(self) -> None:
+        if self._stopped or self._vehicle_connected() is True:
+            self._owed = False
+            return
+        self._owed = True
+        if self._retry is None:
+            self._retry = async_call_later(self._hass, _RETRY_SECONDS, self._retry_now)
+
     def _start(self) -> None:
         control = self._runtime.control
         if control.plug_charge.get("enabled") is True:
@@ -157,9 +171,7 @@ class UnplugRule:
         if self._busy or control.read_only:
             # Not possible right now, but owed: the release must not stay
             # open for the next car.
-            self._owed = True
-            if self._retry is None:
-                self._retry = async_call_later(self._hass, _RETRY_SECONDS, self._retry_now)
+            self._owe()
             return
         self._busy = True
         # Tied to the entry: an unload cancels it before it can write.
@@ -170,13 +182,26 @@ class UnplugRule:
     async def _close_release(self) -> None:
         control = self._runtime.control
         try:
+            if self._vehicle_connected() is not False:
+                # Plugged in again, or unknown: the release of a car that is
+                # there is not this rule's to close.
+                raise _NotAwayError
             if self._runtime.coordinator.current_data().get(CHARGING_RELEASE.key) != 0:
                 await control.async_set_charging_release(False)
+            if self._vehicle_connected() is not False:
+                # With a car the switch-off only waits in the queue, and
+                # ending the pause would replace it.
+                raise _NotAwayError
             # Without a vehicle and with the release off, ending the pause
             # lets no current flow.
             if control.pause_requested is True and not control.energy_goal_stop_requested:
                 await control.async_resume_charging()
+        except _NotAwayError:
+            # A car that is back clears the debt in ``_observe``.
+            self._owe()
         except (HomeAssistantError, DeviceError, OSError) as err:
+            if self._stopped:
+                return
             self._owed = True
             self._notice.failed(
                 f"charging release not switched off after unplugging; retrying every {_RETRY_SECONDS} seconds",
@@ -195,7 +220,11 @@ class UnplugRule:
     @callback
     def _retry_now(self, _now: datetime) -> None:
         self._retry = None
-        if not self._owed:
+        if not self._owed or self._stopped:
+            return
+        if self._vehicle_connected() is True:
+            # The car is back, although no changed poll said so yet.
+            self._owed = False
             return
         control = self._runtime.control
         if control.plug_charge.get("enabled") is True:

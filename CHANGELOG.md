@@ -38,7 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `mennekes_amtron_rtu.assign_vehicle_charge`. With one wallbox they need no
   target.
 - Switching the charging release off when the vehicle is unplugged is an
-  option of the integration instead of a switch entity.
+  option of the integration instead of a switch entity. It starts switched
+  off; switch it on again in the options if you used it.
 - The diagnostic sensors Connection quality, Authorization, Cable lock,
   Detected vehicle phases and Wallbox settings are disabled by default.
 - The blueprint for grid-operator downgrade notifications takes the Charging
