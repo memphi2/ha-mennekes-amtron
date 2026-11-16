@@ -700,6 +700,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         An entry that is not loaded can still own the bus; the retry starts
         its service again.
         """
+        if entry.state is ConfigEntryState.FAILED_UNLOAD:
+            # It still runs on its service, and nothing would start that again.
+            raise AmtronConnectionError("cannot release the active connection")
         if not loaded:
             await async_release(self.hass, entry.entry_id, force=True)
 

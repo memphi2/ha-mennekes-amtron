@@ -76,8 +76,8 @@ class UnplugRule:
         self._memory_notice = FailureNotice(_LOGGER, "Control")
         self._saving = False
         self._connected = self._vehicle_connected()
-        # A switch-off that failed is retried while the car stays away.
-        self._owed = False
+        # A switch-off that is still to do; retried while the car stays away.
+        self._debt = False
         self._busy = False
         self._stopped = False
         self._retry: CALLBACK_TYPE | None = None
@@ -97,8 +97,24 @@ class UnplugRule:
             # Unknown for now: the next reading is compared with the last known.
             self._connected = remembered
         elif remembered is True and self._connected is False:
+            self._owed = True
             self._start()
         self._remember()
+
+    @property
+    def _owed(self) -> bool:
+        return self._debt
+
+    @_owed.setter
+    def _owed(self, owed: bool) -> None:
+        if owed != self._debt:
+            self._debt = owed
+            self._remember()
+
+    def _memory(self) -> bool | None:
+        # An open switch-off is remembered as a car still plugged in: a
+        # restart before it is done finds the unplug again.
+        return True if self._debt else self._connected
 
     def _remember(self) -> None:
         if not self._saving:
@@ -112,8 +128,8 @@ class UnplugRule:
             # Whatever changed while a save ran is saved by the next round.
             saved: bool | None = None
             first = True
-            while first or saved != self._connected:
-                first, saved = False, self._connected
+            while first or saved != self._memory():
+                first, saved = False, self._memory()
                 try:
                     await self._store.async_save(PlugMemory(saved))
                 except (OSError, ValueError) as err:
@@ -148,6 +164,9 @@ class UnplugRule:
         unplugged = connected is False and self._connected is True
         if connected is not None and connected is not self._connected:
             self._connected = connected
+            if unplugged:
+                # Owed from the unplug on, not only once a try has failed.
+                self._debt = True
             self._remember()
         if connected is True:
             # The car is back: nothing is owed for the charge that ended.

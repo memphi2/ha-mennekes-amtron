@@ -497,8 +497,7 @@ class ServiceClient:
             # sample timestamp to an independently carried-forward raw value.
             values = {**values, "energy_total": observed_energy}
             if observed_energy is not None:
-                # One low misread carried forward would look like a meter reset.
-                self.last_energy_total = max(observed_energy, self.last_energy_total or 0.0)
+                self.last_energy_total = observed_energy
         return WallboxData(
             values=values,
             charging_display=display,

@@ -351,3 +351,26 @@ def test_a_service_kept_for_a_retried_setup_gives_up_the_bus_before_a_probe(monk
         assert order == [("release", entry.entry_id, True), "probe"]
 
     asyncio.run(run())
+
+
+def test_an_entry_that_could_not_be_unloaded_keeps_its_service_through_a_probe(monkeypatch):
+    async def run():
+        flow = _flow()
+        entry = flow.reconfigure_entry
+        # Its entities and heartbeat still run, and nothing would start them again.
+        entry.state = ConfigEntryState.FAILED_UNLOAD
+        order = []
+
+        async def release(_hass, entry_id, *, force):
+            order.append("release")
+
+        async def search(_base, *, all_parameters):
+            order.append("probe")
+
+        monkeypatch.setattr(config_flow, "async_release", release)
+        monkeypatch.setattr(config_flow, "async_search", search)
+        with pytest.raises(AmtronConnectionError, match="cannot release the active connection"):
+            await flow._async_search_bus_locked(entry, dict(entry.data), SerialConfig("/dev/other"), False)
+        assert order == []
+
+    asyncio.run(run())

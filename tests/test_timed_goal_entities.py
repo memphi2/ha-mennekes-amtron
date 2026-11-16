@@ -88,8 +88,12 @@ def test_departure_status_and_forecast_are_shown_with_the_services_summary():
             "estimated_finish": finish, "estimated_level_at_departure": 74.0,
         }
         runtime.coordinator.last_update_success = False
-        assert not waiting.available
+        # The service's reason for waiting stays while the service answers.
+        assert waiting.available
         assert not departure.available
+        runtime.client._connected = False
+        assert not waiting.available
+        runtime.client._connected = True
         runtime.coordinator.last_update_success = True
         # A car without departure planning shows no plan, and the time is the
         # service's own again.

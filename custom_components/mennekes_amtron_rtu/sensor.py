@@ -281,7 +281,10 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
     AmtronSensorDescription(
         key="operation_waiting", value=_waiting,
         device_class=SensorDeviceClass.ENUM, options=list(WAITING),
-        ready=lambda runtime: runtime.control.operation is not None,
+        # Shown from the service's last answer: "wallbox unavailable" is one
+        # of its reasons.
+        offline=True,
+        ready=lambda runtime: runtime.client.connected and runtime.control.operation is not None,
         attributes=_waiting_details,
     ),
     # --- Estimates. No state class: a per-charge value is neither a counter

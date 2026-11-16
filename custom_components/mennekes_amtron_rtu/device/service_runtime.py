@@ -96,6 +96,7 @@ class ModbusService:
         self._session_history_retry_at = 0.0
         self._history_notice = FailureNotice(_LOGGER, "Charging session")
         self._wallbox_notice = FailureNotice(_LOGGER, "Connection")
+        self._intent_notice = FailureNotice(_LOGGER, "Control")
         self._listener_notice = FailureNotice(_LOGGER, "Service")
         self._command_lock = asyncio.Lock()
         # The last state published after a completed command, and when.
@@ -155,7 +156,12 @@ class ModbusService:
             if task.cancelled():
                 # Stopped by its owner while it started; the waiting one was not.
                 raise DeviceError("service_unavailable")
-            task.result()
+            error = task.exception()
+            # A task group wraps what ended it; the owner decides by the cause.
+            while isinstance(error, BaseExceptionGroup) and error.exceptions:
+                error = error.exceptions[0]
+            if error is not None:
+                raise error
             raise RuntimeError("service stopped")
         if self._startup_error is not None:
             raise self._startup_error
@@ -199,7 +205,11 @@ class ModbusService:
             state.plug_charge = safe.plug_charge
             state.plug_charge.configure(True, "0" * 64)
             state.plug_charge.hold = True
-            _LOGGER.warning("Control: saved intent rejected; charging blocked until acknowledged in Home Assistant Repairs")
+            # Every reconnect attempt loads it again.
+            self._intent_notice.failed(
+                "saved intent rejected; charging blocked until acknowledged in Home Assistant Repairs",
+                "intent_rejected",
+            )
         self._saved_session_history = self.client.write_state.session_history.snapshot()
         self.identity = identity
         self._store = store
@@ -744,6 +754,7 @@ class ModbusService:
                     state.plug_charge = safe.plug_charge
                     state.guest_permission = None
                     self._intent_rejected = False
+                    self._intent_notice.recovered("saved intent reset acknowledged")
                     control.startup_hold = False
                 return self.snapshot()
             if self._intent_rejected:

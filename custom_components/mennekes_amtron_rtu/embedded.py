@@ -128,6 +128,10 @@ class EmbeddedService:
             async with asyncio.timeout(_START_SECONDS):
                 await self._service.wait_started()
         except BaseException:
+            if task.done() and not task.cancelled():
+                # It ended by itself, and the caller gets that cause: the
+                # stop must not raise it a second time in its place.
+                self._died = True
             await self.async_stop()
             raise
         task.add_done_callback(self._ended)

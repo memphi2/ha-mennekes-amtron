@@ -644,3 +644,31 @@ def test_a_stopped_rule_plans_nothing_more(monkeypatch) -> None:
         assert not _waiting(timers)
 
     asyncio.run(run())
+
+
+def test_a_switch_off_still_owed_at_a_restart_is_done_after_it(monkeypatch) -> None:
+    async def run() -> None:
+        _retry_timers(monkeypatch)
+        hass, entry, transport = await build_runtime()
+        rule = await _unplug_rule(transport, entry)
+        await rule.async_start()
+        await asyncio.gather(*entry.background_tasks)
+        with monkeypatch.context() as busy:
+            calls = _busy_release(busy, entry)
+            await _unplug(transport, entry)
+            assert calls == [False]
+        assert rule._owed
+        # Remembered as still plugged in while the switch-off is open.
+        assert (await rule._store.async_load()).connected is True
+        # Home Assistant restarts before the retry.
+        rule.stop()
+        assert current_release_writes(transport) == 0
+        restarted = UnplugRule(hass, entry)
+        await restarted.async_start()
+        await asyncio.gather(*entry.background_tasks)
+        assert current_release_writes(transport) == 1
+        assert not restarted._owed
+        assert (await restarted._store.async_load()).connected is False
+        restarted.stop()
+
+    asyncio.run(run())

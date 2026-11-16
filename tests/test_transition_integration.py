@@ -64,7 +64,11 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
             assert pending() == "none"
             assert deadline() is None
             assert transport.bank[R.CHARGING_RELEASE.address] == 0
+            # The service still answers while the wallbox does not: its
+            # reason for waiting is exactly what is worth showing then.
             coordinator.last_update_success = False
+            assert waiting.available
+            entry.runtime_data.client._connected = False
             assert not waiting.available
         finally:
             remove()

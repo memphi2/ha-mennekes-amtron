@@ -1089,3 +1089,20 @@ def test_an_app_entry_forgets_a_service_only_when_it_had_one(monkeypatch, tmp_pa
         assert not directory.exists()
 
     asyncio.run(run())
+
+
+def test_a_start_that_ends_in_a_task_group_fails_with_its_cause(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+
+        async def broken(_self):
+            raise ExceptionGroup("service", [OSError("adapter gone")])
+
+        monkeypatch.setattr(service_runtime.ModbusService, "_run", broken)
+        # The setup decides by the cause whether it is tried again.
+        with pytest.raises(OSError, match="adapter gone"):
+            await embedded.async_acquire(hass, entry)
+        assert _hosts(hass) == {}
+        del wallbox
+
+    asyncio.run(run())
