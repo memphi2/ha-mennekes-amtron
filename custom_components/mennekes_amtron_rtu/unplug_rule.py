@@ -48,15 +48,8 @@ class UnplugRule:
             self._runtime.coordinator.async_add_listener(self._observe)
         )
 
-    @callback
-    def _retry_now(self, _now: datetime) -> None:
-        self._retry = None
-        self._observe()
-
     def stop(self) -> None:
-        if self._retry is not None:
-            self._retry()
-            self._retry = None
+        self._cancel_retry()
         if self._unsubscribe is not None:
             self._unsubscribe()
             self._unsubscribe = None
@@ -73,18 +66,25 @@ class UnplugRule:
     def _observe(self) -> None:
         connected = self._vehicle_connected()
         # An unknown reading never counts as a disconnect.
-        unplugged = connected is False and (self._connected is True or self._owed)
+        unplugged = connected is False and self._connected is True
         if connected is not None:
             self._connected = connected
         if connected is True:
+            # The car is back: nothing is owed for the charge that ended.
             self._owed = False
+            self._cancel_retry()
+        if unplugged:
+            self._start()
+
+    def _start(self) -> None:
         control = self._runtime.control
-        if unplugged and not self._busy and not control.read_only and control.plug_charge.get("enabled") is not True:
-            # Tied to the entry: an unload cancels it before it can write.
-            self._busy = True
-            self._entry.async_create_background_task(
-                self._hass, self._close_release(), "amtron_release_off_on_unplug",
-            )
+        if self._busy or control.read_only or control.plug_charge.get("enabled") is True:
+            return
+        self._busy = True
+        # Tied to the entry: an unload cancels it before it can write.
+        self._entry.async_create_background_task(
+            self._hass, self._close_release(), "amtron_release_off_on_unplug",
+        )
 
     async def _close_release(self) -> None:
         control = self._runtime.control
@@ -92,19 +92,37 @@ class UnplugRule:
             if self._runtime.coordinator.current_data().get(CHARGING_RELEASE.key) != 0:
                 await control.async_set_charging_release(False)
             # Without a vehicle and with the release off, ending the pause
-            # switches nothing and waits for no state-change interval.
+            # lets no current flow.
             if control.pause_requested is True and not control.energy_goal_stop_requested:
                 await control.async_resume_charging()
         except (HomeAssistantError, DeviceError, OSError) as err:
             self._owed = True
-            # An unchanged poll notifies nobody, so the retry keeps its own time.
-            self._retry = async_call_later(self._hass, _RETRY_SECONDS, self._retry_now)
             self._notice.failed(
-                "charging release not switched off after unplugging; retrying with the next poll",
+                f"charging release not switched off after unplugging; retrying every {_RETRY_SECONDS} seconds",
                 type(err).__name__,
             )
+            # One retry at a time, on its own clock: an unchanged poll
+            # notifies nobody, and a changed one must not add attempts.
+            self._cancel_retry()
+            self._retry = async_call_later(self._hass, _RETRY_SECONDS, self._retry_now)
         else:
             self._owed = False
             self._notice.recovered("charging release switched off after unplugging")
         finally:
             self._busy = False
+
+    @callback
+    def _retry_now(self, _now: datetime) -> None:
+        self._retry = None
+        if not self._owed:
+            return
+        if self._vehicle_connected() is False:
+            self._start()
+        else:
+            # Unknown for now; a returned car clears the debt in ``_observe``.
+            self._retry = async_call_later(self._hass, _RETRY_SECONDS, self._retry_now)
+
+    def _cancel_retry(self) -> None:
+        if self._retry is not None:
+            self._retry()
+            self._retry = None

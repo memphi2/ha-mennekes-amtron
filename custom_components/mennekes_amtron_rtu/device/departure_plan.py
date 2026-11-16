@@ -334,6 +334,7 @@ class DepartureController:
         self._trail_scope: str | None = None
         self._estimate: float | None = None
         self._command_notice = FailureNotice(_LOGGER, "Departure plan")
+        self._storage_notice = FailureNotice(_LOGGER, "Departure plan")
         # The time of the latest tick's sample.
         self._now: datetime | None = None
         # What this wallbox's cars taught the plan; kept across trips.
@@ -437,12 +438,12 @@ class DepartureController:
         try:
             await finish_goal_save(asyncio.to_thread(self.store.save, self._state()))
         except (OSError, ValueError) as err:
-            if not self.storage_error:
-                _LOGGER.warning("Departure plan: not saved (%s); it continues in memory", type(err).__name__)
+            self._storage_notice.failed("not saved; it continues in memory", type(err).__name__)
             self.storage_error = True
             return
         self._durable = decision
         self.storage_error = False
+        self._storage_notice.recovered("saved again")
 
     def snapshot(self) -> dict[str, Any]:
         return {

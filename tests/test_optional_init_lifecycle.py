@@ -31,7 +31,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_SOC_ENTITY,
 )
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass
+from tests.ha_fakes import FakeConfigEntry, FakeHass, capture_timers
 from tests.test_charging_cost_options import NETWORK
 from tests.test_home_assistant_smoke import _boot
 from tests.test_init import _patch_client, _patch_issues
@@ -121,6 +121,7 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         timed = Mock(async_start=AsyncMock(side_effect=timed_error), async_stop=AsyncMock())
         monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args, **_kwargs: vehicle)
         monkeypatch.setattr(integration, "TimedGoalObserver", lambda *_args: timed)
+        timers = capture_timers(monkeypatch, integration.embedded)
         with pytest.raises(ConfigEntryNotReady) as caught:
             await integration.async_setup_entry(hass, entry)
         assert caught.value.translation_key == ("timed_goal_state_invalid" if failure == "timed" else "timed_goal_unavailable")
@@ -129,9 +130,16 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         timed.async_start.assert_awaited_once()
         timed.async_stop.assert_awaited_once()
         runtime = entry.runtime_data
-        assert not runtime.heartbeat.running
         assert not runtime.client.connected
+        # The wallbox answered: the service keeps its heartbeat for the retry
+        # and stops only when none comes.
+        assert transport.close_calls == 0
+        assert hass.data[f"{entry.domain}_embedded"]
+        ((seconds, release, waiting),) = timers
+        assert (seconds, waiting) == (120, True)
+        await release(None)
+        assert not runtime.heartbeat.running
         assert transport.close_calls == 1
-        assert f"{entry.domain}_embedded" not in hass.data or not hass.data[f"{entry.domain}_embedded"]
+        assert not hass.data[f"{entry.domain}_embedded"]
 
     asyncio.run(run())

@@ -12,11 +12,13 @@ import logging
 import shutil
 from collections.abc import Callable
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
-from homeassistant.core import Event, HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers.event import async_call_later
 
 from .device.const import (
     CHARGING_CURRENT_MINIMUM,
@@ -47,6 +49,9 @@ _LOGGER = logging.getLogger(__name__)
 
 _HOSTS = f"{DOMAIN}_embedded"
 _RELOADING = f"{DOMAIN}_reloading"
+_DEFERRED = f"{DOMAIN}_deferred_release"
+# Longer than Home Assistant waits before it tries a failed setup again.
+_RETRY_GRACE_SECONDS = 120
 # Reading the identity over a slow serial line with retries takes a while.
 _START_SECONDS = 60
 # Changed limits wait for the command in progress, not for a hung bus.
@@ -129,6 +134,16 @@ class EmbeddedService:
         if self.on_ended is not None:
             self.on_ended()
 
+    def async_on_polled(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Call ``listener`` after every poll of the wallbox; returns its removal."""
+        self._service.on_polled = listener
+
+        def remove() -> None:
+            if self._service.on_polled is listener:
+                self._service.on_polled = None
+
+        return remove
+
     def credentials_rejected(self) -> bool:
         """Whether the gateway refused the saved password on the newest poll."""
         return isinstance(self._service.failure, WaveshareAuthenticationRejectedError)
@@ -155,6 +170,10 @@ class EmbeddedService:
         finally:
             try:
                 await self._service.stop()
+            except (OSError, ValueError) as err:
+                # The last save failed. The connection is closed all the
+                # same, and an unload must not fail over a full disk.
+                _LOGGER.warning("Service: state not saved while stopping (%s)", type(err).__name__)
             except Exception:
                 # Its end was reported when it happened; everything was
                 # still saved and closed.
@@ -172,7 +191,11 @@ def _hosts(hass: HomeAssistant) -> dict[str, EmbeddedService]:
             hosts = hass.data[_HOSTS]
             while hosts:
                 _entry_id, host = hosts.popitem()
-                await host.async_stop()
+                try:
+                    await host.async_stop()
+                except Exception:
+                    # The other wallboxes still get their orderly stop.
+                    _LOGGER.exception("Service: stop failed")
 
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_all)
     hosts: dict[str, EmbeddedService] = hass.data[_HOSTS]
@@ -189,6 +212,7 @@ async def async_acquire(
     config = embedded_config(entry)
     hosts = _hosts(hass)
     entry_id = entry.entry_id
+    _cancel_deferred_release(hass, entry_id)
     # The running service stays registered while it is adjusted, so a
     # shutdown or its own end in the meantime still finds it.
     host = hosts.get(entry_id)
@@ -237,6 +261,31 @@ async def async_acquire(
     return host
 
 
+def _cancel_deferred_release(hass: HomeAssistant, entry_id: str) -> None:
+    cancel = hass.data.get(_DEFERRED, {}).pop(entry_id, None)
+    if cancel is not None:
+        cancel()
+
+
+@callback
+def async_release_unless_retried(hass: HomeAssistant, entry_id: str) -> None:
+    """Keep a healthy service through a setup that will be tried again.
+
+    A setup can fail for reasons that have nothing to do with the wallbox.
+    The heartbeat carries on for the retry; a retry that never comes, as for
+    an entry disabled meanwhile, stops the service.
+    """
+    _cancel_deferred_release(hass, entry_id)
+
+    async def release(_now: datetime) -> None:
+        hass.data[_DEFERRED].pop(entry_id, None)
+        await async_release(hass, entry_id, force=True)
+
+    hass.data.setdefault(_DEFERRED, {})[entry_id] = async_call_later(
+        hass, _RETRY_GRACE_SECONDS, release
+    )
+
+
 def mark_reloading(hass: HomeAssistant, entry_id: str, reloading: bool) -> None:
     marks: set[str] = hass.data.setdefault(_RELOADING, set())
     (marks.add if reloading else marks.discard)(entry_id)
@@ -246,6 +295,7 @@ async def async_release(hass: HomeAssistant, entry_id: str, *, force: bool = Fal
     """Stop the entry's service unless a reload is about to take it over."""
     if not force and entry_id in hass.data.get(_RELOADING, ()):
         return
+    _cancel_deferred_release(hass, entry_id)
     host = _hosts(hass).pop(entry_id, None)
     if host is not None:
         await host.async_stop()

@@ -31,7 +31,7 @@ from custom_components.mennekes_amtron_rtu.device.waveshare_auth import (
 )
 from custom_components.mennekes_amtron_rtu.service_transport import EmbeddedTransport
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass
+from tests.ha_fakes import FakeConfigEntry, FakeHass, capture_timers
 from tests.test_init import _patch_client
 from tests.test_modbus_service import current_writes
 
@@ -585,5 +585,147 @@ def test_a_limit_of_the_user_above_the_wallbox_maximum_allows_only_the_wallbox_m
             assert host._service.control.max_charging_current == 16
         finally:
             await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_failed_last_save_does_not_fail_the_stop(monkeypatch, tmp_path, caplog):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        service = host._service
+
+        async def full_disk():
+            raise OSError("no space left")
+
+        monkeypatch.setattr(service, "stop", full_disk)
+        await embedded.async_release(hass, entry.entry_id, force=True)
+        assert _hosts(hass) == {}
+        assert "Service: state not saved while stopping (OSError)" in caplog.text
+        monkeypatch.undo()
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_one_service_failing_to_stop_does_not_keep_the_others_running(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        stopped = []
+
+        class Broken:
+            async def async_stop(self):
+                stopped.append("broken")
+                raise RuntimeError("stop failed")
+
+        # Stopped in reverse order: the broken one first.
+        _hosts(hass)["other"] = Broken()
+        await hass.bus.fire(EVENT_HOMEASSISTANT_STOP)
+        assert stopped == ["broken"]
+        assert _hosts(hass) == {}
+        assert not host._service.heartbeat.running
+
+    asyncio.run(run())
+
+
+def test_a_draining_transport_refuses_new_requests():
+    async def run():
+        api = _Api((200, {"accepted": True}))
+        transport = EmbeddedTransport(api)
+        running = asyncio.create_task(transport.call("POST", "/v2/command", {"command": "pause"}))
+        await api.started.wait()
+        draining = asyncio.create_task(transport.async_drain())
+        await asyncio.sleep(0)
+        # Like a web server that no longer accepts connections.
+        assert await transport.call("GET", "/v2/state", None) == (503, {"error": "service_unavailable"})
+        assert len(api.calls) == 1
+        api.release.set()
+        await draining
+        assert await running == (200, {"accepted": True})
+        assert await transport.call("GET", "/v2/state", None) == (503, {"error": "service_unavailable"})
+
+    asyncio.run(run())
+
+
+def test_a_half_initialized_service_starts_over_and_then_starts_its_heartbeat(
+    monkeypatch, tmp_path,
+):
+    async def run():
+        _hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        host = embedded.EmbeddedService(embedded.embedded_config(entry), tmp_path)
+        service = host._service
+        failures = [OSError("state unreadable")]
+
+        async def dependents():
+            if failures:
+                raise failures.pop()
+
+        monkeypatch.setattr(service, "_initialize_dependents", dependents)
+        with pytest.raises(OSError, match="state unreadable"):
+            await service._initialize()
+        # Nothing is left that a later poll would mistake for a started service.
+        assert (service.control, service.goal, service.soc_goal) == (None, None, None)
+        assert not service.heartbeat.running
+        await service._initialize()
+        assert service.control is not None
+        assert service.heartbeat.running
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_setup_that_will_be_retried_keeps_the_service_until_the_retry_stays_away(
+    monkeypatch, tmp_path,
+):
+    async def run():
+        timers = capture_timers(monkeypatch, embedded)
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        embedded.async_release_unless_retried(hass, entry.entry_id)
+        assert host._service.heartbeat.running
+        # The retry takes the running service over and nothing stops it later.
+        assert await embedded.async_acquire(hass, entry) is host
+        assert [timer[2] for timer in timers] == [False]
+        # Asked twice, only the newest wait counts.
+        embedded.async_release_unless_retried(hass, entry.entry_id)
+        embedded.async_release_unless_retried(hass, entry.entry_id)
+        assert [timer[2] for timer in timers] == [False, False, True]
+        await timers[-1][1](None)
+        assert _hosts(hass) == {}
+        assert not host._service.heartbeat.running
+        # A release of its own ends the wait as well.
+        host = await embedded.async_acquire(hass, entry)
+        embedded.async_release_unless_retried(hass, entry.entry_id)
+        await embedded.async_release(hass, entry.entry_id, force=True)
+        assert not timers[-1][2]
+        assert not host._service.heartbeat.running
+
+    asyncio.run(run())
+
+
+def test_every_poll_is_reported_to_one_listener_until_it_is_removed(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, _wallbox = _setup(
+            monkeypatch, tmp_path, options={**MASTER, "scan_interval_seconds": 0.01},
+        )
+        host = await embedded.async_acquire(hass, entry)
+        service = host._service
+        polls = []
+        remove = host.async_on_polled(lambda: polls.append("first"))
+        # A newer listener replaces it; removing the old one leaves the new.
+        host.async_on_polled(lambda: polls.append("second"))
+        remove()
+        polled = asyncio.Event()
+        original = service.on_polled
+
+        def notify():
+            original()
+            polled.set()
+
+        service.on_polled = notify
+        await asyncio.wait_for(polled.wait(), 10)
+        assert set(polls) == {"second"}
+        await embedded.async_release(hass, entry.entry_id, force=True)
 
     asyncio.run(run())

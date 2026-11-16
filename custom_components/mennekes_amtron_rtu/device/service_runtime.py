@@ -126,6 +126,9 @@ class ModbusService:
         self._attempted = asyncio.Event()
         self._startup_error: BaseException | None = None
         self._phase = f"opening {self._connection_name} connection"
+        # Called after every poll, failed or not: whoever shows the state
+        # need not guess when it changed.
+        self.on_polled: Callable[[], None] | None = None
         self.heartbeat.async_add_listener(self._log_heartbeat_health)
 
     def start(self) -> asyncio.Task[None]:
@@ -242,7 +245,16 @@ class ModbusService:
         self.control = control
         self.goal = goal
         self.soc_goal = soc_goal
-        await self._initialize_dependents()
+        try:
+            await self._initialize_dependents()
+        except BaseException:
+            # Half an initialization would poll without ever starting the
+            # heartbeat. The next attempt starts over.
+            self.control = self.goal = self.soc_goal = None
+            await goal.async_stop()
+            await soc_goal.async_stop()
+            await control.async_shutdown()
+            raise
         goal.observe(self.data)
         soc_goal.retry_stop()
         _LOGGER.info("Connection: %s connection established; wallbox initialized", self._connection_name)
@@ -319,6 +331,8 @@ class ModbusService:
                     type(err).__name__,
                 )
             self._attempted.set()
+            if self.on_polled is not None:
+                self.on_polled()
             await asyncio.sleep(self.config.scan_interval)
 
     async def _save_intent(self) -> None:

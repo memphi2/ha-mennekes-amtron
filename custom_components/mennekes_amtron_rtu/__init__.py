@@ -44,7 +44,7 @@ from .data import (
     RuntimeHandoff,
     WallboxData,
 )
-from .device.client_errors import AmtronBusError
+from .device.client_errors import AmtronBusError, AmtronIdentityError
 from .device.const import (
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SERIAL_NUMBER,
@@ -53,7 +53,14 @@ from .device.const import (
 )
 from .device.errors import DeviceError
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError
-from .embedded import async_acquire, async_forget, async_release, mark_reloading
+from .embedded import (
+    EmbeddedService,
+    async_acquire,
+    async_forget,
+    async_release,
+    async_release_unless_retried,
+    mark_reloading,
+)
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import (
     DepartureIntent,
@@ -174,6 +181,8 @@ async def async_setup_entry(
     handoff: RuntimeHandoff | None = hass.data.get(f"{DOMAIN}_reload_clients", {}).get(entry.entry_id)
     client: ServiceClient | None = None
     credentials_rejected: Callable[[], bool] | None = None
+    host: EmbeddedService | None = None
+    connected = False
     try:
         if remote:
             transport: ServiceTransport = HttpTransport(
@@ -181,8 +190,9 @@ async def async_setup_entry(
                 server_url(str(entry.data[CONF_SERVER_URL])),
                 str(entry.data[CONF_SERVER_TOKEN]),
             )
-            # An entry that was direct until now must give up the bus first.
-            await async_release(hass, entry.entry_id, force=True)
+            # An entry that was direct until now must give up the bus first,
+            # and what its own service saved is not the app's state.
+            await async_forget(hass, entry.entry_id)
         else:
             host = await async_acquire(hass, entry, expected_serial)
             transport = host.transport
@@ -197,12 +207,17 @@ async def async_setup_entry(
             )
         # An entry without a saved serial binds to the wallbox it just read.
         client.bind_identity(identity.serial_number)
+        connected = True
         validate_vehicle_selection()
     except BaseException as err:
         if client is not None:
             await client.async_close()
         if not remote:
-            await async_release(hass, entry.entry_id, force=True)
+            await _async_release_after_failure(hass, entry, err, healthy=connected)
+        if isinstance(err, AmtronIdentityError):
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="device_identity_changed"
+            ) from err
         if isinstance(err, WaveshareAuthenticationRejectedError):
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
@@ -224,9 +239,21 @@ async def async_setup_entry(
         raise
 
     coordinator = ServiceCoordinator(
-        hass, entry, client=client, scan_interval=_scan_interval(entry),
+        hass, entry, client=client,
+        # The embedded service says when it has polled; the timer only covers
+        # a poll that never reports.
+        scan_interval=_scan_interval(entry) * (1 if host is None else 2),
         credentials_rejected=credentials_rejected,
     )
+    if host is not None:
+        push: asyncio.Task[None] | None = None
+
+        def polled() -> None:
+            nonlocal push
+            if push is None or push.done():
+                push = hass.async_create_task(coordinator.async_refresh(), "amtron_state_push")
+
+        entry.async_on_unload(host.async_on_polled(polled))
 
     def notify_pending() -> None:
         # Cancelling queued work or changing a goal is not a successful poll.
@@ -376,11 +403,15 @@ async def async_setup_entry(
         async_setup_repairs(hass, entry)
         if entry.runtime_data.controls and entry.options.get(CONF_RELEASE_OFF_ON_UNPLUG) is True:
             entry.runtime_data.unplug_rule = UnplugRule(hass, entry)
-    except BaseException:
+    except BaseException as err:
         try:
             await _async_stop_runtime(entry.runtime_data)
             if not remote:
-                await async_release(hass, entry.entry_id, force=True)
+                await _async_release_after_failure(
+                    hass, entry, err,
+                    # Without a single good poll the wallbox itself is the trouble.
+                    healthy=coordinator.data is not None and coordinator.last_update_success,
+                )
         finally:
             forget_loss_attribution(hass, entry.entry_id)
         raise
@@ -619,6 +650,20 @@ async def _async_switch_vehicle(
     return True
 
 
+async def _async_release_after_failure(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, err: BaseException, *, healthy: bool,
+) -> None:
+    """Stop the embedded service unless only something else failed.
+
+    A setup Home Assistant tries again while the wallbox answers, as over a
+    car's settings, keeps the heartbeat until then.
+    """
+    if healthy and isinstance(err, ConfigEntryNotReady):
+        async_release_unless_retried(hass, entry.entry_id)
+    else:
+        await async_release(hass, entry.entry_id, force=True)
+
+
 def _service_intent_rejected(client: ServiceClient) -> bool:
     return client.snapshot.get("control", {}).get("intent_rejected") is True
 
@@ -785,7 +830,8 @@ async def _async_reload_entry_locked(
         await hass.config_entries.async_reload(entry.entry_id)
     finally:
         mark_reloading(hass, entry.entry_id, False)
-        if entry.state is not ConfigEntryState.LOADED:
+        if entry.state not in (ConfigEntryState.LOADED, ConfigEntryState.SETUP_RETRY):
+            # A setup that is tried again has decided about the service itself.
             await async_release(hass, entry.entry_id)
         if runtime is not None and (retain_cost or retain_attribution):
             runtime.retain_cost_on_unload = False

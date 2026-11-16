@@ -19,6 +19,7 @@ from custom_components.mennekes_amtron_rtu.device.enums import (
     RequestedPhases,
 )
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.notice import FailureNotice
 from tests.test_console_registers import console_fixture
 from tests.test_control import Harness
 
@@ -198,6 +199,7 @@ def service_with(control, *, read_only=False):
         control.read_only = read_only
     service.config = Mock(read_only=read_only)
     service._cap_retry_at = 0.0
+    service._cap_notice = FailureNotice(runtime._LOGGER, "Control")
     service._command_lock = asyncio.Lock()
     return service
 
@@ -209,12 +211,13 @@ def test_the_service_lowers_after_each_poll_and_backs_off_after_a_failure(caplog
 
     async def run():
         service = service_with(control)
-        with caplog.at_level(logging.INFO, logger=runtime.__name__):
-            await service._enforce_current_cap()
+        # A repeated failure is reported once and after that only for debugging.
+        caplog.set_level(logging.DEBUG, logger=runtime.__name__)
+        await service._enforce_current_cap()
         assert "lowered to the 10.0 A cap" in caplog.text
         control.async_enforce_current_cap.side_effect = DeviceError("time_limit_reached")
         await service._enforce_current_cap()
-        assert "cap not lowered (time_limit_reached)" in caplog.text
+        assert "cap not lowered; retrying every 30 seconds (time_limit_reached)" in caplog.text
         assert service._cap_retry_at == 130
         control.async_enforce_current_cap.side_effect = AmtronBusError("lost")
         clock[0] = 129

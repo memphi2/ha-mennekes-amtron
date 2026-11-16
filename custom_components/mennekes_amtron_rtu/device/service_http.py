@@ -7,14 +7,8 @@ from collections.abc import Awaitable, Callable
 
 from aiohttp import web
 
-from .service_api import ServiceApi, ServiceBusyError
+from .service_api import GETS, POSTS, ServiceApi, ServiceBusyError
 from .service_runtime import ModbusService
-
-_GETS = ("/v2/state", "/v2/diagnostics")
-_POSTS = (
-    "/v2/command", "/v2/read", "/v2/soc-goal/reserve", "/v2/soc-goal/commit",
-    "/v2/soc-goal/resolve",
-)
 
 
 def create_app(service: ModbusService) -> web.Application:
@@ -54,8 +48,8 @@ def create_app(service: ModbusService) -> web.Application:
         return web.json_response(body, status=status)
 
     app.router.add_get("/health", health)
-    for path in _GETS:
+    for path in GETS:
         app.router.add_get(path, call)
-    for path in _POSTS:
+    for path in POSTS:
         app.router.add_post(path, call)
     return app

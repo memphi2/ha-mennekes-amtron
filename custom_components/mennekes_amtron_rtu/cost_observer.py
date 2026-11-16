@@ -40,7 +40,6 @@ from .device.charging_cost import (
     TariffConfig,
 )
 from .device.charging_session import CompletedSession, PresenceGap
-from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
 from .device.enums import EvseState
 from .device.notice import FailureNotice
@@ -67,8 +66,7 @@ class _MeterRun:
 _PRICE_UNITS = {"EUR/kWh": 1.0, "€/kWh": 1.0, "ct/kWh": 0.01, "EUR/MWh": 0.001, "€/MWh": 0.001}
 _RETAINED_OPTIONS = (
     CONF_CHARGING_COST_SOURCE, CONF_CHARGING_PRICE, CONF_CHARGING_PRICE_ENTITY,
-    CONF_CHARGING_NETWORK_TARIFF, CONF_MEASUREMENT_INTERVAL_SECONDS,
-    CONF_SCAN_INTERVAL_SECONDS,
+    CONF_CHARGING_NETWORK_TARIFF,
 )
 
 
@@ -115,7 +113,7 @@ class LastChargingCost:
 
 
 class ChargingCostObserver:
-    """Price only intervals observed by this HA process, in both connection modes."""
+    """Price only intervals observed by this HA process."""
 
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass, self._entry = hass, entry

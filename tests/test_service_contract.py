@@ -26,7 +26,11 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
 )
 from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
 from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
-from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
+from custom_components.mennekes_amtron_rtu.device.service_api import (
+    GETS,
+    POSTS,
+    ServiceApi,
+)
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
@@ -490,6 +494,28 @@ def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hi
                     assert response.status == 500
                 async with session.get(server.make_url("/v2/state"), headers=headers) as response:
                     assert response.status == 200
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_the_web_server_offers_exactly_the_operations_the_service_has(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            offered = {
+                (route.method, route.resource.canonical)
+                for route in create_app(service).router.routes()
+                if route.resource is not None and route.resource.canonical.startswith("/v2/")
+                and route.method != "HEAD"
+            }
+            assert offered == {("GET", path) for path in GETS} | {("POST", path) for path in POSTS}
+            # Each of them reaches an operation, not the answer for an unknown path.
+            api = ServiceApi(service)
+            for method, path in sorted(offered):
+                status, _body = await api.dispatch(method, path, None if method == "GET" else {})
+                assert status != 404, path
         finally:
             await service.stop()
 

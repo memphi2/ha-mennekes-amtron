@@ -72,7 +72,8 @@ def test_remote_write_repairs_change_without_register_or_entity_updates(tmp_path
                     clock[0] += 6
                     await runtime.control.async_set_charging_release(True)
                     assert issue not in registry.issues
-                    assert not updates
+                    # Only the release the service now wants is new state.
+                    assert updates == [1]
                 finally:
                     unsubscribe()
         finally:

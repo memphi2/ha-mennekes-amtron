@@ -142,8 +142,8 @@ class DevicePoller:
             failed.discard(block.name)
             try:
                 result = await self._client.async_read_block(block)
-            except AmtronConnectionError as err:
-                self._log_unavailable(err)
+            except AmtronConnectionError:
+                self._record_lost()
                 raise
             except AmtronBusError as err:
                 failed.add(block.name)
@@ -192,7 +192,7 @@ class DevicePoller:
         if not read and (not held or empty_polls):
             error = AmtronConnectionError("no register block could be read")
             if not answered:
-                self._log_unavailable(error)
+                self._record_lost()
             raise error
         if slow_due:
             self._slow_read_at = self._monotonic()
@@ -201,7 +201,7 @@ class DevicePoller:
         for key in stale:
             values.pop(key, None)
         values.update(read)
-        self._log_available()
+        self._record_recovered()
         data = WallboxData(
             values=values,
             failed_blocks=tuple(sorted(failed)),
@@ -221,20 +221,12 @@ class DevicePoller:
         )
         return data
 
-    def _log_unavailable(self, err: Exception) -> None:
+    def _record_lost(self) -> None:
         changed = self._connection_state.record(False)
         if changed and self._timeline is not None:
             self._timeline.record(EventType.CONNECTION_LOST)
-        if changed and not self._connection_state.logged_unavailable:
-            _LOGGER.warning(
-                "Connection: lost %s (%s)", self._client.config.port, str(err)
-            )
-            self._connection_state.logged_unavailable = True
 
-    def _log_available(self) -> None:
+    def _record_recovered(self) -> None:
         changed = self._connection_state.record(True)
         if changed and self._timeline is not None:
             self._timeline.record(EventType.CONNECTION_RECOVERED)
-        if changed and self._connection_state.logged_unavailable:
-            _LOGGER.info("Connection: reconnected to %s", self._client.config.port)
-            self._connection_state.logged_unavailable = False

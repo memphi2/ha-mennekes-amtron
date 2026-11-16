@@ -15,10 +15,14 @@ from custom_components.mennekes_amtron_rtu import (
     async_setup,
     async_setup_entry,
     async_unload_entry,
+    embedded,
     repairs,
 )
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronIdentityError,
+)
 from custom_components.mennekes_amtron_rtu.device.connection import (
     NetworkConfig,
     SerialConfig,
@@ -38,6 +42,7 @@ from custom_components.mennekes_amtron_rtu.entry_connection import (
     connection_config,
     serial_config,
 )
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 
@@ -408,3 +413,98 @@ def test_optional_setup_failures_keep_reauthentication_and_retry_reasons() -> No
     with pytest.raises(ConfigEntryAuthFailed) as caught:
         integration._raise_optional_setup_error(client, RuntimeError("x"), "soc_goal_unavailable")
     assert caught.value.translation_key == "service_auth_failed"
+
+
+def test_another_wallbox_on_the_connection_is_named_as_such(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(data=_direct_data("serial"))
+
+        async def acquire(*_args: object) -> None:
+            raise AmtronIdentityError("serial number differs")
+
+        monkeypatch.setattr(integration, "async_acquire", acquire)
+        with pytest.raises(ConfigEntryNotReady) as caught:
+            await async_setup_entry(hass, entry)
+        assert caught.value.translation_key == "device_identity_changed"
+
+    asyncio.run(run())
+
+
+def test_the_embedded_service_pushes_its_polls_and_the_timer_only_backs_them_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(data=_direct_data("serial"))
+        transport = FakeModbusClient(device_bank())
+        _patch_client(monkeypatch, transport)
+        _patch_issues(monkeypatch)
+        assert await async_setup_entry(hass, entry)
+        coordinator = entry.runtime_data.coordinator
+        service = _host(hass, entry)._service
+        assert coordinator.update_interval.total_seconds() == 2 * service.config.scan_interval
+        refreshes = []
+        gate = asyncio.Event()
+
+        async def refresh() -> None:
+            refreshes.append(1)
+            await gate.wait()
+
+        monkeypatch.setattr(coordinator, "async_refresh", refresh)
+        # A poll that ends while the last one is still being fetched adds none.
+        service.on_polled()
+        service.on_polled()
+        await asyncio.sleep(0)
+        assert refreshes == [1]
+        gate.set()
+        await asyncio.sleep(0)
+        service.on_polled()
+        await asyncio.sleep(0)
+        assert refreshes == [1, 1]
+        # Home Assistant runs these when it unloads the entry.
+        monkeypatch.undo()
+        assert await async_unload_entry(hass, entry)
+        for unload in entry.unloads:
+            result = unload()
+            if asyncio.iscoroutine(result):
+                await result
+        assert service.on_polled is None
+
+    asyncio.run(run())
+
+
+def test_an_entry_moved_to_the_app_gives_up_the_bus_and_its_own_saved_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
+        transport = FakeModbusClient(device_bank())
+        _patch_client(monkeypatch, transport)
+        _patch_issues(monkeypatch)
+        assert await async_setup_entry(hass, entry)
+        saved = embedded.state_directory(hass, entry.entry_id)
+        # A reload keeps the service; this one changes where the wallbox is.
+        embedded.mark_reloading(hass, entry.entry_id, True)
+        assert await async_unload_entry(hass, entry)
+        assert _host(hass, entry) is not None
+        assert (saved / "intent.json").exists()
+
+        class Offline:
+            def __init__(self, *_args: object) -> None:
+                pass
+
+            async def call(self, *_args: object) -> None:
+                raise ServiceConnectionError("service_unavailable", "app offline")
+
+        monkeypatch.setattr(integration, "HttpTransport", Offline)
+        monkeypatch.setattr(integration, "async_get_clientsession", lambda _hass: None)
+        entry.data = {"server_url": "http://app:8765", "server_token": "token"}
+        with pytest.raises(ConfigEntryNotReady):
+            await async_setup_entry(hass, entry)
+        assert _host(hass, entry) is None
+        assert transport.close_calls == 1
+        assert not saved.exists()
+
+    asyncio.run(run())

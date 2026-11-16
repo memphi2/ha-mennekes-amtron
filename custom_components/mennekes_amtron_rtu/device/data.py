@@ -104,10 +104,9 @@ class WriteDiagnostics:
 
 @dataclass(slots=True)
 class ConnectionState:
-    """Availability of the Modbus connection, tracked for log hygiene."""
+    """Availability of the Modbus connection, so each change is recorded once."""
 
     available: bool = True
-    logged_unavailable: bool = False
 
     def record(self, available: bool) -> bool:
         """Store availability and return true when the state changed."""

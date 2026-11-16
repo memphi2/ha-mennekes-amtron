@@ -169,7 +169,7 @@ def test_service_versions_use_numeric_and_prerelease_ordering(
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("advertised", [service_compat.MIN_SERVICE_VERSION, "0.10.0b1", "0.9.2b1"])
+@pytest.mark.parametrize("advertised", [service_compat.MIN_SERVICE_VERSION, "0.10.0", "0.11.0b1"])
 def test_supported_services_work_without_a_matching_integration_version(tmp_path, advertised):
     async def run():
         service, bus, _clock = await service_fixture(tmp_path)

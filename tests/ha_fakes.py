@@ -302,3 +302,23 @@ def collect(entities: Iterable[Any]) -> dict[str, Any]:
         )
         result[str(key)] = entity
     return result
+
+
+def capture_timers(monkeypatch: Any, module: Any) -> list[list[Any]]:
+    """Collect ``[seconds, action, waiting]`` for a module's delayed calls.
+
+    A test fires or inspects them instead of waiting for the clock.
+    """
+    timers: list[list[Any]] = []
+
+    def call_later(_hass: Any, seconds: float, action: Any) -> Callable[[], None]:
+        timer = [seconds, action, True]
+        timers.append(timer)
+
+        def cancel() -> None:
+            timer[2] = False
+
+        return cancel
+
+    monkeypatch.setattr(module, "async_call_later", call_later)
+    return timers

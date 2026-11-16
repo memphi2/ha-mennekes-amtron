@@ -10,7 +10,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import repairs
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass
+from tests.ha_fakes import FakeConfigEntry, FakeHass, capture_timers
 from tests.test_vehicle_detection import detection_catalog
 
 
@@ -50,6 +50,7 @@ def connected_vehicle(hass, *, first):
 def test_changed_vehicle_aborts_setup_before_old_trip_can_start(tmp_path, monkeypatch, stage):
     async def run():
         real, hass, entry, transport = setup_case(tmp_path, monkeypatch)
+        timers = capture_timers(monkeypatch, integration.embedded)
         connected_vehicle(hass, first=True)
         original_connect = transport.connect
         original_refresh = integration.ServiceCoordinator.async_config_entry_first_refresh
@@ -86,6 +87,12 @@ def test_changed_vehicle_aborts_setup_before_old_trip_can_start(tmp_path, monkey
                 vehicle.async_stop.assert_awaited_once()
             else:
                 vehicle.async_start.assert_not_awaited()
+            # The wallbox is fine: its service and heartbeat stay for the
+            # retry, and stop only when none comes.
+            assert transport.connected
+            ((seconds, release, waiting),) = timers
+            assert (seconds, waiting) == (120, True)
+            await release(None)
             assert not transport.connected
         finally:
             await real.async_stop()

@@ -10,13 +10,14 @@ from custom_components.mennekes_amtron_rtu import (
     CONTROL_PLATFORMS,
     READ_PLATFORMS,
     _entry_platforms,
+    unplug_rule,
 )
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.switch import async_setup_entry
 from custom_components.mennekes_amtron_rtu.unplug_rule import UnplugRule
 from tests.fakes import device_bank, put, raise_connection_error
-from tests.ha_fakes import build_runtime, collect
+from tests.ha_fakes import build_runtime, capture_timers, collect
 
 
 async def _switches(**kwargs: object):
@@ -345,28 +346,57 @@ async def _poll(transport, entry) -> None:
     await entry.runtime_data.coordinator.async_refresh()
 
 
-def test_a_failed_release_off_is_retried_with_the_next_poll_and_reported_once(
+def _retry_timers(monkeypatch) -> list:
+    return capture_timers(monkeypatch, unplug_rule)
+
+
+def _waiting(timers) -> list:
+    return [timer for timer in timers if timer[2]]
+
+
+async def _fire(timers, entry) -> None:
+    (timer,) = _waiting(timers)
+    timer[2] = False
+    timer[1](None)
+    await asyncio.gather(*entry.background_tasks)
+
+
+def _busy_release(monkeypatch, entry, *, failures: int | None = None) -> list[bool]:
+    calls: list[bool] = []
+
+    async def release_off(released: bool) -> None:
+        calls.append(released)
+        if failures is None or len(calls) <= failures:
+            raise HomeAssistantError("busy")
+
+    monkeypatch.setattr(entry.runtime_data.control, "async_set_charging_release", release_off)
+    return calls
+
+
+def test_a_failed_release_off_is_retried_on_one_timer_and_reported_once(
     monkeypatch, caplog,
 ) -> None:
     async def run() -> None:
         caplog.set_level(logging.DEBUG, logger="custom_components.mennekes_amtron_rtu.unplug_rule")
+        timers = _retry_timers(monkeypatch)
         _hass, entry, transport = await build_runtime()
-        calls: list[bool] = []
-
-        async def release_off(released: bool) -> None:
-            calls.append(released)
-            if len(calls) < 3:
-                raise HomeAssistantError("busy")
-
-        monkeypatch.setattr(entry.runtime_data.control, "async_set_charging_release", release_off)
+        calls = _busy_release(monkeypatch, entry, failures=2)
         rule = await _unplug_rule(transport, entry)
         await _unplug(transport, entry)
         assert calls == [False]
-        for expected in (2, 3, 3):
+        # Polls add no attempts, however many of them notify.
+        for _ in range(3):
             await _poll(transport, entry)
             await asyncio.gather(*entry.background_tasks)
-            assert len(calls) == expected
-        failed = "Control: charging release not switched off after unplugging; retrying with the next poll"
+        assert calls == [False]
+        assert [timer[0] for timer in _waiting(timers)] == [30]
+        await _fire(timers, entry)
+        assert len(calls) == 2
+        await _fire(timers, entry)
+        assert len(calls) == 3
+        # Switched off: nothing is left to retry.
+        assert not _waiting(timers)
+        failed = "Control: charging release not switched off after unplugging; retrying every 30 seconds"
         assert _records(caplog, failed) == [logging.WARNING, logging.DEBUG]
         assert _records(caplog, "Control: charging release switched off after unplugging") == [logging.INFO]
         rule.stop()
@@ -374,37 +404,41 @@ def test_a_failed_release_off_is_retried_with_the_next_poll_and_reported_once(
     asyncio.run(run())
 
 
-def test_a_retry_waits_for_the_running_switch_off_and_ends_when_the_car_is_back(monkeypatch) -> None:
+def test_a_retry_ends_when_the_car_is_back_or_the_rule_stops(monkeypatch) -> None:
     async def run() -> None:
+        timers = _retry_timers(monkeypatch)
         _hass, entry, transport = await build_runtime()
-        gate = asyncio.Event()
-        calls: list[bool] = []
-
-        async def release_off(released: bool) -> None:
-            calls.append(released)
-            if len(calls) == 2:
-                await gate.wait()
-            raise HomeAssistantError("busy")
-
-        monkeypatch.setattr(entry.runtime_data.control, "async_set_charging_release", release_off)
+        calls = _busy_release(monkeypatch, entry)
         rule = await _unplug_rule(transport, entry)
         await _unplug(transport, entry)
         assert calls == [False]
-        await _poll(transport, entry)
-        await asyncio.sleep(0)
-        assert len(calls) == 2
-        # Polls while the switch-off still runs start no second one.
-        await _poll(transport, entry)
-        await _poll(transport, entry)
-        await asyncio.sleep(0)
-        assert len(calls) == 2
-        gate.set()
-        await asyncio.gather(*entry.background_tasks)
+        assert len(_waiting(timers)) == 1
         # The car is back: nothing is owed any more.
         _plug(transport, True)
         await _poll(transport, entry)
-        await _poll(transport, entry)
-        await asyncio.gather(*entry.background_tasks)
+        assert not _waiting(timers)
+        # The next unplug owes again, and a stopped rule gives that up.
+        await _unplug(transport, entry)
+        assert len(calls) == 2
+        assert len(_waiting(timers)) == 1
+        rule.stop()
+        assert not _waiting(timers)
+
+    asyncio.run(run())
+
+
+def test_a_retry_waits_while_the_plug_state_is_unknown(monkeypatch) -> None:
+    async def run() -> None:
+        timers = _retry_timers(monkeypatch)
+        _hass, entry, transport = await build_runtime()
+        calls = _busy_release(monkeypatch, entry)
+        rule = await _unplug_rule(transport, entry)
+        await _unplug(transport, entry)
+        entry.runtime_data.coordinator.last_update_success = False
+        await _fire(timers, entry)
+        assert calls == [False]
+        entry.runtime_data.coordinator.last_update_success = True
+        await _fire(timers, entry)
         assert len(calls) == 2
         rule.stop()
 

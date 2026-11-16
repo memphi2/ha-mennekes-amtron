@@ -39,6 +39,10 @@ from custom_components.mennekes_amtron_rtu.device.register_blocks import (
     SLOW_BLOCK_INTERVAL_SECONDS,
     BlockCadence,
 )
+from custom_components.mennekes_amtron_rtu.device.runtime_events import (
+    EventTimeline,
+    EventType,
+)
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 from tests.ha_fakes import FakeConfigEntry, FakeHass
@@ -79,6 +83,7 @@ async def _coordinator(
     connection_state: ConnectionState | None = None,
     monotonic: Any = None,
     measurement_interval: float = 5,
+    timeline: EventTimeline | None = None,
 ) -> _Polling:
     client = MennekesModbusClient(
         SerialConfig(port="/dev/fake"), client_factory=lambda _config: transport
@@ -91,6 +96,7 @@ async def _coordinator(
             identity,
             connection_state=connection_state or ConnectionState(),
             measurement_interval=measurement_interval,
+            timeline=timeline,
             **({"monotonic": monotonic} if monotonic else {}),
         ),
         identity,
@@ -198,27 +204,28 @@ def test_an_entirely_silent_device_fails_the_update() -> None:
     asyncio.run(run())
 
 
-def test_availability_is_logged_once_per_change(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+def test_a_lost_and_a_recovered_connection_are_each_recorded_once() -> None:
     async def run() -> None:
         transport = FakeModbusClient(device_bank())
-        state = ConnectionState()
-        coordinator = await _coordinator(transport, connection_state=state)
+        timeline = EventTimeline()
+        coordinator = await _coordinator(transport, timeline=timeline)
         await coordinator._async_update_data()
+
+        def recorded() -> list[str]:
+            return [event["event"] for event in timeline.snapshot()]
 
         # a block read on every poll, not one of the slow configuration ones
         transport.read_exceptions[0x0100] = raise_connection_error()
-        with caplog.at_level(logging.INFO):
-            for _ in range(3):
-                with pytest.raises(AmtronBusError):
-                    await coordinator._async_update_data()
-            assert sum("Connection: lost" in r.message for r in caplog.records) == 1
+        for _ in range(3):
+            with pytest.raises(AmtronBusError):
+                await coordinator._async_update_data()
+        assert recorded().count(EventType.CONNECTION_LOST.value) == 1
+        assert EventType.CONNECTION_RECOVERED.value not in recorded()
 
-            transport.read_exceptions.clear()
-            await coordinator._async_update_data()
-            await coordinator._async_update_data()
-            assert sum("Connection: reconnected" in r.message for r in caplog.records) == 1
+        transport.read_exceptions.clear()
+        await coordinator._async_update_data()
+        await coordinator._async_update_data()
+        assert recorded().count(EventType.CONNECTION_RECOVERED.value) == 1
 
     asyncio.run(run())
 

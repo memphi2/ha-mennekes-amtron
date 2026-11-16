@@ -874,8 +874,10 @@ def test_the_plan_survives_storage_failures(tmp_path, caplog, monkeypatch):
         assert box.plan.storage_error
         assert caplog.text.count("Departure plan: not saved") == 1
         monkeypatch.undo()
-        await box.plan.tick()
+        with caplog.at_level(logging.INFO, logger=dp.__name__):
+            await box.plan.tick()
         assert not box.plan.storage_error
+        assert caplog.text.count("Departure plan: saved again") == 1
         assert DepartureStore(box.path, "fixture").load()["trip"]["deadline"] == (NOW + timedelta(hours=2)).isoformat()
     run(go())
 

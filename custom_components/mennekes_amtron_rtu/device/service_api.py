@@ -58,17 +58,15 @@ class ServiceApi:
 
     async def _route(self, method: str, path: str, payload: object) -> dict[str, Any]:
         service = self._service
-        if method == "GET":
-            if path == "/v2/state":
-                return await service.stable_snapshot(patient=True)
-            if path == "/v2/diagnostics":
-                # Passive RAM snapshot: no serial reads, writes or file access.
-                return {
-                    "write_transactions": service.client.write_trace.snapshot(),
-                    "runtime_events": service.diagnostics.timeline.snapshot(),
-                }
-            raise _NotFoundError(path)
-        if method != "POST" or path not in _POSTS:
+        if (method, path) == ("GET", "/v2/state"):
+            return await service.stable_snapshot(patient=True)
+        if (method, path) == ("GET", "/v2/diagnostics"):
+            # Passive RAM snapshot: no serial reads, writes or file access.
+            return {
+                "write_transactions": service.client.write_trace.snapshot(),
+                "runtime_events": service.diagnostics.timeline.snapshot(),
+            }
+        if method != "POST" or path not in POSTS:
             raise _NotFoundError(path)
         if not isinstance(payload, dict):
             raise ValueError("expected an object")
@@ -90,7 +88,9 @@ class ServiceApi:
             return await service.read(payload)
 
 
-_POSTS = frozenset({
+# Every operation there is; the web server registers exactly these.
+GETS = ("/v2/state", "/v2/diagnostics")
+POSTS = (
     "/v2/command", "/v2/read", "/v2/soc-goal/reserve", "/v2/soc-goal/commit",
     "/v2/soc-goal/resolve",
-})
+)

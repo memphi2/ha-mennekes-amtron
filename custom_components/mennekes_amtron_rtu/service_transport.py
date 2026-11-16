@@ -74,8 +74,12 @@ class EmbeddedTransport:
     def __init__(self, api: ServiceApi) -> None:
         self._api = api
         self._running: set[asyncio.Task[Reply]] = set()
+        self._closed = False
 
     async def call(self, method: str, path: str, payload: dict[str, Any] | None) -> Reply:
+        if self._closed:
+            # A closed web server refuses the connection.
+            return 503, {"error": "service_unavailable"}
         # JSON in both directions keeps the types and isolation HTTP gives.
         request = None if payload is None else json.loads(json.dumps(payload))
         task = asyncio.create_task(self._dispatch(method, path, request))
@@ -102,6 +106,7 @@ class EmbeddedTransport:
             task.exception()
 
     async def async_drain(self) -> None:
-        """Wait for requests their callers gave up on, before the service stops."""
-        if self._running:
+        """Take no new requests and let the running ones finish, before the service stops."""
+        self._closed = True
+        while self._running:
             await asyncio.gather(*self._running, return_exceptions=True)
