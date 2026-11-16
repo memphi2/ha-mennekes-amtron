@@ -924,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Laden gesperrt: gespeicherte Einstellungen abgelehnt",
-            "description": "Die App konnte ihre gespeicherten Ladeeinstellungen nicht lesen. Die alte Datei bleibt erhalten; automatisches Laden ist gesperrt. Bestätige, um sie durch sichere Startwerte zu ersetzen: Pause aktiv, Ladefreigabe aus, 6 A Fortsetzstrom, keine Ladeziele. Es wird keine Ladung gestartet. Prüfe danach Fahrzeugprofile, Ziele und Plug & Charge und schalte Ladefreigabe und Fortsetzen bewusst ein. Im Nur-Lesen-Modus kann die App eine physische Ladung nicht stoppen; prüfe zuerst die Wallbox."
+            "description": "Die gespeicherten Ladeeinstellungen konnten nicht gelesen werden. Die alte Datei bleibt erhalten; automatisches Laden ist gesperrt. Bestätige, um sie durch sichere Startwerte zu ersetzen: Pause aktiv, Ladefreigabe aus, 6 A Fortsetzstrom, keine Ladeziele. Es wird keine Ladung gestartet. Prüfe danach Fahrzeugprofile, Ziele und Plug & Charge und schalte Ladefreigabe und Fortsetzen bewusst ein. Im Nur-Lesen-Modus lässt sich eine physische Ladung von hier nicht stoppen; prüfe zuerst die Wallbox."
           }
         },
         "error": {

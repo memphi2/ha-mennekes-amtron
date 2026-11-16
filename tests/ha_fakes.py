@@ -179,6 +179,7 @@ class FakeConfigEntry:
         self.version = 1
         self.pref_disable_polling = False
         self.state = ConfigEntryState.SETUP_IN_PROGRESS
+        self.disabled_by = None
         self.data = (
             {CONF_PORT: "/dev/fake", CONF_SERIAL_NUMBER: "ABC123456789"}
             if data is None

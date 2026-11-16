@@ -924,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Ricarica bloccata: impostazioni salvate rifiutate",
-            "description": "L’app non riesce a leggere le impostazioni salvate. Il file resta conservato e la ricarica automatica è bloccata. Conferma per sostituirlo: pausa attiva, consenso disattivato, corrente di ripresa 6 A, nessun obiettivo. La ricarica non parte. Controlla poi profili, obiettivi e Plug & Charge prima di riprendere. In sola lettura l’app non può fermare la ricarica: controlla prima la wallbox."
+            "description": "Non è possibile leggere le impostazioni salvate. Il file resta conservato e la ricarica automatica è bloccata. Conferma per sostituirlo: pausa attiva, consenso disattivato, corrente di ripresa 6 A, nessun obiettivo. La ricarica non parte. Controlla poi profili, obiettivi e Plug & Charge prima di riprendere. In sola lettura la ricarica non può essere fermata da qui: controlla prima la wallbox."
           }
         },
         "error": {

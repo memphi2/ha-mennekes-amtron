@@ -282,6 +282,8 @@ async def async_setup_entry(
         entry_data=dict(entry.data),
         controls=remote or control_mode_is_master(dict(entry.options)),
     )
+    # Whether a failure below is something other than a silent wallbox.
+    wallbox_answers = True
     try:
         # A reconnect is only a gap; the session's presence rule judges it.
         if handoff is not None and handoff.identity != identity:
@@ -368,7 +370,11 @@ async def async_setup_entry(
 
         client.on_update = update_remote
         update_remote()
-        await coordinator.async_config_entry_first_refresh()
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except BaseException:
+            wallbox_answers = False
+            raise
         validate_vehicle_selection()
         if automatic_selection_available(entry.options):
             # Before the car's rules start: they rest for an unconfirmed car.
@@ -408,13 +414,14 @@ async def async_setup_entry(
             entry.runtime_data.unplug_rule = UnplugRule(hass, entry)
     except BaseException as err:
         try:
-            await _async_stop_runtime(entry.runtime_data)
-            if not remote:
-                await _async_release_after_failure(
-                    hass, entry, err,
-                    # Without a single good poll the wallbox itself is the trouble.
-                    healthy=coordinator.data is not None and coordinator.last_update_success,
-                )
+            try:
+                await _async_stop_runtime(entry.runtime_data)
+            finally:
+                # Whatever else fails, no service is left that nothing stops.
+                if not remote:
+                    await _async_release_after_failure(
+                        hass, entry, err, healthy=wallbox_answers,
+                    )
         finally:
             forget_loss_attribution(hass, entry.entry_id)
         raise
@@ -833,8 +840,11 @@ async def _async_reload_entry_locked(
         await hass.config_entries.async_reload(entry.entry_id)
     finally:
         mark_reloading(hass, entry.entry_id, False)
-        if entry.state not in (ConfigEntryState.LOADED, ConfigEntryState.SETUP_RETRY):
-            # A setup that is tried again has decided about the service itself.
+        if entry.state not in (
+            ConfigEntryState.LOADED, ConfigEntryState.SETUP_RETRY, ConfigEntryState.FAILED_UNLOAD,
+        ):
+            # A setup that is tried again has decided about the service itself,
+            # and an entry that could not be unloaded still runs on it.
             await async_release(hass, entry.entry_id)
         if runtime is not None and (retain_cost or retain_attribution):
             runtime.retain_cost_on_unload = False

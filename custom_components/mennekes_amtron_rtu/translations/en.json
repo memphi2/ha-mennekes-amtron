@@ -924,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Charging blocked: saved settings rejected",
-            "description": "The app could not read its saved charging settings. The old file is preserved and automatic charging is blocked. Confirm to replace it with safe defaults: paused, charging release off, 6 A resume current, no targets. Charging does not start. Afterwards check your vehicle profiles, targets and Plug & Charge, then deliberately enable release and resume. In read-only mode the app cannot stop a physical charge; check the wallbox first."
+            "description": "The saved charging settings could not be read. The old file is preserved and automatic charging is blocked. Confirm to replace it with safe defaults: paused, charging release off, 6 A resume current, no targets. Charging does not start. Afterwards check your vehicle profiles, targets and Plug & Charge, then deliberately enable release and resume. In read-only mode a physical charge cannot be stopped from here; check the wallbox first."
           }
         },
         "error": {

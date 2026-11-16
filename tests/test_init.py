@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 
@@ -506,5 +507,66 @@ def test_an_entry_moved_to_the_app_gives_up_the_bus_and_its_own_saved_state(
         assert _host(hass, entry) is None
         assert transport.close_calls == 1
         assert not saved.exists()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("state", "kept"), [
+    (ConfigEntryState.LOADED, True),
+    (ConfigEntryState.SETUP_RETRY, True),
+    # Still running on the service: stopping it would strand every entity.
+    (ConfigEntryState.FAILED_UNLOAD, True),
+    (ConfigEntryState.SETUP_ERROR, False),
+    (ConfigEntryState.NOT_LOADED, False),
+])
+def test_after_a_reload_the_service_stops_only_when_nothing_uses_it_any_more(
+    monkeypatch: pytest.MonkeyPatch, state: ConfigEntryState, kept: bool,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
+        transport = FakeModbusClient(device_bank())
+        _patch_client(monkeypatch, transport)
+        _patch_issues(monkeypatch)
+        assert await async_setup_entry(hass, entry)
+        runtime = entry.runtime_data
+        entry.runtime_data = None
+
+        async def reload(_entry_id: str) -> None:
+            entry.state = state
+
+        hass.config_entries.async_reload = reload
+        await async_reload_entry(hass, entry)
+        assert (_host(hass, entry) is not None) is kept
+        assert transport.close_calls == (0 if kept else 1)
+        entry.runtime_data = runtime
+        await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_failing_cleanup_after_a_failed_setup_still_frees_the_bus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
+        transport = FakeModbusClient(device_bank())
+        _patch_client(monkeypatch, transport)
+        _patch_issues(monkeypatch)
+
+        async def platforms(*_args: object) -> None:
+            raise RuntimeError("platform failed")
+
+        async def cleanup(*_args: object, **_kwargs: object) -> None:
+            raise RuntimeError("observer did not stop")
+
+        hass.config_entries.async_forward_entry_setups = platforms
+        monkeypatch.setattr(integration, "_async_stop_runtime", cleanup)
+        with pytest.raises(RuntimeError, match="observer did not stop"):
+            await async_setup_entry(hass, entry)
+        # No service is left that nothing would ever stop.
+        assert _host(hass, entry) is None
+        assert transport.close_calls == 1
 
     asyncio.run(run())

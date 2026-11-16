@@ -924,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Laden geblokkeerd: opgeslagen instellingen geweigerd",
-            "description": "De app kan de opgeslagen instellingen niet lezen. Het bestand blijft behouden en automatisch laden is geblokkeerd. Bevestig veilige beginwaarden: pauze aan, laadvrijgave uit, hervatstroom 6 A, geen doelen. Laden start niet. Controleer daarna profielen, doelen en Plug & Charge voordat je vrijgeeft en hervat. In alleen-lezenmodus kan de app laden niet stoppen; controleer eerst de wallbox."
+            "description": "De opgeslagen instellingen kunnen niet worden gelezen. Het bestand blijft behouden en automatisch laden is geblokkeerd. Bevestig veilige beginwaarden: pauze aan, laadvrijgave uit, hervatstroom 6 A, geen doelen. Laden start niet. Controleer daarna profielen, doelen en Plug & Charge voordat je vrijgeeft en hervat. In alleen-lezenmodus kan het laden van hieruit niet worden gestopt; controleer eerst de wallbox."
           }
         },
         "error": {

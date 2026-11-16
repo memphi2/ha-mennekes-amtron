@@ -924,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Recharge bloquée : réglages enregistrés rejetés",
-            "description": "L’application ne peut pas lire les réglages enregistrés. Le fichier est conservé et la recharge automatique est bloquée. Confirmez pour le remplacer : pause active, autorisation coupée, courant de reprise de 6 A, aucun objectif. La recharge ne démarre pas. Vérifiez ensuite profils, objectifs et Plug & Charge avant de reprendre. En lecture seule, vérifiez la borne : l’application ne peut pas arrêter la recharge."
+            "description": "Les réglages enregistrés ne peuvent pas être lus. Le fichier est conservé et la recharge automatique est bloquée. Confirmez pour le remplacer : pause active, autorisation coupée, courant de reprise de 6 A, aucun objectif. La recharge ne démarre pas. Vérifiez ensuite profils, objectifs et Plug & Charge avant de reprendre. En lecture seule, vérifiez la borne : la recharge ne peut pas être arrêtée d’ici."
           }
         },
         "error": {

@@ -6,6 +6,7 @@ sends commands. It decides nothing about the wallbox.
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import copy
@@ -55,6 +56,9 @@ def ha_command[**P, T](
     return call
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
 class ServiceHeartbeat:
     """The service's heartbeat health, published on change only."""
 
@@ -79,7 +83,12 @@ class ServiceHeartbeat:
             return
         self._healthy = healthy
         for listener in tuple(self._listeners):
-            listener()
+            try:
+                listener()
+            except Exception:
+                # Whoever shows the heartbeat never fails the poll or the
+                # command that brought the news.
+                _LOGGER.exception("Heartbeat: listener failed")
 
 
 class ServiceControl:

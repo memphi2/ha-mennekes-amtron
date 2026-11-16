@@ -55,6 +55,7 @@ async def _setup(monkeypatch, *, remote=False, read_only=False, healthy=True, er
             "heartbeat": {"healthy": healthy, "running": not read_only},
         }
         runtime.client = client
+        entry.data = {**entry.data, "server_url": "http://app.invalid:8765"}
         await original_client.async_close()
     else:
         # The service's own report of its heartbeat, as every poll returns it.
@@ -392,3 +393,39 @@ def test_connection_repair_explanations_exist_in_every_language():
         for key in (ISSUE_HEARTBEAT_UNAVAILABLE, ISSUE_SERVICE_UNAVAILABLE):
             assert issues[key]["title"], (path.name, key)
             assert issues[key]["description"], (path.name, key)
+
+
+def test_a_direct_entry_without_its_service_misses_the_heartbeat_not_an_app(monkeypatch):
+    async def run():
+        _, entry, transport, registry, monitor = await _setup(monkeypatch)
+        # There is no app that could keep a heartbeat going on its own.
+        entry.runtime_data.client._mark_unavailable()
+        _expire(monitor)
+        assert set(registry.created) == {_issue(entry, ISSUE_HEARTBEAT_UNAVAILABLE)}
+        assert transport.writes == []
+        monitor.stop()
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_a_failing_heartbeat_listener_fails_neither_the_poll_nor_the_others(monkeypatch, caplog):
+    async def run():
+        _, entry, _transport, _registry, monitor = await _setup(monkeypatch)
+        client = entry.runtime_data.client
+        heartbeat = ServiceHeartbeat(client)
+        seen = []
+
+        def broken():
+            raise RuntimeError("entity write failed")
+
+        heartbeat.async_add_listener(broken)
+        heartbeat.async_add_listener(lambda: seen.append(heartbeat.healthy))
+        client.snapshot["heartbeat"]["healthy"] = False
+        heartbeat.update()
+        assert seen == [False]
+        assert "Heartbeat: listener failed" in caplog.text
+        monitor.stop()
+        await client.async_close()
+
+    asyncio.run(run())

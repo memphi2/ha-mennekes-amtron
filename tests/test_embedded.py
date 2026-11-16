@@ -46,6 +46,7 @@ def _hosts(hass):
 def _setup(monkeypatch, tmp_path, *, options=None, bank=None):
     hass = FakeHass(str(tmp_path))
     entry = FakeConfigEntry(options=dict(MASTER if options is None else options))
+    hass.config_entries.entries[entry.entry_id] = entry
     wallbox = FakeModbusClient(device_bank() if bank is None else bank)
     _patch_client(monkeypatch, wallbox)
     return hass, entry, wallbox
@@ -850,5 +851,87 @@ def test_every_poll_is_reported_to_one_listener_until_it_is_removed(monkeypatch,
         await asyncio.wait_for(polled.wait(), 10)
         assert set(polls) == {"second"}
         await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_delayed_restart_is_dropped_for_a_removed_or_disabled_entry(monkeypatch, tmp_path):
+    async def run():
+        timers = capture_timers(monkeypatch, embedded)
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        reloads = []
+        hass.config_entries.async_schedule_reload = reloads.append
+
+        async def die():
+            host = await embedded.async_acquire(hass, entry)
+            host._service._heartbeat_task.cancel()
+            for _ in range(200):
+                await asyncio.sleep(0.01)
+                if entry.entry_id not in _hosts(hass) and (reloads or timers):
+                    break
+            await asyncio.sleep(0.05)
+
+        await die()
+        assert reloads == [entry.entry_id]
+        # The second end waits; the entry is disabled meanwhile.
+        del reloads[:]
+        await die()
+        ((_seconds, reload, waiting),) = timers
+        assert waiting
+        entry.disabled_by = "user"
+        reload(None)
+        assert reloads == []
+        # Removed during the wait: its timer goes with it.
+        entry.disabled_by = None
+        del timers[:]
+        await die()
+        assert timers[-1][2]
+        await embedded.async_forget(hass, entry.entry_id)
+        assert not timers[-1][2]
+        del hass.config_entries.entries[entry.entry_id]
+        timers[-1][1](None)
+        assert reloads == []
+
+    asyncio.run(run())
+
+
+def test_a_kept_service_is_released_at_once_when_the_entry_is_disabled(monkeypatch, tmp_path):
+    async def run():
+        timers = capture_timers(monkeypatch, embedded)
+        listeners = []
+
+        def connect(_hass, _signal, listener):
+            listeners.append(listener)
+            return lambda: listeners.remove(listener)
+
+        monkeypatch.setattr(embedded, "async_dispatcher_connect", connect)
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        embedded.async_release_unless_retried(hass, entry)
+        (changed,) = listeners
+        entry.state = ConfigEntryState.SETUP_RETRY
+        # Another entry, or this one still waiting for its retry: nothing to do.
+        changed("updated", FakeConfigEntry(entry_id="other"))
+        changed("updated", entry)
+        await asyncio.sleep(0)
+        assert host._service.heartbeat.running
+        # A reload passes through "not loaded" while it holds the setup lock.
+        entry.state = ConfigEntryState.NOT_LOADED
+        async with entry.setup_lock:
+            changed("updated", entry)
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+        assert host._service.heartbeat.running
+        assert len([timer for timer in timers if timer[2]]) == 1
+        # Disabled: Home Assistant says so and the bus is free right away.
+        changed("updated", entry)
+        for _ in range(50):
+            await asyncio.sleep(0.01)
+            if not _hosts(hass):
+                break
+        assert _hosts(hass) == {}
+        assert not host._service.heartbeat.running
+        assert listeners == []
+        assert not any(timer[2] for timer in timers)
 
     asyncio.run(run())

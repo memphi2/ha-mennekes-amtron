@@ -57,11 +57,18 @@ def test_a_downgrade_and_its_release_are_each_notified_once(tmp_path: Path) -> N
             await show("charging", 8)
             del calls[:]
             for state, limit in (
-                ("unavailable", None), ("charging", 8), ("unknown", None),
-                ("unknown", 8), ("charging", 8), ("unavailable", None), ("charging", None),
+                ("unavailable", None), ("charging", 8), ("unavailable", None), ("charging", None),
             ):
                 await show(state, limit)
             assert calls == []
+            # A status that is merely unknown still carries the limit.
+            await show("unknown")
+            await show("unknown", 8)
+            await show("charging", 8)
+            await show("unknown")
+            assert [call["title"] for call in calls] == [
+                "Wallbox downgraded", "Wallbox downgrade released",
+            ]
         finally:
             await hass.async_stop()
 

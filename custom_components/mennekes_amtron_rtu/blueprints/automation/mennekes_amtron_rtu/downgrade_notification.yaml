@@ -3,6 +3,7 @@ blueprint:
   description: >-
     Sends a notification when the grid operator limits the wallbox, and
     another when the limit is released.
+    A change that happens while the wallbox is unavailable is not reported.
 
     The downgrade is enforced inside the wallbox over its own hardware input.
     Nothing on the Modbus side can prevent or raise it; this automation only
@@ -41,8 +42,8 @@ conditions:
   - condition: template
     value_template: >-
       {{ trigger.from_state is not none
-         and trigger.from_state.state not in ['unavailable', 'unknown']
-         and trigger.to_state.state not in ['unavailable', 'unknown'] }}
+         and trigger.from_state.state != 'unavailable'
+         and trigger.to_state.state != 'unavailable' }}
 
 actions:
   - variables:

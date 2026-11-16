@@ -196,7 +196,7 @@ def test_the_typing_gate_covers_every_module() -> None:
     import check_typing
 
     targets = set(check_typing.strict_targets())
-    assert "custom_components/mennekes_amtron_rtu/control.py" in targets
+    assert "custom_components/mennekes_amtron_rtu/service_control.py" in targets
     assert "custom_components/mennekes_amtron_rtu/device/registers.py" in targets
     assert "scripts/check_repo.py" in targets
 
@@ -423,13 +423,11 @@ def test_the_register_gate_rejects_an_icon_that_hides_a_device_class(
 def test_numeric_sensors_declare_a_display_precision() -> None:
     """Otherwise a float32 register shows as 230.10000610351562."""
 
-    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-        SENSOR_DESCRIPTIONS,
-    )
+    from custom_components.mennekes_amtron_rtu.sensor import SENSORS
 
     missing = [
         description.key
-        for description in SENSOR_DESCRIPTIONS
+        for description in SENSORS
         if description.native_unit_of_measurement
         and description.suggested_display_precision is None
     ]

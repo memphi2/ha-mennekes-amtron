@@ -150,7 +150,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             step_id="wallbox_service",
             data_schema=unplug_schema(draft.values),
             description_placeholders=_service_values(self.config_entry),
-            last_step=False,
+            last_step=True,
         )
 
     async def async_step_wallbox_basic(

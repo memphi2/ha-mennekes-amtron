@@ -17,9 +17,10 @@ from pathlib import Path
 from time import monotonic
 from typing import TYPE_CHECKING
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import SIGNAL_CONFIG_ENTRY_CHANGED, ConfigEntryState
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
 
 from .device.const import (
@@ -53,6 +54,8 @@ _HOSTS = f"{DOMAIN}_embedded"
 _RELOADING = f"{DOMAIN}_reloading"
 _DEFERRED = f"{DOMAIN}_deferred_release"
 _RESTARTS = f"{DOMAIN}_restarts"
+_RESTART_TIMERS = f"{DOMAIN}_restart_timers"
+_RETRYING = (ConfigEntryState.SETUP_RETRY, ConfigEntryState.SETUP_IN_PROGRESS)
 # How often a service kept for a retried setup asks whether the retry is still due.
 _RETRY_CHECK_SECONDS = 30
 # A service that ran this long before it ended starts again at once.
@@ -266,8 +269,14 @@ async def async_acquire(
 
         @callback
         def reload(_now: datetime | None = None) -> None:
-            # Whoever started a service meanwhile has reloaded already.
-            if entry_id not in hosts and not hass.is_stopping:
+            hass.data.get(_RESTART_TIMERS, {}).pop(entry_id, None)
+            # Whoever started a service meanwhile has reloaded already, and
+            # an entry removed or disabled since then wants none.
+            if (
+                entry_id not in hosts and not hass.is_stopping
+                and hass.config_entries.async_get_entry(entry_id) is entry
+                and entry.disabled_by is None
+            ):
                 hass.config_entries.async_schedule_reload(entry_id)
 
         async def restart() -> None:
@@ -279,7 +288,10 @@ async def async_acquire(
                         "Service: stopped again soon after its start; next start in %.0f seconds",
                         delay,
                     )
-                    async_call_later(hass, delay, reload)
+                    _cancel_restart(hass, entry_id)
+                    hass.data.setdefault(_RESTART_TIMERS, {})[entry_id] = async_call_later(
+                        hass, delay, reload
+                    )
                 else:
                     reload()
 
@@ -311,6 +323,12 @@ def _cancel_deferred_release(hass: HomeAssistant, entry_id: str) -> None:
         cancel()
 
 
+def _cancel_restart(hass: HomeAssistant, entry_id: str) -> None:
+    cancel = hass.data.get(_RESTART_TIMERS, {}).pop(entry_id, None)
+    if cancel is not None:
+        cancel()
+
+
 @callback
 def async_release_unless_retried(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     """Keep a healthy service through a setup that will be tried again.
@@ -322,21 +340,37 @@ def async_release_unless_retried(hass: HomeAssistant, entry: MennekesAmtronConfi
     """
     entry_id = entry.entry_id
     _cancel_deferred_release(hass, entry_id)
+    watches: dict[str, Callable[[], None]] = hass.data.setdefault(_DEFERRED, {})
+    timer: Callable[[], None] | None = None
 
-    def wait() -> None:
-        hass.data.setdefault(_DEFERRED, {})[entry_id] = async_call_later(
-            hass, _RETRY_CHECK_SECONDS, check
-        )
+    def stop_watching() -> None:
+        unsubscribe()
+        if timer is not None:
+            timer()
 
-    async def check(_now: datetime) -> None:
-        hass.data[_DEFERRED].pop(entry_id, None)
-        # The failed setup itself is still in progress when this is asked first.
-        if entry.state in (ConfigEntryState.SETUP_RETRY, ConfigEntryState.SETUP_IN_PROGRESS):
-            wait()
+    async def check(_now: datetime | None = None) -> None:
+        nonlocal timer
+        if watches.get(entry_id) is not stop_watching:
+            return
+        if timer is not None:
+            timer()
+        # The failed setup itself is still in progress when this is asked
+        # first, and a reload passes through "not loaded" under the lock.
+        if entry.state in _RETRYING or entry.setup_lock.locked():
+            timer = async_call_later(hass, _RETRY_CHECK_SECONDS, check)
         else:
+            timer = None
             await async_release(hass, entry_id, force=True)
 
-    wait()
+    @callback
+    def changed(_change: object, changed_entry: object) -> None:
+        # Told at once where Home Assistant says so; the timer covers the rest.
+        if changed_entry is entry and entry.state not in _RETRYING:
+            hass.async_create_task(check(), "amtron_service_release")
+
+    unsubscribe = async_dispatcher_connect(hass, SIGNAL_CONFIG_ENTRY_CHANGED, changed)
+    timer = async_call_later(hass, _RETRY_CHECK_SECONDS, check)
+    watches[entry_id] = stop_watching
 
 
 def mark_reloading(hass: HomeAssistant, entry_id: str, reloading: bool) -> None:
@@ -349,6 +383,7 @@ async def async_release(hass: HomeAssistant, entry_id: str, *, force: bool = Fal
     if not force and entry_id in hass.data.get(_RELOADING, ()):
         return
     _cancel_deferred_release(hass, entry_id)
+    _cancel_restart(hass, entry_id)
     host = _hosts(hass).pop(entry_id, None)
     if host is not None:
         await host.async_stop()

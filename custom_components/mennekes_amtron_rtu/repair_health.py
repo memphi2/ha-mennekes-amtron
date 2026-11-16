@@ -15,6 +15,7 @@ from .repair_issues import (
     ISSUE_SERVICE_UNAVAILABLE,
     heartbeat_lost,
 )
+from .service_client import CONF_SERVER_URL
 
 HEARTBEAT_REPAIR_DELAY = 60.0
 _ISSUES = (ISSUE_HEARTBEAT_UNAVAILABLE, ISSUE_SERVICE_UNAVAILABLE)
@@ -67,7 +68,11 @@ class HeartbeatRepairMonitor:
         if runtime.client.snapshot.get("control", {}).get("read_only") is not False:
             return None
         if not runtime.client.connected:
-            return ISSUE_SERVICE_UNAVAILABLE
+            # Only an app runs apart from Home Assistant and may keep its
+            # heartbeat; without one, the heartbeat itself is what is missing.
+            if CONF_SERVER_URL in self._entry.data:
+                return ISSUE_SERVICE_UNAVAILABLE
+            return ISSUE_HEARTBEAT_UNAVAILABLE
         if heartbeat.healthy is not False:
             return None
         coordinator = runtime.coordinator

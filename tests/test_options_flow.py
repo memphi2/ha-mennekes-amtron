@@ -119,6 +119,8 @@ def test_app_connection_only_shows_the_apps_wallbox_settings():
         shown = await flow.async_step_wallbox()
         assert shown["type"] == "form"
         assert shown["step_id"] == "wallbox_service"
+        # Submitting saves and closes, so the button must not say "Next".
+        assert shown["last_step"] is True
         # Only the rule Home Assistant applies itself can be changed here.
         assert set(fields(shown)) == {"release_off_on_unplug"}
         assert shown["description_placeholders"] == {
