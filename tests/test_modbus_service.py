@@ -338,6 +338,21 @@ def test_a_rejected_saved_state_does_not_keep_the_service_down(tmp_path, caplog)
             assert caplog.text.count("Control: saved intent rejected") == 1
             # Rejected evidence survives until an explicit acknowledgement.
             assert json.loads(path.read_text())["identity"] == "another-wallbox"
+            # Polls and reconnects neither call it solved nor report it again.
+            caplog.set_level("DEBUG")
+            await service.refresh()
+            await service._initialize()
+            assert "intent saved again" not in caplog.text
+            warnings = [
+                r for r in caplog.records
+                if "saved intent rejected" in r.getMessage() and r.levelname == "WARNING"
+            ]
+            assert len(warnings) == 1
+            await service.command({
+                "command": "acknowledge_intent_reset",
+                "expected_serial_number": service.identity.serial_number,
+            })
+            assert "Control: saved intent reset acknowledged" in caplog.text
         finally:
             await service.stop()
     asyncio.run(run())

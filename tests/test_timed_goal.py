@@ -239,9 +239,12 @@ def test_observer_lifecycle_and_write_failure_status(
         notified = []
         monkeypatch.setattr(observer, "_notify", lambda: notified.append(observer.planned_start))
         observer.planned_start = datetime(2026, 11, 16, tzinfo=UTC)
+        observer.forecast = object()
         observer._set_status("write_pending")
         observer._set_status("write_pending")
         assert notified == [None]
+        # Nor does an estimate stay beside a status it was not made for.
+        assert observer.forecast is None
         monkeypatch.undo()
         monkeypatch.setattr(observer, "_evaluate", failed)
         # The cause is named, not its text, which may differ every time.

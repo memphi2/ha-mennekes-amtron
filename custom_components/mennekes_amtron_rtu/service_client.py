@@ -112,7 +112,7 @@ class ServiceClient:
         self.soc_goal = SocGoal()
         self._last_energy_observed_at: float | None = None
         # The newest meter value that was really read. An observation whose
-        # read failed carries none, and the meter never runs backwards.
+        # read failed carries none.
         self.last_energy_total: float | None = None
 
     def bind_identity(self, serial_number: str | None) -> None:

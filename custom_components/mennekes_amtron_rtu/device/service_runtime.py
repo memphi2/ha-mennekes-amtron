@@ -97,6 +97,7 @@ class ModbusService:
         self._history_notice = FailureNotice(_LOGGER, "Charging session")
         self._wallbox_notice = FailureNotice(_LOGGER, "Connection")
         self._intent_notice = FailureNotice(_LOGGER, "Control")
+        self._rejected_notice = FailureNotice(_LOGGER, "Control")
         self._listener_notice = FailureNotice(_LOGGER, "Service")
         self._command_lock = asyncio.Lock()
         # The last state published after a completed command, and when.
@@ -120,7 +121,6 @@ class ModbusService:
         self._energy_sample_at: float | None = None
         # Since when every poll failed; a goal pauses only after a while.
         self._meter_failing_since: float | None = None
-        self._intent_notice = FailureNotice(_LOGGER, "Control")
         self._cap_notice = FailureNotice(_LOGGER, "Control")
         self._intent_rejected = False
         self._stopping = False
@@ -206,7 +206,7 @@ class ModbusService:
             state.plug_charge.configure(True, "0" * 64)
             state.plug_charge.hold = True
             # Every reconnect attempt loads it again.
-            self._intent_notice.failed(
+            self._rejected_notice.failed(
                 "saved intent rejected; charging blocked until acknowledged in Home Assistant Repairs",
                 "intent_rejected",
             )
@@ -754,7 +754,7 @@ class ModbusService:
                     state.plug_charge = safe.plug_charge
                     state.guest_permission = None
                     self._intent_rejected = False
-                    self._intent_notice.recovered("saved intent reset acknowledged")
+                    self._rejected_notice.recovered("saved intent reset acknowledged")
                     control.startup_hold = False
                 return self.snapshot()
             if self._intent_rejected:

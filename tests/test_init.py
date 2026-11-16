@@ -599,3 +599,34 @@ def test_a_leftover_plug_state_that_cannot_be_removed_does_not_fail_the_setup(
         assert await async_unload_entry(hass, entry)
 
     asyncio.run(run())
+
+
+def test_an_acknowledged_reset_reloads_only_a_loaded_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
+        _patch_client(monkeypatch, FakeModbusClient(device_bank()))
+        _patch_issues(monkeypatch)
+        reloads: list[bool] = []
+
+        async def reload(_hass: object, _entry: object, *, force: bool) -> None:
+            reloads.append(force)
+
+        monkeypatch.setattr(integration, "async_reload_entry", reload)
+        assert await async_setup_entry(hass, entry)
+        client = entry.runtime_data.client
+        rejected = [True]
+        monkeypatch.setattr(integration, "_service_intent_rejected", lambda _client: rejected[0])
+        # Still being set up: a reload now would take the service from under it.
+        client.on_update()
+        await asyncio.sleep(0)
+        assert reloads == []
+        # The first update of the loaded entry catches up.
+        entry.state = ConfigEntryState.LOADED
+        client.on_update()
+        client.on_update()
+        await asyncio.sleep(0)
+        assert reloads == [True]
+        assert await async_unload_entry(hass, entry)
+
+    asyncio.run(run())

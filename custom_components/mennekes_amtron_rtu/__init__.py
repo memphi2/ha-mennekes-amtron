@@ -353,7 +353,9 @@ async def async_setup_entry(
         def update_remote() -> None:
             nonlocal intent_rejected, known_write_errors
             rejected = _service_intent_rejected(client)
-            if rejected != intent_rejected:
+            if rejected != intent_rejected and entry.state is ConfigEntryState.LOADED:
+                # A change seen while the entry is still being set up waits
+                # for the first update after it: only a loaded entry reloads.
                 intent_rejected = rejected
                 # Rebuild deferred vehicle owners after the reset, including
                 # one acknowledged through another HA or API client. The
