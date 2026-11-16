@@ -197,7 +197,7 @@ def service_with(control, *, read_only=False):
     service.control = control
     if control is not None:
         control.read_only = read_only
-    service.config = Mock(read_only=read_only)
+    service.config = Mock(read_only=read_only, cap_from_wallbox=False)
     service._cap_retry_at = 0.0
     service._cap_notice = FailureNotice(runtime._LOGGER, "Control")
     service._command_lock = asyncio.Lock()
