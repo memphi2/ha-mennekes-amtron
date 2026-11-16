@@ -621,6 +621,20 @@ def test_a_car_plugged_in_again_keeps_its_release_and_its_pause(monkeypatch) -> 
         assert not rule._owed
         # It is withdrawn: minutes later it would stop the car that is back.
         assert cancelled == [1]
+        # Queued with the car still away (a wallbox that cannot tell): not
+        # done yet, so the pause stays and the switch-off stays owed.
+        connected[0] = False
+        rule._connected = True
+        rule._observe()
+
+        async def queued(released: bool) -> None:
+            calls.append(released)
+
+        monkeypatch.setattr(control, "async_set_charging_release", queued)
+        await asyncio.gather(*entry.background_tasks)
+        assert (len(calls), resumed, cancelled) == (3, [], [1])
+        assert rule._owed
+        assert len(_waiting(timers)) == 1
         rule.stop()
 
     asyncio.run(run())

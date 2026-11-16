@@ -238,3 +238,30 @@ def test_remote_cancellation_rechecks_permission_and_connection(tmp_path):
         await service.stop()
 
     asyncio.run(run())
+
+
+def test_the_departure_plan_is_accepted_while_only_the_wallbox_is_away(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        async with ClientSession() as session:
+            remote = ServiceClient(session, "http://localhost", TOKEN)
+            snapshot = service.snapshot()
+            snapshot["available"] = False
+            remote.apply_snapshot(snapshot, require_available=False)
+            sent = []
+
+            async def request(method, path, payload=None):
+                sent.append(payload["command"])
+                return snapshot
+
+            remote.request = request
+            # Plan data needs no bus: the service takes all three kinds.
+            for command in ("departure_trip", "departure_inputs", "departure_choice"):
+                await remote.execute(command)
+            assert sent == ["departure_trip", "departure_inputs", "departure_choice"]
+            with pytest.raises(DeviceError, match=r"service_not_ready|service_unavailable"):
+                await remote.execute("resume")
+            await remote.async_close()
+        await service.stop()
+
+    asyncio.run(run())
