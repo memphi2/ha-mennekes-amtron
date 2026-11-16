@@ -192,9 +192,8 @@ async def async_setup_entry(
                 server_url(str(entry.data[CONF_SERVER_URL])),
                 str(entry.data[CONF_SERVER_TOKEN]),
             )
-            # An entry that was direct until now must give up the bus first,
-            # and what its own service saved is not the app's state.
-            await async_leave(hass, entry.entry_id)
+            # An entry that was direct until now must give up the bus first.
+            await async_release(hass, entry.entry_id, force=True)
         else:
             host = await async_acquire(hass, entry, expected_serial)
             transport = host.transport
@@ -210,6 +209,11 @@ async def async_setup_entry(
         # An entry without a saved serial binds to the wallbox it just read.
         client.bind_identity(identity.serial_number)
         connected = True
+        if remote:
+            # The app is the right one and answers: what the entry's own
+            # service saved is not the app's state. Until then it is kept for
+            # a way back.
+            await async_leave(hass, entry.entry_id)
         validate_vehicle_selection()
     except BaseException as err:
         if client is not None:

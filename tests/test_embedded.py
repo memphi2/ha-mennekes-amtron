@@ -1106,3 +1106,22 @@ def test_a_start_that_ends_in_a_task_group_fails_with_its_cause(monkeypatch, tmp
         del wallbox
 
     asyncio.run(run())
+
+
+def test_an_unforeseen_end_while_starting_is_reported_and_tried_again(monkeypatch, tmp_path, caplog):
+    async def run():
+        hass, entry, _wallbox = _setup(monkeypatch, tmp_path)
+
+        async def broken(_self):
+            raise RuntimeError("Heartbeat task stopped unexpectedly")
+
+        monkeypatch.setattr(service_runtime.ModbusService, "_run", broken)
+        # A setup that fails with this is tried again; an unknown error is not.
+        with pytest.raises(DeviceError, match="service_unavailable"):
+            await embedded.async_acquire(hass, entry)
+        assert _hosts(hass) == {}
+        (report,) = [r for r in caplog.records if "stopped while starting" in r.getMessage()]
+        assert report.getMessage() == "Service: stopped while starting (RuntimeError)"
+        assert report.exc_info is not None
+
+    asyncio.run(run())

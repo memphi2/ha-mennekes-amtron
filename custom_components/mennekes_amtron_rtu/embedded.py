@@ -23,6 +23,7 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
 
+from .device.client_errors import AmtronBusError
 from .device.const import (
     CHARGING_CURRENT_MINIMUM,
     CONF_CURRENT_LIMIT,
@@ -127,12 +128,21 @@ class EmbeddedService:
         try:
             async with asyncio.timeout(_START_SECONDS):
                 await self._service.wait_started()
-        except BaseException:
-            if task.done() and not task.cancelled():
+        except BaseException as err:
+            died = task.done() and not task.cancelled()
+            if died:
                 # It ended by itself, and the caller gets that cause: the
                 # stop must not raise it a second time in its place.
                 self._died = True
             await self.async_stop()
+            if died and isinstance(err, Exception) and not isinstance(
+                err, (AmtronBusError, DeviceError, OSError, TimeoutError, ValueError)
+            ):
+                # Unforeseen, but no reason never to try again.
+                _LOGGER.error(
+                    "Service: stopped while starting (%s)", type(err).__name__, exc_info=err,
+                )
+                raise DeviceError("service_unavailable") from err
             raise
         task.add_done_callback(self._ended)
 

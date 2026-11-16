@@ -208,11 +208,14 @@ class UnplugRule:
                 # Plugged in again, or unknown: the release of a car that is
                 # there is not this rule's to close.
                 raise _NotAwayError
-            if self._runtime.coordinator.current_data().get(CHARGING_RELEASE.key) != 0:
+            wrote = self._runtime.coordinator.current_data().get(CHARGING_RELEASE.key) != 0
+            if wrote:
                 await control.async_set_charging_release(False)
             if self._vehicle_connected() is not False:
-                # With a car the switch-off only waits in the queue, and
-                # ending the pause would replace it.
+                if wrote and control.pending_action == "disable_charging":
+                    # With a car the switch-off only waits in the queue: it
+                    # must not close the release of the car that is back.
+                    await control.async_cancel_pending_change()
                 raise _NotAwayError
             # Without a vehicle and with the release off, ending the pause
             # lets no current flow.

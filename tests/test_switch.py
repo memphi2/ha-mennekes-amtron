@@ -608,9 +608,19 @@ def test_a_car_plugged_in_again_keeps_its_release_and_its_pause(monkeypatch) -> 
             connected[0] = True
 
         monkeypatch.setattr(control, "async_set_charging_release", plugged_meanwhile)
+        # With the car there, the service only queued the switch-off.
+        cancelled: list[int] = []
+
+        async def cancel() -> None:
+            cancelled.append(1)
+
+        monkeypatch.setattr(control, "async_cancel_pending_change", cancel)
+        monkeypatch.setattr(type(control), "pending_action", property(lambda _self: "disable_charging"))
         await asyncio.gather(*entry.background_tasks)
         assert (calls, resumed) == ([False, False], [])
         assert not rule._owed
+        # It is withdrawn: minutes later it would stop the car that is back.
+        assert cancelled == [1]
         rule.stop()
 
     asyncio.run(run())

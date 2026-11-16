@@ -511,7 +511,40 @@ def test_an_entry_moved_to_the_app_gives_up_the_bus_and_its_own_saved_state(
             await async_setup_entry(hass, entry)
         assert _host(hass, entry) is None
         assert transport.close_calls == 1
-        assert not saved.exists()
+        # The app did not answer: what the own service saved is kept for a
+        # way back, until the app has proven to be the right one.
+        assert (saved / "intent.json").exists()
+        left = []
+
+        async def leave(_hass: object, entry_id: str) -> None:
+            left.append(entry_id)
+
+        async def reached(self: object) -> None:
+            raise ServiceConnectionError("service_version_mismatch", "after the connection")
+
+        monkeypatch.setattr(integration, "async_leave", leave)
+        monkeypatch.setattr(integration.ServiceClient, "async_connect", reached)
+        with pytest.raises(ConfigEntryNotReady):
+            await async_setup_entry(hass, entry)
+        assert left == []
+
+        # Once the right app answers, the entry's own saved state goes.
+        async def answers(self: object) -> None:
+            assert left == []
+            self.identity = SimpleNamespace(serial_number=None)
+
+        class ReachedError(Exception):
+            pass
+
+        def coordinator(*_args: object, **_kwargs: object) -> None:
+            raise ReachedError
+
+        monkeypatch.setattr(integration.ServiceClient, "async_connect", answers)
+        monkeypatch.setattr(integration.ServiceClient, "bind_identity", lambda _self, _serial: None)
+        monkeypatch.setattr(integration, "ServiceCoordinator", coordinator)
+        with pytest.raises(ReachedError):
+            await async_setup_entry(hass, entry)
+        assert left == [entry.entry_id]
 
     asyncio.run(run())
 
