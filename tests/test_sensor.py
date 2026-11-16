@@ -318,3 +318,54 @@ def test_the_estimated_cost_exists_with_a_price_and_reports_its_coverage() -> No
 def test_a_diagnostic_needs_named_values() -> None:
     with pytest.raises(ValueError, match="no named values"):
         _enum("temperature")
+
+
+def test_one_failed_meter_read_leaves_no_gap_in_the_energy_total() -> None:
+    async def run() -> None:
+        hass, entry, _transport = await build_runtime()
+        added: dict[str, object] = {}
+        await async_setup_entry(hass, entry, lambda entities: added.update(collect(entities)))
+        energy = added["energy_total"]
+        runtime = entry.runtime_data
+        assert energy.native_value == pytest.approx(1234.5)
+        assert runtime.client.last_energy_total == pytest.approx(1234.5)
+        # The observation of a failed read carries no value: the last one stays.
+        runtime.coordinator.data.values["energy_total"] = None
+        assert energy.available
+        assert energy.native_value == pytest.approx(1234.5)
+        # Nothing was ever read: there is nothing to show.
+        runtime.client.last_energy_total = None
+        assert not energy.available
+        assert energy.native_value is None
+        await runtime.client.async_close()
+        await entry.service.stop()
+
+    asyncio.run(run())
+
+
+def test_two_refreshes_never_fetch_at_the_same_time() -> None:
+    async def run() -> None:
+        _hass, entry, _transport = await build_runtime()
+        coordinator = entry.runtime_data.coordinator
+        fetch = coordinator._fetch
+        running: list[int] = []
+        most = 0
+
+        async def counted():
+            nonlocal most
+            running.append(1)
+            most = max(most, len(running))
+            await asyncio.sleep(0.01)
+            try:
+                return await fetch()
+            finally:
+                running.pop()
+
+        coordinator._fetch = counted
+        # A pushed poll and a command's own refresh meet.
+        await asyncio.gather(coordinator._async_update_data(), coordinator._async_update_data())
+        assert most == 1
+        await entry.runtime_data.client.async_close()
+        await entry.service.stop()
+
+    asyncio.run(run())

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
@@ -52,6 +53,9 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
         # Estimates follow every poll, a failed one as None.
         self.observe_session: Callable[[WallboxData | None], Awaitable[None]] | None = None
         self._pending_refresh: CALLBACK_TYPE | None = None
+        # A pushed poll, the timer and a command's own refresh may meet: the
+        # session observers see one sample at a time.
+        self._update_lock = asyncio.Lock()
         client.on_auth_error = self._publish_auth_error
 
     @property
@@ -100,6 +104,10 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
             self.async_update_listeners()
 
     async def _async_update_data(self) -> WallboxData:
+        async with self._update_lock:
+            return await self._fetch()
+
+    async def _fetch(self) -> WallboxData:
         try:
             data = await self._client.update()
         except AmtronConnectionError as err:

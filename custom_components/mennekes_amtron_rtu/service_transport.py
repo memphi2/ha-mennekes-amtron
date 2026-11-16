@@ -18,6 +18,8 @@ from .device.service_api import ServiceApi, ServiceBusyError
 from .service_errors import ServiceConnectionError
 
 _TIMEOUT_SECONDS = 15
+# Longer than any command's own waits between its writes.
+_DRAIN_SECONDS = 30
 _MAX_RESPONSE_BYTES = 131072
 
 Reply = tuple[int, dict[str, Any]]
@@ -114,7 +116,21 @@ class EmbeddedTransport:
             task.exception()
 
     async def async_drain(self) -> None:
-        """Take no new requests and let the running ones finish, before the service stops."""
+        """Take no new requests and let the running ones finish, before the service stops.
+
+        A request stuck behind a hung connection is given up after a while:
+        nothing may keep the bus from being handed on.
+        """
         self._closed = True
+        deadline = asyncio.get_running_loop().time() + _DRAIN_SECONDS
         while self._running:
-            await asyncio.gather(*self._running, return_exceptions=True)
+            left = deadline - asyncio.get_running_loop().time()
+            if left <= 0:
+                stuck = tuple(self._running)
+                _LOGGER.warning("Service: %d request(s) abandoned while stopping", len(stuck))
+                for task in stuck:
+                    task.cancel()
+                await asyncio.gather(*stuck, return_exceptions=True)
+                return
+            # Waiting cancels none of them: a command finishes its writes.
+            await asyncio.wait(tuple(self._running), timeout=left)

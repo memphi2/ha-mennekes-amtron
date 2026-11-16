@@ -79,6 +79,11 @@ def _register(key: str) -> Callable[[Runtime], StateType]:
     return read
 
 
+def _energy_total(runtime: Runtime) -> StateType:
+    value = runtime.coordinator.current_data().get("energy_total")
+    return value if isinstance(value, (int, float)) else runtime.client.last_energy_total
+
+
 def _enum_register(key: str) -> Callable[[Runtime], StateType]:
     # The register map owns the mapping: an undocumented value becomes no
     # state at all instead of an option Home Assistant does not know.
@@ -240,7 +245,9 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
         }),
     ),
     AmtronSensorDescription(
-        key="energy_total", register="energy_total", value=_register("energy_total"),
+        # One failed meter read is no gap in the energy statistics.
+        key="energy_total", capability="energy_total", value=_energy_total,
+        ready=lambda runtime: _energy_total(runtime) is not None,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR, device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING, suggested_display_precision=2,
     ),

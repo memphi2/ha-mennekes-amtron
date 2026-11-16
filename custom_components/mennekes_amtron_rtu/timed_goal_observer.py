@@ -116,6 +116,7 @@ class TimedGoalObserver:
         self._pending = False
         self._stopping = False
         self._handover_notice = FailureNotice(_LOGGER, "Departure plan")
+        self._evaluation_notice = FailureNotice(_LOGGER, "Departure plan")
         self._goal_lock = asyncio.Lock()
         self._save_dirty = False
         self._save_unknown = False
@@ -206,11 +207,14 @@ class TimedGoalObserver:
             try:
                 await self._evaluate()
                 self._handover_notice.recovered("handed to the service")
+                self._evaluation_notice.recovered("evaluation works again")
             except (AmtronBusError, HomeAssistantError) as err:
                 self._set_status("write_pending")
                 self._handover_notice.failed("not handed to the service yet", str(err))
-            except Exception:
-                _LOGGER.exception("Departure plan: evaluation failed")
+            except Exception as err:  # noqa: BLE001 - one car's plan never stops the others
+                self._evaluation_notice.failed(
+                    "evaluation failed", type(err).__name__, level=logging.ERROR, exc_info=True,
+                )
                 self._set_status("error")
 
     async def async_set_deadline(

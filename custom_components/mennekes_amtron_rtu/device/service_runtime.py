@@ -152,6 +152,9 @@ class ModbusService:
         finally:
             attempted.cancel()
         if task.done():
+            if task.cancelled():
+                # Stopped by its owner while it started; the waiting one was not.
+                raise DeviceError("service_unavailable")
             task.result()
             raise RuntimeError("service stopped")
         if self._startup_error is not None:

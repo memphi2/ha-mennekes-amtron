@@ -37,6 +37,7 @@ from .device.const import (
     DOMAIN,
 )
 from .device.errors import DeviceError
+from .device.notice import FailureNotice
 from .device.service_api import ServiceApi
 from .device.service_config import ServerConfig
 from .device.service_departure_runtime import DepartureModbusService
@@ -55,6 +56,7 @@ _RELOADING = f"{DOMAIN}_reloading"
 _DEFERRED = f"{DOMAIN}_deferred_release"
 _RESTARTS = f"{DOMAIN}_restarts"
 _RESTART_TIMERS = f"{DOMAIN}_restart_timers"
+_RESTART_NOTICES = f"{DOMAIN}_restart_notices"
 _RETRYING = (ConfigEntryState.SETUP_RETRY, ConfigEntryState.SETUP_IN_PROGRESS)
 # How often a service kept for a retried setup asks whether the retry is still due.
 _RETRY_CHECK_SECONDS = 30
@@ -117,7 +119,7 @@ class EmbeddedService:
         self._stopped = False
         # Called when the service ends on its own, which it does rather than
         # carry on without its heartbeat.
-        self.on_ended: Callable[[], None] | None = None
+        self.on_ended: Callable[[str], None] | None = None
 
     async def async_start(self) -> None:
         """Start and wait for the wallbox; a failed start leaves nothing running."""
@@ -137,12 +139,11 @@ class EmbeddedService:
         error = task.exception()
         while isinstance(error, BaseExceptionGroup) and error.exceptions:
             error = error.exceptions[0]
-        _LOGGER.error(
-            "Service: stopped unexpectedly (%s); starting it again",
-            type(error).__name__ if error is not None else "no error",
-        )
+        reason = type(error).__name__ if error is not None else "no error"
         if self.on_ended is not None:
-            self.on_ended()
+            self.on_ended(reason)
+        else:
+            _LOGGER.error("Service: stopped unexpectedly (%s)", reason)
 
     def async_on_polled(self, listener: Callable[[], None]) -> Callable[[], None]:
         """Call ``listener`` after every poll of the wallbox; returns its removal."""
@@ -289,10 +290,21 @@ async def async_acquire(
         # Home Assistant stopped it while it started.
         raise DeviceError("service_unavailable")
 
-    def ended() -> None:
+    def ended(reason: str) -> None:
         if hosts.get(entry_id) is not host:
             return
+        notices: dict[str, FailureNotice] = hass.data.setdefault(_RESTART_NOTICES, {})
+        notice = notices.setdefault(entry_id, FailureNotice(_LOGGER, "Service"))
         delay = _restart_delay(hass, entry_id)
+        if not delay:
+            # It ran steadily since the last time: this is a new episode.
+            notice.recovered("ran steadily again")
+        # One report per cause, however often it ends for it.
+        notice.failed(
+            "stopped unexpectedly; starting it again"
+            + (f" in {delay:.0f} seconds" if delay else ""),
+            reason, level=logging.ERROR,
+        )
 
         @callback
         def reload(_now: datetime | None = None) -> None:
@@ -311,10 +323,6 @@ async def async_acquire(
                 await _async_stop_registered(hosts, entry_id, host)
             finally:
                 if delay:
-                    _LOGGER.warning(
-                        "Service: stopped again soon after its start; next start in %.0f seconds",
-                        delay,
-                    )
                     _cancel_restart(hass, entry_id)
                     hass.data.setdefault(_RESTART_TIMERS, {})[entry_id] = async_call_later(
                         hass, delay, reload
@@ -381,9 +389,15 @@ def async_release_unless_retried(hass: HomeAssistant, entry: MennekesAmtronConfi
             return
         if timer is not None:
             timer()
-        # The failed setup itself is still in progress when this is asked
-        # first, and a reload passes through "not loaded" under the lock.
-        if entry.state in _RETRYING or entry.setup_lock.locked():
+        if entry.state not in _RETRYING and entry.setup_lock.locked():
+            # A reload passes through "not loaded" under the lock, and so
+            # does a disable: wait for whichever it is to finish.
+            async with entry.setup_lock:
+                pass
+            if watches.get(entry_id) is not stop_watching:
+                return
+        # The failed setup itself is still in progress when this is asked first.
+        if entry.state in _RETRYING:
             timer = async_call_later(hass, _RETRY_CHECK_SECONDS, check)
         else:
             timer = None
@@ -417,11 +431,19 @@ async def async_release(hass: HomeAssistant, entry_id: str, *, force: bool = Fal
         await _async_stop_registered(hosts, entry_id, host)
 
 
+async def async_leave(hass: HomeAssistant, entry_id: str) -> None:
+    """Forget the service of an entry that now uses the app, if it had one."""
+    directory = state_directory(hass, entry_id)
+    if entry_id in _hosts(hass) or await hass.async_add_executor_job(directory.exists):
+        await async_forget(hass, entry_id)
+
+
 async def async_forget(hass: HomeAssistant, entry_id: str) -> None:
     """Stop the service of a removed entry and delete what it saved."""
     await async_release(hass, entry_id, force=True)
     hass.data.get(_RELOADING, set()).discard(entry_id)
     hass.data.get(_RESTARTS, {}).pop(entry_id, None)
+    hass.data.get(_RESTART_NOTICES, {}).pop(entry_id, None)
     await hass.async_add_executor_job(
         lambda: shutil.rmtree(state_directory(hass, entry_id), ignore_errors=True)
     )

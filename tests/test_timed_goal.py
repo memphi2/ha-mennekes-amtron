@@ -205,7 +205,10 @@ def test_timed_goal_source_updates_and_explicit_clear(monkeypatch: pytest.Monkey
     asyncio.run(run())
 
 
-def test_observer_lifecycle_and_write_failure_status(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_observer_lifecycle_and_write_failure_status(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("DEBUG")
     async def run() -> None:
         unsubs: list[str] = []
         observer, _control, _hass = setup_observer(monkeypatch)
@@ -237,9 +240,16 @@ def test_observer_lifecycle_and_write_failure_status(monkeypatch: pytest.MonkeyP
             raise RuntimeError("unexpected")
 
         monkeypatch.setattr(observer, "_evaluate", broken)
-        observer.request_evaluate()
-        await observer._task
-        assert observer.status == "error"
+        for _ in range(3):
+            observer.request_evaluate()
+            await observer._task
+            assert observer.status == "error"
+        # A fault that returns with every evaluation is reported once.
+        reports = [r for r in caplog.records if "evaluation failed" in r.getMessage()]
+        assert [(r.levelname, bool(r.exc_info)) for r in reports] == [
+            ("ERROR", True), ("DEBUG", False), ("DEBUG", False),
+        ]
+        assert reports[0].getMessage() == "Departure plan: evaluation failed (RuntimeError)"
         await observer.async_stop()
         assert "state" in unsubs
         assert "time" in unsubs

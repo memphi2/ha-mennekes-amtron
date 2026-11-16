@@ -383,7 +383,7 @@ def test_a_service_whose_heartbeat_dies_is_stopped_and_the_entry_reloaded(
         assert not host._service.heartbeat.running
         assert wallbox.close_calls == 1
         assert "Heartbeat: task stopped unexpectedly (cancelled)" in caplog.text
-        assert "Service: stopped unexpectedly (" in caplog.text
+        assert "Service: stopped unexpectedly; starting it again (" in caplog.text
         # The restart itself finished without an error.
         assert len(tasks) == 1
         await tasks[0]
@@ -520,7 +520,7 @@ def test_a_replaced_service_ending_late_does_not_reload_the_entry(monkeypatch, t
         host = await embedded.async_acquire(hass, entry)
         ended = host.on_ended
         await embedded.async_release(hass, entry.entry_id, force=True)
-        ended()
+        ended("RuntimeError")
         await asyncio.sleep(0)
         assert reloads == []
 
@@ -751,7 +751,8 @@ def test_a_service_that_keeps_ending_is_restarted_ever_later(monkeypatch, tmp_pa
             reload(None)
             assert reloads == [entry.entry_id]
         assert waits == [10, 20, 40, 80, 160, 320, 600, 600]
-        assert "Service: stopped again soon after its start; next start in 10 seconds" in caplog.text
+        # Ending for the same cause again and again is reported once.
+        assert caplog.text.count("Service: stopped unexpectedly; starting it again") == 1
         # A delayed restart that someone else already made is not repeated.
         reloads.clear()
         timers.clear()
@@ -915,16 +916,26 @@ def test_a_kept_service_is_released_at_once_when_the_entry_is_disabled(monkeypat
         changed("updated", entry)
         await asyncio.sleep(0)
         assert host._service.heartbeat.running
-        # A reload passes through "not loaded" while it holds the setup lock.
+        # A reload passes through "not loaded" while it holds the setup lock;
+        # its setup takes the service over before the lock is free again.
         entry.state = ConfigEntryState.NOT_LOADED
         async with entry.setup_lock:
             changed("updated", entry)
             await asyncio.sleep(0)
             await asyncio.sleep(0)
+            assert host._service.heartbeat.running
+            assert await embedded.async_acquire(hass, entry) is host
+        await asyncio.sleep(0.02)
         assert host._service.heartbeat.running
-        assert len([timer for timer in timers if timer[2]]) == 1
-        # Disabled: Home Assistant says so and the bus is free right away.
-        changed("updated", entry)
+        assert listeners == []
+        # Disabled: Home Assistant says so, and once it is through with the
+        # entry the bus is free right away.
+        embedded.async_release_unless_retried(hass, entry)
+        (changed,) = listeners
+        async with entry.setup_lock:
+            changed("updated", entry)
+            await asyncio.sleep(0.02)
+            assert host._service.heartbeat.running
         for _ in range(50):
             await asyncio.sleep(0.01)
             if not _hosts(hass):
@@ -999,5 +1010,76 @@ def test_a_release_keeps_the_place_until_the_connection_is_closed(monkeypatch, t
         closed.set()
         await asyncio.gather(releasing, second)
         assert _hosts(hass) == {}
+
+    asyncio.run(run())
+
+
+def test_a_start_stopped_by_someone_else_fails_without_cancelling_the_setup(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        entered = asyncio.Event()
+
+        async def blocked(_client):
+            entered.set()
+            await asyncio.Future()
+
+        monkeypatch.setattr(service_runtime, "async_read_identity", blocked)
+        setup = asyncio.create_task(embedded.async_acquire(hass, entry))
+        await asyncio.wait_for(entered.wait(), 5)
+        # A reconfigure form, or Home Assistant stopping, frees the bus.
+        await embedded.async_release(hass, entry.entry_id, force=True)
+        # The setup itself was not cancelled: it fails and is tried again.
+        with pytest.raises(DeviceError, match="service_unavailable"):
+            await asyncio.wait_for(setup, 5)
+        assert not setup.cancelled()
+        assert _hosts(hass) == {}
+        assert wallbox.close_calls == 1
+
+    asyncio.run(run())
+
+
+def test_a_request_that_never_returns_does_not_keep_the_bus(monkeypatch, caplog):
+    async def run():
+        api = _Api((200, {"accepted": True}))
+        transport = EmbeddedTransport(api)
+        monkeypatch.setattr(service_transport, "_TIMEOUT_SECONDS", 0.02)
+        monkeypatch.setattr(service_transport, "_DRAIN_SECONDS", 0.05)
+        with pytest.raises(TimeoutError):
+            await transport.call("POST", "/v2/command", {"command": "pause"})
+        (stuck,) = transport._running
+        # Stuck behind a hung connection: given up, so the service can stop.
+        await asyncio.wait_for(transport.async_drain(), 5)
+        assert stuck.cancelled()
+        assert not transport._running
+        assert "Service: 1 request(s) abandoned while stopping" in caplog.text
+
+    asyncio.run(run())
+
+
+def test_an_app_entry_forgets_a_service_only_when_it_had_one(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        forgotten = []
+        forget = embedded.async_forget
+
+        async def record(hass_, entry_id):
+            forgotten.append(entry_id)
+            await forget(hass_, entry_id)
+
+        monkeypatch.setattr(embedded, "async_forget", record)
+        # Never direct: nothing to stop and nothing to delete.
+        await embedded.async_leave(hass, entry.entry_id)
+        assert forgotten == []
+        await embedded.async_acquire(hass, entry)
+        await embedded.async_leave(hass, entry.entry_id)
+        assert forgotten == [entry.entry_id]
+        assert _hosts(hass) == {}
+        assert wallbox.close_calls == 1
+        # Only its saved state is left, after a restart of Home Assistant.
+        directory = embedded.state_directory(hass, entry.entry_id)
+        directory.mkdir(parents=True)
+        await embedded.async_leave(hass, entry.entry_id)
+        assert forgotten == [entry.entry_id] * 2
+        assert not directory.exists()
 
     asyncio.run(run())

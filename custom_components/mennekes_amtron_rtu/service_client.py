@@ -111,6 +111,9 @@ class ServiceClient:
         self.energy_goal = EnergyGoal()
         self.soc_goal = SocGoal()
         self._last_energy_observed_at: float | None = None
+        # The newest meter value that was really read. An observation whose
+        # read failed carries none, and the meter never runs backwards.
+        self.last_energy_total: float | None = None
 
     def bind_identity(self, serial_number: str | None) -> None:
         """Bind a configured client; setup probes remain free to read identity."""
@@ -492,6 +495,8 @@ class ServiceClient:
             # Meter value and timestamp form one observation. Never attach a
             # sample timestamp to an independently carried-forward raw value.
             values = {**values, "energy_total": observed_energy}
+            if observed_energy is not None:
+                self.last_energy_total = observed_energy
         return WallboxData(
             values=values,
             charging_display=display,

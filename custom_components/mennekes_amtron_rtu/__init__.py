@@ -58,6 +58,7 @@ from .embedded import (
     EmbeddedService,
     async_acquire,
     async_forget,
+    async_leave,
     async_release,
     async_release_unless_retried,
     mark_reloading,
@@ -193,7 +194,7 @@ async def async_setup_entry(
             )
             # An entry that was direct until now must give up the bus first,
             # and what its own service saved is not the app's state.
-            await async_forget(hass, entry.entry_id)
+            await async_leave(hass, entry.entry_id)
         else:
             host = await async_acquire(hass, entry, expected_serial)
             transport = host.transport
@@ -251,7 +252,13 @@ async def async_setup_entry(
 
         def polled() -> None:
             nonlocal push
-            if push is None or push.done():
+            # The service outlives a reload; a runtime being taken down or
+            # not yet up fetches nothing.
+            if (
+                entry.state is ConfigEntryState.LOADED
+                and getattr(getattr(entry, "runtime_data", None), "coordinator", None) is coordinator
+                and (push is None or push.done())
+            ):
                 push = hass.async_create_task(coordinator.async_refresh(), "amtron_state_push")
 
         entry.async_on_unload(host.async_on_polled(polled))
@@ -349,8 +356,11 @@ async def async_setup_entry(
             if rejected != intent_rejected:
                 intent_rejected = rejected
                 # Rebuild deferred vehicle owners after the reset, including
-                # one acknowledged through another HA or API client.
-                hass.config_entries.async_schedule_reload(entry.entry_id)
+                # one acknowledged through another HA or API client. The
+                # service and its heartbeat stay.
+                hass.async_create_task(
+                    async_reload_entry(hass, entry, force=True), "amtron_reload"
+                )
             heartbeat.update()
             if not client.connected:
                 # A command or diagnostics request can fail long before
@@ -416,7 +426,11 @@ async def async_setup_entry(
         else:
             # A plug state from before the rule was switched off says nothing
             # about now.
-            await PlugMemoryStore(hass, entry.entry_id, "").async_remove()
+            try:
+                await PlugMemoryStore(hass, entry.entry_id, "").async_remove()
+            except OSError as err:
+                # The rule is off; its leftover is removed by a later setup.
+                _LOGGER.debug("Control: old plug state not removed (%s)", type(err).__name__)
     except BaseException as err:
         try:
             try:
@@ -651,7 +665,9 @@ async def _async_switch_vehicle(
         # never sees the result: only a reload brings the car's rules back.
         # An unload or HA shutdown cancels it too; those must stay down.
         if entry.state is ConfigEntryState.LOADED and not hass.is_stopping:
-            hass.config_entries.async_schedule_reload(entry.entry_id)
+            hass.async_create_task(
+                async_reload_entry(hass, entry, force=True), "amtron_reload"
+            )
         raise
     except Exception:
         # Any failure falls back to a full reload, which retries the setup.
@@ -804,23 +820,27 @@ async def _async_stop_runtime(
 
 
 async def async_reload_entry(
-    hass: HomeAssistant, entry: MennekesAmtronConfigEntry
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, *, force: bool = False,
 ) -> None:
-    """Reload the entry after its options changed."""
+    """Reload the entry after its options changed.
+
+    ``force`` reloads although no option changed, for a runtime that has to
+    be built again; the embedded service is kept either way.
+    """
 
     locks: dict[str, asyncio.Lock] = hass.data.setdefault(f"{DOMAIN}_reload_locks", {})
     async with locks.setdefault(entry.entry_id, asyncio.Lock()):
-        await _async_reload_entry_locked(hass, entry)
+        await _async_reload_entry_locked(hass, entry, force)
 
 
 async def _async_reload_entry_locked(
-    hass: HomeAssistant, entry: MennekesAmtronConfigEntry,
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, force: bool = False,
 ) -> None:
     """Inspect the current owner only after earlier option reloads finish."""
 
     runtime = getattr(entry, "runtime_data", None)
     cost = runtime.charging_cost if runtime is not None else None
-    if runtime is not None:
+    if runtime is not None and not force:
         if (
             runtime.plug_charge is not None and runtime.plug_charge.options_applied() is True
         ) or (cost is not None and cost.apply_tariff_only_update()):
