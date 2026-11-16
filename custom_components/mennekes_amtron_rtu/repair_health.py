@@ -57,8 +57,8 @@ class HeartbeatRepairMonitor:
             return None
         runtime = self._entry.runtime_data
         if isinstance(runtime.coordinator.last_exception, ConfigEntryAuthFailed):
-            # HA already asks for the corrected credentials. The intentionally
-            # stopped heartbeat must not add an unrelated connectivity repair.
+            # HA already asks for the corrected credentials; the heartbeat it
+            # cannot send meanwhile is no separate connectivity repair.
             return None
         heartbeat = runtime.heartbeat
         if heartbeat is None:

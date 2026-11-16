@@ -289,6 +289,7 @@ async def build_runtime(
     entry.service = service
     hass.config_entries.entries[entry.entry_id] = entry
     await coordinator.async_refresh()
+    entry.state = ConfigEntryState.LOADED
     return hass, entry, wallbox
 
 

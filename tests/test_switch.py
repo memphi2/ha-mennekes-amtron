@@ -532,3 +532,35 @@ def test_a_plug_state_that_cannot_be_read_or_saved_never_stops_the_rule(
         rule.stop()
 
     asyncio.run(run())
+
+
+def test_an_unplug_during_a_running_switch_off_is_owed_and_not_lost(monkeypatch) -> None:
+    async def run() -> None:
+        timers = _retry_timers(monkeypatch)
+        _hass, entry, transport = await build_runtime()
+        calls = _busy_release(monkeypatch, entry, failures=0)
+        rule = await _unplug_rule(transport, entry)
+        control = type(entry.runtime_data.control)
+        # Not writable in the very poll that shows the unplug.
+        monkeypatch.setattr(control, "read_only", property(lambda _self: True))
+        await _unplug(transport, entry)
+        assert calls == []
+        assert [timer[0] for timer in _waiting(timers)] == [30]
+        # A second edge while one is owed adds no second timer.
+        rule._start()
+        assert len(_waiting(timers)) == 1
+        monkeypatch.setattr(control, "read_only", property(lambda _self: False))
+        await _fire(timers, entry)
+        assert calls == [False]
+        assert not _waiting(timers)
+        # The same holds while an earlier switch-off is still running.
+        rule._busy = True
+        rule._start()
+        assert rule._owed
+        assert len(_waiting(timers)) == 1
+        rule._busy = False
+        await _fire(timers, entry)
+        assert calls == [False, False]
+        rule.stop()
+
+    asyncio.run(run())

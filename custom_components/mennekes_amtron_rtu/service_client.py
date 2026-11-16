@@ -205,10 +205,11 @@ class ServiceClient:
                 "cannot communicate with the Modbus service"
             ) from err
 
-    async def update(self) -> WallboxData:
+    async def update(self, *, consume_energy: bool = True) -> WallboxData:
+        """Fetch the state; ``consume_energy`` off leaves the meter sample to the next poll."""
         async with self._snapshot_lock:
             payload = await self.request("GET", "/v2/state")
-            return self.apply_snapshot(payload)
+            return self.apply_snapshot(payload, consume_energy=consume_energy)
 
     def apply_snapshot(
         self, payload: dict[str, Any], *, require_available: bool = True,

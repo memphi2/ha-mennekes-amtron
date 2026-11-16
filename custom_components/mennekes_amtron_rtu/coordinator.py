@@ -114,9 +114,15 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
             if self.observe_session is not None:
                 await self.observe_session(None)
             if self._credentials_rejected is not None and self._credentials_rejected():
-                raise ConfigEntryAuthFailed(
+                auth_error = ConfigEntryAuthFailed(
                     translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
-                ) from err
+                )
+                if not self.last_update_success:
+                    # HA notifies nobody of a second failed poll in a row;
+                    # an earlier connection repair must still see this cause.
+                    self.async_set_update_error(auth_error)
+                    self.async_update_listeners()
+                raise auth_error from err
             if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
                 raise ConfigEntryAuthFailed(
                     translation_domain=DOMAIN, translation_key="service_auth_failed"

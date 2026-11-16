@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
@@ -92,6 +95,7 @@ def test_every_action_reaches_the_guest_of_the_wallbox(monkeypatch):
         assert guest.calls.pop() == ("async_start_guest", {})
         other = FakeConfigEntry(entry_id="entry-2")
         other.runtime_data = entry.runtime_data
+        other.state = ConfigEntryState.LOADED
         hass.config_entries.entries["entry-2"] = other
         with pytest.raises(ServiceValidationError) as error:
             await handler(SimpleNamespace(context=Context(), data=schema({})))
@@ -185,4 +189,25 @@ def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypat
             service._guest_scope = service._connection_sample().scope
             client.apply_snapshot(service.snapshot())
             assert control.guest_active()
+    asyncio.run(run())
+
+
+def test_a_guest_start_leaves_the_meter_sample_to_the_poll():
+    async def run():
+        _hass, entry, _transport = await build_runtime()
+        client = entry.runtime_data.client
+        service = entry.service
+        sample = service.snapshot()["energy_sample"]["observed_at"]
+        # The service has read the meter since the last poll.
+        client._last_energy_observed_at = None
+        with contextlib.suppress(HomeAssistantError):
+            await GuestCharging(client, AsyncMock()).async_start_guest()
+        # Still unseen: the poll's observers price it, not the button.
+        assert client._last_energy_observed_at is None
+        data = await client.update()
+        assert data.energy_read
+        assert client._last_energy_observed_at == sample
+        await client.async_close()
+        await service.stop()
+
     asyncio.run(run())

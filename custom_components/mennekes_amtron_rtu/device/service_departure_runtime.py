@@ -20,6 +20,7 @@ from .departure_plan import (
 )
 from .departure_store import DepartureStore
 from .errors import DeviceError
+from .notice import FailureNotice
 from .operation import summarize
 from .service_guest_runtime import GuestModbusService
 
@@ -51,6 +52,7 @@ class DepartureModbusService(GuestModbusService):
 
     def _configure_control(self, control: AmtronControl) -> None:
         super()._configure_control(control)
+        self._tick_notice = FailureNotice(_LOGGER, "Departure plan")
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
         self.departure = DepartureController(
             DepartureStore(self.state_path.with_name("departure-plan.json"), identity),
@@ -146,10 +148,13 @@ class DepartureModbusService(GuestModbusService):
             departure.wake.clear()
             try:
                 await departure.tick()
-            except Exception:
+                self._tick_notice.recovered("tick works again")
+            except Exception as err:  # noqa: BLE001
                 # The bus owner shares this task group; an unforeseen failure
                 # must not stop the service. The plan writes nothing meanwhile.
-                _LOGGER.exception("Departure plan: tick failed")
+                self._tick_notice.failed(
+                    "tick failed", type(err).__name__, level=logging.ERROR, exc_info=True,
+                )
                 departure.status = "error"
             with suppress(TimeoutError):
                 await asyncio.wait_for(departure.wake.wait(), _TICK_SECONDS)

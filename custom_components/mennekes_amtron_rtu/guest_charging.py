@@ -27,7 +27,9 @@ class GuestCharging:
         if not client.connected:
             raise DeviceError("service_unavailable")
         try:
-            await client.update()
+            # Only the revision is needed: the meter sample stays for the
+            # poll whose observers price it.
+            await client.update(consume_energy=False)
         except AmtronConnectionError as err:
             raise DeviceError("service_unavailable") from err
         snapshot = client.snapshot

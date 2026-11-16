@@ -745,3 +745,29 @@ def test_a_rejected_gateway_password_asks_for_it_again_instead_of_only_failing()
         assert raised.value.translation_key == "gateway_authentication_failed"
 
     asyncio.run(run())
+
+
+def test_a_password_rejected_after_a_lost_connection_still_reaches_the_listeners() -> None:
+    async def run() -> None:
+        rejected = [False]
+        coordinator = ServiceCoordinator(
+            FakeHass(), FakeConfigEntry(),
+            client=_Client(AmtronConnectionError("lost"), AmtronConnectionError("lost")),
+            scan_interval=5, credentials_rejected=lambda: rejected[0],
+        )
+        seen: list[BaseException | None] = []
+        coordinator.async_add_listener(lambda: seen.append(coordinator.last_exception))
+        # While the last poll worked, Home Assistant reports the failure itself.
+        rejected[0] = True
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator._async_update_data()
+        assert seen == []
+        # After a failed poll it would stay silent: the connection repair
+        # must still learn that the cause is the password now.
+        coordinator.last_update_success = False
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator._async_update_data()
+        (error,) = seen
+        assert isinstance(error, ConfigEntryAuthFailed)
+
+    asyncio.run(run())

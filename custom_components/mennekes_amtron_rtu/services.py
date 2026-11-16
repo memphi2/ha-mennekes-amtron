@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import probatio
 from homeassistant.auth.models import User
 from homeassistant.auth.permissions.const import POLICY_CONTROL
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import Unauthorized, UnknownUser
@@ -161,6 +162,13 @@ def async_resolve_controls(
     return [runtime.control for runtime in _resolve_runtimes(hass, device_ids, user)]
 
 
+def _loaded_runtime(entry: Any) -> MennekesAmtronRuntimeData | None:
+    """The entry's runtime while it is loaded; a failed setup leaves a stopped one behind."""
+    if entry.state is not ConfigEntryState.LOADED:
+        return None
+    return getattr(entry, "runtime_data", None)
+
+
 def _resolve_runtimes(
     hass: HomeAssistant, device_ids: list[str] | None, user: User | None = None
 ) -> list[MennekesAmtronRuntimeData]:
@@ -169,7 +177,7 @@ def _resolve_runtimes(
     if device_ids is None:
         loaded = [
             entry for entry in hass.config_entries.async_entries(DOMAIN)
-            if getattr(entry, "runtime_data", None) is not None
+            if _loaded_runtime(entry) is not None
         ]
         if len(loaded) != 1:
             raise service_validation_error("wallbox_target_required")
@@ -185,7 +193,7 @@ def _resolve_runtimes(
                 targets.append((device_id, entry))
     runtimes: list[MennekesAmtronRuntimeData] = []
     for device_id, entry in targets:
-        runtime_data = getattr(entry, "runtime_data", None)
+        runtime_data = _loaded_runtime(entry)
         if runtime_data is None:
             raise service_validation_error(
                 "entry_not_loaded", {"device": device_id}

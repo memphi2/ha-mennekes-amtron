@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import Context
 from homeassistant.exceptions import (
     HomeAssistantError,
@@ -592,6 +593,7 @@ def test_an_action_for_several_wallboxes_acts_on_none_when_one_cannot(
         first.runtime_data.timed_goal = SimpleNamespace(async_use_next_calendar_event=use)
         # The second wallbox has no departure planning.
         second.runtime_data = SimpleNamespace(timed_goal=None)
+        second.state = ConfigEntryState.LOADED
         services.async_setup_services(hass)
         handler, schema = hass.services.registered[(DOMAIN, "use_calendar_departure")]
         call = SimpleNamespace(context=Context(), data=schema({"device_id": ["one", "two"]}))
@@ -602,5 +604,26 @@ def test_an_action_for_several_wallboxes_acts_on_none_when_one_cannot(
         second.runtime_data.timed_goal = SimpleNamespace(async_use_next_calendar_event=use)
         await handler(call)
         assert used == ["first", "first"]
+
+    asyncio.run(run())
+
+
+def test_a_wallbox_whose_setup_failed_is_not_one_to_act_on() -> None:
+    async def run() -> None:
+        hass, entry, _transport = await build_runtime()
+        # A failed setup leaves its stopped runtime behind while it is retried.
+        broken = FakeConfigEntry(entry_id="entry-2")
+        broken.runtime_data = SimpleNamespace()
+        broken.state = ConfigEntryState.SETUP_RETRY
+        hass.config_entries.entries[broken.entry_id] = broken
+        assert services._resolve_runtimes(hass, None) == [entry.runtime_data]
+        registry = SimpleNamespace(
+            async_get=lambda _device: SimpleNamespace(config_entry_id=broken.entry_id),
+        )
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(services.dr, "async_get", lambda _hass: registry)
+            with pytest.raises(ServiceValidationError) as excinfo:
+                services._resolve_runtimes(hass, ["dev"])
+        assert excinfo.value.translation_key == "entry_not_loaded"
 
     asyncio.run(run())

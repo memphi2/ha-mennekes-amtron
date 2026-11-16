@@ -152,7 +152,14 @@ class UnplugRule:
 
     def _start(self) -> None:
         control = self._runtime.control
-        if self._busy or control.read_only or control.plug_charge.get("enabled") is True:
+        if control.plug_charge.get("enabled") is True:
+            return
+        if self._busy or control.read_only:
+            # Not possible right now, but owed: the release must not stay
+            # open for the next car.
+            self._owed = True
+            if self._retry is None:
+                self._retry = async_call_later(self._hass, _RETRY_SECONDS, self._retry_now)
             return
         self._busy = True
         # Tied to the entry: an unload cancels it before it can write.

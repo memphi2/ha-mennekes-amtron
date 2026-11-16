@@ -188,14 +188,17 @@ def test_a_plan_pause_ends_through_a_resume_with_the_service_cap(departure_servi
     asyncio.run(run())
 
 
-def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(departure_service, monkeypatch):
+def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(
+    departure_service, monkeypatch, caplog,
+):
     async def run():
+        caplog.set_level("DEBUG")
         async with departure_service() as (s, _transport, _clock):
             calls = []
 
             async def tick():
                 calls.append(len(calls))
-                if len(calls) == 1:
+                if len(calls) <= 3:
                     s.departure.wake.set()
                     raise RuntimeError("fixture")
                 raise asyncio.CancelledError
@@ -203,8 +206,14 @@ def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(departure_servic
             s.departure.tick = tick
             with pytest.raises(asyncio.CancelledError):
                 await s._departure_loop()
-            assert calls == [0, 1]
+            assert calls == [0, 1, 2, 3]
             assert s.departure.status == "error"
+            # A tick that fails every five seconds is reported once.
+            reports = [r for r in caplog.records if "tick failed" in r.getMessage()]
+            assert [(r.levelname, bool(r.exc_info)) for r in reports] == [
+                ("ERROR", True), ("DEBUG", False), ("DEBUG", False),
+            ]
+            assert reports[0].getMessage() == "Departure plan: tick failed (RuntimeError)"
             plan, s.departure = s.departure, None
 
             async def stop(_delay):
