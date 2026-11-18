@@ -244,9 +244,9 @@ def test_the_jobs_loop_runs_the_plan_beside_the_orders(departure_service, monkey
             monkeypatch.setattr(s.planner, "loop", departure_loop)
             monkeypatch.setattr(s.guest, "loop", orders)
             monkeypatch.setattr(s, "_run_bus", orders)
-            with pytest.raises(ExceptionGroup) as raised:
+            # The part that failed ends the service with its own error.
+            with pytest.raises(StopLoopError):
                 await s._run()
-            assert raised.group_contains(StopLoopError)
     asyncio.run(run())
 
 

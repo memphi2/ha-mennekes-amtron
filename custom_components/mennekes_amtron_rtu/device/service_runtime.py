@@ -317,10 +317,18 @@ class ModbusService:
         return self.planner.revision
 
     async def _run(self) -> None:
-        async with asyncio.TaskGroup() as group:
-            group.create_task(self._run_bus(), name="amtron_bus_owner")
-            group.create_task(self.guest.loop(), name="amtron_guest_limits")
-            group.create_task(self.planner.loop(), name="amtron_departure")
+        try:
+            async with asyncio.TaskGroup() as group:
+                group.create_task(self._run_bus(), name="amtron_bus_owner")
+                group.create_task(self.guest.loop(), name="amtron_guest_limits")
+                group.create_task(self.planner.loop(), name="amtron_departure")
+        except BaseExceptionGroup as failed:
+            # The part that failed ends the service with its own error, as
+            # an owner and the process exit expect it.
+            cause: BaseException = failed
+            while isinstance(cause, BaseExceptionGroup):
+                cause = cause.exceptions[0]
+            raise cause from None
 
     async def _run_bus(self) -> None:
         await self._run_polling()
