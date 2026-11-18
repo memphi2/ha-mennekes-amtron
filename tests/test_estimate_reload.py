@@ -133,7 +133,6 @@ def test_unselected_profile_captures_baseline_and_survives_selection_reload(tmp_
         finally:
             await _unload(hass, entry)
         assert _host(hass, entry) is None
-        assert not hass.data.get("mennekes_amtron_rtu_charge_watch")
         if costs:
             assert current.charging_cost._closed
         assert not current.client.connected
@@ -191,7 +190,6 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
             assert old.charging_cost._closed is (outcome != "reconnected")
             assert not old.client.connected
             if outcome in {"skipped", "failed", "identity_changed"}:
-                assert not hass.data.get("mennekes_amtron_rtu_charge_watch")
                 # Nothing took the service over; it is stopped.
                 assert _host(hass, entry) is None
             elif outcome == "connection_changed":

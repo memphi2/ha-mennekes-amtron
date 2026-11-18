@@ -106,11 +106,6 @@ class PlugChargeObserver:
         """The first failed release condition while the status is blocked."""
         return self._blocked_reason
 
-    @property
-    def decision_reason(self) -> str:
-        """Explain waiting as well as blocking, without changing state enums."""
-        return self._decision_reason
-
     @staticmethod
     def _gate_since(raw: object) -> datetime | None:
         """When the gate saw the current plug-in; None unless timezone-aware."""

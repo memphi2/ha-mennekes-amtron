@@ -13,7 +13,6 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.mennekes_amtron_rtu import _entry_platforms, sensor
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
-    LOSS_SENSOR_KEYS,
 )
 from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
 from custom_components.mennekes_amtron_rtu.device.charge_loss import (
@@ -38,6 +37,7 @@ def cost_observer():
     return SimpleNamespace(available=True, current=None, last=LastChargingCost())
 
 
+LOSS_SENSOR_KEYS = ("last_charging_loss", "average_charging_loss")
 COST_SENSOR_KEYS = ("current_estimated_charging_cost", "last_estimated_charging_cost")
 ESTIMATE_SENSOR_DESCRIPTIONS = tuple(
     description for description in sensor.SENSORS

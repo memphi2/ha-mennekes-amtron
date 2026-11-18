@@ -225,20 +225,23 @@ recurring failures require their logged cause to be corrected.
 
 ## Saved state and database traffic
 
-Ordinary charging intent and shared energy/percentage limits are saved in
-`intent.json`, including bounded evidence for restoring guest permission.
-Format 2 rejects older beta intent files and requires a safe reset acknowledgement.
-The selected time, vehicle plan and its bounded learned model
-are saved in `departure-plan.json`. The meter log, the plug cycle and its note
-are saved in `charge-meter.json`, at every change of the plug cycle and else
-every five minutes. All three are bound to the wallbox identity.
+The service keeps three files, each bound to the wallbox identity:
+
+| File | Content | Written |
+|---|---|---|
+| `intent.json` | Charging intent, shared energy and percentage limits, bounded evidence for restoring guest permission | When that intent changes |
+| `departure-plan.json` | The selected time, the vehicle plan and its bounded learned model | When the plan changes |
+| `charge-meter.json` | The meter log, the plug cycle and its note | At a change of the plug cycle, else every five minutes |
+
+An intent file of another format is rejected and requires a safe reset
+acknowledgement. An unusable `charge-meter.json` only starts measuring again.
 There is no guest-order file, separate guest energy baseline or charging-rate
 history. Guest permission is kept only in service memory for the current plug-in.
 
 State updates use atomic replacement and owner-only permissions. Include the
-service data directory and private token in protected backups. Incompatible
-beta state must not be treated as fresh charging permission; follow the repair
-and reconfiguration instructions in [Updates](installation.md#updates).
+service data directory and private token in protected backups. A rejected
+intent file never counts as charging permission; the acknowledgement is
+described in [Updates](installation.md#updates).
 
 Heartbeats and polls do not create entries in that state file. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
@@ -273,6 +276,18 @@ timestamp; `single_phase` and `all_phases` may instead have `null` while waiting
 for vehicle pause confirmation. Once confirmed, a fixed timestamp identifies
 the end of the grace period. HA derives the two pending-change sensors from the
 service data rather than maintaining a second queue.
+
+The snapshot's `charge_meter` object describes what the service measured for
+cost and loss estimates; times are epoch seconds:
+
+| Field | Meaning |
+|---|---|
+| `first_reading_at` | The oldest reading in the meter log; `null` while it is empty |
+| `known_since` | Since when the plug state has been known without a long gap |
+| `present` | Whether a car is plugged in; `null` while unknown |
+| `plugged_at`, `charging_at` | Plug-in and first charging of the running cycle; `null` unless the service saw the plug-in |
+| `note` | The note Home Assistant attached to the running cycle with `charge_note` |
+| `last`, `last_note` | Plug-in and unplug of the last cycle seen from end to end, and its note |
 
 | Endpoint | Purpose |
 |---|---|

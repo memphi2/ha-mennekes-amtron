@@ -9,4 +9,3 @@ LOSS_SOURCE_DISABLED: Final = "disabled"
 LOSS_SOURCE_VEHICLE_HISTORY: Final = "vehicle_history"
 LOSS_SOURCE_SENSOR: Final = "sensor"
 LOSS_MATCH_WINDOW_SECONDS: Final = 30 * 60
-LOSS_SENSOR_KEYS: Final = ("last_charging_loss", "average_charging_loss")
