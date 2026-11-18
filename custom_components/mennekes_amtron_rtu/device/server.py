@@ -21,10 +21,7 @@ from .app_settings import (
     create_setup_app,
 )
 from .connection import NetworkConfig, SerialConfig
-from .console_charging import ChargingConsole as ServiceConsole
-from .service_charging_http import (
-    create_charging_console as create_console_app,
-)
+from .console_http import ServiceConsole, create_console_app
 from .service_config import ServerConfig
 from .service_departure_runtime import DepartureModbusService as ModbusService
 from .service_discovery import app_token, publish_discovery

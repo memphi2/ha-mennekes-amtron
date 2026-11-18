@@ -6,8 +6,8 @@ import asyncio
 
 from aiohttp.test_utils import TestClient, TestServer
 
-from custom_components.mennekes_amtron_rtu.device.console_charging import (
-    ChargingConsole,
+from custom_components.mennekes_amtron_rtu.device.console_http import (
+    ServiceConsole,
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 
@@ -16,7 +16,7 @@ HEADERS = {"X-Remote-User-Id": "f" * 32, "X-Remote-User-Groups": "system-admin"}
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 
-class Console(ChargingConsole):
+class Console(ServiceConsole):
     async def _request(self, method, path, payload=None):
         assert method == "GET"
         assert path == "/info"

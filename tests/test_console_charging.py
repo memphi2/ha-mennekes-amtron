@@ -8,8 +8,8 @@ import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
 from custom_components.mennekes_amtron_rtu.device import app_settings
-from custom_components.mennekes_amtron_rtu.device.service_charging_http import (
-    create_charging_console,
+from custom_components.mennekes_amtron_rtu.device.console_http import (
+    create_console_app,
 )
 from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
     DepartureModbusService,
@@ -25,7 +25,7 @@ def test_console_targets_auth_cas_and_vehicle_maximum(tmp_path, monkeypatch):
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with (
             runtime.guest_service(tmp_path) as (service, _transport, _clock),
-            TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+            TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
         ):
             assert (await client.get("/api/charging")).status == 403
             response = await client.get("/api/charging", headers=HEADERS)
@@ -68,7 +68,7 @@ def test_console_departure_is_saved_separately_and_rejects_stale_choice(tmp_path
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             await hand_over(service)
-            async with TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client:
+            async with TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client:
                 state = await (await client.get("/api/charging", headers=HEADERS)).json()
                 headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
                 deadline = (datetime.now(UTC) + timedelta(hours=4)).isoformat()
@@ -98,7 +98,7 @@ def test_charging_console_rejects_malformed_and_unavailable_edits(tmp_path, monk
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with (
             runtime.guest_service(tmp_path) as (service, _transport, _clock),
-            TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+            TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
         ):
             response = await client.get("/api/charging", headers=HEADERS)
             state = await response.json()
@@ -183,7 +183,7 @@ def test_guest_console_requires_csrf_and_uses_one_shared_start(tmp_path, monkeyp
         monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock), TestClient(
-            TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))
+            TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))
         ) as client:
             state = await (await client.get("/api/charging", headers=HEADERS)).json()
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
@@ -217,7 +217,7 @@ def test_console_names_definite_guest_refusals_only(tmp_path, monkeypatch):
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with (
             runtime.guest_service(tmp_path) as (service, transport, _clock),
-            TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+            TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
         ):
             put(transport.bank, R.LOCK_EVSE, 1)
             await service.refresh()
@@ -245,7 +245,7 @@ def test_console_reports_a_guest_failure_after_a_write_as_uncertain(tmp_path, mo
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with (
             runtime.guest_service(tmp_path) as (service, _transport, _clock),
-            TestClient(TestServer(create_charging_console(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+            TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
         ):
             state = await (await client.get("/api/charging", headers=HEADERS)).json()
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
@@ -264,8 +264,8 @@ def test_app_names_a_hint_for_exactly_the_definite_refusals():
     import re
     from pathlib import Path
 
-    from custom_components.mennekes_amtron_rtu.device import console_charging
+    from custom_components.mennekes_amtron_rtu.device import console_http
 
-    source = Path(console_charging.__file__).with_name("app_charging.js").read_text(encoding="utf-8")
+    source = Path(console_http.__file__).with_name("app_charging.js").read_text(encoding="utf-8")
     mapping = re.search(r"const refusals=\{(.*?)\};", source, re.DOTALL).group(1)
-    assert set(re.findall(r"(\w+):\"\w+\"", mapping)) == console_charging._REFUSALS
+    assert set(re.findall(r"(\w+):\"\w+\"", mapping)) == console_http._REFUSALS
