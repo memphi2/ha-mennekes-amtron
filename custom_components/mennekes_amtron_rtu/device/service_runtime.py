@@ -38,6 +38,7 @@ from .persistence import (
 )
 from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
+from .register_monitor import RegisterMonitor
 from .registers import ENERGY_TOTAL, ERROR_CODE, REGISTERS_BY_KEY
 from .service_config import ServerConfig, integer, number
 from .service_store import IntentStore
@@ -84,6 +85,9 @@ class ModbusService:
         # Why the newest poll failed; None while the wallbox answers.
         self.failure: Exception | None = None
         self.heartbeat = HeartbeatTask(self.client, self.diagnostics)
+        # Passive observations for the app's register page.
+        self.register_monitor = RegisterMonitor()
+        self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
         self.goal: EnergyGoalController | None = None
         self.soc_goal: SocGoalController | None = None
@@ -178,6 +182,7 @@ class ModbusService:
             )
 
     async def _initialize(self) -> None:
+        self.register_monitor.clear()
         self._phase = f"opening {self._connection_name} connection"
         await self.client.async_connect()
         self._phase = "reading wallbox identity"
@@ -647,6 +652,38 @@ class ModbusService:
             },
             "write_errors": sorted(self.diagnostics.write_errors),
         }
+
+    async def apply_runtime_settings(self, candidate: ServerConfig) -> None:
+        """Keep the bus owner, heartbeat, hold/backoff state and pending commands.
+
+        A running poll or sleep is not interrupted; the next ordinary cycle
+        uses the new intervals. New commands use the new limits at once, and
+        the polling loop lowers a charging current above a lowered cap.
+        """
+        control = self.control
+        if self._stopping or control is None:
+            raise DeviceError("service_unavailable")
+        candidate = self.resolved_config(candidate)
+        cap = number(candidate.current_cap, 6, 32)
+        options = ControlOptions(
+            control.options.read_only, cap,
+            state_change_interval_seconds=candidate.state_change_interval_seconds,
+            phase_switch_grace_seconds=candidate.phase_switch_grace_seconds,
+        )
+        measurement = number(candidate.measurement_interval, 2, 300)
+        scan = number(candidate.scan_interval, 2, 300)
+        # The only wait. A command takes the control lock before it refreshes,
+        # so this one never waits for the poll lock while holding it, and a
+        # timeout here leaves nothing half applied.
+        await control.async_set_limits(options)
+        if self._poller is not None:
+            self._poller.update_measurement_interval(measurement)
+        self.config = replace(
+            self.config, scan_interval=scan, measurement_interval=measurement,
+            current_cap=cap, cap_from_wallbox=candidate.cap_from_wallbox,
+            state_change_interval_seconds=options.state_change_interval_seconds,
+            phase_switch_grace_seconds=options.phase_switch_grace_seconds,
+        )
 
     def resolved_config(self, config: ServerConfig) -> ServerConfig:
         """Settings with the wallbox's maximum as the cap where asked for."""

@@ -8,12 +8,10 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
-from custom_components.mennekes_amtron_rtu.device.service_console_runtime import (
-    ConsoleModbusService,
-)
 from custom_components.mennekes_amtron_rtu.device.service_guest_runtime import (
     GuestModbusService,
 )
+from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from tests import service_guest_fixture as runtime
 
 
@@ -51,7 +49,7 @@ def test_stopping_and_malformed_guest_requests_never_write(tmp_path):
 def test_bus_owner_return_cannot_leave_a_healthy_looking_guest_loop(monkeypatch):
     async def run():
         service = GuestModbusService.__new__(GuestModbusService)
-        monkeypatch.setattr(ConsoleModbusService, "_run", AsyncMock())
+        monkeypatch.setattr(ModbusService, "_run", AsyncMock())
         with pytest.raises(RuntimeError, match="bus owner stopped"):
             await service._run_bus()
     asyncio.run(run())
@@ -62,7 +60,7 @@ def test_long_unknown_connection_discards_guest_permission(tmp_path, monkeypatch
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             service._guest_scope = service._connection_sample().scope
             assert service._guest_scope is not None
-            monkeypatch.setattr(ConsoleModbusService, "refresh", AsyncMock())
+            monkeypatch.setattr(ModbusService, "refresh", AsyncMock())
             monkeypatch.setattr(service, "_is_available", lambda: False)
             await service.refresh()
             assert service._guest_scope is not None

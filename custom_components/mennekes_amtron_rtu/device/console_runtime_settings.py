@@ -13,20 +13,20 @@ from .runtime_settings import runtime_candidate, runtime_preview
 from .service_config import ServerConfig
 
 if TYPE_CHECKING:
-    from .service_console_runtime import ConsoleModbusService
+    from .service_runtime import ModbusService
 
 
 class RuntimeSettingsConsole(AppSettings):
     """Reuse authorization, optimistic revisions and uncertain-save fencing."""
 
-    def __init__(self, supervisor_token: str, service_token: str, *, service: ConsoleModbusService | None, **kwargs: Any) -> None:
+    def __init__(self, supervisor_token: str, service_token: str, *, service: ModbusService | None, **kwargs: Any) -> None:
         super().__init__(supervisor_token, service_token, **kwargs)
         self.service = service
         # This is an internal credential, never projected into any response.
         # Keep validation independent from changes to Supervisor's stored token.
         self._runtime_token = service_token
 
-    def _configured_service(self) -> ConsoleModbusService:
+    def _configured_service(self) -> ModbusService:
         if self.service is None:
             raise SettingsError("service_not_configured", 503)
         return self.service

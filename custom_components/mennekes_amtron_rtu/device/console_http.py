@@ -11,7 +11,7 @@ from .app_settings import SettingsError, create_settings_app, serve_asset
 from .console_runtime_settings import RuntimeSettingsConsole
 
 if TYPE_CHECKING:
-    from .service_console_runtime import ConsoleModbusService
+    from .service_runtime import ModbusService
 
 CONSOLE_ASSETS = {
     "/targets": ("app_targets.html", "text/html"),
@@ -26,7 +26,7 @@ CONSOLE_ASSETS = {
 class ServiceConsole(RuntimeSettingsConsole):
     """Only explicitly registered operations extend the configuration surface."""
 
-    def __init__(self, *args: Any, service: ConsoleModbusService | None, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, service: ModbusService | None, **kwargs: Any) -> None:
         super().__init__(*args, service=service, **kwargs)
 
     async def read_registers(self, request: web.Request) -> web.Response:

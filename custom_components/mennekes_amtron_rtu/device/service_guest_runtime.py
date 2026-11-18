@@ -18,7 +18,7 @@ from .control import AmtronControl
 from .errors import DeviceError, device_error
 from .guest_permission import GuestPermission
 from .power_window import observed_phases
-from .service_console_runtime import ConsoleModbusService
+from .service_runtime import ModbusService
 from .session_mark import SessionMark
 from .vehicle import snapshot_vehicle_connected
 
@@ -43,7 +43,7 @@ class ConnectionSample:
     session: SessionMark | None = None
 
 
-class GuestModbusService(ConsoleModbusService):
+class GuestModbusService(ModbusService):
     """No guest file, order, energy baseline or separate current controller."""
     _connection_scope: str | None = None
     _connection_unknown_since: float | None = None
