@@ -12,6 +12,7 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.mennekes_amtron_rtu.charge_loss_observer import (
     ChargeLossObserver,
 )
+from custom_components.mennekes_amtron_rtu.charge_watch import charge_watch
 from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
 from custom_components.mennekes_amtron_rtu.loss_store import (
     LossStore,
@@ -20,6 +21,7 @@ from custom_components.mennekes_amtron_rtu.loss_store import (
 from custom_components.mennekes_amtron_rtu.select import async_setup_entry
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
     activate_profile,
+    profiles,
 )
 from custom_components.mennekes_amtron_rtu.vehicle_soc import VehicleSocObserver
 from custom_components.mennekes_amtron_rtu.vehicle_sources import VehicleTelemetry
@@ -221,6 +223,8 @@ def test_switching_profiles_retains_loss_totals_without_reassigning_previous_cha
         first = ChargeLossObserver(hass, entry)
         try:
             await first.async_start()
+            coordinator.watch = charge_watch(hass, "entry")
+            coordinator.owner = profiles(entry.options)[A]
             coordinator.complete(at=1200)
             await hass.async_block_till_done()
             await first.async_assign()
@@ -232,6 +236,7 @@ def test_switching_profiles_retains_loss_totals_without_reassigning_previous_cha
             await second.async_start()
             assert not second.can_assign
             assert second.statistics.sample_count == 0
+            coordinator.owner = profiles(entry.options)[B]
             coordinator.complete(at=1500)
             await hass.async_block_till_done()
             await second.async_assign()

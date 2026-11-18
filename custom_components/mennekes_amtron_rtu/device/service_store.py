@@ -1,4 +1,4 @@
-"""Persist accepted control intent and one completed session atomically."""
+"""Persist accepted control intent atomically."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
 from .guest_permission import GuestPermission
 from .persistence import StorageCommitUncertainError, replace_file
@@ -48,7 +47,7 @@ class IntentStore:
             not isinstance(payload, dict)
             or payload.keys() != {"version", "identity", "pause_requested", "unplug_release",
                                   "charging_release_requested", "charging_setpoint",
-                                  "energy_goal", "soc_goal", "plug_charge", "charging_session_history", "guest_permission"}
+                                  "energy_goal", "soc_goal", "plug_charge", "guest_permission"}
             or payload.get("version") != 2
             or payload.get("identity") != self.identity
         ):
@@ -67,20 +66,12 @@ class IntentStore:
         soc_goal = SocGoal.restore(payload["soc_goal"])
         plug_charge = PlugChargeState.restore(payload["plug_charge"])
         unplug_release = UnplugReleaseState.restore(payload["unplug_release"])
-        history = SessionHistory()
-        try:
-            history = SessionHistory.restore(payload["charging_session_history"])
-        except ValueError:
-            # Optional measurements must not block valid control intent
-            # or heartbeat startup. Do not expose stored data in the log.
-            _LOGGER.warning("Charging session: ignoring invalid saved history")
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current
         state.guest_permission = guest
         state.energy_goal = goal
         state.soc_goal = soc_goal
-        state.session_history = history
         state.plug_charge = plug_charge
         state.unplug_release = unplug_release
         self._last = payload
@@ -95,7 +86,6 @@ class IntentStore:
             "guest_permission": state.guest_permission.snapshot() if state.guest_permission is not None else None,
             "energy_goal": state.energy_goal.snapshot(),
             "soc_goal": state.soc_goal.snapshot(),
-            "charging_session_history": state.session_history.snapshot(),
             "plug_charge": state.plug_charge.durable(),
             "unplug_release": state.unplug_release.snapshot(),
         }

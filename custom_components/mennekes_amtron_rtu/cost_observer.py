@@ -36,10 +36,10 @@ from .device.charging_cost import (
     CostResult,
     TariffConfig,
 )
-from .device.charging_session import PresenceGap
 from .device.data import WallboxData
 from .device.enums import EvseState
 from .device.notice import FailureNotice
+from .device.presence_gap import PresenceGap
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .device.vehicle import snapshot_metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry

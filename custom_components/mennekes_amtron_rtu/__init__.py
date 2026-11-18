@@ -33,6 +33,11 @@ from .charge_loss_const import (
     LOSS_SOURCE_DISABLED,
 )
 from .charge_loss_observer import ChargeLossObserver
+from .charge_watch import (
+    forget_charge_watch,
+    loss_vehicle_options,
+    track_charge_watch,
+)
 from .charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
@@ -72,11 +77,6 @@ from .goal_store import (
     TimedGoalStore,
 )
 from .guest_charging import GuestCharging
-from .loss_attribution import (
-    forget_loss_attribution,
-    loss_vehicle_options,
-    track_loss_attribution,
-)
 from .loss_store import LossStore, async_prune_profile_losses
 from .network_tariff_year import (
     async_refresh_tariff_year,
@@ -304,9 +304,8 @@ async def async_setup_entry(
         # A reconnect is only a gap; the session's presence rule judges it.
         if handoff is not None and handoff.identity != identity:
             await handoff.async_close()
-            forget_loss_attribution(hass, entry.entry_id)
-        if profiles(entry.options):
-            entry.runtime_data.loss_attribution_unsubscribe = track_loss_attribution(hass, entry)
+            forget_charge_watch(hass, entry.entry_id)
+        entry.runtime_data.charge_watch_unsubscribe = track_charge_watch(hass, entry)
         validate_vehicle_selection()
         # Configure the gate before starting heartbeat/recovery. The app owns
         # the previous grant; an unchanged policy survives this HA reload.
@@ -443,7 +442,7 @@ async def async_setup_entry(
                         hass, entry, err, healthy=wallbox_answers,
                     )
         finally:
-            forget_loss_attribution(hass, entry.entry_id)
+            forget_charge_watch(hass, entry.entry_id)
         raise
     _remember_vehicle(entry)
     if handoff is not None:
@@ -807,7 +806,7 @@ async def async_unload_entry(
     if not unloaded:
         return False
     retain_cost = runtime_data.retain_cost_on_unload
-    if retain_cost or runtime_data.retain_attribution_on_unload:
+    if retain_cost or runtime_data.retain_watch_on_unload:
         handoff = hass.data[f"{DOMAIN}_reload_clients"][entry.entry_id]
         handoff.unloaded = True
         handoff.charging_cost = runtime_data.charging_cost if retain_cost else None
@@ -829,8 +828,8 @@ async def async_unload_entry(
             # Last: the car's observers above still withdraw through it.
             await async_release(hass, entry.entry_id)
     finally:
-        if not runtime_data.retain_attribution_on_unload:
-            forget_loss_attribution(hass, entry.entry_id)
+        if not runtime_data.retain_watch_on_unload:
+            forget_charge_watch(hass, entry.entry_id)
     return unloaded
 
 
@@ -847,9 +846,9 @@ async def _async_stop_runtime(
         runtime.vehicle_detection.stop()
     if runtime.vehicle_binding is not None:
         runtime.vehicle_binding.stop()
-    if runtime.loss_attribution_unsubscribe is not None:
-        runtime.loss_attribution_unsubscribe()
-        runtime.loss_attribution_unsubscribe = None
+    if runtime.charge_watch_unsubscribe is not None:
+        runtime.charge_watch_unsubscribe()
+        runtime.charge_watch_unsubscribe = None
     if runtime.plug_charge is not None:
         await runtime.plug_charge.async_stop()
     runtime.coordinator.observe_session = None
@@ -900,7 +899,7 @@ async def _async_reload_entry_locked(
     retain_attribution = runtime is not None and runtime.entry_data == dict(entry.data)
     if runtime is not None:
         runtime.retain_cost_on_unload = retain_cost
-        runtime.retain_attribution_on_unload = retain_attribution
+        runtime.retain_watch_on_unload = retain_attribution
     if runtime is not None and (retain_cost or retain_attribution):
         handoff = RuntimeHandoff(identity=runtime.identity)
         hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = handoff
@@ -918,14 +917,14 @@ async def _async_reload_entry_locked(
             await async_release(hass, entry.entry_id)
         if runtime is not None and (retain_cost or retain_attribution):
             runtime.retain_cost_on_unload = False
-            runtime.retain_attribution_on_unload = False
+            runtime.retain_watch_on_unload = False
             unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
             if unused is not None:
                 try:
                     await unused.async_close()
                 finally:
                     if unused.unloaded and not unused.setup_complete:
-                        forget_loss_attribution(hass, entry.entry_id)
+                        forget_charge_watch(hass, entry.entry_id)
 
 
 async def async_remove_entry(
@@ -934,7 +933,7 @@ async def async_remove_entry(
     """Remove repairs owned by a deleted entry, also on HA before 2026.11."""
 
     hass.data.get(f"{DOMAIN}_reload_locks", {}).pop(entry.entry_id, None)
-    forget_loss_attribution(hass, entry.entry_id)
+    forget_charge_watch(hass, entry.entry_id)
     await async_forget(hass, entry.entry_id)
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()

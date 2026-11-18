@@ -9,10 +9,8 @@ an energy-value change proves which physical vehicle session it belongs to.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
-
-from .charging_session import CompletedSession
 
 LOSS_ASSOCIATIONS = ("changed_value", "manual", "history")
 LOSS_STATES = (
@@ -37,8 +35,29 @@ def _number(value: object, *, positive: bool = False) -> float:
 
 
 @dataclass(frozen=True, slots=True)
+class Charge:
+    """What the wallbox meter delivered between two moments."""
+
+    start: float
+    end: float
+    wallbox_kwh: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def parse(cls, raw: object) -> Charge:
+        if not isinstance(raw, dict) or raw.keys() != {"start", "end", "wallbox_kwh"}:
+            raise ValueError("invalid charge fields")
+        start, end = _number(raw["start"]), _number(raw["end"])
+        if not start < end:
+            raise ValueError("a charge needs a duration")
+        return cls(start, end, _number(raw["wallbox_kwh"], positive=True))
+
+
+@dataclass(frozen=True, slots=True)
 class _Match:
-    session: CompletedSession
+    session: Charge
     vehicle_kwh: float
     association: str
 
@@ -54,7 +73,7 @@ class _Match:
             "session", "vehicle_kwh", "association",
         }:
             raise ValueError("invalid matched loss session")
-        session = CompletedSession.parse(raw["session"])
+        session = Charge.parse(raw["session"])
         energy = _number(raw["vehicle_kwh"], positive=True)
         association = raw["association"]
         if energy > session.wallbox_kwh or association not in LOSS_ASSOCIATIONS:
@@ -78,7 +97,7 @@ class LossStatistics:
         self._previous_vehicle_kwh = 0.0
         self._previous_count = 0
         self._last_match: _Match | None = None
-        self._current_session: CompletedSession | None = None
+        self._current_session: Charge | None = None
 
     @property
     def last_loss_percent(self) -> float | None:
@@ -128,25 +147,21 @@ class LossStatistics:
         self.status = "waiting_for_session" if source is not None else "disabled"
         return True
 
-    def observe_session(self, session: CompletedSession | None) -> bool:
+    def observe_charge(self, session: Charge | None) -> bool:
         """Select the newest complete session without claiming a vehicle match."""
         if self.source is None:
             return False
         if session is not None:
-            session = CompletedSession.parse(session.as_dict())
+            session = Charge.parse(session.as_dict())
             previous = self._current_session or (
                 self._last_match.session if self._last_match is not None else None
             )
             if previous is not None:
-                if session.session_id == previous.session_id:
-                    if session != previous:
-                        raise ValueError("loss session identifier changed its measurements")
+                if session == previous:
                     if self._current_session is not None:
                         return False
-                elif (
-                    session.disconnected_at <= previous.disconnected_at
-                    or session.connected_at < previous.disconnected_at
-                ):
+                elif session.end <= previous.end or session.start < previous.end:
+                    # Older than, or overlapping, what is already accounted for.
                     return False
         before = self.snapshot()
         self._current_session = session
@@ -158,7 +173,7 @@ class LossStatistics:
         return before != self.snapshot()
 
     def apply(
-        self, session: CompletedSession, vehicle_kwh: object, *, association: str,
+        self, session: Charge, vehicle_kwh: object, *, association: str,
     ) -> bool:
         """Accept a matching measurement once, or correct the latest match.
 
@@ -171,7 +186,7 @@ class LossStatistics:
         if association not in LOSS_ASSOCIATIONS:
             raise ValueError("invalid loss association")
         before = self.snapshot()
-        self.observe_session(session)
+        self.observe_charge(session)
         if self._current_session != session:
             return False
         if vehicle_kwh is None:
@@ -189,7 +204,7 @@ class LossStatistics:
         previous_wallbox = self._previous_wallbox_kwh
         previous_vehicle = self._previous_vehicle_kwh
         previous_count = self._previous_count
-        if self._last_match is not None and self._last_match.session.session_id != session.session_id:
+        if self._last_match is not None and self._last_match.session != session:
             previous_wallbox += self._last_match.session.wallbox_kwh
             previous_vehicle += self._last_match.vehicle_kwh
             previous_count += 1
@@ -234,7 +249,7 @@ class LossStatistics:
         status = raw["status"]
         last = _Match.restore(raw["last_match"]) if raw["last_match"] is not None else None
         current = (
-            CompletedSession.parse(raw["current_session"])
+            Charge.parse(raw["current_session"])
             if raw["current_session"] is not None else None
         )
         if (
@@ -255,9 +270,8 @@ class LossStatistics:
             or (
                 current is not None and current != last.session
                 and (
-                    current.session_id == last.session.session_id
-                    or current.disconnected_at <= last.session.disconnected_at
-                    or current.connected_at < last.session.disconnected_at
+                    current.end <= last.session.end
+                    or current.start < last.session.end
                 )
             )
         ):

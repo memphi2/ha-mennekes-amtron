@@ -8,7 +8,6 @@ import threading
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
 
 import atomicwrites
 import pytest
@@ -24,12 +23,10 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
 )
 from custom_components.mennekes_amtron_rtu.charge_loss_observer import (
     ChargeLossObserver,
-    meter_log,
     vehicle_energy,
 )
-from custom_components.mennekes_amtron_rtu.device.charging_session import (
-    CompletedSession,
-)
+from custom_components.mennekes_amtron_rtu.charge_watch import PlugCycle, charge_watch
+from custom_components.mennekes_amtron_rtu.device.charge_loss import Charge
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.registers import (
@@ -48,12 +45,14 @@ class Coordinator:
     def __init__(self):
         self.data = WallboxData(
             values={EVSE_STATE.key: EvseState.IDLE, CP_STATE.key: CpState.A1},
-            session_summary_supported=True, energy_observed_at=1.0,
+            energy_observed_at=1.0,
         )
         self.last_update_success = True
         self.listeners = []
-        # In history mode the meter log of the entry and the last charge in it.
-        self.log = None
+        # The entry's watch, and the last charge written into it.
+        self.watch = None
+        self.history = False
+        self.owner = None
         self.total = 100.0
         self.span = None
 
@@ -69,23 +68,22 @@ class Coordinator:
             listener()
 
     def complete(self, *, at=None, energy=10):
+        """One plug cycle; the meter rises between the vehicle's own bounds."""
         at = time.time() if at is None else at
-        session = CompletedSession(str(uuid4()), at - 100, at, at - 95, at - 90, at - 10, at - 5, energy)
-        if self.log is not None:
-            # The meter rises by the energy between the vehicle's own bounds.
-            for moment, kwh in (
-                (at - 100, self.total), (at - 95, self.total),
-                (at - 5, self.total + energy), (at, self.total + energy),
-            ):
-                self.log.observe(moment, kwh)
-            self.total += energy
-            self.span = (at - 95, at - 5)
+        for moment, kwh in (
+            (at - 100, self.total), (at - 95, self.total),
+            (at - 5, self.total + energy), (at, self.total + energy),
+        ):
+            self.watch.meter.observe(moment, kwh)
+        self.total += energy
+        self.span = (at - 95, at - 5)
+        self.watch.last = PlugCycle(at - 100, at, self.owner)
+        if self.history:
             self.data.values[EVSE_STATE.key] = EvseState.CHARGING
             self.async_update_listeners()
             self.data.values[EVSE_STATE.key] = EvseState.IDLE
-        self.data.charging_session = session.as_dict()
         self.async_update_listeners()
-        return session
+        return Charge(at - 100, at, energy)
 
     def record(self, vehicle_kwh=8):
         """What the vehicle recorded for the last charge."""
@@ -99,8 +97,8 @@ def build(hass, mode="sensor", *, auto=False):
     if mode == "vehicle_history":
         hass.data.setdefault(dr.DATA_REGISTRY, vehicle_registry())
     coordinator = Coordinator()
-    if mode == "vehicle_history":
-        coordinator.log = meter_log(hass, "entry")
+    coordinator.watch = charge_watch(hass, "entry")
+    coordinator.history = mode == "vehicle_history"
     entry = SimpleNamespace(
         entry_id="entry", options={
             CONF_CHARGE_LOSS_SOURCE: mode, CONF_LOSS_AUTO_MATCH: auto,
@@ -392,13 +390,20 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
             assert observer.statistics.sample_count == 1
             await observer.async_stop()
             broken, coord2 = build(hass)
-            with patch.object(broken._store, "async_load", side_effect=ValueError):
+            with patch.object(broken._store, "async_load", side_effect=OSError):
                 await broken.async_start()
                 assert not broken.available
-                coord2.complete()
+                coord2.complete(at=time.time() + 200)
                 await hass.async_block_till_done()
                 assert broken._task is None
                 await broken.async_stop()
+            # Estimates saved in a form nobody reads any more: start without them.
+            fresh, _coord3 = build(hass)
+            with patch.object(fresh._store, "async_load", side_effect=ValueError):
+                await fresh.async_start()
+                assert fresh.available
+                assert fresh.statistics.sample_count == 0
+                await fresh.async_stop()
         finally:
             await observer.async_stop()
             await hass.async_stop()
@@ -761,9 +766,8 @@ def test_a_result_that_waited_behind_another_save_is_checked_again(tmp_path, mod
                 observer._queue()
                 assert observer._task is task
                 if mode == "sensor":
-                    # The session it was started for is gone by the time it may save.
-                    coordinator.data.charging_session = None
-                    coordinator.async_update_listeners()
+                    # A newer charge arrived by the time the first may save.
+                    coordinator.complete(at=time.time() + 200)
                 else:
                     for _ in range(5):
                         await asyncio.sleep(0)
@@ -771,8 +775,56 @@ def test_a_result_that_waited_behind_another_save_is_checked_again(tmp_path, mod
                 observer._lock.release()
                 await hass.async_block_till_done()
                 assert observer.statistics.sample_count == 0
-                assert observer.statistics.status == "waiting_for_session"
+                assert observer.statistics.status == (
+                    "waiting_for_vehicle" if mode == "sensor" else "waiting_for_session"
+                )
             finally:
                 await observer.async_stop()
                 await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        observer._profiled, observer._profile_id = True, "a" * 32
+        watch, now = coordinator.watch, time.time()
+        mine = SimpleNamespace(id="a" * 32)
+        try:
+            await observer.async_start()
+            # Another car's cycle, and one nobody was recognized for.
+            for owner in (SimpleNamespace(id="b" * 32), None):
+                coordinator.owner = owner
+                coordinator.complete(at=now - 5000 + (0 if owner else 500))
+                await hass.async_block_till_done()
+                assert observer._charge is None
+                assert observer.statistics.status == "waiting_for_session"
+            # The reading after the unplug is still to come ...
+            watch.meter.observe(now - 300, coordinator.total)
+            watch.last = PlugCycle(now - 300, now - 10, mine)
+            coordinator.async_update_listeners()
+            assert observer._cycle != watch.last
+            # ... and a plug-in without charging leaves everything as it was.
+            watch.meter.observe(now - 5, coordinator.total)
+            coordinator.async_update_listeners()
+            assert observer._cycle == watch.last
+            assert observer._charge is None
+            # A span the meter log can no longer place is given up.
+            watch.last = PlugCycle(now - 9000, now - 8000, mine)
+            coordinator.async_update_listeners()
+            assert observer._cycle == watch.last
+            coordinator.owner = mine
+            charge = coordinator.complete(at=now)
+            await hass.async_block_till_done()
+            assert observer._charge == charge
+            assert observer.statistics.status == "waiting_for_vehicle"
+            # Queued for a charge that another car's cycle has replaced since.
+            observer._queue()
+            observer._charge = None
+            await hass.async_block_till_done()
+            assert observer.statistics.status == "waiting_for_vehicle"
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
     asyncio.run(run())

@@ -14,16 +14,50 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 import custom_components.mennekes_amtron_rtu.coordinator as coordinator_module
 from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import (
+    MennekesModbusClient,
+    SerialConfig,
+)
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
-from custom_components.mennekes_amtron_rtu.device.enums import EvseState
+from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
+from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
+from tests.fakes import FakeModbusClient, device_bank, put
 from tests.ha_fakes import FakeConfigEntry, FakeHass
-from tests.test_charging_session import reading
 from tests.test_modbus_service import TOKEN, service_fixture
-from tests.test_session_service import observe, owner
+
+
+async def owner(tmp_path, *, layout=R.LAYOUT_V01_03, state=EvseState.IDLE, read_only=True):
+    bank = device_bank(layout=layout, evse_state=state)
+    put(bank, R.CP_STATE, CpState.A1 if state is EvseState.IDLE else CpState.C2)
+    put(bank, R.ENERGY_TOTAL, 100)
+    transport = FakeModbusClient(bank)
+    client = MennekesModbusClient(SerialConfig("/dev/fake"), client_factory=lambda _: transport)
+    service = ModbusService(
+        ServerConfig(client.config, TOKEN, read_only=read_only), tmp_path / "intent.json", client=client,
+    )
+    await service._initialize()
+    return service, transport
+
+
+async def observe(service, transport, clock, at, state, energy):
+    clock[0] = at
+    put(transport.bank, R.EVSE_STATE, state)
+    put(transport.bank, R.CP_STATE, CpState.A1 if state is EvseState.IDLE else CpState.C2)
+    put(transport.bank, R.ENERGY_TOTAL, energy)
+    await service.refresh()
+
+
+def reading(state, total):
+    cp = CpState.A1 if state == EvseState.IDLE else CpState.C2 if state == EvseState.CHARGING else CpState.B1
+    return WallboxData(
+        values={"evse_state": state, "cp_state": cp, "energy_total": total}, energy_read=True,
+    )
 
 
 def test_service_energy_sample_retains_actual_attempt_time_through_cached_polls(tmp_path):

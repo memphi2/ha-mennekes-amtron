@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ._client_write import WriteRateLimiter
-from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
 from .guest_permission import GuestPermission
 from .plug_charge import PlugChargeState
@@ -36,7 +35,6 @@ class WriteState:
     energy_goal: EnergyGoal = field(default_factory=EnergyGoal)
     soc_goal_generation: int = 0
     soc_goal: SocGoal = field(default_factory=SocGoal)
-    session_history: SessionHistory = field(default_factory=SessionHistory)
     guest_permission: GuestPermission | None = None
     plug_charge: PlugChargeState = field(default_factory=PlugChargeState)
     unplug_release: UnplugReleaseState = field(default_factory=UnplugReleaseState)

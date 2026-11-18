@@ -89,11 +89,11 @@ class GuestModbusService(ModbusService):
         self._guest_restore_pending = False
         self.client.write_state.guest_permission = None
 
-    async def _persist(self, *, include_session_history: bool = False) -> None:
+    async def _persist(self) -> None:
         permission = self.client.write_state.guest_permission
         if permission is not None and not self._guest_restore_pending:
             self.client.write_state.guest_permission = GuestPermission(permission.session, self.guest_deadline)
-        await super()._persist(include_session_history=include_session_history)
+        await super()._persist()
 
     @property
     def guest_deadline(self) -> datetime | None:

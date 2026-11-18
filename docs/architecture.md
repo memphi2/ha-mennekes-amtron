@@ -225,6 +225,7 @@ vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapt
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
 charge_loss_observer.py  bounded matching and durable loss aggregate
+charge_watch.py  meter log, plug cycle seen by HA and its recognized vehicle
 device/meter_log.py  bounded total-energy readings to measure a past time span
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
 number.py select.py switch.py button.py datetime.py  control tables
@@ -294,14 +295,16 @@ available cable descriptor timestamps are checked, but missing timestamps and
 tracker coordinates without restore provenance cannot prove measurement
 freshness. A GPS accuracy circle crossing the Home-zone boundary is unknown. Detection remains a heuristic; manually selecting a
 profile is always possible. Manual loss matching requires the profile to have
-been selected before charging. Automatic selection can arrive later: a bounded
-transient attribution records the uniquely confirmed vehicle within the observed
-physical cycle, then binds it to the completed session ID. A conflicting profile
+been selected before charging. Automatic selection can arrive later: the
+charge watch (`charge_watch.py`) records the uniquely confirmed vehicle within
+the plug cycle Home Assistant saw from plug-in to unplug. A conflicting profile
 or observation loss prevents attribution. This record supplies only loss
 settings after automatic deselection; it cannot reactivate SoC or departure goals.
 
-Direct-mode session capture starts when any configured profile needs loss
-estimates or wallbox costs are enabled, before an active vehicle is selected.
+The charge watch follows every poll from setup on, before an active vehicle is
+selected. It keeps the wallbox's total-energy readings in a bounded log; every
+loss estimate is the meter difference over a time span, never a session value
+of the service.
 Controlled reloads on the same physical connection hand over the live session
 observer and compatible cost observer, including their meter baseline and price
 observations. Transport generation changes discard incomplete measurements;

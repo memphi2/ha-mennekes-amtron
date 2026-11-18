@@ -66,7 +66,7 @@ def test_unique_candidates_settle_and_manual_override_cancels_pending_work(tmp_p
     async def run():
         hass = HomeAssistant(str(tmp_path))
         hass.config_entries = ConfigEntries(hass, {})
-        entry = SimpleNamespace(options=detection_catalog())
+        entry = SimpleNamespace(entry_id="entry", options=detection_catalog())
         updates, timers = [], []
 
         def update(entry, *, options):
@@ -140,7 +140,7 @@ def test_startup_invalidates_wrong_car_before_goals_restore_but_does_not_skip_se
     async def run():
         hass = HomeAssistant(str(tmp_path))
         hass.config_entries = ConfigEntries(hass, {})
-        entry = SimpleNamespace(options=detection_catalog())
+        entry = SimpleNamespace(entry_id="entry", options=detection_catalog())
         monkeypatch.setattr(hass.config_entries, "async_update_entry", lambda entry, *, options: setattr(entry, "options", options))
         try:
             for name, plugged in (("first", "off"), ("second", "on")):
@@ -172,7 +172,7 @@ def test_profile_source_subscription_staleness_and_config_changes_are_isolated(t
     async def run():
         hass = HomeAssistant(str(tmp_path))
         hass.config_entries = ConfigEntries(hass, {})
-        entry = SimpleNamespace(options=detection_catalog())
+        entry = SimpleNamespace(entry_id="entry", options=detection_catalog())
         entry.options["vehicle_profiles"][A]["detection"] = {"source": "profile"}
         entry.options["vehicle_profiles"][A]["provider"] = "bavariandata"
         entry.options["vehicle_profiles"][A]["device_id"] = "vehicle"
@@ -215,7 +215,7 @@ def test_profile_source_subscription_staleness_and_config_changes_are_isolated(t
 def test_the_active_car_stays_until_an_unknown_car_is_at_the_wallbox(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        entry = SimpleNamespace(options=detection_catalog())
+        entry = SimpleNamespace(entry_id="entry", options=detection_catalog())
         for entity, value in (("binary_sensor.first_plug", "off"), ("device_tracker.first", "home"),
                               ("binary_sensor.second_plug", "off"), ("device_tracker.second", "home")):
             hass.states.async_set(entity, value)

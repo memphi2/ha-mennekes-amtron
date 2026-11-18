@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and `wallbox_changed`, the `change`
   attribute and the extra logbook sentence are gone. Automations need the new
   types.
+- The service no longer summarizes charging sessions. Its status loses
+  `charging_session`, and its saved intent loses the session history: the
+  app rejects an intent file saved by an earlier version once, and charging
+  stays blocked until that is acknowledged in Home Assistant Repairs.
+- Saved charging-loss averages start again.
 
 ### Changes
 
@@ -28,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   complete record with the wallbox's total energy meter over that record's
   own time span. It no longer needs the record to fit the plug cycle and the
   service's session energy, which left the loss unknown.
+- The charging loss from a vehicle energy sensor compares that value with the
+  meter's difference between plug-in and unplug, as Home Assistant saw them.
 - The charging cost follows the charge itself: the current charge starts at
   0.00 at the plug-in, runs while charging and is 0.00 again after the
   unplug; the last charge takes its value over whenever charging stops and at

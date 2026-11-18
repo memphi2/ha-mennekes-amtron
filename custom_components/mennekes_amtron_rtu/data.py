@@ -39,9 +39,9 @@ class MennekesAmtronRuntimeData:
     # False for a direct connection set to read only: it shows no controls.
     controls: bool = True
     retain_cost_on_unload: bool = False
-    retain_attribution_on_unload: bool = False
+    retain_watch_on_unload: bool = False
     entry_data: dict[str, Any] = field(default_factory=dict)
-    loss_attribution_unsubscribe: Callable[[], None] | None = None
+    charge_watch_unsubscribe: Callable[[], None] | None = None
     # Config data/options are already replaced when an update starts unloading.
     # Retain this runtime's platform set instead of recomputing from the new mode.
     loaded_platforms: tuple[Platform, ...] = ()

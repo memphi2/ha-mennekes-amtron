@@ -18,7 +18,6 @@ from pathlib import Path
 from time import time as wall_clock
 from typing import Any
 
-from .charging_session import SessionHistory
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
 from .command_events import SOURCES, attributed, command_source
@@ -95,10 +94,6 @@ class ModbusService:
         self._store: IntentStore | None = None
         self._poll_lock = asyncio.Lock()
         self._store_lock = asyncio.Lock()
-        self._saved_session_history = self.client.write_state.session_history.snapshot()
-        self._session_history_dirty = False
-        self._session_history_retry_at = 0.0
-        self._history_notice = FailureNotice(_LOGGER, "Charging session")
         self._wallbox_notice = FailureNotice(_LOGGER, "Connection")
         self._intent_notice = FailureNotice(_LOGGER, "Control")
         self._rejected_notice = FailureNotice(_LOGGER, "Control")
@@ -206,7 +201,6 @@ class ModbusService:
             state.guest_permission = None
             state.energy_goal = safe.energy_goal
             state.soc_goal = safe.soc_goal
-            state.session_history = safe.session_history
             state.plug_charge = safe.plug_charge
             state.plug_charge.configure(True, "0" * 64)
             state.plug_charge.hold = True
@@ -215,7 +209,6 @@ class ModbusService:
                 "saved intent rejected; charging blocked until acknowledged in Home Assistant Repairs",
                 "intent_rejected",
             )
-        self._saved_session_history = self.client.write_state.session_history.snapshot()
         self.identity = identity
         self._store = store
         self.config = self.resolved_config(self.config)
@@ -390,8 +383,6 @@ class ModbusService:
                     self.control.observe_plug_charge(None)
                 self._energy_sample = self._energy_sample_at = None
                 self.data.energy_observed_at = None
-                if self.identity.layout_version >= ENERGY_TOTAL.min_layout:
-                    self.client.write_state.session_history.observe(None, now=wall_clock())
                 now = time.monotonic()
                 if self._meter_failing_since is None:
                     self._meter_failing_since = now
@@ -430,24 +421,6 @@ class ModbusService:
                 self.goal.observe(self.data)
             if self.soc_goal is not None:
                 self.soc_goal.retry_stop()
-            if self.identity.layout_version >= ENERGY_TOTAL.min_layout:
-                history = self.client.write_state.session_history
-                self._session_history_dirty |= history.observe(self.data, now=wall_clock())
-                self.data.session_summary_supported = True
-                self.data.charging_session = history.latest.as_dict() if history.latest else None
-                await self._persist_session_history()
-
-    async def _persist_session_history(self) -> None:
-        """Save completed summaries without making optional metrics a bus failure."""
-        if not self._session_history_dirty or time.monotonic() < self._session_history_retry_at:
-            return
-        try:
-            await self._persist(include_session_history=True)
-        except (OSError, ValueError) as err:
-            self._session_history_retry_at = time.monotonic() + 60
-            self._history_notice.failed("completed session not saved", type(err).__name__)
-        else:
-            self._history_notice.recovered("completed sessions saved again")
 
     @attributed("recovery")
     async def _recover(self) -> None:
@@ -513,15 +486,11 @@ class ModbusService:
         if lowered:
             _LOGGER.info("Control: charging current lowered to the %.1f A cap", control.max_charging_current)
 
-    async def _persist(self, *, include_session_history: bool = False) -> None:
+    async def _persist(self) -> None:
         if self._store is not None and not self._intent_rejected:
             async with self._store_lock:
                 self._phase = "saving control intent"
                 original = self.client.write_state
-                history = (
-                    original.session_history.snapshot() if include_session_history
-                    else self._saved_session_history
-                )
                 state = WriteState(
                     guest_permission=original.guest_permission,
                     charging_setpoint=original.charging_setpoint,
@@ -529,7 +498,6 @@ class ModbusService:
                     charging_release_requested=original.charging_release_requested,
                     energy_goal=EnergyGoal.restore(original.energy_goal.snapshot()),
                     soc_goal=SocGoal.restore(original.soc_goal.snapshot()),
-                    session_history=SessionHistory.restore(history),
                     plug_charge=replace(original.plug_charge, session=None, authorized=False),
                     unplug_release=replace(original.unplug_release),
                 )
@@ -539,23 +507,12 @@ class ModbusService:
                 # until it completes, even if shutdown or the HTTP handler is
                 # cancelled again; otherwise an older save can overwrite a
                 # newer intent after that newer save has already returned.
-                try:
-                    while not saving.done():
-                        try:
-                            await asyncio.shield(saving)
-                        except asyncio.CancelledError:
-                            cancelled = True
-                    saving.result()
-                except StorageCommitUncertainError:
-                    if include_session_history:
-                        # An ordinary intent save must retain the summary now
-                        # visible on disk, even though its fsync needs retry.
-                        self._saved_session_history = history
-                        self._session_history_dirty = True
-                    raise
-                if include_session_history:
-                    self._saved_session_history = history
-                    self._session_history_dirty = original.session_history.snapshot() != history
+                while not saving.done():
+                    try:
+                        await asyncio.shield(saving)
+                    except asyncio.CancelledError:
+                        cancelled = True
+                saving.result()
                 if cancelled:
                     raise asyncio.CancelledError
 
@@ -596,15 +553,6 @@ class ModbusService:
             "connection_failures": self.data.connection_failures,
             "connection_retries": self.data.connection_retries,
             "energy_sample": dict(self._energy_sample) if self._energy_sample is not None else None,
-            "charging_session": {
-                "supported": self.identity.layout_version >= ENERGY_TOTAL.min_layout,
-                "latest": (
-                    self.client.write_state.session_history.latest.as_dict()
-                    if self.identity.layout_version >= ENERGY_TOTAL.min_layout
-                    and self.client.write_state.session_history.latest is not None
-                    else None
-                ),
-            },
             "command_events": control.events.snapshot() if control else None,
             "control": {
                 "plug_charge": self.client.write_state.plug_charge.snapshot(),
@@ -985,8 +933,6 @@ class ModbusService:
                     if self.soc_goal is not None:
                         await self.soc_goal.async_stop()
                     await self.control.async_shutdown()
-                self._session_history_retry_at = 0.0
-                await self._persist_session_history()
                 await self._persist()
         finally:
             await self.client.async_close()

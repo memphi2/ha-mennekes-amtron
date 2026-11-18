@@ -55,8 +55,6 @@ class WallboxData:
     session_read: bool = field(default=False, compare=False, repr=False)
     energy_goal_generation: int = field(default=0, compare=False, repr=False)
     # Only completed-session metadata changes; no per-poll progress is exposed.
-    charging_session: dict[str, Any] | None = field(default=None, repr=False)
-    session_summary_supported: bool = field(default=False, repr=False)
     # Keys kept from an earlier poll across one failed read, for display only.
     held: frozenset[str] = field(default=frozenset(), compare=False, repr=False)
 

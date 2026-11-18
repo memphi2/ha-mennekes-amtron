@@ -16,7 +16,6 @@ from urllib.parse import urlsplit
 from aiohttp import ClientError, ClientSession
 
 from .device.charging_display import DISPLAY_OPTIONS
-from .device.charging_session import CompletedSession
 from .device.client_errors import AmtronConnectionError
 from .device.command_events import CommandEvents, command_source
 from .device.const import (
@@ -241,21 +240,6 @@ class ServiceClient:
             retried = payload["connection_retries"]
             if retried is not None and (type(retried) is not int or retried < 0):
                 raise ValueError("invalid connection retry count")
-            section = "charging_session"
-            session_supported = False
-            completed_session = None
-            if "charging_session" in payload:
-                summary = payload["charging_session"]
-                if (
-                    not isinstance(summary, dict)
-                    or summary.keys() != {"supported", "latest"}
-                    or type(summary["supported"]) is not bool
-                    or (not summary["supported"] and summary["latest"] is not None)
-                ):
-                    raise ValueError("invalid charging session summary")
-                session_supported = summary["supported"]
-                if summary["latest"] is not None:
-                    completed_session = CompletedSession.parse(summary["latest"])
             section = "energy_sample"
             observed_at: float | None = None
             observed_energy: float | None = None
@@ -511,8 +495,6 @@ class ServiceClient:
             connection_retries=retried,
             energy_goal=goal.snapshot() if goal_supported else None,
             soc_goal=soc_goal.snapshot() if soc_supported else None,
-            charging_session=completed_session.as_dict() if completed_session is not None else None,
-            session_summary_supported=session_supported,
             energy_read=energy_read,
             energy_observed_at=observed_at,
         )

@@ -68,9 +68,6 @@ def owners(monkeypatch, entry, *, failure=None):
 
             async def observe(data):
                 events.append(f"{name}.observe")
-                # The service summarizes the sessions estimates follow.
-                if data is not None:
-                    assert data.session_summary_supported
 
             async def stop():
                 assert entry.runtime_data.coordinator.observe_session is None
@@ -104,7 +101,6 @@ def test_direct_estimates_are_wired_before_first_poll_and_closed_after_successfu
         runtime = entry.runtime_data
         assert (runtime.charge_loss is not None) is loss
         assert (runtime.charging_cost is not None) is cost
-        assert runtime.coordinator.data.session_summary_supported
         if cost:
             assert events[:2] == ["cost.start", "cost.observe"]
         if loss:
@@ -239,7 +235,6 @@ def test_app_entry_estimates_follow_the_apps_sessions_and_keep_saved_losses(tmp_
                 monkeypatch.setattr(integration, "async_get_clientsession", lambda _hass: session)
                 assert await integration.async_setup_entry(hass, entry)
                 runtime = entry.runtime_data
-                assert runtime.coordinator.data.session_summary_supported
                 assert await asyncio.to_thread(losses.path.exists)
                 assert Platform.BUTTON in runtime.loaded_platforms
                 if enabled:

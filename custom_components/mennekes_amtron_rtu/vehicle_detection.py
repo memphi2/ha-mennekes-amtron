@@ -17,9 +17,9 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
+from .charge_watch import confirm_automatic_vehicle
 from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
-from .loss_attribution import confirm_automatic_vehicle
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
     CONF_VEHICLE_AUTO_SELECTION,

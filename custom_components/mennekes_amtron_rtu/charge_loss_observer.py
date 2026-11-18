@@ -8,7 +8,6 @@ import math
 import time
 from contextlib import suppress
 from typing import TYPE_CHECKING
-from uuid import NAMESPACE_URL, uuid5
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -28,23 +27,19 @@ from .charge_loss_const import (
     LOSS_SOURCE_SENSOR,
     LOSS_SOURCE_VEHICLE_HISTORY,
 )
-from .device.charge_loss import LossStatistics
-from .device.charging_session import CompletedSession
-from .device.const import DOMAIN
-from .device.data import WallboxData
+from .charge_watch import PlugCycle, charge_watch, loss_vehicle_options
+from .device.charge_loss import Charge, LossStatistics
 from .device.enums import EvseState
-from .device.meter_log import MeterLog
+from .device.meter_log import MAX_INTERPOLATION_SECONDS
 from .device.notice import FailureNotice
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
-from .device.registers import ENERGY_TOTAL, EVSE_STATE
+from .device.registers import EVSE_STATE
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import _finish_atomic
-from .loss_attribution import attributed_session, loss_vehicle_options
 from .loss_store import LossStore
 from .vehicle_profiles import (
     CONF_VEHICLE_PROFILE_ID,
-    CONF_VEHICLE_PROFILE_SELECTED_AT,
 )
 from .vehicle_sources import loss_source, resolve_history_source
 
@@ -53,12 +48,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _RETRY_DELAYS = (60, 300, 1800)
-
-
-def meter_log(hass: HomeAssistant, entry_id: str) -> MeterLog:
-    """The wallbox's meter readings; they outlive a reload of the entry."""
-    logs: dict[str, MeterLog] = hass.data.setdefault(f"{DOMAIN}_meter_log", {})
-    return logs.setdefault(entry_id, MeterLog())
 
 
 def vehicle_energy(state: State | None) -> float | None:
@@ -85,12 +74,6 @@ class ChargeLossObserver:
         options = loss_vehicle_options(hass, entry)
         self._profile_id: str | None = options.get(CONF_VEHICLE_PROFILE_ID)
         self._profiled = self._profile_id is not None
-        selected_at = options.get(CONF_VEHICLE_PROFILE_SELECTED_AT, 0)
-        self._selected_at = (
-            float(selected_at)
-            if type(selected_at) in (int, float) and math.isfinite(selected_at) and selected_at >= 0
-            else float("inf")
-        )
         self.mode = loss_source(options)
         self._entity = str(options.get(CONF_VEHICLE_LAST_CHARGE_ENERGY, ""))
         self._auto = options.get(CONF_LOSS_AUTO_MATCH, False)
@@ -107,9 +90,10 @@ class ChargeLossObserver:
             hass, entry.entry_id, identity, profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
         )
         self.statistics = LossStatistics()
-        self._meter = meter_log(hass, entry.entry_id)
+        self._watch = charge_watch(hass, entry.entry_id)
         self._charging = False
-        self._session: CompletedSession | None = None
+        self._cycle: PlugCycle | None = None
+        self._charge: Charge | None = None
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -127,20 +111,20 @@ class ChargeLossObserver:
 
     @property
     def available(self) -> bool:
-        data = self._coordinator.current_data()
-        if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
-            # The vehicle's record is measured against the wallbox meter.
-            return (
-                self._storage_ok and self._source_ready and data.energy_observed_at is not None
-                and self._history_source is not None and self._history_source.available
-            )
-        return self._storage_ok and self._source_ready and data.session_summary_supported
+        # Every estimate is measured against the wallbox's energy meter.
+        return (
+            self._storage_ok and self._source_ready
+            and self._coordinator.current_data().energy_observed_at is not None
+            and (self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
+                self._history_source is not None and self._history_source.available
+            ))
+        )
 
     @property
     def can_assign(self) -> bool:
         return (
             self.mode == LOSS_SOURCE_SENSOR and self.available
-            and self._session is not None and self._unplugged()
+            and self._charge is not None and self._unplugged()
         )
 
     def _unplugged(self) -> bool:
@@ -150,7 +134,9 @@ class ChargeLossObserver:
     async def async_start(self) -> None:
         try:
             self.statistics = await self._store.async_load()
-        except (ValueError, OSError):
+        except ValueError:
+            _LOGGER.warning("Charging loss: saved estimates unusable; starting without them")
+        except OSError:
             self._storage_ok = False
             self._storage_corrupt = True
             _LOGGER.warning("Charging loss: storage cannot be read; optional loss estimates are unavailable")
@@ -211,57 +197,52 @@ class ChargeLossObserver:
             if not self._source_ready:
                 return
             initial = True
-        data = self._coordinator.current_data()
+        self._watch.observe(self._entry)
         if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
-            self._meter_updated(data, initial=initial)
-            return
-        session = CompletedSession.parse(data.charging_session) if data.charging_session else None
-        ownership = (
-            attributed_session(self._hass, self._entry, self._profile_id, session)
-            if self._profile_id is not None and session is not None else None
-        )
-        if self._profiled and (
-            session is None or ownership is False
-            or (ownership is None and session.started_after < self._selected_at)
-        ):
-            # A newly selected vehicle does not own an earlier wallbox session.
-            # Retain this profile's saved last match and weighted average.
-            self._session = None
-            self._pending = False
-            return
-        if session != self._session or initial:
-            self._session = session
+            # The vehicle's record follows the stop by a while: retry for it.
+            charging = self._coordinator.current_data().get(EVSE_STATE.key) == EvseState.CHARGING
+            stopped, self._charging = self._charging and not charging, charging
+            if initial or stopped:
+                self._attempt = 0
+                if self._retry is not None:
+                    self._retry()
+                    self._retry = None
+                self._queue()
+                return
+        elif self._plug_cycle_measured():
             self._queue()
-        elif not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
+            return
+        if not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
+            # A failed save discarded the candidate: form it again.
             self._queue()
 
-    def _meter_updated(self, data: WallboxData, *, initial: bool) -> None:
-        """Log the meter; ask the vehicle for its record once charging has stopped."""
-        energy = data.get(ENERGY_TOTAL.key)
-        if (
-            self._coordinator.last_update_success and data.energy_read
-            and data.energy_observed_at is not None
-            and isinstance(energy, (int, float)) and not isinstance(energy, bool)
-        ):
-            self._meter.observe(data.energy_observed_at, float(energy))
-        charging = data.get(EVSE_STATE.key) == EvseState.CHARGING
-        stopped, self._charging = self._charging and not charging, charging
-        if initial or stopped:
-            # The vehicle's record follows the stop by a while: retry for it.
-            self._attempt = 0
-            if self._retry is not None:
-                self._retry()
-                self._retry = None
-            self._queue()
-        elif not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
-            # A failed save discarded the candidate; read the record again.
-            self._queue()
+    def _plug_cycle_measured(self) -> bool:
+        """Take the last plug cycle of this car once the meter covers it."""
+        cycle = self._watch.last
+        if cycle is None or cycle == self._cycle:
+            return False
+        if self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id):
+            # Another car's charge: this profile keeps its last match and average.
+            self._cycle, self._charge = cycle, None
+            return False
+        energy = self._watch.meter.energy_between(cycle.plugged_at, cycle.unplugged_at)
+        if energy is None:
+            # The reading after the unplug is still to come; it does not come
+            # any more once the meter log cannot place the boundary.
+            if time.time() - cycle.unplugged_at > MAX_INTERPOLATION_SECONDS:
+                self._cycle = cycle
+            return False
+        self._cycle = cycle
+        if energy <= 0:
+            return False
+        self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy)
+        return True
 
     @callback
     def _queue(self) -> None:
         if (
             self._stopping or self._storage_corrupt or not self._source_ready
-            or (self.mode != LOSS_SOURCE_VEHICLE_HISTORY and self._profiled and self._session is None)
+            or (self.mode != LOSS_SOURCE_VEHICLE_HISTORY and self._charge is None)
         ):
             return
         self._pending = True
@@ -274,29 +255,29 @@ class ChargeLossObserver:
             if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
                 await self._measure_record()
                 continue
-            session = self._session
+            charge = self._charge
+            if charge is None:
+                continue
             energy: float | None = None
             change: tuple[float, float] | None = None
-            if session is not None and self._auto and self._change is not None and self._unplugged():
+            if self._auto and self._change is not None and self._unplugged():
                 at, value = self._change
-                if self._started_at <= session.disconnected_at <= at <= session.disconnected_at + LOSS_MATCH_WINDOW_SECONDS:
+                if self._started_at <= charge.end <= at <= charge.end + LOSS_MATCH_WINDOW_SECONDS:
                     energy = value
                     change = self._change
             async with self._lock:
-                if session != self._session or self._stopping:
+                if charge != self._charge or self._stopping:
                     continue
                 candidate = LossStatistics.restore(self.statistics.snapshot())
-                candidate.observe_session(session)
-                if session is not None and energy is not None and (
-                    change is None or self._change is change
-                ):
-                    candidate.apply(session, energy, association="changed_value")
+                candidate.observe_charge(charge)
+                if energy is not None and self._change is change:
+                    candidate.apply(charge, energy, association="changed_value")
                 if await self._save(candidate) and change is not None and self._change is change:
                     self._change = None
 
     async def _measure_record(self) -> None:
         """Compare the vehicle's newest record with the meter over the same span."""
-        source, since = self._history_source, self._meter.first_at
+        source, since = self._history_source, self._watch.meter.first_at
         self._last_query = time.monotonic()
         record = None
         if source is not None and since is not None:
@@ -310,15 +291,12 @@ class ChargeLossObserver:
                 # the same bounded retry policy applies to this provider.
                 # Do not log exception messages that may contain VINs.
                 _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
-        wallbox = self._meter.energy_between(record.start, record.end) if record is not None else None
+        wallbox = self._watch.meter.energy_between(record.start, record.end) if record is not None else None
         if record is None or wallbox is None or wallbox <= 0:
             # No record yet, or the meter reading after its end is still to come.
             self._schedule_retry()
             return
-        session = CompletedSession(
-            str(uuid5(NAMESPACE_URL, f"vehicle-record:{record.start!r}:{record.end!r}:{wallbox!r}")),
-            record.start, record.end, record.start, record.start, record.end, record.end, wallbox,
-        )
+        session = Charge(record.start, record.end, wallbox)
         async with self._lock:
             if self._stopping:
                 return
@@ -378,16 +356,16 @@ class ChargeLossObserver:
     async def async_assign(self) -> None:
         """Explicitly associate a last-energy value; never change charging state."""
         async with self._lock:
-            if self._stopping or not self.can_assign or self._session is None:
+            if self._stopping or not self.can_assign or self._charge is None:
                 raise service_validation_error("loss_unavailable")
             energy = vehicle_energy(self._hass.states.get(self._entity))
-            if energy is None or energy > self._session.wallbox_kwh:
+            if energy is None or energy > self._charge.wallbox_kwh:
                 raise service_validation_error("loss_energy_invalid")
             # The explicit assignment supersedes older buffered estimates.
             # Events arriving during the save form a new candidate and survive.
             self._change = None
             candidate = LossStatistics.restore(self.statistics.snapshot())
-            candidate.apply(self._session, energy, association="manual")
+            candidate.apply(self._charge, energy, association="manual")
             if not await self._save(candidate):
                 raise service_validation_error("loss_storage_unavailable")
 

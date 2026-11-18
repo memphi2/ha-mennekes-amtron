@@ -6,7 +6,6 @@ import asyncio
 import time
 from types import SimpleNamespace
 from unittest.mock import patch
-from uuid import uuid4
 
 import pytest
 from homeassistant.core import HomeAssistant, State
@@ -17,9 +16,6 @@ from custom_components.mennekes_amtron_rtu.cost_observer import (
     electricity_price,
 )
 from custom_components.mennekes_amtron_rtu.device.charging_cost import CostResult
-from custom_components.mennekes_amtron_rtu.device.charging_session import (
-    CompletedSession,
-)
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.registers import (
@@ -81,17 +77,11 @@ def test_only_actual_tariff_changes_with_unchanged_connection_can_skip_reload(tm
     asyncio.run(run())
 
 
-def data(at, energy, *, present=False, fresh=True, session=None):
+def data(at, energy, *, present=False, fresh=True):
     return WallboxData(
         values={ENERGY_TOTAL.key: energy, EVSE_STATE.key: EvseState.CHARGING if present else EvseState.IDLE, CP_STATE.key: CpState.C2 if present else CpState.A1},
         energy_read=fresh, energy_observed_at=at,
-        charging_session=session.as_dict() if session else None,
-        session_summary_supported=True,
     )
-
-
-def completed(at, energy=10):
-    return CompletedSession(str(uuid4()), at, at+100, at+5, at+10, at+90, at+95, energy)
 
 
 @pytest.mark.parametrize(("value", "unit", "expected"), [
@@ -114,7 +104,6 @@ def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
         hass.states.async_set("sensor.price", "0.20", {"unit_of_measurement": "EUR/kWh"})
         observer = ChargingCostObserver(hass, entry(dynamic=True))
         at = time.time()+1
-        session = completed(at)
         try:
             await observer.async_start()
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at):
@@ -126,7 +115,7 @@ def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
 
             observer._price_changed(SimpleNamespace(data={"new_state": State("sensor.price", "0.40", {"unit_of_measurement": "EUR/kWh"})}, time_fired=datetime.fromtimestamp(at+50, UTC)))
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+100):
-                await observer.async_observe(data(at+100, 110, session=session))
+                await observer.async_observe(data(at+100, 110))
             assert observer.last.result.cost == pytest.approx(3)
             assert observer.last.result.energy_kwh == 10
         finally:
@@ -186,7 +175,6 @@ def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp
         configured.options["active_vehicle_profile"] = "first"
         observer = ChargingCostObserver(hass, configured)
         at = time.time() + 1
-        session = completed(at)
         try:
             await observer.async_start()
             for offset, energy, present in ((0, 100, False), (10, 102, True)):
@@ -198,7 +186,7 @@ def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp
             observer.rebind(configured)
             for offset, energy, present in ((50, 105, True), (100, 110, False)):
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, session=session if not present else None))
+                    await observer.async_observe(data(at + offset, energy, present=present))
             assert observer.last.result.cost == pytest.approx(3)
             assert observer.last.result.complete
             # The rebinding updates its configuration baseline, so a later
@@ -265,7 +253,6 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
         configured = entry(dynamic=True)
         observer = ChargingCostObserver(hass, configured)
         at = time.time() + 1
-        session = completed(at)
         try:
             await observer.async_start()
             initial_subscription = observer._unsubscribe
@@ -284,7 +271,7 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
             observer.rebind(configured)
             assert observer._unsubscribe is initial_subscription
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 100):
-                await observer.async_observe(data(at + 100, 110, session=session))
+                await observer.async_observe(data(at + 100, 110))
             assert observer.last.result.complete
             assert observer.last.result.cost == pytest.approx(3)
         finally:
@@ -311,7 +298,7 @@ def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path):
                 await observer.async_observe(data(at+25, 102.5, present=True))
                 await observer.async_observe(None)
             with patch(clock, return_value=at+100):
-                await observer.async_observe(data(at+100, 110, session=completed(at)))
+                await observer.async_observe(data(at+100, 110))
             assert observer.last.result.cost == pytest.approx(3)
             assert observer.last.result.complete
         finally:
@@ -328,15 +315,15 @@ def test_session_published_after_the_next_idle_reading_keeps_its_cost(tmp_path):
         try:
             await observer.async_start()
             clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            for offset, energy, present, summary in (
-                (0, 100, False, None),
-                (25, 102.5, True, None),
-                (90, 110, True, None),
-                (100, 110, False, None),  # HA first sees the meter read only once unplugged.
-                (160, 110, False, completed(at)),  # The app publishes the session later.
+            for offset, energy, present in (
+                (0, 100, False),
+                (25, 102.5, True),
+                (90, 110, True),
+                (100, 110, False),  # HA first sees the meter read only once unplugged.
+                (160, 110, False),
             ):
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, session=summary))
+                    await observer.async_observe(data(at + offset, energy, present=present))
             assert observer.last.result.complete
             assert observer.last.result.cost == pytest.approx(3)
         finally:
@@ -361,7 +348,7 @@ def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
                 "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
             assert observer.apply_tariff_only_update()
             with patch(clock, return_value=at+160):
-                await observer.async_observe(data(at+160, 110, session=completed(at)))
+                await observer.async_observe(data(at+160, 110))
             assert not observer.last.result.complete
         finally:
             await observer.async_stop()

@@ -45,6 +45,10 @@ Vehicle profiles retain their own averages when you switch between cars.
 Changing a profile's selected vehicle or energy source starts a new average for
 that source.
 
+With a vehicle energy sensor, the wallbox side of a charge is the total
+energy meter's difference between plug-in and unplug, as Home Assistant saw
+them. A plug cycle without delivered energy changes nothing.
+
 For manual selection, choose the correct profile **before charging begins**.
 Automatic cable/home recognition may arrive after the wallbox detects charging;
 it can still identify that same observed cycle if no conflicting vehicle was
@@ -261,14 +265,13 @@ with one correctable latest match are retained outside Recorder. There is no
 growing list of sessions, raw vehicle history or price history. The current
 pricing interval keeps at most 256 price changes; overflow makes the estimate incomplete.
 
-Loss values change only when an assignment, a completed session or the car's newest record changes. Costs
+Loss values change only when an assignment, a completed plug cycle or the car's newest record changes. Costs
 are rounded to cents and the last-cost energy attributes to 0.01 kWh. No extra
 long-term statistics are created. The current-cost entity is disabled by
 default; leaving it disabled keeps only the final cost in Recorder.
 
-The app can continue observing a wallbox cycle while HA restarts. A
-BavarianData record needs HA's own meter readings over its whole span. Cost
-calculation runs in HA, so a running app cannot reconstruct a complete cost
-across HA downtime, even with a fixed price. A service restart also loses the
-uncompleted session anchor. Previously completed results remain stored. Storage
+Losses and costs are measured in HA against the wallbox's total energy meter.
+A charge needs HA's own meter readings over its whole span: a plug cycle or a
+BavarianData record that began before HA started cannot be measured, even with
+a fixed price. Previously completed results remain stored. Storage
 problems affect these optional estimates, not heartbeat or charging commands.
