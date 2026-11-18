@@ -91,12 +91,14 @@ class ChargeMeter:
     def __init__(self) -> None:
         self.log = MeterLog()
         self.last: tuple[float, float] | None = None
+        # Since when presence has been known without a long gap.
+        self.known_since: float | None = None
         self._gap = PresenceGap()
         self._lose_cycle()
 
     def _lose_cycle(self) -> None:
         """Nobody saw the whole cycle any more: it cannot be measured."""
-        self._present: bool | None = None
+        self.present: bool | None = None
         self.plugged_at: float | None = None
         self.charging_at: float | None = None
 
@@ -108,24 +110,30 @@ class ChargeMeter:
         if reading is not None:
             self.log.observe(now, reading)
         if self._gap.observe(now, known=present is not None):
+            # A long gap may hide an unplug, and another car.
             self._lose_cycle()
+            self.known_since = None
         if present is None:
             return
+        if self.known_since is None:
+            self.known_since = now
         if not present:
-            if self._present and self.plugged_at is not None:
+            if self.present and self.plugged_at is not None:
                 self.last = (self.plugged_at, now)
             self._lose_cycle()
-            self._present = False
+            self.present = False
             return
-        if self._present is False:
+        if self.present is False:
             self.plugged_at = now
-        self._present = True
+        self.present = True
         if charging and self.charging_at is None and self.plugged_at is not None:
             self.charging_at = now
 
     def snapshot(self) -> dict[str, Any]:
         return {
             "first_reading_at": self.log.first_at,
+            "known_since": self.known_since,
+            "present": self.present,
             "plugged_at": self.plugged_at,
             "charging_at": self.charging_at,
             "last": list(self.last) if self.last is not None else None,
@@ -135,8 +143,8 @@ class ChargeMeter:
 def parse_charge_meter(raw: object) -> dict[str, Any]:
     """Validate what a service reports of its charge meter."""
     if not isinstance(raw, dict) or raw.keys() != {
-        "first_reading_at", "plugged_at", "charging_at", "last",
-    }:
+        "first_reading_at", "known_since", "present", "plugged_at", "charging_at", "last",
+    } or (raw["present"] is not None and type(raw["present"]) is not bool):
         raise ValueError("invalid charge meter")
     last = raw["last"]
     if last is not None:
@@ -148,6 +156,8 @@ def parse_charge_meter(raw: object) -> dict[str, Any]:
         last = (start, end)
     return {
         "first_reading_at": _moment(raw["first_reading_at"]),
+        "known_since": _moment(raw["known_since"]),
+        "present": raw["present"],
         "plugged_at": _moment(raw["plugged_at"]),
         "charging_at": _moment(raw["charging_at"]),
         "last": last,

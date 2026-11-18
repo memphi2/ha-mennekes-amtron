@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 from homeassistant.core import HomeAssistant, State
 
+from custom_components.mennekes_amtron_rtu import cost_observer
 from custom_components.mennekes_amtron_rtu.cost_observer import (
     ChargingCostObserver,
     LastChargingCost,
@@ -18,11 +19,16 @@ from custom_components.mennekes_amtron_rtu.cost_observer import (
 from custom_components.mennekes_amtron_rtu.device.charging_cost import CostResult
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.meter_log import (
+    ChargeMeter,
+    parse_charge_meter,
+)
 from custom_components.mennekes_amtron_rtu.device.registers import (
     CP_STATE,
     ENERGY_TOTAL,
     EVSE_STATE,
 )
+from custom_components.mennekes_amtron_rtu.device.vehicle import metered_vehicle_present
 
 
 def entry(*, dynamic=False):
@@ -77,6 +83,18 @@ def test_only_actual_tariff_changes_with_unchanged_connection_can_skip_reload(tm
     asyncio.run(run())
 
 
+async def feed(observer, data):
+    """One poll, with the plug state as the service's charge meter saw it."""
+    meter = observer.__dict__.setdefault("_service_meter", ChargeMeter())
+    now = cost_observer.time.time()
+    if data is None:
+        meter.observe(now, present=None)
+    else:
+        meter.observe(now, present=metered_vehicle_present(data.get, cp_supported=True))
+        data.charge_meter = parse_charge_meter(meter.snapshot())
+    await observer.async_observe(data)
+
+
 def data(at, energy, *, present=False, fresh=True):
     return WallboxData(
         values={ENERGY_TOTAL.key: energy, EVSE_STATE.key: EvseState.CHARGING if present else EvseState.IDLE, CP_STATE.key: CpState.C2 if present else CpState.A1},
@@ -107,15 +125,15 @@ def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
         try:
             await observer.async_start()
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at):
-                await observer.async_observe(data(at, 100))
+                await feed(observer, data(at, 100))
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+25):
-                await observer.async_observe(data(at+25, 102.5, present=True))
+                await feed(observer, data(at+25, 102.5, present=True))
             # Explicit event time makes the tariff boundary independent of test speed.
             from datetime import UTC, datetime
 
             observer._price_changed(SimpleNamespace(data={"new_state": State("sensor.price", "0.40", {"unit_of_measurement": "EUR/kWh"})}, time_fired=datetime.fromtimestamp(at+50, UTC)))
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+100):
-                await observer.async_observe(data(at+100, 110))
+                await feed(observer, data(at+100, 110))
             assert observer.last.result.cost == pytest.approx(3)
             assert observer.last.result.energy_kwh == 10
         finally:
@@ -179,14 +197,14 @@ def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp
             await observer.async_start()
             for offset, energy, present in ((0, 100, False), (10, 102, True)):
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present))
+                    await feed(observer, data(at + offset, energy, present=present))
             assert observer.current.complete
             configured.options = {**configured.options, "active_vehicle_profile": "second"}
             assert observer.retain_for_reload(configured)
             observer.rebind(configured)
             for offset, energy, present in ((50, 105, True), (100, 110, False)):
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present))
+                    await feed(observer, data(at + offset, energy, present=present))
             assert observer.last.result.cost == pytest.approx(3)
             assert observer.last.result.complete
             # The rebinding updates its configuration baseline, so a later
@@ -257,9 +275,9 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
             await observer.async_start()
             initial_subscription = observer._unsubscribe
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at):
-                await observer.async_observe(data(at, 100))
+                await feed(observer, data(at, 100))
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 25):
-                await observer.async_observe(data(at + 25, 102.5, present=True))
+                await feed(observer, data(at + 25, 102.5, present=True))
             configured.options = {**configured.options, "active_vehicle_profile": "second"}
             assert observer.retain_for_reload(configured)
             # Polling has stopped for the logical reload. Price subscriptions
@@ -271,7 +289,7 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
             observer.rebind(configured)
             assert observer._unsubscribe is initial_subscription
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 100):
-                await observer.async_observe(data(at + 100, 110))
+                await feed(observer, data(at + 100, 110))
             assert observer.last.result.complete
             assert observer.last.result.cost == pytest.approx(3)
         finally:
@@ -289,16 +307,16 @@ def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path):
             await observer.async_start()
             clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
             with patch(clock, return_value=at):
-                await observer.async_observe(data(at, 100))
+                await feed(observer, data(at, 100))
             with patch(clock, return_value=at+5):
                 transition = data(at+5, 100, fresh=False)
                 transition.values[CP_STATE.key] = CpState.B1  # CP leads the EVSE state
-                await observer.async_observe(transition)
+                await feed(observer, transition)
             with patch(clock, return_value=at+25):
-                await observer.async_observe(data(at+25, 102.5, present=True))
-                await observer.async_observe(None)
+                await feed(observer, data(at+25, 102.5, present=True))
+                await feed(observer, None)
             with patch(clock, return_value=at+100):
-                await observer.async_observe(data(at+100, 110))
+                await feed(observer, data(at+100, 110))
             assert observer.last.result.cost == pytest.approx(3)
             assert observer.last.result.complete
         finally:
@@ -323,7 +341,7 @@ def test_session_published_after_the_next_idle_reading_keeps_its_cost(tmp_path):
                 (160, 110, False),
             ):
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present))
+                    await feed(observer, data(at + offset, energy, present=present))
             assert observer.last.result.complete
             assert observer.last.result.cost == pytest.approx(3)
         finally:
@@ -343,12 +361,12 @@ def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
             clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
             for offset, energy, present, fresh in ((0, 100, False, True), (25, 105, True, True), (100, 110, False, False)):
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh))
+                    await feed(observer, data(at + offset, energy, present=present, fresh=fresh))
             configured.options = {**configured.options, "charging_network_tariff": {
                 "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
             assert observer.apply_tariff_only_update()
             with patch(clock, return_value=at+160):
-                await observer.async_observe(data(at+160, 110))
+                await feed(observer, data(at+160, 110))
             assert not observer.last.result.complete
         finally:
             await observer.async_stop()
@@ -367,7 +385,7 @@ def test_long_outage_keeps_the_running_cost_without_claiming_completeness(tmp_pa
             for offset, value in ((0, data(at, 100)), (10, data(at+10, 101, present=True)), (60, None), (200, None),
                                   (210, data(at+210, 105, present=True)), (270, data(at+270, 106, present=True))):
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(value)
+                    await feed(observer, value)
             assert not observer.current.complete
             assert observer.current.energy_kwh == 6
         finally:
@@ -387,7 +405,7 @@ def test_an_idle_poll_without_a_meter_read_keeps_the_running_cost_baseline(tmp_p
             for offset, value in ((0, data(at, 100)), (10, data(at+10, 100, fresh=False)),
                                   (20, data(at+20, 105, present=True))):
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(value)
+                    await feed(observer, value)
             assert observer.current.complete
             assert observer.current.energy_kwh == 5
         finally:
@@ -406,11 +424,11 @@ def test_waiting_plugged_in_moves_the_running_cost_start_past_a_tariff_edit(tmp_
             await observer.async_start()
             clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
             with patch(clock, return_value=at):
-                await observer.async_observe(data(at, 100))
+                await feed(observer, data(at, 100))
             waiting = data(at+10, 100)
             waiting.values[EVSE_STATE.key], waiting.values[CP_STATE.key] = EvseState.EV_CONNECTED, CpState.B1
             with patch(clock, return_value=at+10):
-                await observer.async_observe(waiting)
+                await feed(observer, waiting)
             configured.options = {**configured.options, "charging_network_tariff": {
                 "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
             with patch(clock, return_value=at+20):
@@ -420,7 +438,7 @@ def test_waiting_plugged_in_moves_the_running_cost_start_past_a_tariff_edit(tmp_
                 if energy == 100:
                     reading.values[EVSE_STATE.key], reading.values[CP_STATE.key] = EvseState.EV_CONNECTED, CpState.B1
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(reading)
+                    await feed(observer, reading)
             assert observer.current.complete
             assert observer.current.energy_kwh == 5
         finally:
@@ -441,7 +459,7 @@ def test_a_failed_meter_read_after_unplug_does_not_start_the_next_cost_mid_charg
                                   (20, data(at+20, None)),  # read failed, new sample time
                                   (30, data(at+30, 110, present=True))):
                 with patch(clock, return_value=at + offset):
-                    await observer.async_observe(value)
+                    await feed(observer, value)
             assert not observer.current.complete
             assert observer.current.energy_kwh == 0
         finally:
@@ -467,7 +485,7 @@ def test_replug_before_a_meter_read_starts_a_complete_running_cost(tmp_path, see
             readings += [waiting, data(at+40, 110, present=True)]
             for value in readings:
                 with patch(clock, return_value=value.energy_observed_at):
-                    await observer.async_observe(value)
+                    await feed(observer, value)
             # Without the unplug poll it is one cycle from the first idle reading.
             assert observer.current.complete
             assert observer.current.energy_kwh == (2 if seen_unplugged else 10)
@@ -495,7 +513,7 @@ def reading(at, energy, state, *, fresh=True):
 async def play(observer, at, steps):
     for offset, energy, state, *rest in steps:
         with patch(CLOCK, return_value=at + offset):
-            await observer.async_observe(
+            await feed(observer,
                 None if state is None else reading(at + offset, energy, state, fresh=not rest or rest[0])
             )
 
@@ -628,7 +646,7 @@ def test_an_old_cached_reading_is_no_baseline(tmp_path):
     async def body(_hass, observer, at):
         await play(observer, at, [(-100, 100, "idle")])
         with patch(CLOCK, return_value=at):
-            await observer.async_observe(reading(at, 101, "charging"))
+            await feed(observer, reading(at, 101, "charging"))
         assert not observer.current.complete
         await play(observer, at, [(60, 110, "charging"), (100, 110, "idle")])
         # Only the observed part is priced, and it says so.
@@ -657,9 +675,9 @@ def test_a_long_gap_after_the_unplug_drops_the_pending_final_reading(tmp_path):
         unknown = reading(at + 80, 105, "idle", fresh=False)
         unknown.values[EVSE_STATE.key] = unknown.values[CP_STATE.key] = None
         with patch(CLOCK, return_value=at + 80):
-            await observer.async_observe(unknown)
+            await feed(observer, unknown)
         with patch(CLOCK, return_value=at + 4000):
-            await observer.async_observe(unknown)
+            await feed(observer, unknown)
         # Another car may have charged meanwhile: the old charge stays as it was.
         await play(observer, at, [(4010, 130, "idle")])
         assert observer.last.result.cost == pytest.approx(1.5)

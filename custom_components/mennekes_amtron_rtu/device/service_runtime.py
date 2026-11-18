@@ -46,7 +46,7 @@ from .service_version import SERVICE_VERSION
 from .soc_goal import SocGoal
 from .soc_goal_controller import SocGoalController
 from .soc_transactions import SocTransactions
-from .vehicle import snapshot_vehicle_connected
+from .vehicle import snapshot_metered_vehicle_present
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
@@ -419,7 +419,7 @@ class ModbusService:
             sample = self._energy_sample if self.data.energy_read else None
             self.charge_meter.observe(
                 (sample["observed_at"] if sample is not None else None) or wall_clock(),
-                present=snapshot_vehicle_connected(self.data.get, self.identity.layout_version),
+                present=snapshot_metered_vehicle_present(self.data.get, self.identity.layout_version),
                 charging=self.data.get(EVSE_STATE.key) == EvseState.CHARGING,
                 reading=sample["value"] if sample is not None else None,
             )

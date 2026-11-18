@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The service keeps a bounded log of meter readings and the last plug cycle
   (`charge_meter` in its status) and answers `POST /v2/energy` for any time
   span; a restart of Home Assistant no longer interrupts a loss measurement.
+  The charging cost takes the plug state and its gaps from there as well.
 - The charging cost follows the charge itself: the current charge starts at
   0.00 at the plug-in, runs while charging and is 0.00 again after the
   unplug; the last charge takes its value over whenever charging stops and at

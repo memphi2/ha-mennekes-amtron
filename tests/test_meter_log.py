@@ -73,13 +73,15 @@ def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
     meter.observe(40, present=True, charging=True, reading=101)
     meter.observe(50, present=True, charging=True, reading=104)
     assert meter.snapshot() == {
-        "first_reading_at": 10, "plugged_at": 30, "charging_at": 40, "last": None,
+        "first_reading_at": 10, "known_since": 10, "present": True,
+        "plugged_at": 30, "charging_at": 40, "last": None,
     }
     # One poll without an answer is bridged.
     meter.observe(60, present=None)
     meter.observe(70, present=False, reading=105)
     assert meter.snapshot() == {
-        "first_reading_at": 10, "plugged_at": None, "charging_at": None, "last": [30, 70],
+        "first_reading_at": 10, "known_since": 10, "present": False,
+        "plugged_at": None, "charging_at": None, "last": [30, 70],
     }
     assert meter.log.energy_between(*meter.last) == pytest.approx(4)
     assert parse_charge_meter(meter.snapshot())["last"] == (30, 70)
@@ -87,13 +89,20 @@ def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
     meter.observe(80, present=True)
     meter.observe(90, present=None)
     meter.observe(900, present=True)
+    assert meter.known_since == 900
     meter.observe(910, present=False)
     assert meter.last == (30, 70)
+    # A clock that stepped back measures the gap from there.
+    meter.observe(500, present=None)
+    meter.observe(510, present=False)
+    assert meter.known_since == 900
+    assert meter.present is False
 
 
 @pytest.mark.parametrize("changes", [
     {"extra": 1}, {"last": [1]}, {"last": (1, 2)}, {"last": [2, 1]}, {"last": [None, 2]},
     {"plugged_at": "1"}, {"charging_at": True}, {"first_reading_at": float("nan")},
+    {"present": 1}, {"known_since": []},
 ])
 def test_a_reported_charge_meter_is_checked(changes) -> None:
     raw = {**ChargeMeter().snapshot(), **changes}

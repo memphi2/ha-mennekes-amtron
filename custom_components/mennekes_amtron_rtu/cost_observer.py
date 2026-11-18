@@ -39,9 +39,7 @@ from .device.charging_cost import (
 from .device.data import WallboxData
 from .device.enums import EvseState
 from .device.notice import FailureNotice
-from .device.presence_gap import PresenceGap
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
-from .device.vehicle import snapshot_metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 
@@ -114,7 +112,8 @@ class ChargingCostObserver:
         # The start of a charge whose car left before its final meter reading.
         self._closing_start: CostCheckpoint | None = None
         self._closing_partial = False
-        self._gap = PresenceGap()
+        # Since when the service has known the plug state without a long gap.
+        self._known_since: float | None = None
         self._started_at = time.time()
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
@@ -259,12 +258,17 @@ class ChargingCostObserver:
         now = time.time()
         if data is None:
             # One failed poll is no meter evidence: the next reading spans the
-            # gap. A long gap may hide another car for the running estimate.
-            self._presence(now, known=False)
+            # gap, and the service judges how long the plug state was unknown.
             return
         self._supported = data.energy_observed_at is not None
-        present = snapshot_metered_vehicle_present(data.get, self._entry.runtime_data.identity.layout_version)
-        self._presence(now, known=present is not None)
+        # The plug state as the service saw it, which runs on without us.
+        meter = data.charge_meter or {}
+        present = meter.get("present")
+        known_since = meter.get("known_since")
+        if known_since != self._known_since:
+            if self._known_since is not None:
+                self._gap_passed()
+            self._known_since = known_since
         at = data.energy_observed_at or 0.0
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         energy = data.get(ENERGY_TOTAL.key)
@@ -308,17 +312,17 @@ class ChargingCostObserver:
         if self._dirty and time.monotonic() >= self._retry_at:
             await self._save()
 
-    def _presence(self, now: float, *, known: bool) -> None:
-        if self._gap.observe(now, known=known):
-            # A long gap may hide another car. A running charge goes on but
-            # no longer counts as complete; a baseline without a car, and a
-            # charge waiting for its final reading, do not survive it.
-            if self._active and self._cycle_start is not None:
-                self._cycle_partial = True
-            else:
-                self._cycle_start, self._cycle_partial = None, False
-            self._unplugged = False
-            self._closing_start = None
+    def _gap_passed(self) -> None:
+        """The service lost sight of the plug state for too long."""
+        # A long gap may hide another car. A running charge goes on but no
+        # longer counts as complete; a baseline without a car, and a charge
+        # waiting for its final reading, do not survive it.
+        if self._active and self._cycle_start is not None:
+            self._cycle_partial = True
+        else:
+            self._cycle_start, self._cycle_partial = None, False
+        self._unplugged = False
+        self._closing_start = None
 
     async def _save(self) -> None:
         try:

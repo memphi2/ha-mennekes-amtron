@@ -23,6 +23,7 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
 )
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.meter_log import ChargeMeter
 from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
@@ -293,8 +294,8 @@ def test_the_service_measures_a_plug_cycle_and_answers_for_any_span(tmp_path):
                 service._poller.async_poll = polling
                 await observe(service, transport, clock, 1030, EvseState.IDLE, 106)
                 assert service.snapshot()["charge_meter"] == {
-                    "first_reading_at": 1000, "plugged_at": None, "charging_at": None,
-                    "last": [1010, 1030],
+                    "first_reading_at": 1000, "known_since": 1000, "present": False,
+                    "plugged_at": None, "charging_at": None, "last": [1010, 1030],
                 }
                 data = client.apply_snapshot(service.snapshot())
                 assert data.charge_meter["last"] == (1010, 1030)
@@ -322,7 +323,7 @@ def test_the_service_measures_a_plug_cycle_and_answers_for_any_span(tmp_path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("meter", [None, {}, {"last": [2, 1], "first_reading_at": None, "plugged_at": None, "charging_at": None}])
+@pytest.mark.parametrize("meter", [None, {}, {**ChargeMeter().snapshot(), "last": [2, 1]}])
 def test_malformed_remote_charge_meter_cannot_be_published(tmp_path, meter):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
