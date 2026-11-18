@@ -34,12 +34,8 @@ def _key(error) -> str:
 
 
 def test_guest_button_uses_real_snapshot_and_identity_bound_command(tmp_path, monkeypatch):
-    from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-        DepartureModbusService,
-    )
     from tests import service_guest_fixture as runtime
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with (
             runtime.guest_service(tmp_path) as (service, transport, clock),
             TestServer(create_app(service)) as server, ClientSession() as session,
@@ -165,14 +161,10 @@ def test_failed_refresh_prevents_guest_start_and_reports_service_unavailable():
 def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypatch):
     from datetime import timedelta
 
-    from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-        DepartureModbusService,
-    )
     from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
     from tests import service_guest_fixture as runtime
 
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock), TestServer(
             create_app(service)
         ) as server, ClientSession() as session:
@@ -186,7 +178,7 @@ def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypat
             assert service.guest_deadline == deadline
             await control.async_set_target_time(None)
             assert service.guest_deadline is None
-            service._guest_scope = service._connection_sample().scope
+            service.guest.scope = service.guest.connection_sample().scope
             client.apply_snapshot(service.snapshot())
             assert control.guest_active()
     asyncio.run(run())

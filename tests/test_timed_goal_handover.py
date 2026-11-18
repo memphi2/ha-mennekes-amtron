@@ -402,7 +402,7 @@ def test_guest_mode_holds_vehicle_handover_but_keeps_explicit_time_editing(monke
     from unittest.mock import AsyncMock
     async def run():
         observer, service, _hass = handover(monkeypatch)
-        service.guest_active = lambda: True
+        service.guest.active = lambda: True
         service.async_set_target_time = AsyncMock()
         service.state["status"] = "guest_mode"
         original = observer.goal.snapshot()

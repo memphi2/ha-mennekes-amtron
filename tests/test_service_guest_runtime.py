@@ -8,10 +8,15 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
-from custom_components.mennekes_amtron_rtu.device.service_guest_runtime import (
-    GuestModbusService,
+from custom_components.mennekes_amtron_rtu.device.power_window import (
+    observed_phases,
 )
-from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
+from custom_components.mennekes_amtron_rtu.device.service_guest_runtime import (
+    GuestLimits,
+)
+from custom_components.mennekes_amtron_rtu.device.service_runtime import (
+    ModbusService,
+)
 from tests import service_guest_fixture as runtime
 
 
@@ -24,18 +29,17 @@ from tests import service_guest_fixture as runtime
     ({"switched_phases": 0, "grid_phases_connected": 99, "detected_ev_phases": 3}, 0),
 ])
 def test_power_learning_uses_selected_phases_not_vehicle_maximum(values, expected):
-    service = GuestModbusService.__new__(GuestModbusService)
-    service.data = WallboxData(values=values)
-    assert service._rate_phases() == expected
-    service.data.held = frozenset({"switched_phases"})
-    assert service._rate_phases() == 0
+    data = WallboxData(values=values)
+    assert (observed_phases(data.fresh) or 0) == expected
+    data.held = frozenset({"switched_phases"})
+    assert observed_phases(data.fresh) is None
 
 
 def test_stopping_and_malformed_guest_requests_never_write(tmp_path):
     async def run():
         async with runtime.guest_service(tmp_path) as (service, transport, _clock):
             payload = {"command":"guest_start", "expected_serial_number":service.identity.serial_number,
-                       "expected_guest_revision":service.guest_revision}
+                       "expected_guest_revision":service.guest.revision}
             with pytest.raises(ValueError, match="guest command"):
                 await service.command({**payload, "extra":True})
             service._stopping = True
@@ -48,8 +52,8 @@ def test_stopping_and_malformed_guest_requests_never_write(tmp_path):
 
 def test_bus_owner_return_cannot_leave_a_healthy_looking_guest_loop(monkeypatch):
     async def run():
-        service = GuestModbusService.__new__(GuestModbusService)
-        monkeypatch.setattr(ModbusService, "_run", AsyncMock())
+        service = ModbusService.__new__(ModbusService)
+        monkeypatch.setattr(ModbusService, "_run_polling", AsyncMock())
         with pytest.raises(RuntimeError, match="bus owner stopped"):
             await service._run_bus()
     asyncio.run(run())
@@ -58,16 +62,16 @@ def test_bus_owner_return_cannot_leave_a_healthy_looking_guest_loop(monkeypatch)
 def test_long_unknown_connection_discards_guest_permission(tmp_path, monkeypatch):
     async def run():
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
-            service._guest_scope = service._connection_sample().scope
-            assert service._guest_scope is not None
-            monkeypatch.setattr(ModbusService, "refresh", AsyncMock())
+            service.guest.scope = service.guest.connection_sample().scope
+            assert service.guest.scope is not None
+            monkeypatch.setattr(ModbusService, "_poll", AsyncMock())
             monkeypatch.setattr(service, "_is_available", lambda: False)
             await service.refresh()
-            assert service._guest_scope is not None
-            service._connection_unknown_since -= 61
+            assert service.guest.scope is not None
+            service.guest.connection_unknown_since -= 61
             await service.refresh()
-            assert service._guest_scope is None
-            assert service._connection_session is None
+            assert service.guest.scope is None
+            assert service.guest.connection_session is None
     asyncio.run(run())
 
 
@@ -80,12 +84,12 @@ def test_guest_limit_loop_retries_transient_errors_and_propagates_cancellation(m
     )
 
     async def run():
-        service = GuestModbusService.__new__(GuestModbusService)
+        guest = GuestLimits(ModbusService.__new__(ModbusService))
         error = AmtronConnectionError("offline") if bus_error else AmtronRateLimitedError("current", 4)
         tick = AsyncMock(side_effect=[error, asyncio.CancelledError()])
-        monkeypatch.setattr(service, "_guest_tick", tick)
+        monkeypatch.setattr(guest, "tick", tick)
         monkeypatch.setattr(service_guest_runtime.asyncio, "sleep", AsyncMock())
         with pytest.raises(asyncio.CancelledError):
-            await service._guest_loop()
+            await guest.loop()
         assert tick.await_count == 2
     asyncio.run(run())

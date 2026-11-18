@@ -59,6 +59,10 @@ ignore = ["E501"]
 # subprocesses, import the register table as `R` for density, and are not a
 # package.
 "tests/*" = ["S101", "SLF001", "INP001", "S603", "N812"]
+# The guest permission and the departure plan are parts of the one service and
+# share its state.
+"custom_components/mennekes_amtron_rtu/device/service_guest_runtime.py" = ["SLF001"]
+"custom_components/mennekes_amtron_rtu/device/service_departure_runtime.py" = ["SLF001"]
 # The gates and release tooling run fixed developer commands -- git, gh,
 # python, pyspdxtools -- with no input from anywhere but this repository.
 "scripts/*" = ["S603", "S607", "INP001"]

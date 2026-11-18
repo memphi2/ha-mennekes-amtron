@@ -143,8 +143,8 @@ class ServiceConsole(AppSettings):
         return {
             "schema": 1, "read_only": control.read_only,
             "revision": service.choice_revision,
-            "guest_revision": getattr(service, "guest_revision", None),
-            "guest_active": getattr(service, "guest_active", False),
+            "guest_revision": service.guest.revision,
+            "guest_active": service.guest.active,
             "energy": {"target": control.energy_goal.target_kwh, "status": control.energy_goal.status},
             "soc": {
                 "configured": control.soc_goal.source is not None,

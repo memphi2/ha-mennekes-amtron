@@ -23,6 +23,7 @@ from .client_errors import AmtronBusError
 from .command_events import SOURCES, attributed, command_source
 from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
+from .departure_plan import DepartureController
 from .energy_goal import EnergyGoal
 from .energy_goal_controller import EnergyGoalController
 from .enums import EvseState, RequestedPhases, SolarChargingMode
@@ -31,6 +32,7 @@ from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
 from .meter_log import ChargeMeter
 from .notice import FailureNotice
+from .operation import summarize
 from .persistence import (
     StorageCommitUncertainError,
     StorageStateUnknownError,
@@ -41,6 +43,8 @@ from .register_blocks import REGISTER_BLOCKS
 from .register_monitor import RegisterMonitor
 from .registers import ENERGY_TOTAL, ERROR_CODE, EVSE_STATE, REGISTERS_BY_KEY
 from .service_config import ServerConfig, integer, number
+from .service_departure_runtime import DEPARTURE_COMMANDS, DeparturePlanner
+from .service_guest_runtime import GuestLimits
 from .service_store import IntentStore
 from .service_version import SERVICE_VERSION
 from .soc_goal import SocGoal
@@ -92,6 +96,9 @@ class ModbusService:
         self.charge_meter = ChargeMeter()
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
+        # Guest permission and departure plan: parts of this one service.
+        self.guest = GuestLimits(self)
+        self.planner = DeparturePlanner(self)
         self.goal: EnergyGoalController | None = None
         self.soc_goal: SocGoalController | None = None
         self._poller: DevicePoller | None = None
@@ -237,7 +244,8 @@ class ModbusService:
             request_refresh=self._control_updated,
             validate_deferred=self._validate_deferred,
         )
-        self._configure_control(control)
+        self.guest.configure_control(control)
+        self.planner.configure_control(control)
         goal = EnergyGoalController(control, self.client, self._persist)
         soc_goal = SocGoalController(control, self._persist)
         try:
@@ -262,7 +270,9 @@ class ModbusService:
         self.goal = goal
         self.soc_goal = soc_goal
         try:
-            await self._initialize_dependents()
+            # Guards load before goal recovery and heartbeat startup.
+            await self.planner.initialize()
+            await self.guest.initialize()
         except BaseException:
             # Half an initialization would poll without ever starting the
             # heartbeat. The next attempt starts over.
@@ -281,13 +291,30 @@ class ModbusService:
         else:
             _LOGGER.info("Heartbeat: disabled in read-only mode")
 
-    async def _initialize_dependents(self) -> None:
-        """Load dependent guards before goal recovery and heartbeat startup."""
+    @property
+    def departure(self) -> DepartureController | None:
+        return self.planner.controller
 
-    def _configure_control(self, control: AmtronControl) -> None:
-        """Allow an in-process service owner to install guards before first use."""
+    @property
+    def guest_deadline(self) -> datetime | None:
+        """The shared target time also limits a guest."""
+        return self.planner.deadline
+
+    @property
+    def target_time_revision(self) -> str | None:
+        return self.planner.revision
 
     async def _run(self) -> None:
+        async with asyncio.TaskGroup() as group:
+            group.create_task(self._run_bus(), name="amtron_bus_owner")
+            group.create_task(self.guest.loop(), name="amtron_guest_limits")
+            group.create_task(self.planner.loop(), name="amtron_departure")
+
+    async def _run_bus(self) -> None:
+        await self._run_polling()
+        raise RuntimeError("Modbus bus owner stopped unexpectedly")
+
+    async def _run_polling(self) -> None:
         """Fail the service if its independent heartbeat writer exits."""
         if self.config.read_only:
             await self._polling_loop()
@@ -371,6 +398,18 @@ class ModbusService:
             self._intent_notice.recovered("intent saved again")
 
     async def refresh(self) -> None:
+        polled = False
+        try:
+            await self._poll()
+            polled = True
+        finally:
+            try:
+                self.guest.after_poll(polled=polled)
+            finally:
+                if self.departure is not None:
+                    self.departure.observe()
+
+    async def _poll(self) -> None:
         async with self._poll_lock:
             self._phase = "polling the wallbox"
             if self._poller is None:
@@ -499,6 +538,7 @@ class ModbusService:
             _LOGGER.info("Control: charging current lowered to the %.1f A cap", control.max_charging_current)
 
     async def _persist(self) -> None:
+        self.guest.stamp_permission()
         if self._store is not None and not self._intent_rejected:
             async with self._store_lock:
                 self._phase = "saving control intent"
@@ -551,6 +591,29 @@ class ModbusService:
         )
 
     def snapshot(self) -> dict[str, Any]:
+        result = self._device_snapshot()
+        departure = self.departure
+        result["control"] = {
+            **result["control"],
+            # None while the plan is loading; Home Assistant then waits
+            # instead of planning on its own.
+            "departure": departure.snapshot() if departure is not None and departure.ready else None,
+            "target_time_revision": self.target_time_revision,
+            "guest_revision": self.guest.revision,
+            "guest_active": self.guest.active,
+            "guest_mode": self.guest.mode,
+            "guest_confirmation_required": self.guest.restore_pending,
+        }
+        # Who controls the charge, why it waits and what comes next.
+        result["control"]["operation"] = summarize(
+            available=result["available"] is True, present=self.guest.connection_sample().present,
+            control=result["control"], departure=result["control"]["departure"],
+            # Shared energy, percentage and guest-time stops report a reached target.
+            goal_stop=self.control is not None and self.control.energy_goal_stop_requested,
+        )
+        return result
+
+    def _device_snapshot(self) -> dict[str, Any]:
         control = self.control
         return {
             "api_version": API_VERSION,
@@ -685,10 +748,6 @@ class ModbusService:
         self._published = (time.monotonic(), result)
         return result
 
-    def _soc_observation_scope(self) -> str | None:
-        """Only a service tracking a physical connection may cache its SoC."""
-        return None
-
     @property
     def choice_revision(self) -> str:
         """Fence app edits against explicit selections, not changing telemetry."""
@@ -711,6 +770,11 @@ class ModbusService:
         self, payload: dict[str, Any], *,
         _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None,
     ) -> dict[str, Any]:
+        name = payload.get("command")
+        if name in DEPARTURE_COMMANDS:
+            return await self.planner.command(payload)
+        if name == "guest_start":
+            return await self.guest.start(payload)
         if payload.keys() - {
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
             "source", "soc", "maximum", "deadline", "expected_soc_revision",
@@ -829,7 +893,7 @@ class ModbusService:
                         reading = self._soc_reading
                         payload = {**payload, "source": control.soc_goal.source,
                             "maximum": control.soc_goal.maximum_percent,
-                            "soc": reading[1] if reading is not None and reading[0] == control.soc_goal.source and reading[3] == self._soc_observation_scope() and time.monotonic() - reading[2] <= 900 else None}
+                            "soc": reading[1] if reading is not None and reading[0] == control.soc_goal.source and reading[3] == self.guest.soc_observation_scope() and time.monotonic() - reading[2] <= 900 else None}
                     source = payload.get("source")
                     if not isinstance(source, str):
                         raise ValueError("source is required")
@@ -854,7 +918,7 @@ class ModbusService:
                             None if maximum is None else number(maximum, 0, 100), source=source,
                         )
                     if command != "soc_goal_choice":
-                        scope = self._soc_observation_scope()
+                        scope = self.guest.soc_observation_scope()
                         self._soc_reading = None if scope is None else (source, None if soc is None else number(soc, 0, 100), time.monotonic(), scope)
                 elif command == "resume":
                     await control.async_resume_charging(
@@ -927,6 +991,12 @@ class ModbusService:
         raise ValueError("unsupported read")
 
     async def stop(self) -> None:
+        try:
+            await self.planner.shutdown()
+        finally:
+            await self._stop()
+
+    async def _stop(self) -> None:
         self._stopping = True
         try:
             await self.soc_transactions.close()

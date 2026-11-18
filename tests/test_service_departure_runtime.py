@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -20,8 +19,8 @@ from custom_components.mennekes_amtron_rtu.device.departure_store import (
 )
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.operation import Operation
-from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-    DepartureModbusService,
+from custom_components.mennekes_amtron_rtu.device.service_runtime import (
+    ModbusService,
 )
 from tests import service_guest_fixture as runtime
 
@@ -30,7 +29,6 @@ CAR = "profile:bmw:sensor.soc|"
 
 @pytest.fixture
 def departure_service(tmp_path, monkeypatch):
-    monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
     return lambda: runtime.guest_service(tmp_path)
 
 
@@ -58,7 +56,7 @@ async def hand_over(service, *, hours=2.0, soc=50.0):
 def test_the_service_charges_and_rests_a_handed_over_departure(departure_service):
     async def run():
         async with departure_service() as (s, transport, clock):
-            assert server.ModbusService is DepartureModbusService
+            assert server.ModbusService is ModbusService
             given, result = await hand_over(s)
             departure = result["control"]["departure"]
             assert departure["inputs"] == given.digest
@@ -117,7 +115,7 @@ def test_the_snapshot_summarizes_who_controls_the_charge(departure_service):
                 "kind": "level", "value": 80.0, "deadline": s.departure.trip.deadline.isoformat(),
             }
             assert Operation.restore(summary).controller == "departure_plan"
-            s._guest_scope = s._connection_sample().scope
+            s.guest.scope = s.guest.connection_sample().scope
             assert s.snapshot()["control"]["operation"]["controller"] == "guest"
 
     asyncio.run(run())
@@ -146,11 +144,11 @@ def test_departure_commands_are_validated_before_the_plan_sees_them(departure_se
             # Ordinary commands still reach the base service.
             with pytest.raises(ValueError, match="unknown command"):
                 await s.command({"command": "nonsense", "expected_serial_number": serial})
-            plan, s.departure = s.departure, None
+            plan, s.planner.controller = s.departure, None
             with pytest.raises(DeviceError, match="service_unavailable"):
                 await s.command(trip)
             assert s.snapshot()["control"]["departure"] is None
-            s.departure = plan
+            s.planner.controller = plan
     asyncio.run(run())
 
 
@@ -160,15 +158,15 @@ def test_plan_writes_need_an_available_wallbox(departure_service):
             s._success = False
             deadline = datetime.now(UTC) + timedelta(hours=1)
             with pytest.raises(DeviceError, match="service_unavailable"):
-                await s._apply_departure(16.0, deadline)
+                await s.planner._apply_departure(16.0, deadline)
             with pytest.raises(DeviceError, match="service_unavailable"):
-                await s._end_departure_pause()
+                await s.planner._end_departure_pause()
             control, s.control = s.control, None
-            await s._cancel_departure()
-            assert s._departure_sample().goal_status == "disabled"
+            await s.planner._cancel_departure()
+            assert s.planner._departure_sample().goal_status == "disabled"
             s.control = control
             # Cancelling is queue bookkeeping and works without the bus.
-            await s._cancel_departure()
+            await s.planner._cancel_departure()
             assert s.control.pending_action is None
     asyncio.run(run())
 
@@ -180,7 +178,7 @@ def test_a_plan_pause_ends_through_a_resume_with_the_service_cap(departure_servi
             await s.departure.tick()
             assert s.control.pause_requested is True
             clock[0] += 400
-            await s._end_departure_pause()
+            await s.planner._end_departure_pause()
             # The resume restores the current from before the plan's pause.
             assert s.control.pause_requested is False
             assert runtime.current_writes(transport)[-1] == 8
@@ -205,7 +203,7 @@ def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(
 
             s.departure.tick = tick
             with pytest.raises(asyncio.CancelledError):
-                await s._departure_loop()
+                await s.planner.loop()
             assert calls == [0, 1, 2, 3]
             assert s.departure.status == "error"
             # A tick that fails every five seconds is reported once.
@@ -214,16 +212,16 @@ def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(
                 ("ERROR", True), ("DEBUG", False), ("DEBUG", False),
             ]
             assert reports[0].getMessage() == "Departure plan: tick failed (RuntimeError)"
-            plan, s.departure = s.departure, None
+            plan, s.planner.controller = s.departure, None
 
             async def stop(_delay):
                 raise asyncio.CancelledError
 
             monkeypatch.setattr(departure_runtime.asyncio, "sleep", stop)
             with pytest.raises(asyncio.CancelledError):
-                await s._departure_loop()
+                await s.planner.loop()
             monkeypatch.undo()
-            s.departure = plan
+            s.planner.controller = plan
     asyncio.run(run())
 
 
@@ -243,22 +241,22 @@ def test_the_jobs_loop_runs_the_plan_beside_the_orders(departure_service, monkey
                 started.set()
                 await asyncio.Event().wait()
 
-            monkeypatch.setattr(s, "_departure_loop", departure_loop)
-            monkeypatch.setattr(departure_runtime.GuestModbusService, "_guest_loop", lambda _self: orders())
+            monkeypatch.setattr(s.planner, "loop", departure_loop)
+            monkeypatch.setattr(s.guest, "loop", orders)
+            monkeypatch.setattr(s, "_run_bus", orders)
             with pytest.raises(ExceptionGroup) as raised:
-                await s._guest_loop()
+                await s._run()
             assert raised.group_contains(StopLoopError)
     asyncio.run(run())
 
 
-def test_initialisation_needs_a_configured_plan(departure_service, monkeypatch):
+def test_initialisation_needs_a_configured_plan(departure_service):
     async def run():
         async with departure_service() as (s, _transport, _clock):
-            monkeypatch.setattr(departure_runtime.GuestModbusService, "_initialize_dependents", AsyncMock())
-            s.departure = None
+            plan, s.planner.controller = s.departure, None
             with pytest.raises(RuntimeError, match="not configured"):
-                await departure_runtime.DepartureModbusService._initialize_dependents(s)
-            monkeypatch.undo()
+                await s.planner.initialize()
+            s.planner.controller = plan
     asyncio.run(run())
 
 
@@ -276,13 +274,13 @@ def test_guest_start_invalidates_departure_writes_already_waiting_for_command_lo
             guest = asyncio.create_task(service.command({
                 "command": "guest_start",
                 "expected_serial_number": service.identity.serial_number,
-                "expected_guest_revision": service.guest_revision,
+                "expected_guest_revision": service.guest.revision,
             }))
             await asyncio.sleep(0)
             deadline = datetime.now(UTC) + timedelta(hours=1)
             old_plan = asyncio.create_task(
-                service._end_departure_pause() if action == "resume"
-                else service._apply_departure(None if action == "pause" else 10, deadline)
+                service.planner._end_departure_pause() if action == "resume"
+                else service.planner._apply_departure(None if action == "pause" else 10, deadline)
             )
             await asyncio.sleep(0)
             assert not guest.done()
@@ -291,7 +289,7 @@ def test_guest_start_invalidates_departure_writes_already_waiting_for_command_lo
             await guest
             with pytest.raises(DeviceError, match="soc_goal_source_changed"):
                 await old_plan
-            assert service._guest_scope is not None
+            assert service.guest.scope is not None
             assert service.control.pause_requested is False
             assert service.control.pending_action is None
             assert runtime.current_writes(transport)[-1] >= 6
@@ -307,7 +305,7 @@ def test_departure_resume_cannot_override_manual_guest_pause(departure_service):
             await service.command({
                 "command": "guest_start",
                 "expected_serial_number": service.identity.serial_number,
-                "expected_guest_revision": service.guest_revision,
+                "expected_guest_revision": service.guest.revision,
             })
             clock[0] += 1000
             await service.command({
@@ -316,7 +314,7 @@ def test_departure_resume_cannot_override_manual_guest_pause(departure_service):
             before = list(transport.writes)
             clock[0] += 1000
             with pytest.raises(DeviceError, match="soc_goal_source_changed"):
-                await service._end_departure_pause()
+                await service.planner._end_departure_pause()
             assert service.control.pause_requested is True
             assert service.control.pending_action is None
             assert transport.writes == before

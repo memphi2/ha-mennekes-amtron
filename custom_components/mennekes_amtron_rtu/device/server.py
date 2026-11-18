@@ -23,10 +23,10 @@ from .app_settings import (
 from .connection import NetworkConfig, SerialConfig
 from .console_http import ServiceConsole, create_console_app
 from .service_config import ServerConfig
-from .service_departure_runtime import DepartureModbusService as ModbusService
 from .service_discovery import app_token, publish_discovery
 from .service_http import create_app
 from .service_overview import service_overview
+from .service_runtime import ModbusService
 
 _LOGGER = logging.getLogger(__name__)
 

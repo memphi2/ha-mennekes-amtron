@@ -9,9 +9,6 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
-from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-    DepartureModbusService,
-)
 from tests import service_guest_fixture as runtime
 from tests.fakes import put
 
@@ -20,7 +17,6 @@ from tests.fakes import put
 @pytest.mark.parametrize("paused", [False, True])
 def test_restart_restores_same_connection_without_losing_limits_or_manual_pause(tmp_path, monkeypatch, pnc, paused):
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         deadline = datetime.now(UTC) + timedelta(hours=1)
         async with runtime.guest_service(tmp_path) as (service, transport, clock):
             if pnc:
@@ -31,15 +27,15 @@ def test_restart_restores_same_connection_without_losing_limits_or_manual_pause(
             await service.control.async_set_soc_goal(80, source="car", soc=90)
             clock[0] += 1000
             await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
-                                   "expected_guest_revision": service.guest_revision})
+                                   "expected_guest_revision": service.guest.revision})
             if paused:
                 clock[0] += 1000
                 await service.command({"command": "pause", "expected_serial_number": service.identity.serial_number})
             bank = transport.bank
         async with runtime.guest_service(tmp_path, bank=bank) as (service, transport, clock):
             assert not service._intent_rejected
-            assert service.guest_mode
-            assert not service._guest_restore_pending
+            assert service.guest.mode
+            assert not service.guest.restore_pending
             assert service.guest_deadline == deadline
             assert service.control.energy_goal.target_kwh == 5
             assert service.control.soc_goal.target_percent == 80
@@ -47,10 +43,10 @@ def test_restart_restores_same_connection_without_losing_limits_or_manual_pause(
             assert not service.control.goal_stop_requested
             await service.departure.tick()
             assert not transport.writes
-            assert service.guest_active is not paused
+            assert service.guest.active is not paused
             clock[0] += 10
             await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
-            await service._guest_tick()
+            await service.guest.tick()
             assert service.control.pause_requested is True
     asyncio.run(run())
 
@@ -58,11 +54,10 @@ def test_restart_restores_same_connection_without_losing_limits_or_manual_pause(
 @pytest.mark.parametrize("change", ["counter", "missing-proof", "missing-plan", "damaged-plan", "unplugged"])
 def test_restart_does_not_reuse_unproven_permission(tmp_path, monkeypatch, change):
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, transport, _clock):
             await service.departure.set_trip(datetime.now(UTC) + timedelta(hours=1), "manual")
             await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
-                                   "expected_guest_revision": service.guest_revision})
+                                   "expected_guest_revision": service.guest.revision})
             bank = transport.bank
         if change == "counter":
             put(bank, R.SESSIONS_TOTAL, 43)
@@ -80,34 +75,33 @@ def test_restart_does_not_reuse_unproven_permission(tmp_path, monkeypatch, chang
             put(bank, R.CP_STATE, 10)
         async with runtime.guest_service(tmp_path, bank=bank) as (service, transport, clock):
             if change == "unplugged":
-                assert not service.guest_mode
+                assert not service.guest.mode
                 assert service.client.write_state.guest_permission is None
                 return
-            assert service._guest_restore_pending
+            assert service.guest.restore_pending
             assert service.snapshot()["control"]["operation"]["waiting"] == "vehicle_unconfirmed"
             with pytest.raises(DeviceError):
                 await service.control.async_resume_charging(current_cap=16)
             clock[0] += 10
-            await service._guest_tick()
+            await service.guest.tick()
             assert runtime.current_writes(transport)[-1] < 6
             assert service.control.pause_requested
             await service.departure.tick()
             assert runtime.current_writes(transport)[-1] < 6
             clock[0] += 1000
             await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
-                                   "expected_guest_revision": service.guest_revision})
-            assert not service._guest_restore_pending
-            assert service.guest_active
+                                   "expected_guest_revision": service.guest.revision})
+            assert not service.guest.restore_pending
+            assert service.guest.active
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("expired", [False, True])
 def test_restart_enforces_already_reached_limit(tmp_path, monkeypatch, expired):
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, transport, _clock):
             await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
-                                   "expected_guest_revision": service.guest_revision})
+                                   "expected_guest_revision": service.guest.revision})
             if expired:
                 await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
             else:
@@ -116,11 +110,11 @@ def test_restart_enforces_already_reached_limit(tmp_path, monkeypatch, expired):
             await service._persist()
             bank = transport.bank
         async with runtime.guest_service(tmp_path, bank=bank) as (service, transport, clock):
-            assert service.guest_mode
-            assert not service._guest_restore_pending
+            assert service.guest.mode
+            assert not service.guest.restore_pending
             assert service.control.energy_goal_stop_requested
             clock[0] += 10
-            await service._guest_tick()
+            await service.guest.tick()
             if not expired:
                 await service.control.async_pause_for_energy_goal()
             assert runtime.current_writes(transport)[-1] < 6
@@ -159,7 +153,6 @@ def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, mo
     from unittest.mock import AsyncMock
 
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, transport, _clock):
             if failure == "store":
                 real_persist = service._persist
@@ -177,9 +170,9 @@ def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, mo
                 monkeypatch.setattr(service.control, method, AsyncMock(side_effect=DeviceError("guest_start_not_permitted")))
             with pytest.raises((OSError, DeviceError)):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
-                                       "expected_guest_revision": service.guest_revision})
+                                       "expected_guest_revision": service.guest.revision})
             assert not transport.writes
-            assert not service.guest_mode
+            assert not service.guest.mode
             assert service.client.write_state.guest_permission is None
             assert json.loads((tmp_path / "intent.json").read_text())["guest_permission"] is None
     asyncio.run(run())
@@ -194,14 +187,13 @@ def test_failed_resume_after_accepted_release_keeps_guest_limits(tmp_path, monke
     )
 
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             error = DeviceValidationError("guest_start_not_permitted") if validation else DeviceError("service_unavailable")
             monkeypatch.setattr(service.control, "_async_apply_current", AsyncMock(side_effect=error))
             with pytest.raises(DeviceError):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
-                                       "expected_guest_revision": service.guest_revision})
-            assert service.guest_mode
+                                       "expected_guest_revision": service.guest.revision})
+            assert service.guest.mode
             assert service.client.write_state.guest_permission is not None
     asyncio.run(run())
 
@@ -209,7 +201,6 @@ def test_failed_resume_after_accepted_release_keeps_guest_limits(tmp_path, monke
 @pytest.mark.parametrize("uncertain", [False, True])
 def test_release_reply_failure_keeps_permission_only_when_write_may_have_happened(tmp_path, monkeypatch, uncertain):
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, transport, clock):
             put(transport.bank, R.CHARGING_RELEASE, 0)
             await service.refresh()
@@ -217,7 +208,7 @@ def test_release_reply_failure_keeps_permission_only_when_write_may_have_happene
             clock[0] += 1000
             with pytest.raises((DeviceError, TimeoutError)):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
-                                       "expected_guest_revision": service.guest_revision})
-            assert service.guest_mode is uncertain
+                                       "expected_guest_revision": service.guest.revision})
+            assert service.guest.mode is uncertain
             assert (service.client.write_state.guest_permission is not None) is uncertain
     asyncio.run(run())

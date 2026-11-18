@@ -8,8 +8,8 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 )
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
-from custom_components.mennekes_amtron_rtu.device.service_guest_runtime import (
-    GuestModbusService,
+from custom_components.mennekes_amtron_rtu.device.service_runtime import (
+    ModbusService,
 )
 from tests.fakes import FakeModbusClient, device_bank
 from tests.fakes import put as put
@@ -26,7 +26,7 @@ async def guest_service(tmp_path, *, read_only=False, bank=None):
     transport = FakeModbusClient(bank or device_bank(evse_state=2, charging_current=8))
     clock = [1000.0]
     client = MennekesModbusClient(SerialConfig("/dev/fake"), client_factory=lambda _: transport, monotonic=lambda: clock[0])
-    service = GuestModbusService(ServerConfig(client.config, TOKEN, read_only=read_only, current_cap=16), tmp_path / "intent.json", client=client)
+    service = ModbusService(ServerConfig(client.config, TOKEN, read_only=read_only, current_cap=16), tmp_path / "intent.json", client=client)
     try:
         await service._initialize()
         await service.heartbeat.async_stop()

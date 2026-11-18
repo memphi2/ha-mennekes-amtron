@@ -24,12 +24,8 @@ class Console(ServiceConsole):
 
 
 def test_obsolete_order_routes_are_not_exposed(tmp_path, monkeypatch):
-    from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-        DepartureModbusService,
-    )
     from tests import service_guest_fixture as runtime
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             service.config = __import__("dataclasses").replace(service.config, token=TOKEN)
             async with TestClient(TestServer(create_app(service))) as client:

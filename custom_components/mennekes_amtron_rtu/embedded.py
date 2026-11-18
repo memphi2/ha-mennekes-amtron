@@ -41,7 +41,7 @@ from .device.errors import DeviceError
 from .device.notice import FailureNotice
 from .device.service_api import ServiceApi
 from .device.service_config import ServerConfig
-from .device.service_departure_runtime import DepartureModbusService
+from .device.service_runtime import ModbusService
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .entry_connection import connection_config
 from .options_flow import control_mode_is_master
@@ -109,7 +109,7 @@ class EmbeddedService:
         self, config: ServerConfig, directory: Path, expected_serial: str | None = None,
     ) -> None:
         self.config = config
-        self._service = DepartureModbusService(config, directory / "intent.json")
+        self._service = ModbusService(config, directory / "intent.json")
         # Bound before the first read: another wallbox on this connection is
         # rejected before the service writes anything to it, heartbeat included.
         self._service.client.bind_identity(expected_serial)

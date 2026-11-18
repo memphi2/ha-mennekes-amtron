@@ -10,8 +10,9 @@ For maintainers and technical investigations; normal setup starts with
 ## One service runtime
 
 There is one runtime for the wallbox: the service in `device/`
-(`service_runtime.py`, `service_departure_runtime.py` with
-`DepartureModbusService`, and `service_api.py` with `ServiceApi.dispatch`).
+(`service_runtime.py` with the one `ModbusService`, its parts `GuestLimits` in
+`service_guest_runtime.py` and `DeparturePlanner` in
+`service_departure_runtime.py`, and `service_api.py` with `ServiceApi.dispatch`).
 The `device/` package has no Home Assistant imports. It contains the shared
 register map, USB/LAN transport, poll cadence, heartbeat, recovery, control
 rules, goals, sessions and their stores. The same source is packaged as
@@ -137,7 +138,7 @@ endpoint, with no Modbus owner, heartbeat or discovery. A configured but missing
 adapter still follows the normal reconnect path. Standalone configuration remains
 strict and has no Ingress setup mode.
 
-`GuestModbusService` grants explicit permission for the current physical
+`GuestLimits` grants explicit permission for the current physical
 connection through the ordinary charging release and resume methods. The existing
 energy controller retains its own meter baseline; the shared departure timestamp
 is the guest time cutoff. Ordinary current and pause commands remain available.
