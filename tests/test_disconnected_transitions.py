@@ -286,7 +286,7 @@ def test_a_car_plugged_in_before_the_release_write_keeps_the_guard():
         _unplug(harness)
         put(harness.transport.bank, R.CHARGING_RELEASE, 0)
         control._write_state.mode_change_at = harness.clock[0]
-        read_switch = control._async_read_switch
+        read_switch = control.writes.async_read_switch
 
         async def plug_in_after_the_first_look(spec, **kwargs):
             value = await read_switch(spec, **kwargs)
@@ -294,7 +294,7 @@ def test_a_car_plugged_in_before_the_release_write_keeps_the_guard():
             put(harness.transport.bank, R.CP_STATE, CpState.B1)
             return value
 
-        control._async_read_switch = plug_in_after_the_first_look
+        control.writes.async_read_switch = plug_in_after_the_first_look
         await control.async_set_charging_release(True)
         # The release waits for the interval instead of slipping through.
         assert harness.transport.writes == []

@@ -189,7 +189,7 @@ def test_failed_resume_after_accepted_release_keeps_guest_limits(tmp_path, monke
     async def run():
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             error = DeviceValidationError("guest_start_not_permitted") if validation else DeviceError("service_unavailable")
-            monkeypatch.setattr(service.control, "_async_apply_current", AsyncMock(side_effect=error))
+            monkeypatch.setattr(service.control.writes, "async_apply_current", AsyncMock(side_effect=error))
             with pytest.raises(DeviceError):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,
                                        "expected_guest_revision": service.guest.revision})

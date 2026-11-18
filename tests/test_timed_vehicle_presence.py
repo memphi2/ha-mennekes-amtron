@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import (
-    control_state as device_control,
+    control as device_control,
 )
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState

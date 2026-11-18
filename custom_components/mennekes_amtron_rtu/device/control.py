@@ -8,16 +8,22 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import time
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from .capabilities import phase_switch_is_supported
-from .client import LockedRegisterReader
+from .client import LockedRegisterReader, MennekesModbusClient
 from .client_errors import (
     AmtronBusError,
+    AmtronIdentityError,
+    AmtronIllegalAddressError,
     AmtronRateLimitedError,
+    AmtronWriteRejectedError,
 )
-from .command_events import CONTROL_ACTIONS, command_source
+from .command_events import CONTROL_ACTIONS, CommandEvents, command_source
 from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
@@ -28,17 +34,24 @@ from .const import (
     SYSTEM_RESTART_VALUE,
 )
 from .control_queue import CommandQueue
-from .control_state import (
+from .control_types import (
     ControlOptions,
-    _PendingCommand,
+    PendingCommand,
+    PhaseChange,
+    TimedCommandCancelledError,
+    pause_state,
 )
-from .data import WallboxData
+from .control_write import WritePath
+from .data import DeviceIdentity, WallboxData, WriteDiagnostics
+from .energy_goal import EnergyGoal
 from .enums import EvseState, RequestedPhases, SolarChargingMode
-from .errors import DeviceError, validation_error
+from .errors import DeviceError, DeviceValidationError, validation_error
+from .plug_charge import PlugChargeController
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
     CP_STATE,
+    ENERGY_TOTAL,
     ERROR_CODE,
     EVSE_STATE,
     HEARTBEAT,
@@ -46,6 +59,14 @@ from .registers import (
     SYSTEM_RESTART,
 )
 from .runtime_events import EventType
+from .soc_goal import SocGoal
+from .unplug_release import UnplugRelease
+from .write_state import WriteState
+
+if TYPE_CHECKING:
+    from .energy_goal_controller import EnergyGoalController
+    from .soc_goal_controller import SocGoalController
+
 
 __all__ = ["PENDING_ACTIONS", "AmtronControl", "ControlOptions"]
 
@@ -57,8 +78,294 @@ _GOAL_PAUSE_RECHECK_SECONDS = 60.0
 _CAP_TOLERANCE_A = 0.05
 
 
-class AmtronControl(CommandQueue):
+class AmtronControl:
     """Validated, rate-limited write access to one wallbox."""
+
+    def __init__(
+        self,
+        client: MennekesModbusClient,
+        *,
+        diagnostics: WriteDiagnostics,
+        identity: DeviceIdentity,
+        options: ControlOptions,
+        state: Callable[[], WallboxData],
+        request_refresh: Callable[[], Awaitable[None]] | None = None,
+        notify_write_error: Callable[[], None] | None = None,
+        notify_pending: Callable[[], None] | None = None,
+        validate_deferred: Callable[[], None] | None = None,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._client = client
+        self._diagnostics = diagnostics
+        self._identity = identity
+        self._options = options
+        self.startup_hold = False
+        self._state = state
+        self._request_refresh = request_refresh
+        self._notify_write_error = notify_write_error
+        self._notify_pending = notify_pending
+        self._validate_deferred = validate_deferred
+        self._sleep = sleep
+        self._monotonic = monotonic
+        self._pending: PendingCommand | None = None
+        self._phase_change: PhaseChange | None = None
+        self._release_writes = 0
+        # When, and on which connection, a goal pause was last read back.
+        self._goal_pause_confirmed: tuple[float, int] | None = None
+        self._pending_due = 0.0
+        self._pending_until: datetime | None = None
+        self._pending_changed = asyncio.Event()
+        self._current_lock = asyncio.Lock()
+        self._flush_task: asyncio.Task[None] | None = None
+        self._write_state = client.write_state
+        self._events = CommandEvents()
+        self._active_command: PendingCommand | None = None
+        self._command_acknowledged = False
+        self._guest_release_applied = False
+        self._command_write_started = False
+        self._recovery_deadline: float | None = None
+        self._recovery_generation = 0
+        self.goal_controller: EnergyGoalController | None = None
+        self.soc_goal_controller: SocGoalController | None = None
+        self._plug_charge = PlugChargeController(self)
+        self.unplug_release = UnplugRelease(self)
+        # The parts hold no state of their own; they work on this control.
+        self.writes = WritePath(self)
+        self.queue = CommandQueue(self)
+        self.guest_confirmation_required: Callable[[], bool] = lambda: False
+        self.time_limit_reached: Callable[[], bool] = lambda: False
+        self.guest_active: Callable[[], bool] = lambda: False
+
+    @property
+    def layout_version(self) -> int:
+        return self._identity.layout_version
+
+    def monotonic(self) -> float:
+        """The clock of the write intervals."""
+        return self._monotonic()
+
+    @property
+    def write_state(self) -> WriteState:
+        """Share bounded control intent with the goal owners."""
+        return self._write_state
+
+    @property
+    def energy_goal(self) -> EnergyGoal:
+        """Return the shared durable energy limit, including its stop latch."""
+        return self._write_state.energy_goal
+
+    @property
+    def supports_energy_goal(self) -> bool:
+        """Energy goals require the wallbox's lifetime energy counter."""
+        return self._identity.layout_version >= ENERGY_TOTAL.min_layout
+
+    @property
+    def goal_stop_requested(self) -> bool:
+        """The energy and SoC goals' stop, including evidence awaiting the lock."""
+        return (
+            self.goal_controller.stop_requested if self.goal_controller is not None
+            else self.energy_goal.stop_requested
+        ) or self._soc_stop_requested
+
+    @property
+    def _soc_stop_requested(self) -> bool:
+        """The active SoC fence, including pending evidence and storage faults."""
+        return (
+            self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
+            else (not self.guest_active() and self.soc_goal.stop_requested)
+        )
+
+    @property
+    def energy_goal_stop_requested(self) -> bool:
+        """Every stop that fences starts: energy, vehicle percentage and guest time."""
+        return self.goal_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()
+
+    @property
+    def release_stop_requested(self) -> bool:
+        """The same active limits also prevent a Plug & Charge grant."""
+        return self.energy_goal_stop_requested
+
+    def _stop_reason(self) -> str:
+        """Prefer the retained energy/percentage goal when multiple limits apply."""
+        if self.guest_confirmation_required():
+            return "guest_confirmation"
+        return "time_limit" if not self.goal_stop_requested and self.time_limit_reached() else "energy_goal"
+
+    def stop_error(self) -> DeviceValidationError:
+        if self.guest_confirmation_required():
+            return validation_error("guest_confirmation_required")
+        return validation_error(
+            "time_limit_reached" if self._stop_reason() == "time_limit" else "energy_goal_stop_active"
+        )
+
+    @property
+    def energy_goal_guard(self) -> asyncio.Lock:
+        """Serialize the goal owner with ordinary and deferred commands."""
+        return self._current_lock
+
+    @property
+    def soc_goal(self) -> SocGoal:
+        """Return the vehicle percentage ceiling for the configured sources."""
+        return self._write_state.soc_goal
+
+    @property
+    def supports_soc_goal(self) -> bool:
+        return True
+
+    @property
+    def events(self) -> CommandEvents:
+        """Expose discrete outcomes without per-poll entity updates."""
+        return self._events
+
+    @property
+    def pending_action(self) -> str | None:
+        """Return the latest queued command without changing actual readback."""
+        return self._pending.action if self._pending else None
+
+    @property
+    def pending_guest_start(self) -> bool:
+        """A queued resume that also owns the required release step."""
+        return self._pending is not None and self._pending.grant_release
+
+    @property
+    def pending_owner(self) -> str | None:
+        """The owner of the queued command; None for a command by hand."""
+        return self._pending.owner if self._pending else None
+
+    @property
+    def pending_until(self) -> datetime | None:
+        """Return a stable deadline; a UI can derive remaining time locally."""
+        return self._pending_until
+
+    @property
+    def charging_setpoint(self) -> float | None:
+        """Return the remembered resume target, retained across entry reloads."""
+
+        return self._write_state.charging_setpoint
+
+    @charging_setpoint.setter
+    def charging_setpoint(self, value: float | None) -> None:
+        self._write_state.charging_setpoint = value
+
+    @property
+    def charging_release_requested(self) -> bool | None:
+        """Return explicit release intent, independently of fault readback."""
+
+        return self._write_state.charging_release_requested
+
+    @charging_release_requested.setter
+    def charging_release_requested(self, value: bool | None) -> None:
+        self._write_state.charging_release_requested = value
+
+    @property
+    def pause_requested(self) -> bool | None:
+        """Return pause intent, independently of fault/reset readback."""
+
+        return self._write_state.pause_requested
+
+    @pause_requested.setter
+    def pause_requested(self, value: bool | None) -> None:
+        self._write_state.pause_requested = value
+
+    @property
+    def options(self) -> ControlOptions:
+        """Return the active control options."""
+
+        return self._options
+
+    @property
+    def read_only(self) -> bool:
+        """Block commands; a startup hold still permits protective gate denial."""
+
+        return self._options.read_only or self.startup_hold
+
+    @property
+    def max_charging_current(self) -> float:
+        """Return the highest charging current a user may request.
+
+        The device limits anything it is sent anyway; this is the limit the
+        number entity shows, so a user never sees a value the wallbox would
+        silently clamp.
+        """
+
+        limits = [
+            value
+            for value in (
+                self._identity.max_evse_current,
+                self._options.current_cap,
+            )
+            if value is not None and value >= CHARGING_CURRENT_MINIMUM
+        ]
+        if not limits:
+            return CHARGING_CURRENT_MINIMUM
+        return min(limits)
+
+    @property
+    def is_paused(self) -> bool | None:
+        """Keep confirmed state across failed polls; unknown is not running."""
+
+        snapshot = self._state()
+        if snapshot.current_write_generation == self._write_state.current_write_generation:
+            current = snapshot.get(CHARGING_CURRENT_EMS.key)
+            if isinstance(current, (int, float)) and math.isfinite(current) and current >= 0:
+                self._write_state.confirmed_current = float(current)
+        return pause_state(self._write_state.confirmed_current)
+
+    @staticmethod
+    def _validate_timed_owner(owner: str) -> None:
+        if not isinstance(owner, str) or not 1 <= len(owner) <= 128:
+            raise ValueError("invalid timed command owner")
+
+    @staticmethod
+    def _uncertain(error: BaseException) -> bool:
+        return not isinstance(error, DeviceValidationError) and not isinstance(
+            error.__cause__,
+            (AmtronWriteRejectedError, AmtronIllegalAddressError, AmtronIdentityError),
+        )
+
+    def _mode_change_remaining(self) -> float:
+        if self._write_state.mode_change_at is None:
+            return 0.0
+        waited = self._monotonic() - self._write_state.mode_change_at
+        return max(0.0, self._options.state_change_interval_seconds - waited)
+
+    def _record_replaced(self, command: PendingCommand | None) -> None:
+        if self._pending is not None and self._pending != command:
+            self.events.record("replaced", self._pending.action, "replaced", source=self._pending.source, requested_value=self._pending.value)
+
+    def _clear_pending(self, *, outcome: str | None = None, reason: str = "completed") -> bool:
+        changed = self._pending is not None
+        if self._pending is not None:
+            if outcome is not None and self._active_command is None:
+                self.events.record(outcome, self._pending.action, reason, source=self._pending.source, requested_value=self._pending.value)
+            elif self._active_command is not None:
+                self._record_replaced(self._active_command)
+        self._pending = None
+        self._phase_change = None
+        self._pending_until = None
+        self._pending_changed.set()
+        return changed
+
+    def _command_cancellation_reason(self, command: PendingCommand) -> str | None:
+        if command.grant_release and not self.guest_active():
+            return "unknown"
+        if command.owner is None:
+            return None
+        if command.deadline is not None and datetime.now(UTC) >= command.deadline:
+            return "deadline_expired"
+        if self.soc_goal.status != "active" or self.soc_goal.target_percent <= 0 or self.energy_goal_stop_requested:
+            return "energy_goal"
+        return None
+
+    def _check_command_context(self) -> None:
+        command = self._active_command
+        if command is not None and (reason := self._command_cancellation_reason(command)):
+            raise TimedCommandCancelledError(reason)
+
+    def _require_write_access(self) -> None:
+        if self.read_only:
+            raise validation_error("read_only_mode")
 
     @property
     def plug_charge(self) -> dict[str, object]:
@@ -101,7 +408,7 @@ class AmtronControl(CommandQueue):
                 # moment ago on this connection, and this poll still reads it;
                 # a reboot or fallback shows up in the poll or the reconnect.
                 return
-            if await self._async_vehicle_absent():
+            if await self.writes.async_vehicle_absent():
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
                 return
@@ -136,7 +443,7 @@ class AmtronControl(CommandQueue):
                 "guest" if reason in ("time_limit", "guest_confirmation") else
                 "soc_goal" if self._soc_stop_requested else "energy_goal"
             )
-            await self._async_observe_command(_PendingCommand(
+            await self.queue.async_observe_command(PendingCommand(
                 "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True,
                 source=source, completion_reason=reason,
             ))
@@ -191,8 +498,8 @@ class AmtronControl(CommandQueue):
             target = maximum
         elif target != CHARGING_CURRENT_UNLIMITED:
             target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
-        await self._async_submit_locked(
-            _PendingCommand("resume", target, recovery_generation=generation, source="energy_goal"), automatic=True,
+        await self.queue.async_submit_locked(
+            PendingCommand("resume", target, recovery_generation=generation, source="energy_goal"), automatic=True,
         )
 
     def observe_recovery(self, error_code: object, current_write_generation: int) -> None:
@@ -263,7 +570,7 @@ class AmtronControl(CommandQueue):
                 or current <= maximum + _CAP_TOLERANCE_A
             ):
                 return False
-            await self._async_submit_locked(_PendingCommand("set_current", maximum))
+            await self.queue.async_submit_locked(PendingCommand("set_current", maximum))
             return True
 
     async def async_set_charging_current(
@@ -299,14 +606,14 @@ class AmtronControl(CommandQueue):
         # Both a valid limit and zero can resume a paused charge. Classify
         # them from confirmed state, not from the name of the HA control.
         async with self._current_lock:
-            await self._async_submit_locked(_PendingCommand("set_current", current))
+            await self.queue.async_submit_locked(PendingCommand("set_current", current))
 
     async def async_pause_charging(self) -> None:
         """Pause charging the documented way, by signalling 0 A to the EV."""
 
         self._require_write_access()
         async with self._current_lock:
-            await self._async_submit_locked(_PendingCommand("pause", CHARGING_PAUSE_CURRENT))
+            await self.queue.async_submit_locked(PendingCommand("pause", CHARGING_PAUSE_CURRENT))
 
     async def async_set_timed_current(
         self, value: float | None, *, deadline: datetime, owner: str,
@@ -321,7 +628,7 @@ class AmtronControl(CommandQueue):
             or not math.isfinite(value) or value < CHARGING_CURRENT_MINIMUM
         ):
             raise validation_error("charging_current_invalid", {"value": str(value), "minimum": "6"})
-        command = _PendingCommand(
+        command = PendingCommand(
             "pause" if value is None else "set_current",
             CHARGING_PAUSE_CURRENT if value is None else min(value, self.max_charging_current),
             owner=owner, deadline=deadline, source="departure_plan",
@@ -334,9 +641,9 @@ class AmtronControl(CommandQueue):
                 # Refused plans must not change remembered current or command
                 # intent, or cancel another goal's automatic recovery.
                 self.events.record("cancelled", command.action, reason, source=command.source, requested_value=command.value)
-                await self._async_cancel_pending()
+                await self.queue.async_cancel_pending()
                 return
-            await self._async_submit_locked(command)
+            await self.queue.async_submit_locked(command)
 
     async def async_cancel_timed_current(self, owner: str) -> None:
         """Cancel only this planner's queue, even when writes became disabled."""
@@ -374,7 +681,7 @@ class AmtronControl(CommandQueue):
                 target = maximum
             elif target != CHARGING_CURRENT_UNLIMITED:
                 target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
-            await self._async_submit_locked(_PendingCommand(
+            await self.queue.async_submit_locked(PendingCommand(
                 "resume", target, grant_release=grant_release,
                 source="guest" if grant_release else command_source.get(),
             ))
@@ -394,7 +701,7 @@ class AmtronControl(CommandQueue):
                 self._plug_charge.set_manual(released)
             written = self._release_writes
             try:
-                await self._async_submit_locked(_PendingCommand(
+                await self.queue.async_submit_locked(PendingCommand(
                     "enable_charging" if released else "disable_charging", int(released),
                 ))
             except BaseException:
@@ -409,7 +716,7 @@ class AmtronControl(CommandQueue):
 
         self._require_write_access()
         async with self._current_lock:
-            await self._async_submit_locked(_PendingCommand("lock" if locked else "unlock", int(locked)))
+            await self.queue.async_submit_locked(PendingCommand("lock" if locked else "unlock", int(locked)))
 
     async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
         """Set the solar charging mode shown on the wallbox (0x0D03).
@@ -421,7 +728,7 @@ class AmtronControl(CommandQueue):
         """
         self._require_write_access()
         async with self._current_lock:
-            await self._async_write(SOLAR_CHARGING_MODE, int(mode))
+            await self.writes.async_write(SOLAR_CHARGING_MODE, int(mode))
 
     async def async_set_requested_phases(self, phases: RequestedPhases) -> None:
         """Request single-phase or all-phase charging through 0x0D04.
@@ -435,7 +742,7 @@ class AmtronControl(CommandQueue):
         if not phase_switch_is_supported(self._identity.phase_options_hw):
             raise validation_error("phase_switch_unsupported")
         async with self._current_lock:
-            await self._async_submit_locked(_PendingCommand(
+            await self.queue.async_submit_locked(PendingCommand(
                 "single_phase" if phases == RequestedPhases.SINGLE_PHASE else "all_phases",
                 int(phases),
             ))
@@ -493,15 +800,15 @@ class AmtronControl(CommandQueue):
                 )
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             try:
-                await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
+                await self.writes.async_write(HEARTBEAT, HEARTBEAT_VALUE)
                 # Error 200 requires release before the current register. The
                 # current step below reasserts a goal stop as the pause value;
                 # rejecting this recovery-only release would leave it faulted.
-                await self._async_write(
+                await self.writes.async_write(
                     CHARGING_RELEASE, int(self.charging_release_requested is not False and not self._plug_charge.state.blocked),
                     recovery_release=True,
                 )
-                await self._async_apply_current(
+                await self.writes.async_apply_current(
                     min(target, self.max_charging_current),
                     preserve_setpoint=paused,
                     recovery=True,
@@ -525,12 +832,12 @@ class AmtronControl(CommandQueue):
         self._require_write_access()
         async with self._current_lock:
             await self._async_require_restart_idle()
-            await self._async_write(
+            await self.writes.async_write(
                 SYSTEM_RESTART, SYSTEM_RESTART_VALUE, precondition=self._async_require_restart_idle,
             )
 
     async def _async_require_restart_idle(self, read: LockedRegisterReader | None = None) -> None:
-        state = await self._async_current_evse_state("restart_state_unknown", read=read)
+        state = await self.writes.async_current_evse_state("restart_state_unknown", read=read)
         if state != EvseState.IDLE:
             raise validation_error("restart_requires_idle")
 
@@ -552,7 +859,7 @@ class AmtronControl(CommandQueue):
         An older wallbox has no CP state; its idle EVSE state is all it can say.
         """
         if self._identity.layout_version >= CP_STATE.min_layout:
-            return await self._async_vehicle_absent()
+            return await self.writes.async_vehicle_absent()
         try:
             state = await self._client.async_read_register(EVSE_STATE)
         except AmtronBusError:
@@ -570,6 +877,6 @@ class AmtronControl(CommandQueue):
             # A release queued for the car that left must not open it later.
             self._clear_pending(outcome="cancelled")
         written = self._release_writes
-        await self._async_apply_release(False)
+        await self.writes.async_apply_release(False)
         if self._release_writes != written:
             self.events.record("executed", "disable_charging", source=source)

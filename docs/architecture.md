@@ -205,10 +205,10 @@ device/write_state.py        shared write guards retained across entry reloads
 device/unplug_release.py     the whole release-off-on-unplug rule: state, observation, write
 device/identity.py           the read-once device facts
 device/heartbeat.py          the heartbeat task
-device/control.py            the commands of the control; with the three files below the only write path
-device/control_state.py      options, requested state, goals and the one pending command
-device/control_write.py      every register write with its interlocks and write intervals
-device/control_queue.py      runs a command now or keeps it until it may run
+device/control.py            the control: its state and commands; with its two parts the only write path
+device/control_write.py      its part WritePath: every register write with interlocks and write intervals
+device/control_queue.py      its part CommandQueue: runs a command now or keeps it until it may run
+device/control_types.py      the small types the control and its parts share
 device/poller.py             shared cadence-aware polling
 device/service_*.py          service runtime, API, options and intent storage
 device/server.py             standalone process entrypoint
@@ -469,8 +469,9 @@ retry timer and both listeners. Healthy operation adds no polling or states.
 
 ### One choke point for writes
 
-`device/control.py`, with `control_write.py`, `control_queue.py` and
-`control_state.py` beneath it, is the only place that may change device state. It exists
+`AmtronControl` in `device/control.py`, with its parts `WritePath`
+(`control_write.py`) and `CommandQueue` (`control_queue.py`), is the only place
+that may change device state. It exists
 because `0x0302` is three different commands depending on the value, and two
 of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics

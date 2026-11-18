@@ -417,7 +417,7 @@ def test_source_and_requested_value_survive_queued_execution():
             command_source.reset(token)
         assert control.pending_action == "set_current"
         harness.clock[0] += 6
-        await control._async_flush_pending()
+        await control.queue.async_flush_pending()
         event = CommandEvents.parse(control.events.snapshot())[2][-1]
         assert event.source == "plug_charge"
         assert event.requested_value == 6
