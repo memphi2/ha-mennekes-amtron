@@ -7,6 +7,7 @@ import logging
 import math
 import time
 from contextlib import suppress
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.core import (
@@ -27,18 +28,27 @@ from .charge_loss_const import (
     LOSS_SOURCE_SENSOR,
     LOSS_SOURCE_VEHICLE_HISTORY,
 )
-from .device.charge_loss import LossStatistics
-from .device.charging_session import CompletedSession
+from .charge_watch import (
+    PlugCycle,
+    cycle_around,
+    last_cycle,
+    loss_vehicle_options,
+    measurable_since,
+)
+from .device.charge_loss import Charge, LossStatistics
+from .device.client_errors import AmtronConnectionError
+from .device.enums import EvseState
+from .device.errors import DeviceError
+from .device.meter_log import MAX_INTERPOLATION_SECONDS
 from .device.notice import FailureNotice
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
+from .device.registers import EVSE_STATE
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import _finish_atomic
-from .loss_attribution import attributed_session, loss_vehicle_options
 from .loss_store import LossStore
 from .vehicle_profiles import (
     CONF_VEHICLE_PROFILE_ID,
-    CONF_VEHICLE_PROFILE_SELECTED_AT,
 )
 from .vehicle_sources import loss_source, resolve_history_source
 
@@ -63,6 +73,16 @@ def vehicle_energy(state: State | None) -> float | None:
     return value if math.isfinite(value) and value > 0 else None
 
 
+_STORAGE_RETRY_SECONDS = 60
+
+
+@dataclass(frozen=True, slots=True)
+class Booking:
+    """What a decided plug cycle still has to book: its charge, or none if unmeasurable."""
+
+    charge: Charge | None
+
+
 class ChargeLossObserver:
     """One optional, bounded session matcher and one durable weighted aggregate."""
 
@@ -70,15 +90,9 @@ class ChargeLossObserver:
         self._hass = hass
         self._entry = entry
         self._coordinator = entry.runtime_data.coordinator
-        options = loss_vehicle_options(hass, entry)
+        options = loss_vehicle_options(entry)
         self._profile_id: str | None = options.get(CONF_VEHICLE_PROFILE_ID)
         self._profiled = self._profile_id is not None
-        selected_at = options.get(CONF_VEHICLE_PROFILE_SELECTED_AT, 0)
-        self._selected_at = (
-            float(selected_at)
-            if type(selected_at) in (int, float) and math.isfinite(selected_at) and selected_at >= 0
-            else float("inf")
-        )
         self.mode = loss_source(options)
         self._entity = str(options.get(CONF_VEHICLE_LAST_CHARGE_ENERGY, ""))
         self._auto = options.get(CONF_LOSS_AUTO_MATCH, False)
@@ -95,7 +109,17 @@ class ChargeLossObserver:
             hass, entry.entry_id, identity, profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
         )
         self.statistics = LossStatistics()
-        self._session: CompletedSession | None = None
+        self._charging = False
+        # The last plug cycle that was decided, and the charge an energy
+        # value of the car may go to. What the decision still has to book
+        # until a save succeeds is kept apart: a later cycle of another car
+        # must neither lose it nor delay it.
+        self._cycle: PlugCycle | None = None
+        self._charge: Charge | None = None
+        self._booking: Booking | None = None
+        # What the last failed save tried to book: the same again waits for
+        # the storage retry, so a failing disk is not written on every poll.
+        self._tried: tuple[Booking | None, tuple[float, float] | None] | None = None
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -103,7 +127,6 @@ class ChargeLossObserver:
         self._attempt = 0
         self._task: asyncio.Task[None] | None = None
         self._pending = False
-        self._query_history = False
         self._last_query = float("-inf")
         self._lock = asyncio.Lock()
         self._stopping = False
@@ -114,9 +137,10 @@ class ChargeLossObserver:
 
     @property
     def available(self) -> bool:
+        # Every estimate is measured against the wallbox's energy meter.
         return (
             self._storage_ok and self._source_ready
-            and self._coordinator.current_data().session_summary_supported
+            and self._coordinator.current_data().energy_observed_at is not None
             and (self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
                 self._history_source is not None and self._history_source.available
             ))
@@ -126,8 +150,18 @@ class ChargeLossObserver:
     def can_assign(self) -> bool:
         return (
             self.mode == LOSS_SOURCE_SENSOR and self.available
-            and self._session is not None and self._unplugged()
+            and self._assignable is not None and self._unplugged()
         )
+
+    @property
+    def _decided(self) -> bool:
+        """Whether the service's last plug cycle is the one decided here."""
+        return self._cycle is not None and last_cycle(self._entry) == self._cycle
+
+    @property
+    def _assignable(self) -> Charge | None:
+        """The charge a value of the car may go to; none while a newer cycle is open."""
+        return self._charge if self._decided else None
 
     def _unplugged(self) -> bool:
         data = self._coordinator.current_data()
@@ -136,7 +170,9 @@ class ChargeLossObserver:
     async def async_start(self) -> None:
         try:
             self.statistics = await self._store.async_load()
-        except (ValueError, OSError):
+        except ValueError:
+            _LOGGER.warning("Charging loss: saved estimates unusable; starting without them")
+        except OSError:
             self._storage_ok = False
             self._storage_corrupt = True
             _LOGGER.warning("Charging loss: storage cannot be read; optional loss estimates are unavailable")
@@ -187,7 +223,7 @@ class ChargeLossObserver:
         if changed:
             self._last_query = float("-inf")
         if time.monotonic() - self._last_query >= 30:
-            self._query_history = True
+            self._attempt = 0
             self._queue()
 
     @callback
@@ -197,44 +233,63 @@ class ChargeLossObserver:
             if not self._source_ready:
                 return
             initial = True
-        data = self._coordinator.current_data()
-        session = CompletedSession.parse(data.charging_session) if data.charging_session else None
-        ownership = (
-            attributed_session(self._hass, self._entry, self._profile_id, session)
-            if self._profile_id is not None and session is not None else None
-        )
-        if self._profiled and (
-            session is None or ownership is False
-            or (ownership is None and session.started_after < self._selected_at)
-        ):
-            # A newly selected vehicle does not own an earlier wallbox session.
-            # Retain this profile's saved last match and weighted average.
-            self._session = None
-            self._pending = False
-            if self._retry is not None:
-                self._retry()
-                self._retry = None
+        if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
+            # The vehicle's record follows the stop by a while: retry for it.
+            charging = self._coordinator.current_data().get(EVSE_STATE.key) == EvseState.CHARGING
+            stopped, self._charging = self._charging and not charging, charging
+            if initial or stopped:
+                self._attempt = 0
+                if self._retry is not None:
+                    self._retry()
+                    self._retry = None
+                self._queue()
+                return
+        elif (cycle := last_cycle(self._entry)) is not None and cycle != self._cycle:
+            self._queue()
             return
-        if session != self._session or initial:
-            self._session = session
-            self._attempt = 0
-            if self._retry is not None:
-                self._retry()
-                self._retry = None
-            self._query_history = self._history_source is not None
+        if not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= _STORAGE_RETRY_SECONDS:
+            # A failed save discarded the candidate: form it again.
             self._queue()
-        elif not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
-            # A failed save discarded the candidate, including its matched
-            # history energy. Re-read the local history for the current session
-            # before retrying storage; otherwise only the empty match is saved.
-            self._query_history = self._history_source is not None
-            self._queue()
+
+    async def _energy(self, start: float, end: float) -> float | None:
+        """What the meter delivered in a span; None when its log does not cover it."""
+        return await self._entry.runtime_data.client.async_energy_between(start, end)
+
+    async def _take_plug_cycle(self) -> None:
+        """Decide the service's last plug cycle once, as soon as that is possible."""
+        cycle = last_cycle(self._entry)
+        if cycle is None or cycle == self._cycle:
+            return
+        if self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id):
+            # Another car's charge: this profile keeps its last match and average.
+            self._cycle, self._charge = cycle, None
+            return
+        if (known := self.statistics.known(cycle.plugged_at, cycle.unplugged_at)) is not None:
+            # Seen again after a restart: it is accounted for.
+            self._cycle, self._charge = cycle, known
+            return
+        try:
+            energy = await self._energy(cycle.plugged_at, cycle.unplugged_at)
+        except (AmtronConnectionError, DeviceError):
+            # No answer is no measurement: asked again at the next poll.
+            return
+        if energy is None and time.time() - cycle.unplugged_at <= MAX_INTERPOLATION_SECONDS:
+            # The reading after the unplug is still to come.
+            return
+        self._cycle = cycle
+        if energy == 0:
+            # Plugged in without charging: everything stays as it was. After
+            # a restart nothing is assignable: a charge unseen meanwhile may
+            # lie between the saved one and this plug-in.
+            return
+        # A cycle the meter cannot measure is no longer the charge before it.
+        self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy) if energy is not None else None
+        self._booking = Booking(self._charge)
 
     @callback
     def _queue(self) -> None:
         if (
             self._stopping or self._storage_corrupt or not self._source_ready
-            or (self._profiled and self._session is None)
         ):
             return
         self._pending = True
@@ -244,44 +299,85 @@ class ChargeLossObserver:
     async def _run(self) -> None:
         while self._pending and not self._stopping:
             self._pending = False
-            session = self._session
-            query, self._query_history = self._query_history, False
+            if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
+                await self._measure_record()
+                continue
+            await self._take_plug_cycle()
+            # Nothing is matched while a newer cycle is still open.
+            charge = self._assignable
+            booking = self._booking
+            if charge is None and booking is None and self._storage_ok:
+                continue
             energy: float | None = None
-            association = "changed_value"
             change: tuple[float, float] | None = None
-            if session is not None and query:
-                self._last_query = time.monotonic()
-                try:
-                    match = await self._history_source.async_match(session) if self._history_source is not None else None
-                except (HomeAssistantError, TimeoutError):
-                    match = None
-                except Exception as err:  # noqa: BLE001 - isolate third-party services
-                    # A third-party history service can fail with its own
-                    # exception types. Keep the wallbox and its setup usable;
-                    # the same bounded retry policy applies to this provider.
-                    # Do not log exception messages that may contain VINs.
-                    _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
-                    match = None
-                energy = match.vehicle_kwh if match is not None else None
-                association = "history"
-                if match is None and session == self._session:
-                    self._schedule_retry()
-            elif session is not None and self._auto and self._change is not None and self._unplugged():
+            if charge is not None and self._auto and self._change is not None and self._unplugged():
                 at, value = self._change
-                if self._started_at <= session.disconnected_at <= at <= session.disconnected_at + LOSS_MATCH_WINDOW_SECONDS:
+                if self._started_at <= charge.end <= at <= charge.end + LOSS_MATCH_WINDOW_SECONDS:
                     energy = value
                     change = self._change
+            attempt = (booking, change)
+            if (
+                not self._storage_ok and attempt == self._tried
+                and time.monotonic() - self._last_storage_attempt < _STORAGE_RETRY_SECONDS
+            ):
+                continue
             async with self._lock:
-                if session != self._session or self._stopping:
+                if self._stopping:
                     continue
                 candidate = LossStatistics.restore(self.statistics.snapshot())
-                candidate.observe_session(session)
-                if session is not None and energy is not None and (
-                    change is None or self._change is change
-                ):
-                    candidate.apply(session, energy, association=association)
-                if await self._save(candidate) and change is not None and self._change is change:
-                    self._change = None
+                if booking is not None:
+                    candidate.observe_charge(booking.charge)
+                elif charge is not None:
+                    candidate.observe_charge(charge)
+                if charge is not None and energy is not None and self._change is change:
+                    candidate.apply(charge, energy, association="changed_value")
+                saved = await self._save(candidate)
+                self._tried = None if saved else attempt
+                if saved:
+                    if self._booking is booking:
+                        self._booking = None
+                    if change is not None and self._change is change:
+                        self._change = None
+
+    async def _measure_record(self) -> None:
+        """Compare the vehicle's newest record with the meter over the same span."""
+        source = self._history_source
+        # Without a plug cycle seen here, no record of the car can be measured.
+        since = measurable_since(self._entry)
+        self._last_query = time.monotonic()
+        record = None
+        if source is not None and since is not None:
+            try:
+                record = await source.async_latest(since=since, until=time.time())
+            except (HomeAssistantError, TimeoutError):
+                record = None
+            except Exception as err:  # noqa: BLE001 - isolate third-party services
+                # A third-party history service can fail with its own
+                # exception types. Keep the wallbox and its setup usable;
+                # the same bounded retry policy applies to this provider.
+                # Do not log exception messages that may contain VINs.
+                _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
+        if record is not None:
+            cycle = cycle_around(self._entry, record.start, record.end)
+            if cycle is None or (self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id)):
+                # Charged elsewhere, or another car was plugged in here meanwhile.
+                return
+        try:
+            wallbox = await self._energy(record.start, record.end) if record is not None else None
+        except (AmtronConnectionError, DeviceError):
+            wallbox = None
+        if record is None or wallbox is None or wallbox <= 0:
+            # No record yet, or the meter reading after its end is still to come.
+            self._schedule_retry()
+            return
+        session = Charge(record.start, record.end, wallbox)
+        async with self._lock:
+            if self._stopping:
+                return
+            candidate = LossStatistics.restore(self.statistics.snapshot())
+            candidate.apply(session, record.vehicle_kwh, association="history")
+            if not self._storage_ok or candidate.snapshot() != self.statistics.snapshot():
+                await self._save(candidate)
 
     def _schedule_retry(self) -> None:
         if self._retry is not None or self._attempt >= len(_RETRY_DELAYS):
@@ -292,7 +388,6 @@ class ChargeLossObserver:
         @callback
         def retry(_: object) -> None:
             self._retry = None
-            self._query_history = True
             self._queue()
 
         self._retry = async_call_later(self._hass, delay, retry)
@@ -335,16 +430,17 @@ class ChargeLossObserver:
     async def async_assign(self) -> None:
         """Explicitly associate a last-energy value; never change charging state."""
         async with self._lock:
-            if self._stopping or not self.can_assign or self._session is None:
+            charge = self._assignable
+            if self._stopping or not self.can_assign or charge is None:
                 raise service_validation_error("loss_unavailable")
             energy = vehicle_energy(self._hass.states.get(self._entity))
-            if energy is None or energy > self._session.wallbox_kwh:
+            if energy is None or energy > charge.wallbox_kwh:
                 raise service_validation_error("loss_energy_invalid")
             # The explicit assignment supersedes older buffered estimates.
             # Events arriving during the save form a new candidate and survive.
             self._change = None
             candidate = LossStatistics.restore(self.statistics.snapshot())
-            candidate.apply(self._session, energy, association="manual")
+            candidate.apply(charge, energy, association="manual")
             if not await self._save(candidate):
                 raise service_validation_error("loss_storage_unavailable")
 

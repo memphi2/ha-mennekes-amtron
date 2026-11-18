@@ -42,7 +42,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class SocControl(Protocol):
-    """The same source-bound operations in direct and service mode."""
+    """The source-bound percentage-goal operations of the service."""
 
     @property
     def supports_soc_goal(self) -> bool: ...
@@ -64,7 +64,7 @@ class SocControl(Protocol):
 
 @runtime_checkable
 class TransactionalSocControl(Protocol):
-    """Service-only transaction operations, absent from direct controllers."""
+    """The transaction operations of the service, beyond the plain goal calls."""
 
     @property
     def soc_goal_revision(self) -> str | None: ...

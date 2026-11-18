@@ -95,22 +95,6 @@ def test_stopping_cancels_the_task() -> None:
     asyncio.run(run())
 
 
-def test_an_adopted_task_is_cancelled_too() -> None:
-    transport = FakeModbusClient(device_bank())
-
-    async def run() -> None:
-        client = _client(transport)
-        await client.async_connect()
-        heartbeat = HeartbeatTask(client, WriteDiagnostics(), interval=3600)
-        task = asyncio.get_running_loop().create_task(heartbeat.async_run())
-        heartbeat.attach(task)
-        await asyncio.sleep(0)
-        await heartbeat.async_stop()
-        assert task.cancelled()
-
-    asyncio.run(run())
-
-
 def _counting_sleep(limit: int):
     beats = {"count": 0}
 

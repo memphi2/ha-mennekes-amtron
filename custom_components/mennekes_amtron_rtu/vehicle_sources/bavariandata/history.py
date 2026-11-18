@@ -12,27 +12,23 @@ import asyncio
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from itertools import pairwise
 
 from homeassistant.core import HomeAssistant, SupportsResponse
 
-from custom_components.mennekes_amtron_rtu.device.charging_session import (
-    CompletedSession,
-)
-from custom_components.mennekes_amtron_rtu.vehicle_sources.types import HistoryMatch
+from custom_components.mennekes_amtron_rtu.vehicle_sources.types import ChargeRecord
 
 from .identity import DOMAIN, bavarian_vehicle_vin
 
 HISTORY_SERVICE = "get_charging_sessions"
 HISTORY_LIMIT = 50
 HISTORY_TIMEOUT_SECONDS = 10.0
-MATCH_TOLERANCE_SECONDS = 60.0
+# Below this a span is too short for the wallbox meter's reading interval.
+MIN_VEHICLE_KWH = 1.0
 _MAX_EPOCH = 253402300799.0
 
 
 @dataclass(frozen=True, slots=True)
 class _Record:
-    vin: str
     start: float
     end: float
     energy: float
@@ -69,9 +65,6 @@ def _query_time(value: float) -> str:
 def _record(
     raw: dict[str, object], start: float, end: float, *, home_zone: str | None,
 ) -> _Record:
-    vin = raw.get("vin")
-    if not isinstance(vin, str) or not vin.strip() or len(vin) > 64:
-        raise ValueError("invalid charging-history vehicle identity")
     if raw.get("late_start") is not False or raw.get("interrupted") is not False:
         raise ValueError("charging-history energy is incomplete")
     if raw.get("charge_method") not in (None, "ac"):
@@ -88,75 +81,50 @@ def _record(
             not isinstance(zone, str) or zone.strip().casefold() != home_zone.strip().casefold()
         ):
             raise ValueError("charging history is located outside the configured home zone")
-    return _Record(vin.strip().upper(), start, end, _energy(raw.get("energy_kwh")))
+    return _Record(start, end, _energy(raw.get("energy_kwh")))
 
 
-def _match_history(
-    response: object, session: CompletedSession, *, home_zone: str | None,
-    expected_vin: str,
-) -> HistoryMatch | None:
+def _latest(
+    response: object, *, home_zone: str | None, expected_vin: str,
+) -> ChargeRecord | None:
+    """The newest record that can be measured; unusable ones are passed over."""
     if not isinstance(response, dict):
         return None
     rows = response.get("sessions")
     # The public service does not prove whether a full page was truncated.
     if not isinstance(rows, list) or not rows or len(rows) >= HISTORY_LIMIT:
         return None
-    lower = session.connected_at - MATCH_TOLERANCE_SECONDS
-    upper = session.disconnected_at + MATCH_TOLERANCE_SECONDS
-    records: dict[tuple[str, float], _Record] = {}
-    try:
-        for raw in rows:
-            if not isinstance(raw, dict):
-                return None
-            vin = raw.get("vin")
-            if not isinstance(vin, str) or vin.strip().upper() != expected_vin:
-                return None
-            start = _epoch(raw.get("start"))
-            if start > upper:
+    latest: _Record | None = None
+    for raw in rows:
+        if not isinstance(raw, dict):
+            return None
+        vin = raw.get("vin")
+        # Another car in the answer means the selection is not what it seems.
+        if not isinstance(vin, str) or vin.strip().upper() != expected_vin:
+            return None
+        try:
+            start, end = _epoch(raw.get("start")), _epoch(raw.get("end"))
+            if end <= start:
                 continue
-            end = _epoch(raw.get("end"))
-            if end < start:
-                return None
-            if end < lower:
-                continue
-            if start < lower or end > upper:
-                return None
             item = _record(raw, start, end, home_zone=home_zone)
-            key = (item.vin, item.start)
-            if key in records and records[key] != item:
-                return None
-            records[key] = item
-    except (ValueError, OverflowError, OSError):
-        return None
-    ordered = sorted(records.values(), key=lambda row: row.start)
-    if not ordered or len({item.vin for item in ordered}) != 1:
-        return None
-    if any(previous.end > following.start for previous, following in pairwise(ordered)):
-        return None
-    if not (
-        session.started_after - MATCH_TOLERANCE_SECONDS
-        <= ordered[0].start <= session.started_before + MATCH_TOLERANCE_SECONDS
-        and session.ended_after - MATCH_TOLERANCE_SECONDS
-        <= ordered[-1].end <= session.ended_before + MATCH_TOLERANCE_SECONDS
-    ):
-        return None
-    try:
-        total = math.fsum(item.energy for item in ordered)
-    except OverflowError:
-        return None
-    return HistoryMatch(total, len(ordered))
+        except (ValueError, OverflowError, OSError):
+            # Interrupted, without battery energy, elsewhere: not this one.
+            continue
+        if item.energy >= MIN_VEHICLE_KWH and (latest is None or item.end > latest.end):
+            latest = item
+    return None if latest is None else ChargeRecord(latest.start, latest.end, latest.energy)
 
 
-async def async_read_history(
-    hass: HomeAssistant, device_id: str, session: CompletedSession, *,
+async def async_read_latest(
+    hass: HomeAssistant, device_id: str, *, since: float, until: float,
     home_zone: str | None = None,
     expected_vin: str | None = None,
-) -> HistoryMatch | None:
+) -> ChargeRecord | None:
     """Read one bounded local history page; callers handle service/timeout errors.
 
-    Source timestamps, completeness flags and both charging boundaries must
-    agree. Multiple AC records may cover pauses in one plug cycle, but every
-    overlapping record must be complete, non-overlapping and for the same VIN.
+    Returns the newest complete AC record of the selected vehicle with its
+    own time span and battery energy. A record that is interrupted, started
+    late, lacks battery energy or is too small to measure is passed over.
     Missing optional location evidence neither proves nor disproves location.
     """
     selected_vin = bavarian_vehicle_vin(hass, device_id)
@@ -164,8 +132,7 @@ async def async_read_history(
         return None
     if home_zone is not None and (not isinstance(home_zone, str) or not home_zone.strip()):
         return None
-    session = CompletedSession.parse(session.as_dict())
-    if (
+    if not since < until or (
         not hass.services.has_service(DOMAIN, HISTORY_SERVICE)
         or hass.services.supports_response(DOMAIN, HISTORY_SERVICE) is SupportsResponse.NONE
     ):
@@ -176,12 +143,12 @@ async def async_read_history(
             {
                 "device_id": device_id,
                 "vin": selected_vin,
-                "from": _query_time(session.connected_at - MATCH_TOLERANCE_SECONDS),
-                "to": _query_time(session.disconnected_at + MATCH_TOLERANCE_SECONDS),
+                "from": _query_time(since),
+                "to": _query_time(until),
                 "limit": HISTORY_LIMIT,
             },
             blocking=True, return_response=True,
         )
     if bavarian_vehicle_vin(hass, device_id) != selected_vin:
         return None
-    return _match_history(response, session, home_zone=home_zone, expected_vin=selected_vin)
+    return _latest(response, home_zone=home_zone, expected_vin=selected_vin)

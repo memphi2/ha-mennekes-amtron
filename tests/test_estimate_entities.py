@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -14,14 +13,15 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.mennekes_amtron_rtu import _entry_platforms, sensor
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
-    LOSS_SENSOR_KEYS,
 )
 from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
-from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
+from custom_components.mennekes_amtron_rtu.device.charge_loss import (
+    Charge,
+    LossStatistics,
+)
 from custom_components.mennekes_amtron_rtu.device.charging_cost import CostResult
 from custom_components.mennekes_amtron_rtu.services import DEVICE_ACTIONS
 from tests.ha_fakes import FakeConfigEntry, build_runtime, collect
-from tests.test_charging_session import complete
 
 
 def loss_observer(mode="sensor"):
@@ -37,6 +37,7 @@ def cost_observer():
     return SimpleNamespace(available=True, current=None, last=LastChargingCost())
 
 
+LOSS_SENSOR_KEYS = ("last_charging_loss", "average_charging_loss")
 COST_SENSOR_KEYS = ("current_estimated_charging_cost", "last_estimated_charging_cost")
 ESTIMATE_SENSOR_DESCRIPTIONS = tuple(
     description for description in sensor.SENSORS
@@ -92,7 +93,7 @@ def test_loss_entities_round_values_and_publish_no_per_poll_timestamps():
         assert last.native_value is None
         assert average.native_value is None
         assert last.extra_state_attributes == {"sample_count": 0}
-        first = complete().latest
+        first = Charge(10, 60, 10)
         observer.statistics.apply(first, 9.123, association="manual")
         assert last.native_value == average.native_value == 8.8
         assert last.native_unit_of_measurement == "%"
@@ -101,12 +102,12 @@ def test_loss_entities_round_values_and_publish_no_per_poll_timestamps():
         stable = last.native_value, last.extra_state_attributes
         observer.statistics.apply(first, 9.124, association="manual")
         assert (last.native_value, last.extra_state_attributes) == stable
-        second = replace(complete(offset=100).latest, wallbox_kwh=20)
+        second = Charge(110, 160, 20)
         observer.statistics.apply(second, 16.789, association="history")
         assert last.native_value == 16.1
         assert average.native_value == 13.6
         assert last.extra_state_attributes == {"sample_count": 2, "association": "history"}
-        observer.statistics.observe_session(complete(offset=200).latest)
+        observer.statistics.observe_charge(Charge(210, 260, 10))
         assert last.native_value is None
         assert average.native_value == 13.6
         assert last.extra_state_attributes == {"sample_count": 2}
@@ -146,9 +147,13 @@ def test_cost_entities_distinguish_unknown_incomplete_zero_and_negative_cost():
         assert current.native_unit_of_measurement == last.native_unit_of_measurement == "EUR"
         assert current.extra_state_attributes == {"complete": True}
         assert last.extra_state_attributes == {"complete": True, "energy_kwh": 20, "unpriced_kwh": 0}
+        # A partly priced charge shows what is known and says it is incomplete.
         observer.current = CostResult(3.4, 2.123, 12.34567, False)
-        assert current.native_value is None
+        assert current.native_value == 3.4
         assert current.extra_state_attributes == {"complete": False}
+        # Nothing could be priced: no amount at all.
+        observer.current = CostResult(0, 2, 2, False)
+        assert current.native_value is None
         observer.current = CostResult(0, 0, 2, True)
         assert current.native_value == 0
         observer.available = False

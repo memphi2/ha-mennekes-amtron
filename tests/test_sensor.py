@@ -291,7 +291,7 @@ def test_the_charging_loss_exists_with_a_loss_source_and_reports_its_samples() -
 def test_the_estimated_cost_exists_with_a_price_and_reports_its_coverage() -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
-        result = SimpleNamespace(cost=1.2345, complete=False, energy_kwh=7.256, unpriced_kwh=0.004)
+        result = SimpleNamespace(estimate=1.2345, complete=False, energy_kwh=7.256, unpriced_kwh=0.004)
         cost = SimpleNamespace(available=True, current=result, last=SimpleNamespace(result=result))
         entry.runtime_data.charging_cost = cost
         sensors: dict[str, object] = {}

@@ -34,16 +34,15 @@ def test_cancel_is_readless_idempotent_and_retains_the_remembered_target():
         control = await harness.connect()
         notified = []
         control._notify_pending = lambda: notified.append(control.pending_action)
-        assert not control.can_cancel_pending
+        assert control.pending_action is None
         await control.async_set_charging_current(10)
         await control.async_set_charging_current(14)
-        assert control.can_cancel_pending
+        assert control.pending_action is not None
         assert control.charging_setpoint == 14
         before = (harness.transport.reads[:], harness.transport.writes[:], harness.refreshes)
         await harness.client.async_close()
 
         await control.async_cancel_pending_change()
-        assert not control.can_cancel_pending
         assert control.pending_action is None
         assert control.pending_until is None
         assert control.charging_setpoint == 14

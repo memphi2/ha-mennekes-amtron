@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Connect to the Modbus service",
-        "description": "Supervisor apps connect automatically without entering a URL or token. This form is for a separately hosted service. When migrating from direct Modbus, disable the previous integration entry first to release the Modbus connection.",
+        "description": "Supervisor apps connect automatically without entering a URL or token. This form is for a separately hosted service.",
         "data": {
           "server_url": "Service URL",
           "server_token": "Access token"
@@ -587,12 +587,48 @@
           "event_type": {
             "name": "Kind",
             "state": {
-              "command_done": "Command carried out",
-              "command_failed": "Command failed",
-              "command_cancelled": "Command cancelled",
-              "session_started": "Vehicle plugged in",
-              "session_ended": "Vehicle unplugged",
-              "wallbox_changed": "Wallbox changed"
+              "paused": "Charging paused",
+              "resumed": "Charging resumed",
+              "current_set": "Charging current set",
+              "single_phase_set": "One phase selected",
+              "all_phases_set": "All available phases selected",
+              "release_enabled": "Charging release enabled",
+              "release_disabled": "Charging release disabled",
+              "unlocked": "Wallbox unlocked",
+              "locked": "Wallbox locked",
+              "recovered": "Error recovery confirmed",
+              "pause_failed": "Pause charging failed",
+              "resume_failed": "Resume charging failed",
+              "set_current_failed": "Set charging current failed",
+              "single_phase_failed": "Use one phase failed",
+              "all_phases_failed": "Use all available phases failed",
+              "enable_charging_failed": "Enable charging release failed",
+              "disable_charging_failed": "Disable charging release failed",
+              "unlock_failed": "Unlock wallbox failed",
+              "lock_failed": "Lock wallbox failed",
+              "recover_failed": "Recover from error failed",
+              "pause_cancelled": "Pause charging cancelled",
+              "resume_cancelled": "Resume charging cancelled",
+              "set_current_cancelled": "Set charging current cancelled",
+              "single_phase_cancelled": "Use one phase cancelled",
+              "all_phases_cancelled": "Use all available phases cancelled",
+              "enable_charging_cancelled": "Enable charging release cancelled",
+              "disable_charging_cancelled": "Disable charging release cancelled",
+              "unlock_cancelled": "Unlock wallbox cancelled",
+              "lock_cancelled": "Lock wallbox cancelled",
+              "vehicle_plugged_in": "Vehicle plugged in",
+              "vehicle_unplugged": "Vehicle unplugged",
+              "charging_started": "Charging started",
+              "charging_stopped": "Charging stopped",
+              "error_occurred": "Error occurred",
+              "error_cleared": "Error cleared",
+              "authorized": "Authorized",
+              "authorization_rejected": "Authorization rejected",
+              "downgrade_started": "Downgrade started",
+              "downgrade_ended": "Downgrade ended",
+              "cable_locked": "Cable locked",
+              "cable_unlocked": "Cable unlocked",
+              "phases_switched": "Phases switched"
             }
           },
           "action": {
@@ -668,24 +704,6 @@
           },
           "occurred_at": {
             "name": "Occurred at"
-          },
-          "change": {
-            "name": "Change",
-            "state": {
-              "vehicle_plugged_in": "Vehicle plugged in",
-              "vehicle_unplugged": "Vehicle unplugged",
-              "charging_started": "Charging started",
-              "charging_stopped": "Charging stopped",
-              "error_occurred": "Error occurred",
-              "error_cleared": "Error cleared",
-              "authorized": "Authorized",
-              "authorization_rejected": "Authorization rejected",
-              "downgrade_started": "Downgrade started",
-              "downgrade_ended": "Downgrade ended",
-              "cable_locked": "Cable locked",
-              "cable_unlocked": "Cable unlocked",
-              "phases_switched": "Phases switched"
-            }
           },
           "cp_state": {
             "name": "Control pilot state"

@@ -703,7 +703,7 @@ def test_a_refused_manual_release_does_not_stay_armed():
         h = Harness()
         c = await armed(h)
         h.transport.bank[R.LOCK_EVSE.address] = 1
-        c._async_submit_locked = AsyncMock(side_effect=DeviceValidationError("refused"))
+        c.queue.async_submit_locked = AsyncMock(side_effect=DeviceValidationError("refused"))
         with pytest.raises(DeviceValidationError):
             await c.async_set_charging_release(True)
         assert not c.plug_charge["manual"]

@@ -320,6 +320,15 @@ def test_invalid_or_reversed_time_does_not_reprice_history(bad_time, method):
     assert accumulator.result == CostResult(0, 20, 20, False)
 
 
+def test_a_price_at_an_unusable_time_applies_to_the_energy_after_that_interval():
+    accumulator = CostAccumulator()
+    accumulator.sample(10, 100, 0.2)
+    accumulator.set_price(5, 0.5)
+    accumulator.observe_energy(100, 110)
+    accumulator.observe_energy(200, 120)
+    assert accumulator.result == CostResult(5, 10, 20, False)
+
+
 def test_large_gap_and_energy_increase_at_same_timestamp_are_incomplete():
     accumulator = CostAccumulator(max_gap=100)
     accumulator.sample(0, 100, 0.2)

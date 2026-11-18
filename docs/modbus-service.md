@@ -180,7 +180,7 @@ health changes rather than every beat. [Reduce HA history](recorder.md).
 The app includes a custom AppArmor profile.
 Supervisor loads it automatically when the app is installed;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
-communication and its own token, charging-intent and vehicle-planning files. App options remain
+communication and its own token, charging-intent, vehicle-planning and charge-meter files. App options remain
 read-only to the service. Normal heartbeat and charging operation are intended
 to continue within these limits.
 

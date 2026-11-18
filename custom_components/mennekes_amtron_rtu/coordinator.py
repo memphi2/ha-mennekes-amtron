@@ -51,10 +51,10 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
         self._client = client
         self._credentials_rejected = credentials_rejected
         # Estimates follow every poll, a failed one as None.
-        self.observe_session: Callable[[WallboxData | None], Awaitable[None]] | None = None
+        self.observe_estimates: Callable[[WallboxData | None], Awaitable[None]] | None = None
         self._pending_refresh: CALLBACK_TYPE | None = None
         # A pushed poll, the timer and a command's own refresh may meet: the
-        # session observers see one sample at a time.
+        # estimates see one sample at a time.
         self._update_lock = asyncio.Lock()
         client.on_auth_error = self._publish_auth_error
 
@@ -117,8 +117,8 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
         try:
             data = await self._client.update()
         except AmtronConnectionError as err:
-            if self.observe_session is not None:
-                await self.observe_session(None)
+            if self.observe_estimates is not None:
+                await self.observe_estimates(None)
             if self._credentials_rejected is not None and self._credentials_rejected():
                 auth_error = ConfigEntryAuthFailed(
                     translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
@@ -145,7 +145,7 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
                     translation_domain=DOMAIN, translation_key="service_version_mismatch"
                 ) from err
             raise UpdateFailed(str(err)) from err
-        if self.observe_session is not None:
-            await self.observe_session(data)
+        if self.observe_estimates is not None:
+            await self.observe_estimates(data)
         self._follow_pending(data.pending_change_until)
         return data

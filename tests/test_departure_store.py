@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.device import departure_store as store_module
+from custom_components.mennekes_amtron_rtu.device import bound_file as store_module
 from custom_components.mennekes_amtron_rtu.device import persistence
 from custom_components.mennekes_amtron_rtu.device.departure_store import (
     MAX_PLAN_BYTES,

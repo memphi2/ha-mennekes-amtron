@@ -17,9 +17,7 @@ from custom_components.mennekes_amtron_rtu.device.console_http import (
     create_console_app,
 )
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
-from custom_components.mennekes_amtron_rtu.device.service_console_runtime import (
-    ConsoleModbusService,
-)
+from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_app_settings import BASE, HEADERS, TOKEN, FixtureSettings
 
@@ -35,7 +33,7 @@ class FixtureConsole(ServiceConsole):
 async def console_fixture(tmp_path):
     transport = FakeModbusClient(device_bank(charging_current=8))
     client = MennekesModbusClient(SerialConfig("/dev/fake"), client_factory=lambda _: transport)
-    service = ConsoleModbusService(ServerConfig(client.config, TOKEN, current_cap=16), tmp_path / "intent.json", client=client)
+    service = ModbusService(ServerConfig(client.config, TOKEN, current_cap=16), tmp_path / "intent.json", client=client)
     await service._initialize()
     return service, transport
 

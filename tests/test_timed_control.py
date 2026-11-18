@@ -7,7 +7,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.device import control as device_control
+from custom_components.mennekes_amtron_rtu.device import (
+    control as device_control,
+)
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.errors import (

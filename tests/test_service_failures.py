@@ -360,6 +360,52 @@ def test_unexpected_worker_exit_stops_heartbeat_serial_and_discovery(
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("worker_ends", [False, True])
+def test_standalone_service_stops_on_a_signal_and_fails_when_its_worker_ends(
+    tmp_path, monkeypatch, caplog, worker_ends
+):
+    import signal
+    from dataclasses import replace
+
+    from custom_components.mennekes_amtron_rtu.device import server
+
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        signals = {}
+        started = asyncio.Event()
+
+        async def worker():
+            started.set()
+            if not worker_ends:
+                await asyncio.Future()
+
+        monkeypatch.setattr(service, "_run", worker)
+        monkeypatch.setattr(server, "ModbusService", lambda *_: service)
+        # Without Supervisor there is neither an ingress listener nor discovery.
+        monkeypatch.setattr(server, "create_console_app", lambda *_: pytest.fail("standalone opened ingress"))
+        monkeypatch.setattr(server, "publish_discovery", lambda *_: pytest.fail("standalone published discovery"))
+        monkeypatch.setattr(
+            asyncio.get_running_loop(), "add_signal_handler",
+            lambda sig, callback, *args: signals.update({sig: (callback, args)}),
+        )
+        task = asyncio.create_task(server.run(replace(service.config, port=0), tmp_path / "intent.json"))
+        await asyncio.wait_for(started.wait(), 2)
+        if worker_ends:
+            with pytest.raises(RuntimeError, match="Modbus worker stopped"):
+                await asyncio.wait_for(task, 2)
+        else:
+            callback, args = signals[signal.SIGTERM]
+            callback(*args)
+            await asyncio.wait_for(task, 2)
+            assert "Service: SIGTERM received; stopping" in caplog.text
+        assert not service.client.connected
+        assert not service.heartbeat.running
+        assert "Service: shutdown complete" in caplog.text
+
+    caplog.set_level("INFO")
+    asyncio.run(run())
+
+
 def test_fatal_cli_error_is_actionable_and_does_not_echo_private_details(
     tmp_path, monkeypatch, caplog
 ):

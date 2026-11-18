@@ -1,18 +1,15 @@
-"""Persist accepted control intent and one completed session atomically."""
+"""Persist accepted control intent atomically."""
 
 from __future__ import annotations
 
 import json
 import logging
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
-from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
 from .guest_permission import GuestPermission
-from .persistence import StorageCommitUncertainError
+from .persistence import StorageCommitUncertainError, replace_file
 from .plug_charge import PlugChargeState
 from .service_config import number
 from .soc_goal import SocGoal
@@ -50,7 +47,7 @@ class IntentStore:
             not isinstance(payload, dict)
             or payload.keys() != {"version", "identity", "pause_requested", "unplug_release",
                                   "charging_release_requested", "charging_setpoint",
-                                  "energy_goal", "soc_goal", "plug_charge", "charging_session_history", "guest_permission"}
+                                  "energy_goal", "soc_goal", "plug_charge", "guest_permission"}
             or payload.get("version") != 2
             or payload.get("identity") != self.identity
         ):
@@ -69,20 +66,12 @@ class IntentStore:
         soc_goal = SocGoal.restore(payload["soc_goal"])
         plug_charge = PlugChargeState.restore(payload["plug_charge"])
         unplug_release = UnplugReleaseState.restore(payload["unplug_release"])
-        history = SessionHistory()
-        try:
-            history = SessionHistory.restore(payload["charging_session_history"])
-        except ValueError:
-            # Optional measurements must not block valid control intent
-            # or heartbeat startup. Do not expose stored data in the log.
-            _LOGGER.warning("Charging session: ignoring invalid saved history")
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current
         state.guest_permission = guest
         state.energy_goal = goal
         state.soc_goal = soc_goal
-        state.session_history = history
         state.plug_charge = plug_charge
         state.unplug_release = unplug_release
         self._last = payload
@@ -97,34 +86,17 @@ class IntentStore:
             "guest_permission": state.guest_permission.snapshot() if state.guest_permission is not None else None,
             "energy_goal": state.energy_goal.snapshot(),
             "soc_goal": state.soc_goal.snapshot(),
-            "charging_session_history": state.session_history.snapshot(),
             "plug_charge": state.plug_charge.durable(),
             "unplug_release": state.unplug_release.snapshot(),
         }
         if payload == self._last:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, name = tempfile.mkstemp(prefix=".intent-", dir=self.path.parent)
-        temporary = Path(name)
         try:
-            with os.fdopen(descriptor, "w") as stream:
-                json.dump(payload, stream, allow_nan=False)
-                stream.flush()
-                os.fsync(stream.fileno())
-            temporary.replace(self.path)
-            # A later directory-sync failure must not let an older cached
-            # payload skip the write that would restore it.
+            replace_file(self.path, json.dumps(payload, allow_nan=False).encode(), prefix=".intent-")
+        except StorageCommitUncertainError:
+            # The target file already names the new snapshot: the goal
+            # controllers must not take it for an uncommitted save, and the
+            # older cached payload must not skip the write that restores it.
             self._last = None
-            try:
-                directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
-                try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
-            except OSError as err:
-                # The target file already names the new snapshot. It must not
-                # be treated as an uncommitted save by the goal controllers.
-                raise StorageCommitUncertainError("intent replaced but directory sync failed") from err
-            self._last = payload
-        finally:
-            temporary.unlink(missing_ok=True)
+            raise
+        self._last = payload

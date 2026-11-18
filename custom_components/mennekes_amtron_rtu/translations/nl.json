@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Verbinden met de Modbus-service",
-        "description": "Supervisor-apps maken automatisch verbinding zonder dat je een URL of token hoeft in te voeren. Dit formulier is voor een afzonderlijk gehoste service. Schakel bij de overstap van direct Modbus eerst de bestaande integratievermelding uit om de Modbus-verbinding vrij te geven.",
+        "description": "Supervisor-apps maken automatisch verbinding zonder dat je een URL of token hoeft in te voeren. Dit formulier is voor een afzonderlijk gehoste service.",
         "data": {
           "server_url": "Service-URL",
           "server_token": "Toegangstoken"
@@ -587,12 +587,48 @@
           "event_type": {
             "name": "Soort",
             "state": {
-              "command_done": "Opdracht uitgevoerd",
-              "command_failed": "Opdracht mislukt",
-              "command_cancelled": "Opdracht geannuleerd",
-              "session_started": "Voertuig aangesloten",
-              "session_ended": "Voertuig losgekoppeld",
-              "wallbox_changed": "Wijziging aan de wallbox"
+              "paused": "Laden gepauzeerd",
+              "resumed": "Laden hervat",
+              "current_set": "Laadstroom ingesteld",
+              "single_phase_set": "Eén fase gekozen",
+              "all_phases_set": "Alle beschikbare fasen gekozen",
+              "release_enabled": "Laadtoestemming ingeschakeld",
+              "release_disabled": "Laadtoestemming uitgeschakeld",
+              "unlocked": "Wallbox ontgrendeld",
+              "locked": "Wallbox vergrendeld",
+              "recovered": "Foutherstel bevestigd",
+              "pause_failed": "Laden pauzeren mislukt",
+              "resume_failed": "Laden hervatten mislukt",
+              "set_current_failed": "Laadstroom instellen mislukt",
+              "single_phase_failed": "Eén fase gebruiken mislukt",
+              "all_phases_failed": "Alle beschikbare fasen gebruiken mislukt",
+              "enable_charging_failed": "Laden toestaan mislukt",
+              "disable_charging_failed": "Laadtoestemming uitschakelen mislukt",
+              "unlock_failed": "Wallbox ontgrendelen mislukt",
+              "lock_failed": "Wallbox vergrendelen mislukt",
+              "recover_failed": "Fout verhelpen mislukt",
+              "pause_cancelled": "Laden pauzeren geannuleerd",
+              "resume_cancelled": "Laden hervatten geannuleerd",
+              "set_current_cancelled": "Laadstroom instellen geannuleerd",
+              "single_phase_cancelled": "Eén fase gebruiken geannuleerd",
+              "all_phases_cancelled": "Alle beschikbare fasen gebruiken geannuleerd",
+              "enable_charging_cancelled": "Laden toestaan geannuleerd",
+              "disable_charging_cancelled": "Laadtoestemming uitschakelen geannuleerd",
+              "unlock_cancelled": "Wallbox ontgrendelen geannuleerd",
+              "lock_cancelled": "Wallbox vergrendelen geannuleerd",
+              "vehicle_plugged_in": "Voertuig aangesloten",
+              "vehicle_unplugged": "Voertuig losgekoppeld",
+              "charging_started": "Laden gestart",
+              "charging_stopped": "Laden gestopt",
+              "error_occurred": "Fout opgetreden",
+              "error_cleared": "Fout verholpen",
+              "authorized": "Geautoriseerd",
+              "authorization_rejected": "Autorisatie geweigerd",
+              "downgrade_started": "Vermogensbeperking gestart",
+              "downgrade_ended": "Vermogensbeperking beëindigd",
+              "cable_locked": "Kabel vergrendeld",
+              "cable_unlocked": "Kabel ontgrendeld",
+              "phases_switched": "Fasen omgeschakeld"
             }
           },
           "action": {
@@ -668,24 +704,6 @@
           },
           "occurred_at": {
             "name": "Tijdstip"
-          },
-          "change": {
-            "name": "Wijziging",
-            "state": {
-              "vehicle_plugged_in": "Voertuig aangesloten",
-              "vehicle_unplugged": "Voertuig losgekoppeld",
-              "charging_started": "Laden gestart",
-              "charging_stopped": "Laden gestopt",
-              "error_occurred": "Fout opgetreden",
-              "error_cleared": "Fout verholpen",
-              "authorized": "Geautoriseerd",
-              "authorization_rejected": "Autorisatie geweigerd",
-              "downgrade_started": "Vermogensbeperking gestart",
-              "downgrade_ended": "Vermogensbeperking beëindigd",
-              "cable_locked": "Kabel vergrendeld",
-              "cable_unlocked": "Kabel ontgrendeld",
-              "phases_switched": "Fasen omgeschakeld"
-            }
           },
           "cp_state": {
             "name": "Control-pilot-status"

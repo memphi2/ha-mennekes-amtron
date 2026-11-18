@@ -601,7 +601,7 @@ def test_the_coordinator_shows_the_services_identity_and_state() -> None:
         async def observe(value: WallboxData | None) -> None:
             observed.append(value)
 
-        coordinator.observe_session = observe
+        coordinator.observe_estimates = observe
         assert await coordinator._async_update_data() is data
         assert observed == [data]
 
@@ -622,7 +622,7 @@ def test_each_service_failure_has_its_own_reason(reason, error, key) -> None:
         async def observe(value: WallboxData | None) -> None:
             observed.append(value)
 
-        coordinator.observe_session = observe
+        coordinator.observe_estimates = observe
         with pytest.raises(error) as caught:
             await coordinator._async_update_data()
         assert caught.value.translation_key == key

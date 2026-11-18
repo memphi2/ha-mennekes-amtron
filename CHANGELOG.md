@@ -5,6 +5,72 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0b2 — 2026-11-18
+
+### Breaking changes
+
+- **Activity** has one logbook row per event, and the row says what happened.
+  Its event types are now `paused`, `resumed`, `current_set`,
+  `single_phase_set`, `all_phases_set`, `release_enabled`, `release_disabled`,
+  `unlocked`, `locked` and `recovered` for completed commands,
+  `<action>_failed` and `<action>_cancelled` per command, such as
+  `pause_failed` or `resume_cancelled`, and the wallbox changes by their
+  own name, such as `vehicle_plugged_in`, `vehicle_unplugged`,
+  `charging_started` or `error_occurred`. The types `command_done`,
+  `command_failed`, `command_cancelled`, `session_started`, `session_ended`
+  and `wallbox_changed`, the `change`
+  attribute and the extra logbook sentence are gone. Automations need the new
+  types.
+- The service no longer summarizes charging sessions. Its status loses
+  `charging_session`, and its saved intent loses the session history: the
+  app rejects an intent file saved by an earlier version once, and charging
+  stays blocked until that is acknowledged in Home Assistant Repairs.
+- Saved charging-loss averages start again.
+
+### Changes
+
+- The charging loss from the BavarianData history compares the car's newest
+  complete record with the wallbox's total energy meter over that record's
+  own time span, when that span lies in a plug cycle the service saw at this
+  wallbox. It no longer needs the service's session energy, which left the
+  loss unknown.
+- The charging loss from a vehicle energy sensor compares that value with the
+  meter's difference between plug-in and unplug.
+- The service keeps a bounded log of meter readings and the last plug cycle
+  (`charge_meter` in its status) and answers `POST /v2/energy` for any time
+  span; a restart of Home Assistant no longer interrupts a loss measurement.
+  The service saves both in `charge-meter.json` and goes on measuring after
+  its own ordinary restart of less than two minutes. Home Assistant hands it the
+  recognized vehicle as a note on the plug cycle (command `charge_note`), so
+  that name survives a restart as well.
+  The charging cost takes the plug state and its gaps from there as well.
+  The log keeps only what the running and the last plug cycle need, and the
+  file is written at a change of the plug cycle and every five minutes while
+  a car charges; an idle wallbox writes nothing.
+- A record from the car's history counts only when it was charged at this
+  wallbox, and with vehicle profiles only in a plug cycle of that car. A plug
+  cycle the meter cannot measure makes the last loss unknown instead of
+  leaving the charge before assignable.
+- The charging cost follows the charge itself: the current charge starts at
+  0.00 at the plug-in, runs while charging and is 0.00 again after the
+  unplug; the last charge takes its value over whenever charging stops and at
+  the unplug. It no longer waits for the service's session summary, which
+  often left it unknown. An incomplete cost shows the priced part with
+  `complete` false instead of unknown. A stored last cost from an earlier
+  version is not taken over. A plug-in that Home Assistant missed while the
+  service saw it starts the cost again.
+- The app and the integration must both be 0.10.0b2; update them together.
+  Home Assistant refuses an older service.
+- The service no longer reports the field `choice_revision` in its state; the
+  integration never read it.
+- The documentation and the connection form no longer carry upgrade hints for
+  versions before 0.10.0.
+- A reload or restart no longer shows the last command again as new
+  activity: the Activity entity is unknown until the next event.
+- Internal: the service's register monitor and live settings are part of the
+  service itself, and members nothing used are gone.
+- Test: the Recorder row check waits until the charging display has settled.
+
 ## 0.10.0b1 — 2026-11-15
 
 ### Breaking changes

@@ -9,14 +9,31 @@ For maintainers and technical investigations; normal setup starts with
 
 ## One service runtime
 
-There is one runtime for the wallbox: the service in `device/`
-(`service_runtime.py`, `service_departure_runtime.py` with
-`DepartureModbusService`, and `service_api.py` with `ServiceApi.dispatch`).
-The `device/` package has no Home Assistant imports. It contains the shared
-register map, USB/LAN transport, poll cadence, heartbeat, recovery, control
-rules, goals, sessions and their stores. The same source is packaged as
-`amtron_device` for the independent service; there is no copied driver
-implementation to keep in sync.
+There is one runtime for the wallbox: the service in `device/`. The package
+has no Home Assistant imports and is packaged unchanged as `amtron_device` for
+the app and the standalone service; there is no copied driver to keep in sync.
+
+The service is one object, `ModbusService` (`service_runtime.py`). It owns the
+Modbus client, the poller, the heartbeat and these parts, each in its own
+file and each with one job:
+
+| Part | File | Job |
+|---|---|---|
+| `AmtronControl` | `control.py` | The requested state and every command; the only way to the bus for a write |
+| `WritePath`, `CommandQueue` | `control_write.py`, `control_queue.py` | The control's two parts: each register write with its interlocks and intervals, and the one pending command |
+| `GuestLimits` | `guest_limits.py` | Guest permission for the current plug-in |
+| `DeparturePlanner` | `departure_planner.py` | The handed-over trip and its charging plan |
+| `ChargeMeter` | `meter_log.py` | The total-energy readings and the plug cycle, for cost and loss estimates |
+
+A part holds a reference to its owner and is called at fixed points: control
+setup, initialization, every poll, every save, the command entry and the
+snapshot. Nothing is a subclass of the service or of the control.
+
+`ServiceApi.dispatch` (`service_api.py`) is the one entry for requests. The
+service keeps three files, each bound to the wallbox identity and replaced
+atomically: `intent.json` (`service_store.py`) for the control intent, and
+`departure-plan.json` and `charge-meter.json` through the shared `BoundFile`
+(`bound_file.py`).
 
 Home Assistant reaches that runtime through one of two transports in
 `service_transport.py`; both answer with the HTTP status and JSON object the
@@ -57,9 +74,9 @@ changes have their own version and publication decision; see
 [publication](service-releasing.md).
 
 The service serializes commands independently of client lifetime and keeps
-heartbeat and polling active; the app does so without HA. Its state file only
-changes with durable control intent or a completed charging summary, not
-ordinary meter progress. Named commands retain device guards; the API has no
+heartbeat and polling active; the app does so without HA. Its intent file
+changes only with durable control intent, and its charge meter is saved at a
+change of the plug cycle and every five minutes while a car charges. Named commands retain device guards; the API has no
 raw register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
@@ -137,7 +154,7 @@ endpoint, with no Modbus owner, heartbeat or discovery. A configured but missing
 adapter still follows the normal reconnect path. Standalone configuration remains
 strict and has no Ingress setup mode.
 
-`GuestModbusService` grants explicit permission for the current physical
+`GuestLimits` grants explicit permission for the current physical
 connection through the ordinary charging release and resume methods. The existing
 energy controller retains its own meter baseline; the shared departure timestamp
 is the guest time cutoff. Ordinary current and pause commands remain available.
@@ -169,7 +186,7 @@ per-retry Recorder attributes.
 `tests/test_service_process.py` runs the server in a separate process over a
 virtual serial Modbus bus while a real HA instance stops and starts. It checks
 continued heartbeat delivery, unchanged pause and absence of replayed commands.
-The other service tests cover migration identity, API validation, bounded queues,
+The other service tests cover wallbox identity, API validation, bounded queues,
 recovery and atomic state persistence. These simulations do not validate the
 physical wallbox's firmware or the Supervisor/container runtime. CI separately
 builds the standalone wheel and app container and checks their entrypoints.
@@ -204,9 +221,19 @@ device/write_state.py        shared write guards retained across entry reloads
 device/unplug_release.py     the whole release-off-on-unplug rule: state, observation, write
 device/identity.py           the read-once device facts
 device/heartbeat.py          the heartbeat task
-device/control.py            the only write path
+device/control.py            AmtronControl: requested state and every command
+device/control_write.py      its part WritePath: each register write, interlocks, write intervals
+device/control_queue.py      its part CommandQueue: the one pending command
+device/control_types.py      the small types the control and its parts share
 device/poller.py             shared cadence-aware polling
-device/service_*.py          service runtime, API, options and intent storage
+device/service_runtime.py    ModbusService, the one owner of bus, parts and state
+device/guest_limits.py       its part GuestLimits
+device/departure_planner.py  its part DeparturePlanner
+device/meter_log.py          its ChargeMeter: bounded total-energy readings and the plug cycle
+device/service_api.py        ServiceApi.dispatch, the one request entry
+device/service_store.py      intent.json
+device/bound_file.py         BoundFile for departure-plan.json and charge-meter.json
+device/service_config.py     service options
 device/server.py             standalone process entrypoint
 embedded.py           the service inside HA for a direct entry
 service_transport.py  HttpTransport and EmbeddedTransport
@@ -225,6 +252,8 @@ vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapt
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
 charge_loss_observer.py  bounded matching and durable loss aggregate
+charge_watch.py  names the vehicle of a plug cycle to the service that measured it
+cost_observer.py  prices the energy of the running plug cycle
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
 number.py select.py switch.py button.py datetime.py  control tables
 event.py              the Activity event entity
@@ -292,26 +321,36 @@ age. Upstream BavarianData can restore cable state and tracker coordinates;
 available cable descriptor timestamps are checked, but missing timestamps and
 tracker coordinates without restore provenance cannot prove measurement
 freshness. A GPS accuracy circle crossing the Home-zone boundary is unknown. Detection remains a heuristic; manually selecting a
-profile is always possible. Manual loss matching requires the profile to have
-been selected before charging. Automatic selection can arrive later: a bounded
-transient attribution records the uniquely confirmed vehicle within the observed
-physical cycle, then binds it to the completed session ID. A conflicting profile
-or observation loss prevents attribution. This record supplies only loss
-settings after automatic deselection; it cannot reactivate SoC or departure goals.
+profile is always possible.
 
-Direct-mode session capture starts when any configured profile needs loss
-estimates or wallbox costs are enabled, before an active vehicle is selected.
-Controlled reloads on the same physical connection hand over the live session
-observer and compatible cost observer, including their meter baseline and price
-observations. Transport generation changes discard incomplete measurements;
-full unload and failed setup close all retained owners. Only completed summaries
-are stored, so retaining these bounded in-memory models adds no Recorder writes.
+Cost and loss estimates rest on the service's `ChargeMeter`. It keeps a
+bounded log of total-energy readings and follows the plug cycle from plug-in
+to unplug; a gap too long to rule out an unplug ends the cycle unmeasured.
+Every loss is a vehicle's energy against the meter's difference over a time
+span, which Home Assistant asks for with `POST /v2/energy`: the span of the
+car's own charging record inside a plug cycle, or the plug cycle itself for a
+vehicle energy sensor. The
+cost observer prices the energy of the running cycle and takes the plug state
+and its gaps from the same meter.
+
+Only Home Assistant knows which car it was. The charge watch
+(`charge_watch.py`) hands the uniquely confirmed vehicle to the service as a
+note on the running cycle, and the service keeps it with the cycle. A car
+selected by hand owns only a charge that began afterwards; a second name for
+the same cycle makes it nobody's. The note supplies only loss settings after
+automatic deselection; it cannot reactivate SoC or departure goals.
+
+Meter, cycle and note are saved in `charge-meter.json`, so they outlast a
+restart of Home Assistant and an ordinary restart of the service shorter than
+the gap rule allows; after a crash the saved state can be five minutes old,
+and the cycle then ends unmeasured. A controlled reload hands over a compatible cost observer with
+its meter baseline and price observations; a full unload or a failed setup
+closes it. Estimates add no Recorder writes beyond their own results.
 
 Manually selected entity sources work without a vehicle profile. Creating a
 profile starts with that vehicle's explicit settings; it does not invent a
 profile from earlier flat selections. Provider selection uses only the current
-provider/device keys. Before 1.0 we do not maintain migrations for obsolete
-beta configuration, storage or API formats. Hardware capability handling,
+provider/device keys. Hardware capability handling,
 identity checks and the supported Home Assistant range are separate concerns.
 
 Options edits are held in a section-local draft until the final form is
@@ -461,11 +500,13 @@ retry timer and both listeners. Healthy operation adds no polling or states.
 
 ### One choke point for writes
 
-`device/control.py` is the only module that may change device state. It exists
-because `0x0302` is three different commands depending on the value, and two
-of them are dangerous. Centralising it means the minimum current, the
-`allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
-counters are written once and cannot be forgotten by a new platform.
+`AmtronControl` (`device/control.py`) is the only place that may change device
+state. Every command enters there, `CommandQueue` runs it now or keeps it as
+the one pending command, and `WritePath` performs each register write. The
+choke point exists because `0x0302` is three different commands depending on
+the value, and two of them are dangerous. Minimum current, the
+`allow_unlimited` opt-in, clamping, rate limits and diagnostics counters are
+written once and cannot be forgotten by a new platform.
 
 Current writes retain their five-second register floor. A separate `state_change_interval_seconds` option defaults to 300 and
 accepts 0–3600 seconds; zero disables the longer guard. A direct entry passes
@@ -582,7 +623,7 @@ a dashboard full of `unknown`.
 service poller -> WallboxData (decoded snapshot) -> service API
 service API    -> HttpTransport | EmbeddedTransport -> ServiceClient
 coordinator    -> entities (table projections)
-ServiceControl -> named command -> device/control.py -> client
+ServiceControl -> named command -> AmtronControl -> CommandQueue -> WritePath -> client
 ```
 
 `WallboxData` is a plain snapshot: a register-key to value mapping plus the

@@ -25,6 +25,11 @@ from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 SERIAL = "ABC123456789"
 
 
+def intent_of(service):
+    """What the service was told to do; the operation summary is its status."""
+    return {key: value for key, value in service.snapshot()["control"].items() if key != "operation"}
+
+
 @pytest.mark.parametrize("protocol", ["rtu_over_tcp", "modbus_tcp"])
 @pytest.mark.parametrize("replacement", ["DIFFERENT-WALLBOX", ""])
 @pytest.mark.parametrize("operation", ["current", "heartbeat", "recovery"])
@@ -46,7 +51,7 @@ def test_service_reconnect_rejects_physical_replacement_before_any_write(
         await service._initialize()
         await service.heartbeat.async_stop()
         saved = service.state_path.read_bytes()
-        intent = service.snapshot()["control"]
+        intent = intent_of(service)
         bus.writes.clear()
         try:
             # The app process and its cached identity stay alive while the
@@ -72,7 +77,7 @@ def test_service_reconnect_rejects_physical_replacement_before_any_write(
                 await service._recover()
             assert bus.writes == []
             assert service.state_path.read_bytes() == saved
-            assert service.snapshot()["control"] == intent
+            assert intent_of(service) == intent
             assert service.snapshot()["available"] is False
             assert service.identity.serial_number == SERIAL
 
@@ -130,7 +135,7 @@ def test_cancelled_identity_precheck_does_not_persist_an_unsent_command(tmp_path
         service, bus, _clock = await service_fixture(tmp_path)
         await service.heartbeat.async_stop()
         saved = service.state_path.read_bytes()
-        intent = service.snapshot()["control"]
+        intent = intent_of(service)
         generation = service.client.write_state.current_write_generation
         original = bus.read_holding_registers
         verifying = asyncio.Event()
@@ -152,7 +157,7 @@ def test_cancelled_identity_precheck_does_not_persist_an_unsent_command(tmp_path
                 await task
             assert not bus.writes
             assert service.state_path.read_bytes() == saved
-            assert service.snapshot()["control"] == intent
+            assert intent_of(service) == intent
             assert service.client.write_state.current_write_generation == generation
             bus.read_holding_registers = original
             await service.refresh()

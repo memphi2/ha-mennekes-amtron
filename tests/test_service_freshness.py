@@ -16,6 +16,11 @@ from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
 
+def intent_of(service):
+    """What the service was told to do; the operation summary is its status."""
+    return {key: value for key, value in service.snapshot()["control"].items() if key != "operation"}
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -34,7 +39,7 @@ def test_stale_service_rejects_every_command_without_changing_intent(tmp_path, p
     async def run():
         service, transport, _clock = await service_fixture(tmp_path, current=1)
         saved = service.state_path.read_bytes()
-        intent = service.snapshot()["control"]
+        intent = intent_of(service)
         service._updated_at -= 3600
         try:
             async with (
@@ -48,7 +53,7 @@ def test_stale_service_rejects_every_command_without_changing_intent(tmp_path, p
                 ) as response:
                     assert response.status == 409
                     assert (await response.json())["error"] == "service_unavailable"
-                assert service.snapshot()["control"] == intent
+                assert intent_of(service) == intent
                 assert service.state_path.read_bytes() == saved
                 assert all(address == R.HEARTBEAT.address for address, _ in transport.writes)
                 before = service.diagnostics.heartbeats_sent

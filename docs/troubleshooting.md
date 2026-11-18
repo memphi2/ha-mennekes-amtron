@@ -563,19 +563,18 @@ hostnames and adapter identifiers.
 
 ## Understand the activity timeline
 
-The **Activity** entity combines readable command messages in Home Assistant
-Activity with observed physical changes. In Activity, filter by **Activity**
+The **Activity** entity lists completed commands together with observed
+physical changes; each row names what happened. In Activity, filter by **Activity**
 for the concise wallbox timeline. The unfiltered HA activity also includes
 ordinary entity changes, such as sensors becoming unavailable during an HA
 reload. A command acknowledgement does not prove that the car has started
 charging; look for the subsequent **Charging started** change.
 
-Command messages name the trigger (Plug & Charge, departure plan, target
-protection, app or Home Assistant), outcome and requested current where relevant.
+The entity's attributes name the trigger (Plug & Charge, departure plan, target
+protection, app or Home Assistant), the outcome and the requested current.
 Home Assistant means a control or automation; it does not identify a person.
 Unknown sources are labelled explicitly. The original command time is shown in
-the app, included in HA's readable message and kept as the `occurred_at`
-attribute. The HA Activity row and native event timestamp mark receipt in HA,
+the app and kept as the `occurred_at` attribute. The HA Activity row and native event timestamp mark receipt in HA,
 which can be later. Reconnects establish a fresh cursor and do not replay
 commands that happened while HA was disconnected.
 

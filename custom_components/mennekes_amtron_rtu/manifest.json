@@ -2,8 +2,7 @@
   "domain": "mennekes_amtron_rtu",
   "name": "Mennekes Amtron RTU",
   "after_dependencies": [
-    "hassio",
-    "logbook"
+    "hassio"
   ],
   "categories": [
     "energy.ev_charging"
@@ -24,5 +23,5 @@
   "requirements": [
     "pymodbus[serial]>=3.13.1"
   ],
-  "version": "0.10.0b1"
+  "version": "0.10.0b2"
 }

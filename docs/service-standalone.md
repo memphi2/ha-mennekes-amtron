@@ -6,7 +6,7 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-Run service **0.10.0b1 or newer** (API 2) with this integration, and
+Run service **0.10.0b2 or newer** (API 3) with this integration, and
 update the service first. See [Updates](#operation-and-updates). The app's web
 pages, including guest charging, are part of the Home Assistant app and need
 Supervisor Ingress; a standalone service offers the same guest charging through
@@ -155,7 +155,7 @@ This URL addresses our HTTP service, not the LAN gateway's Modbus port. The
 service's `host` and `tcp_port` options separately select the gateway.
 
 Standalone services use manual URL/token setup. Supervisor's automatic discovery
-is available only for the HA OS app. During migration, the service's wallbox serial
+is available only for the HA OS app. The service's wallbox serial
 number must match the existing entry. Re-enable that entry if it remains disabled.
 
 Compare readings while read-only. Then set the permitted `current_cap`, change

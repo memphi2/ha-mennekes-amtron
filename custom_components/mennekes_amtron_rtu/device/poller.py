@@ -1,4 +1,4 @@
-"""Cadence-aware polling shared by direct mode and the independent service."""
+"""Cadence-aware polling of the wallbox registers."""
 
 from __future__ import annotations
 

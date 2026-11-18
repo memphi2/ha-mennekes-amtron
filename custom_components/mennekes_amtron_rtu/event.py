@@ -7,43 +7,42 @@ which one. An automation triggers on the type and narrows by attribute.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 
 from homeassistant.components.event import EventEntity, EventEntityDescription
-from homeassistant.components.logbook import async_log_entry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.translation import async_get_translations
-from homeassistant.util import dt as dt_util
 
 from .data import WallboxData
-from .device.command_events import CommandEvent
-from .device.const import CHARGING_CURRENT_DECIMALS, DOMAIN
+from .device.command_events import ACTIONS, CONTROL_ACTIONS, CommandEvent
+from .device.const import CHARGING_CURRENT_DECIMALS
 from .device.registers import CHARGING_CURRENT_EMS, CP_STATE
+from .device.wallbox_events import EVENT_TYPES as WALLBOX_EVENT_TYPES
 from .device.wallbox_events import WallboxChanges
 from .entity import AmtronEntity, Projection
 from .entry_types import MennekesAmtronConfigEntry
 
 PARALLEL_UPDATES = 0
 
-COMMAND_DONE = "command_done"
-COMMAND_FAILED = "command_failed"
-COMMAND_CANCELLED = "command_cancelled"
-SESSION_STARTED = "session_started"
-SESSION_ENDED = "session_ended"
-WALLBOX_CHANGED = "wallbox_changed"
-EVENT_TYPES = (
-    COMMAND_DONE, COMMAND_FAILED, COMMAND_CANCELLED,
-    SESSION_STARTED, SESSION_ENDED, WALLBOX_CHANGED,
-)
-
-_COMMAND_TYPES = {
-    "executed": COMMAND_DONE, "recovery_succeeded": COMMAND_DONE,
-    "failed": COMMAND_FAILED, "uncertain": COMMAND_FAILED, "recovery_failed": COMMAND_FAILED,
-    "cancelled": COMMAND_CANCELLED, "replaced": COMMAND_CANCELLED,
+# The logbook row of the entity shows the event type and nothing else, so the
+# type itself says what happened: what a completed command did, or which
+# command failed or was dropped.
+_DONE_TYPES = {
+    "pause": "paused", "resume": "resumed", "set_current": "current_set",
+    "single_phase": "single_phase_set", "all_phases": "all_phases_set",
+    "enable_charging": "release_enabled", "disable_charging": "release_disabled",
+    "unlock": "unlocked", "lock": "locked", "recover": "recovered",
 }
-# A car arriving or leaving frames a session; everything else is a change.
-_SESSION_TYPES = {"vehicle_plugged_in": SESSION_STARTED, "vehicle_unplugged": SESSION_ENDED}
+_ENDINGS = {
+    "failed": "failed", "uncertain": "failed", "recovery_failed": "failed",
+    "cancelled": "cancelled", "replaced": "cancelled",
+}
+# Changes the wallbox reported carry their own name as the type.
+EVENT_TYPES = (
+    *_DONE_TYPES.values(),
+    *(f"{action}_failed" for action in ACTIONS),
+    *(f"{action}_cancelled" for action in CONTROL_ACTIONS),
+    *WALLBOX_EVENT_TYPES,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -77,7 +76,6 @@ class AmtronActivity(AmtronEntity, EventEntity):
     def __init__(self, entry: MennekesAmtronConfigEntry, description: _Description) -> None:
         super().__init__(entry, description)
         self._feed = entry.runtime_data.control.events
-        self._labels: dict[str, str] = {}
         # The last successful setpoint, so a periodic automation that repeats
         # it reports once.
         self._last_setpoint: tuple[str, float, str] | None = None
@@ -91,6 +89,9 @@ class AmtronActivity(AmtronEntity, EventEntity):
         # Events are moments, not a state that goes stale with the connection.
         return True
 
+    async def async_get_last_event_data(self) -> None:
+        """Restore nothing: a reload would show the last command as new activity."""
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         # The reading present when the entity appears is the baseline, so a
@@ -98,9 +99,6 @@ class AmtronActivity(AmtronEntity, EventEntity):
         reading = self._reading()
         self._changes.observe(reading)
         self._last_current = _current_readback(reading)
-        self._labels = await async_get_translations(
-            self.hass, self.hass.config.language, "entity", {DOMAIN},
-        )
         self.async_on_remove(self._feed.listen(self._command))
 
     def _reading(self) -> WallboxData | None:
@@ -119,10 +117,7 @@ class AmtronActivity(AmtronEntity, EventEntity):
             self._last_setpoint = None
         self._last_current = current
         for change in changes:
-            self._trigger_event(
-                _SESSION_TYPES.get(change.type, WALLBOX_CHANGED),
-                {"change": change.type, **change.attributes},
-            )
+            self._trigger_event(change.type, dict(change.attributes))
             self.async_write_ha_state()
 
     def _repeats(self, event: CommandEvent) -> bool:
@@ -145,39 +140,11 @@ class AmtronActivity(AmtronEntity, EventEntity):
         # final outcome is activity.
         if self._repeats(event) or (event.action == "set_current" and event.outcome == "replaced"):
             return
-        kind = _COMMAND_TYPES[event.outcome]
+        ending = _ENDINGS.get(event.outcome)
+        kind = _DONE_TYPES[event.action] if ending is None else f"{event.action}_{ending}"
         self._trigger_event(kind, {
             "action": event.action, "result": event.outcome, "reason": event.reason,
             "trigger": event.source, "value": event.requested_value,
             "occurred_at": event.occurred_at,
         })
         self.async_write_ha_state()
-        async_log_entry(
-            self.hass, "Mennekes Amtron", self._sentence(kind, event),
-            domain=DOMAIN, entity_id=self.entity_id,
-        )
-
-    def _label(self, attribute: str, value: str) -> str:
-        key = f"component.{DOMAIN}.entity.event.activity.state_attributes.{attribute}.state.{value}"
-        return self._labels.get(key, value)
-
-    def _name(self, attribute: str, fallback: str) -> str:
-        key = f"component.{DOMAIN}.entity.event.activity.state_attributes.{attribute}.name"
-        return self._labels.get(key, fallback)
-
-    def _sentence(self, kind: str, event: CommandEvent) -> str:
-        """Who asked for what, how it ended and why: two translations, composed."""
-        text = f"{self._label('trigger', event.source)}: {self._label('action', event.action)}"
-        value = event.requested_value
-        if value is not None and event.action in ("set_current", "resume"):
-            text += f" ({self._label('value', '0')})" if value == 0 else f" ({value:g} A)"
-        text += f" - {self._label('event_type', kind)}"
-        if event.reason != "completed":
-            text += f". {self._label('reason', event.reason)}"
-        text += "."
-        if event.occurred_at is not None:
-            # The logbook row is written now; the text keeps the service's
-            # own time, with the offset for a repeated hour at a clock change.
-            at = dt_util.as_local(datetime.fromisoformat(event.occurred_at))
-            text += f" {self._name('occurred_at', 'Occurred at')}: {at.isoformat(sep=' ', timespec='seconds')}."
-        return text

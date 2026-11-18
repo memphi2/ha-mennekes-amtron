@@ -171,12 +171,6 @@ class HeartbeatTask:
             )
         return self._task
 
-    def attach(self, task: asyncio.Task[None]) -> None:
-        """Adopt a task created by Home Assistant's entry task helper."""
-
-        self._stopping = False
-        self._task = task
-
     async def async_stop(self) -> None:
         """Cancel the heartbeat task and wait for it to finish."""
 

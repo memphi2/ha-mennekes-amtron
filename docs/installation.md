@@ -130,17 +130,13 @@ required just to use the wallbox.
 
 ## Updates
 
-Before version 1.0, releases may change configuration, stored state and the
-service API without migration. Read the release notes first.
-After an incompatible update, reconfigure the affected profiles or planning
-options and verify Plug & Charge, pause, release, charging target and departure
-before use. An incompatible saved app state is preserved and charging control is blocked.
+A saved app state that the service cannot use is preserved and charging control is blocked.
 Open **Settings → System → Repairs** in HA to acknowledge safe defaults: pause
 on, charging release off, resume current 6 A and no targets. This does not start
 charging. Reconfigure the desired policies before explicitly enabling release
 and resuming. In read-only mode the app cannot stop a physical charge.
 This does not change the supported wallbox families or minimum Home Assistant
-version. The current integration requires service **0.10.0b1 or newer**, API 2;
+version. The current integration requires service **0.10.0b2 or newer**, API 3;
 app and integration versions do not otherwise have to match.
 
 1. Back up HA and read the release notes, especially the changes marked
@@ -185,8 +181,7 @@ remove and re-add the wallbox.
    entry uses it, then follow any restart request.
 
 Removal does not reset wallbox settings or delete Recorder history and
-blueprints. Update dashboards and automations that used the removed entities.
-Stop the app separately before giving the adapter to another bus owner.
+blueprints. Stop the app separately before giving the adapter to another bus owner.
 
 ---
 

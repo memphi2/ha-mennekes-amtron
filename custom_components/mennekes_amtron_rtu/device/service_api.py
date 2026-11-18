@@ -11,6 +11,7 @@ from typing import Any
 
 from .client_errors import AmtronBusError
 from .errors import DeviceError, DeviceValidationError
+from .meter_log import moment
 from .service_runtime import ModbusService
 
 Reply = tuple[int, dict[str, Any]]
@@ -70,6 +71,13 @@ class ServiceApi:
             raise _NotFoundError(path)
         if not isinstance(payload, dict):
             raise ValueError("expected an object")
+        if path == "/v2/energy":
+            # From the meter log in memory: no bus access.
+            if set(payload) != {"start", "end"}:
+                raise ValueError("invalid energy span")
+            return {"energy_kwh": service.charge_meter.log.energy_between(
+                moment(payload["start"]), moment(payload["end"]),
+            )}
         if path == "/v2/soc-goal/reserve":
             if payload != {}:
                 raise ValueError("invalid percentage-goal reservation")
@@ -91,6 +99,6 @@ class ServiceApi:
 # Every operation there is; the web server registers exactly these.
 GETS = ("/v2/state", "/v2/diagnostics")
 POSTS = (
-    "/v2/command", "/v2/read", "/v2/soc-goal/reserve", "/v2/soc-goal/commit",
-    "/v2/soc-goal/resolve",
+    "/v2/command", "/v2/read", "/v2/energy", "/v2/soc-goal/reserve",
+    "/v2/soc-goal/commit", "/v2/soc-goal/resolve",
 )

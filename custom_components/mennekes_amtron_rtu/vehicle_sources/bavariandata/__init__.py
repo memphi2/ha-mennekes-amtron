@@ -6,13 +6,10 @@ from datetime import datetime
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.mennekes_amtron_rtu.device.charging_session import (
-    CompletedSession,
-)
-from custom_components.mennekes_amtron_rtu.vehicle_sources.types import HistoryMatch
+from custom_components.mennekes_amtron_rtu.vehicle_sources.types import ChargeRecord
 
 from .departure import read_bavarian_departure
-from .history import async_read_history
+from .history import async_read_latest
 from .identity import BavarianVehicleBinding
 
 
@@ -39,13 +36,13 @@ class BavarianDepartureSource(BavarianVehicleBinding):
 
 
 class BavarianChargeHistorySource(BavarianVehicleBinding):
-    """Match public local history without exposing VINs to charging observers."""
+    """Read public local history without exposing VINs to charging observers."""
 
-    async def async_match(self, session: CompletedSession) -> HistoryMatch | None:
+    async def async_latest(self, *, since: float, until: float) -> ChargeRecord | None:
         if not self.available:
             return None
-        return await async_read_history(
-            self._hass, self._device_id, session, expected_vin=self._vin,
+        return await async_read_latest(
+            self._hass, self._device_id, since=since, until=until, expected_vin=self._vin,
         )
 
     def subscribe(self, on_change: Callable[[], None]) -> CALLBACK_TYPE:

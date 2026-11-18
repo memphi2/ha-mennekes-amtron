@@ -125,7 +125,7 @@ def test_unselected_profile_captures_baseline_and_survives_selection_reload(tmp_
             assert current.charging_cost is old.charging_cost
             await poll(EvseState.CHARGING, 105)
             finished = await poll(EvseState.IDLE, 110)
-            assert finished.charging_session["wallbox_kwh"] == 10
+            assert finished.get("energy_total") == 110
             if costs:
                 assert current.charging_cost.last.result.complete
                 assert current.charging_cost.last.result.known_cost == pytest.approx(4.0)
@@ -133,7 +133,6 @@ def test_unselected_profile_captures_baseline_and_survives_selection_reload(tmp_
         finally:
             await _unload(hass, entry)
         assert _host(hass, entry) is None
-        assert not hass.data.get("mennekes_amtron_rtu_loss_attribution")
         if costs:
             assert current.charging_cost._closed
         assert not current.client.connected
@@ -191,7 +190,6 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
             assert old.charging_cost._closed is (outcome != "reconnected")
             assert not old.client.connected
             if outcome in {"skipped", "failed", "identity_changed"}:
-                assert not hass.data.get("mennekes_amtron_rtu_loss_attribution")
                 # Nothing took the service over; it is stopped.
                 assert _host(hass, entry) is None
             elif outcome == "connection_changed":
@@ -217,10 +215,9 @@ def test_short_transport_reconnect_keeps_estimate_continuity(tmp_path, monkeypat
             await poll.reconnect()
             finished = await poll(EvseState.IDLE, 110)
             # The same wallbox and meter answer again: a short reconnect is a gap.
-            assert finished.charging_session is not None
+            assert finished.get("energy_total") == 110
             await poll(EvseState.CHARGING, 115)
-            finished = await poll(EvseState.IDLE, 120)
-            assert finished.charging_session["wallbox_kwh"] == 10
+            await poll(EvseState.IDLE, 120)
             assert runtime.charging_cost.last.result.complete
         finally:
             await _unload(hass, entry)

@@ -59,6 +59,14 @@ ignore = ["E501"]
 # subprocesses, import the register table as `R` for density, and are not a
 # package.
 "tests/*" = ["S101", "SLF001", "INP001", "S603", "N812"]
+# The guest permission and the departure plan are parts of the one service and
+# share its state.
+"custom_components/mennekes_amtron_rtu/device/guest_limits.py" = ["SLF001"]
+"custom_components/mennekes_amtron_rtu/device/departure_planner.py" = ["SLF001"]
+# The write path and the command queue are parts of the one control; the
+# control holds the state they work on.
+"custom_components/mennekes_amtron_rtu/device/control_write.py" = ["SLF001"]
+"custom_components/mennekes_amtron_rtu/device/control_queue.py" = ["SLF001"]
 # The gates and release tooling run fixed developer commands -- git, gh,
 # python, pyspdxtools -- with no input from anywhere but this repository.
 "scripts/*" = ["S603", "S607", "INP001"]
@@ -83,7 +91,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mennekes-amtron-modbus-service"
-version = "0.10.0b1"
+version = "0.10.0b2"
 description = "Independent Modbus RTU owner for Mennekes Amtron wallboxes"
 requires-python = ">=3.14"
 license = "Apache-2.0"

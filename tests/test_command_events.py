@@ -10,7 +10,6 @@ import pytest
 from aiohttp import ClientSession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.mennekes_amtron_rtu import event as event_platform
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.command_events import (
     MAX_EVENTS,
@@ -263,28 +262,25 @@ def test_event_entity_subscribes_without_replaying_and_stays_available(monkeypat
         entity.hass = hass
         assert entity.available
         assert entity.unique_id.endswith("_activity")
-        writes, removals, logged = [], [], []
+        writes, removals = [], []
         monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", AsyncMock())
-        monkeypatch.setattr(event_platform, "async_get_translations", AsyncMock(return_value={}))
-        monkeypatch.setattr(event_platform, "async_log_entry", lambda *args, **_kwargs: logged.append(args[2]))
         monkeypatch.setattr(entity, "async_write_ha_state", lambda: writes.append(True))
         monkeypatch.setattr(entity, "async_on_remove", removals.append)
         await entity.async_added_to_hass()
         assert writes == []
         feed.record("executed", "resume", source="plug_charge", requested_value=16)
-        # The type names what kind of thing happened; attributes say which.
-        assert entity.state_attributes["event_type"] == "command_done"
+        # The type says what happened; attributes say who asked and why.
+        assert entity.state_attributes["event_type"] == "resumed"
         assert entity.state_attributes["action"] == "resume"
         assert entity.state_attributes["result"] == "executed"
         assert entity.state_attributes["trigger"] == "plug_charge"
         feed.record("recovery_failed", "recover", "error_still_active")
-        assert entity.state_attributes["event_type"] == "command_failed"
+        assert entity.state_attributes["event_type"] == "recover_failed"
         assert entity.state_attributes["result"] == "recovery_failed"
         feed.record("uncertain", "recover", "unknown")
-        assert entity.state_attributes["event_type"] == "command_failed"
+        assert entity.state_attributes["event_type"] == "recover_failed"
         assert entity.state_attributes["result"] == "uncertain"
         assert len(writes) == 3
-        assert len(logged) == 3
         for remove in removals:
             remove()
         feed.record("executed", "lock")
@@ -421,7 +417,7 @@ def test_source_and_requested_value_survive_queued_execution():
             command_source.reset(token)
         assert control.pending_action == "set_current"
         harness.clock[0] += 6
-        await control._async_flush_pending()
+        await control.queue.async_flush_pending()
         event = CommandEvents.parse(control.events.snapshot())[2][-1]
         assert event.source == "plug_charge"
         assert event.requested_value == 6

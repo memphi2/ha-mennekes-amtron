@@ -53,8 +53,8 @@ Check the observed charging state and power above for the physical result.
 
 The time beside each result is the original command-event time. For a longer
 timeline together with plug-in, charging and fault changes, use **Home Assistant
-Activity → Activity**. Its readable messages include that original time;
-the HA timeline itself is dated when HA received the event.
+Activity → Activity**. The HA timeline is dated when HA received the event;
+the `occurred_at` attribute keeps the original time.
 [Activity details and repeated commands](troubleshooting.md#understand-the-activity-timeline).
 
 The overview also gives a suggested action for common waiting states. Briefly

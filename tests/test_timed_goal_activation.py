@@ -20,10 +20,10 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 )
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
-from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-    DepartureModbusService,
-)
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
+from custom_components.mennekes_amtron_rtu.device.service_runtime import (
+    ModbusService,
+)
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
@@ -54,7 +54,7 @@ async def planning_service(tmp_path):
     client = MennekesModbusClient(
         SerialConfig("/dev/fake"), client_factory=lambda _: FakeModbusClient(device_bank()),
     )
-    service = DepartureModbusService(
+    service = ModbusService(
         ServerConfig(client.config, TOKEN, read_only=False, current_cap=16), tmp_path / "intent.json", client=client,
     )
     await service._initialize()

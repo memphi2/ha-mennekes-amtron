@@ -10,7 +10,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.control import _PendingCommand
+from custom_components.mennekes_amtron_rtu.device.control_types import (
+    PendingCommand,
+)
 from custom_components.mennekes_amtron_rtu.device.data import (
     ConnectionState,
     WallboxData,
@@ -242,7 +244,7 @@ def test_a_confirmed_goal_pause_is_reread_once_the_poll_or_link_changes(change):
         elif change == "reconnect":
             harness.client._connection_generation += 1
         elif change == "pending":
-            control._pending = _PendingCommand("set_current", 12)
+            control._pending = PendingCommand("set_current", 12)
         harness.clock[0] += 10
         await control.async_pause_for_energy_goal()
         read = (R.CHARGING_CURRENT_EMS.address, R.CHARGING_CURRENT_EMS.count) in harness.transport.reads
@@ -394,14 +396,14 @@ def test_terminal_evidence_during_guarded_reads_is_rechecked_before_start(action
         async def wait_then_notice_goal(**_kwargs):
             runner.observe(_snapshot(harness, 1247))
 
-        control._async_check_transition_interval = wait_then_notice_goal
+        control.writes.async_check_transition_interval = wait_then_notice_goal
 
         async def notice_goal_while_checking_release(_read=None):
             runner.observe(_snapshot(harness, 1247))
             return True
 
         # A paused release change skips the interval but rechecks the goal.
-        control._async_release_switches_charge = notice_goal_while_checking_release
+        control.writes.async_release_switches_charge = notice_goal_while_checking_release
         method = {
             "resume": control.async_resume_charging,
             "release": lambda: control.async_set_charging_release(True),

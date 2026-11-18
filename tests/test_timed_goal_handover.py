@@ -278,7 +278,7 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
                     with pytest.raises(ServiceConnectionError, match=r"control\.departure"):
                         client.apply_snapshot(damaged)
                 # The service's summary is validated like its plan.
-                assert control.operation is None
+                assert control.operation.controller == "direct"
                 summary = {
                     "controller": "departure_plan", "waiting": "until_planned_start",
                     "next": {"event": "plan_start", "at": deadline.isoformat()},

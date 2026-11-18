@@ -31,8 +31,8 @@ from custom_components.mennekes_amtron_rtu.device.const import (
 )
 from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
-from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-    DepartureModbusService,
+from custom_components.mennekes_amtron_rtu.device.service_runtime import (
+    ModbusService,
 )
 from custom_components.mennekes_amtron_rtu.guest_charging import GuestCharging
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
@@ -220,7 +220,7 @@ class PollingTransport(EmbeddedTransport):
     show what the simulated wallbox holds now.
     """
 
-    def __init__(self, service: DepartureModbusService) -> None:
+    def __init__(self, service: ModbusService) -> None:
         super().__init__(ServiceApi(service))
         self.service = service
 
@@ -255,7 +255,7 @@ async def build_runtime(
         client_factory=lambda _config: wallbox,
     )
     directory = Path(tempfile.mkdtemp(prefix="amtron-service-"))
-    service = DepartureModbusService(
+    service = ModbusService(
         ServerConfig(modbus.config, "", read_only=read_only, current_cap=current_cap),
         directory / "intent.json",
         client=modbus,

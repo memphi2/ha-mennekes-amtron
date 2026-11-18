@@ -24,7 +24,7 @@ def test_unknown_and_ambiguous_cars_explain_waiting_without_granting(tmp_path, m
             await report(h, "second", second)
             await report(h)
             assert h.observer.status == "waiting_detection"
-            assert h.observer.decision_reason == reason
+            assert h.observer.decision_details["reason"] == reason
             assert h.observer.blocked_reason is None
             before = h.control.plug_charge.copy()
             details = h.observer.decision_details
@@ -34,7 +34,7 @@ def test_unknown_and_ambiguous_cars_explain_waiting_without_granting(tmp_path, m
             assert details["last_grant_error"] is None
             # Reading it changes neither the gate nor the decision.
             assert h.control.plug_charge == before
-            assert h.observer.decision_reason == reason
+            assert h.observer.decision_details["reason"] == reason
             h.control.async_authorize_plug_charge.assert_not_awaited()
             h.control.async_resume_charging.assert_not_awaited()
     asyncio.run(run())
@@ -45,18 +45,18 @@ def test_report_binding_and_settling_are_distinct_waits(tmp_path, monkeypatch):
         async with observer_harness(tmp_path, monkeypatch) as h:
             h.control.plug_charge["since"] = (dt_util.utcnow() + timedelta(minutes=3)).isoformat()
             await report(h)
-            assert h.observer.decision_reason == "plug_report_not_current"
+            assert h.observer.decision_details["reason"] == "plug_report_not_current"
             h.control.plug_charge["since"] = None
             h.coordinator.async_update_listeners()
-            assert h.observer.decision_reason == "session_time_unknown"
+            assert h.observer.decision_details["reason"] == "session_time_unknown"
             h.control.plug_charge["since"] = (dt_util.utcnow() - timedelta(seconds=1)).isoformat()
             profile = h.entry.runtime_data.vehicle_profile_id
             h.entry.runtime_data.vehicle_profile_id = None
             h.coordinator.async_update_listeners()
-            assert h.observer.decision_reason == "vehicle_binding_pending"
+            assert h.observer.decision_details["reason"] == "vehicle_binding_pending"
             h.entry.runtime_data.vehicle_profile_id = profile
             h.coordinator.async_update_listeners()
-            assert h.observer.decision_reason == "settling"
+            assert h.observer.decision_details["reason"] == "settling"
             h.control.async_authorize_plug_charge.assert_not_awaited()
     asyncio.run(run())
 
@@ -97,11 +97,11 @@ def test_failed_grant_is_explained_without_exposing_raw_errors(tmp_path, monkeyp
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()
             assert h.observer.status == "waiting_release"
-            assert h.observer.decision_reason == "grant_retry"
+            assert h.observer.decision_details["reason"] == "grant_retry"
             assert h.observer.decision_details["last_grant_error"] == category
             assert "private-adapter-address" not in json.dumps(h.observer.decision_details)
             h.control.plug_charge["authorized"] = True
             h.coordinator.async_update_listeners()
-            assert h.observer.decision_reason == "authorized"
+            assert h.observer.decision_details["reason"] == "authorized"
             assert h.observer.decision_details["last_grant_error"] is None
     asyncio.run(run())

@@ -675,7 +675,7 @@ def test_a_half_initialized_service_starts_over_and_then_starts_its_heartbeat(
             if failures:
                 raise failures.pop()
 
-        monkeypatch.setattr(service, "_initialize_dependents", dependents)
+        monkeypatch.setattr(service.guest, "initialize", dependents)
         with pytest.raises(OSError, match="state unreadable"):
             await service._initialize()
         # Nothing is left that a later poll would mistake for a started service.

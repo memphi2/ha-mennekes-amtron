@@ -4,22 +4,18 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import replace
-from uuid import UUID
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
-from custom_components.mennekes_amtron_rtu.device.charging_session import (
-    CompletedSession,
+from custom_components.mennekes_amtron_rtu.device.charge_loss import (
+    Charge,
+    LossStatistics,
 )
 
 
-def session(index=1, *, energy=20.0) -> CompletedSession:
+def session(index=1, *, energy=20.0) -> Charge:
     offset = 2000.0 * index
-    return CompletedSession(
-        str(UUID(int=index)), offset, offset + 1200,
-        offset + 100, offset + 105, offset + 1000, offset + 1005, energy,
-    )
+    return Charge(offset, offset + 1200, energy)
 
 
 def stats() -> LossStatistics:
@@ -45,7 +41,7 @@ def test_unconfigured_model_is_inert_and_has_no_fabricated_zero():
     assert model.wallbox_kwh is None
     assert model.vehicle_kwh is None
     assert not model.configure_source(None)
-    assert not model.observe_session(session())
+    assert not model.observe_charge(session())
     assert not accept(model, session())
     assert LossStatistics.restore(model.snapshot()).snapshot() == model.snapshot()
 
@@ -59,7 +55,7 @@ def test_weighted_average_and_correction_of_latest_session_without_recounting():
     assert model.sample_count == 1
     assert not accept(model, first, 9)
     second = session(2, energy=30)
-    assert model.observe_session(second)
+    assert model.observe_charge(second)
     assert model.last_loss_percent is None
     assert model.average_loss_percent == pytest.approx(10)
     assert model.status == "waiting_for_vehicle"
@@ -88,7 +84,7 @@ def test_owner_supplies_association_and_current_comparison_details(association):
     assert model.wallbox_kwh == 20
     assert model.vehicle_kwh == 18
     assert LossStatistics.restore(model.snapshot()).association == association
-    model.observe_session(session(2))
+    model.observe_charge(session(2))
     assert model.association is None
     assert model.wallbox_kwh is None
     assert model.vehicle_kwh is None
@@ -110,39 +106,49 @@ def test_historical_corrections_and_overlapping_sessions_are_ignored():
     accept(model, second)
     original = model.snapshot()
     assert not accept(model, first, 15)
-    assert not model.observe_session(first)
-    overlap = replace(second, session_id=str(UUID(int=3)), disconnected_at=second.disconnected_at + 1)
+    assert not model.observe_charge(first)
+    overlap = replace(second, end=second.end + 1)
     assert not accept(model, overlap)
     assert model.snapshot() == original
-    same_end = replace(second, session_id=str(UUID(int=4)))
-    assert not model.observe_session(same_end)
+    same_end = replace(second, start=second.start + 1)
+    assert not model.observe_charge(same_end)
 
 
-def test_same_identifier_cannot_rewrite_wallbox_measurements():
+def test_a_span_measured_again_cannot_rewrite_the_accepted_charge():
     model = stats()
     item = session()
     accept(model, item)
-    with pytest.raises(ValueError, match="identifier changed"):
-        accept(model, replace(item, wallbox_kwh=30))
+    assert not accept(model, replace(item, wallbox_kwh=30))
     assert model.last_loss_percent == pytest.approx(10)
+    assert model.wallbox_kwh == 20
+
+
+@pytest.mark.parametrize("raw", [
+    None, {}, {"start": 1, "end": 2}, {"start": 2, "end": 2, "wallbox_kwh": 1},
+    {"start": 1, "end": 2, "wallbox_kwh": 0}, {"start": "1", "end": 2, "wallbox_kwh": 1},
+])
+def test_a_saved_charge_needs_a_duration_and_energy(raw):
+    with pytest.raises(ValueError, match=r"charge|loss value"):
+        Charge.parse(raw)
+    assert Charge.parse(session().as_dict()) == session()
 
 
 def test_missing_complete_session_hides_last_result_but_keeps_valid_average():
     model = stats()
     item = session()
     accept(model, item)
-    assert model.observe_session(None)
+    assert model.observe_charge(None)
     assert model.status == "waiting_for_session"
     assert model.last_loss_percent is None
     assert model.snapshot()["current_session"] is None
     assert model.average_loss_percent == pytest.approx(10)
-    assert not model.observe_session(None)
+    assert not model.observe_charge(None)
     restored = LossStatistics.restore(model.snapshot())
     assert restored.average_loss_percent == pytest.approx(10)
-    assert restored.observe_session(item)
+    assert restored.observe_charge(item)
     assert restored.status == "matched"
     assert restored.sample_count == 1
-    assert not restored.observe_session(item)
+    assert not restored.observe_charge(item)
 
 
 def test_missing_vehicle_input_never_counts_as_zero_loss():
@@ -287,7 +293,7 @@ def test_restore_checks_session_order_and_identifier_consistency():
     for current in (
         session(1),
         replace(session(2), wallbox_kwh=21),
-        replace(session(2), session_id=str(UUID(int=3)), disconnected_at=5300),
+        replace(session(2), end=5300),
     ):
         raw = deepcopy(saved)
         raw["status"] = "waiting_for_vehicle"

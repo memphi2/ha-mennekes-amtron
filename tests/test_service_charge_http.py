@@ -6,8 +6,8 @@ import asyncio
 
 from aiohttp.test_utils import TestClient, TestServer
 
-from custom_components.mennekes_amtron_rtu.device.console_charging import (
-    ChargingConsole,
+from custom_components.mennekes_amtron_rtu.device.console_http import (
+    ServiceConsole,
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 
@@ -16,7 +16,7 @@ HEADERS = {"X-Remote-User-Id": "f" * 32, "X-Remote-User-Groups": "system-admin"}
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 
-class Console(ChargingConsole):
+class Console(ServiceConsole):
     async def _request(self, method, path, payload=None):
         assert method == "GET"
         assert path == "/info"
@@ -24,12 +24,8 @@ class Console(ChargingConsole):
 
 
 def test_obsolete_order_routes_are_not_exposed(tmp_path, monkeypatch):
-    from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-        DepartureModbusService,
-    )
     from tests import service_guest_fixture as runtime
     async def run():
-        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             service.config = __import__("dataclasses").replace(service.config, token=TOKEN)
             async with TestClient(TestServer(create_app(service))) as client:

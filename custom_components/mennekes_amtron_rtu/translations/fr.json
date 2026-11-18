@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Se connecter au service Modbus",
-        "description": "Les applications Supervisor se connectent automatiquement, sans saisir d’URL ni de jeton. Ce formulaire est destiné à un service hébergé séparément. Pour migrer depuis une connexion Modbus directe, désactivez d’abord l’ancienne entrée de l’intégration afin de libérer la connexion Modbus.",
+        "description": "Les applications Supervisor se connectent automatiquement, sans saisir d’URL ni de jeton. Ce formulaire est destiné à un service hébergé séparément.",
         "data": {
           "server_url": "URL du service",
           "server_token": "Jeton d’accès"
@@ -587,12 +587,48 @@
           "event_type": {
             "name": "Type",
             "state": {
-              "command_done": "Commande exécutée",
-              "command_failed": "Échec de la commande",
-              "command_cancelled": "Commande annulée",
-              "session_started": "Véhicule branché",
-              "session_ended": "Véhicule débranché",
-              "wallbox_changed": "Changement à la borne"
+              "paused": "Charge mise en pause",
+              "resumed": "Charge reprise",
+              "current_set": "Courant de charge réglé",
+              "single_phase_set": "Une phase sélectionnée",
+              "all_phases_set": "Toutes les phases disponibles sélectionnées",
+              "release_enabled": "Autorisation de charge activée",
+              "release_disabled": "Autorisation de charge désactivée",
+              "unlocked": "Borne déverrouillée",
+              "locked": "Borne verrouillée",
+              "recovered": "Correction de l’erreur confirmée",
+              "pause_failed": "Échec : mettre la charge en pause",
+              "resume_failed": "Échec : reprendre la charge",
+              "set_current_failed": "Échec : régler le courant de charge",
+              "single_phase_failed": "Échec : utiliser une phase",
+              "all_phases_failed": "Échec : utiliser toutes les phases disponibles",
+              "enable_charging_failed": "Échec : autoriser la charge",
+              "disable_charging_failed": "Échec : désactiver l’autorisation de charge",
+              "unlock_failed": "Échec : déverrouiller la borne",
+              "lock_failed": "Échec : verrouiller la borne",
+              "recover_failed": "Échec : corriger l’erreur",
+              "pause_cancelled": "Annulé : mettre la charge en pause",
+              "resume_cancelled": "Annulé : reprendre la charge",
+              "set_current_cancelled": "Annulé : régler le courant de charge",
+              "single_phase_cancelled": "Annulé : utiliser une phase",
+              "all_phases_cancelled": "Annulé : utiliser toutes les phases disponibles",
+              "enable_charging_cancelled": "Annulé : autoriser la charge",
+              "disable_charging_cancelled": "Annulé : désactiver l’autorisation de charge",
+              "unlock_cancelled": "Annulé : déverrouiller la borne",
+              "lock_cancelled": "Annulé : verrouiller la borne",
+              "vehicle_plugged_in": "Véhicule branché",
+              "vehicle_unplugged": "Véhicule débranché",
+              "charging_started": "Charge démarrée",
+              "charging_stopped": "Charge arrêtée",
+              "error_occurred": "Erreur survenue",
+              "error_cleared": "Erreur résolue",
+              "authorized": "Autorisé",
+              "authorization_rejected": "Autorisation refusée",
+              "downgrade_started": "Réduction de puissance commencée",
+              "downgrade_ended": "Réduction de puissance terminée",
+              "cable_locked": "Câble verrouillé",
+              "cable_unlocked": "Câble déverrouillé",
+              "phases_switched": "Phases commutées"
             }
           },
           "action": {
@@ -668,24 +704,6 @@
           },
           "occurred_at": {
             "name": "Survenu à"
-          },
-          "change": {
-            "name": "Changement",
-            "state": {
-              "vehicle_plugged_in": "Véhicule branché",
-              "vehicle_unplugged": "Véhicule débranché",
-              "charging_started": "Charge démarrée",
-              "charging_stopped": "Charge arrêtée",
-              "error_occurred": "Erreur survenue",
-              "error_cleared": "Erreur résolue",
-              "authorized": "Autorisé",
-              "authorization_rejected": "Autorisation refusée",
-              "downgrade_started": "Réduction de puissance commencée",
-              "downgrade_ended": "Réduction de puissance terminée",
-              "cable_locked": "Câble verrouillé",
-              "cable_unlocked": "Câble déverrouillé",
-              "phases_switched": "Phases commutées"
-            }
           },
           "cp_state": {
             "name": "État du control pilot"

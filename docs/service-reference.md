@@ -225,20 +225,26 @@ recurring failures require their logged cause to be corrected.
 
 ## Saved state and database traffic
 
-Ordinary charging intent and shared energy/percentage limits are saved in
-`intent.json`, including bounded evidence for restoring guest permission.
-Format 2 rejects older beta intent files and requires a safe reset acknowledgement.
-The selected time, vehicle plan and its bounded learned model
-are saved in `departure-plan.json`. Both are bound to the wallbox identity.
+The service keeps three files, each bound to the wallbox identity:
+
+| File | Content | Written |
+|---|---|---|
+| `intent.json` | Charging intent, shared energy and percentage limits, bounded evidence for restoring guest permission | When that intent changes |
+| `departure-plan.json` | The selected time, the vehicle plan and its bounded learned model | When the plan changes |
+| `charge-meter.json` | The meter log of the running and the last plug cycle, the plug cycle and its note | At a change of the plug cycle, and every five minutes while the meter rises |
+
+An intent file of another format is rejected and requires a safe reset
+acknowledgement. An unusable `charge-meter.json` only starts measuring again.
 There is no guest-order file, separate guest energy baseline or charging-rate
 history. Guest permission is kept only in service memory for the current plug-in.
 
 State updates use atomic replacement and owner-only permissions. Include the
-service data directory and private token in protected backups. Incompatible
-beta state must not be treated as fresh charging permission; follow the repair
-and reconfiguration instructions in [Updates](installation.md#updates).
+service data directory and private token in protected backups. A rejected
+intent file never counts as charging permission; the acknowledgement is
+described in [Updates](installation.md#updates).
 
-Heartbeats and polls do not create entries in that state file. The heartbeat
+Heartbeats and polls do not write `intent.json` or `departure-plan.json`; the
+charge meter is the only file saved on a timer, and only while a car charges. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
@@ -272,12 +278,24 @@ for vehicle pause confirmation. Once confirmed, a fixed timestamp identifies
 the end of the grace period. HA derives the two pending-change sensors from the
 service data rather than maintaining a second queue.
 
+The snapshot's `charge_meter` object describes what the service measured for
+cost and loss estimates; times are epoch seconds:
+
+| Field | Meaning |
+|---|---|
+| `known_since` | Since when the plug state has been known without a long gap |
+| `present` | Whether a car is plugged in; `null` while unknown |
+| `plugged_at`, `charging_at` | Plug-in and first charging of the running cycle; `null` unless the service saw the plug-in |
+| `note` | The note Home Assistant attached to the running cycle with `charge_note` |
+| `last`, `last_note` | Plug-in and unplug of the last cycle seen from end to end, and its note |
+
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Public process-liveness check; no wallbox data. |
 | `GET /v2/state` | Authenticated cached wallbox state and service status. While a command runs, the request waits up to two seconds and then returns the state published after the last completed command or poll, if that is at most a minute old. |
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
+| `POST /v2/energy` | Authenticated: the energy the meter delivered between `start` and `end` (epoch seconds), from the service's bounded meter log; `null` when the log does not cover the span. No bus access. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
 | `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
@@ -360,14 +378,16 @@ is derived from their published state and decides nothing:
 The overview page receives the same object as `operation` from
 `/api/overview`, or `null` when it does not validate.
 
-Two commands hand the plan over. Both need `expected_serial_number`, reject
-other fields and are accepted while the wallbox is unreachable, because they
-access no bus:
+Three commands carry data from Home Assistant without accessing the bus: two
+hand the plan over, one names the car of the plug cycle. Each needs
+`expected_serial_number`, rejects other fields and is accepted while the
+wallbox is unreachable:
 
 | Command | Additional fields | Behavior |
 |---|---|---|
 | `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
 | `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
+| `charge_note` | `plugged_at`: the `charge_meter.plugged_at` of the running plug cycle; `note`: string of 1 to 128 characters or `null` | Attach a note to the running plug cycle, such as the car Home Assistant recognized. The note means nothing to the service; it stays with the cycle as `charge_meter.note` and, after the unplug, as `charge_meter.last_note`. A cycle that is over keeps what it had. No bus access. |
 
 The plan writes through the same guarded path as other commands, with the
 owner `departure`. It is saved in `/data/departure-plan.json`, together with

@@ -13,9 +13,6 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceError,
     DeviceValidationError,
 )
-from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
-    DepartureModbusService,
-)
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
@@ -143,10 +140,7 @@ def test_quarantine_survives_restart_and_never_overwrites_evidence(tmp_path, rea
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("extended", [False, True])
-def test_ha_repair_acknowledges_without_starting_and_clears_issue(tmp_path, monkeypatch, extended):
-    if extended:
-        monkeypatch.setattr(fixture_module, "ModbusService", DepartureModbusService)
+def test_ha_repair_acknowledges_without_starting_and_clears_issue(tmp_path, monkeypatch):
     async def run():
         rejected_file(tmp_path / "intent.json")
         service, transport, _clock = await service_fixture(tmp_path)

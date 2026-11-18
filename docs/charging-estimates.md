@@ -13,18 +13,21 @@ polling, vehicle commands or electricity-provider login is needed.
 The wallbox must provide its lifetime energy counter (register layout v01.02
 or newer).
 
-A completed charge here means **one connection cycle, ending when you unplug**.
-Pauses remain part of that cycle. Observe the wallbox while unplugged before
-starting the first charge. Starting observation halfway through charging,
-missing connection transitions or an unreliable counter cannot produce a
-complete estimate. Short gaps keep the cycle: a failed poll or meter read, an
-adapter reconnect, or plug and wallbox state changing in separate polls while
-you plug in or unplug. Vehicle presence unknown for longer than two minutes, or
-two and a half poll intervals with a slow scan, makes the cycle incomplete, as
-does no poll at all for more than about 12 minutes, for example while the host
-sleeps. The final meter reading may follow a little after the
-unplug; the result appears then. The last result becomes unknown when the newest completed
-cycle cannot be matched; a previous result is not passed off as the new one.
+Both estimates measure energy with the wallbox's lifetime energy counter. The
+service keeps its readings and follows each **plug cycle**, from plug-in to
+unplug; pauses remain part of the cycle. A cost belongs to the plug cycle. A
+loss belongs to the plug cycle with a vehicle energy sensor, and to the car's
+own charging record with a vehicle charging history.
+
+A cycle counts only when the service saw it from plug-in to unplug: plug the
+car in after the wallbox has been observed unplugged. Short gaps keep the
+cycle: a failed poll or meter read, an adapter reconnect, or plug and wallbox
+state changing in separate polls. Vehicle presence unknown for longer than two
+minutes, or two and a half poll intervals with a slow scan, ends the cycle
+unmeasured, as does no poll at all for more than about 12 minutes, for example
+while the host sleeps. The final meter reading may follow a little after the
+unplug; the result appears then. A result that cannot be formed is shown as
+unknown; a previous result is not passed off as the new one.
 
 [Charging losses](#charging-losses-choose-the-available-data) · [Fixed or dynamic price](#charging-costs-fixed-or-dynamic-price) · [German network tariffs](#optional-14a-enwg-network-tariffs) · [Restarts](#storage-and-restarts)
 
@@ -33,8 +36,8 @@ cycle cannot be matched; a previous result is not passed off as the new one.
 | Source | What you select | How the charge is matched |
 |---|---|---|
 | Disabled | Nothing | No charging-loss entities or vehicle subscriptions. |
-| Vehicle charging history | The selected vehicle profile | Complete local charging history with matching start/end times; currently implemented for BavarianData. |
-| Vehicle energy sensor | An existing sensor for battery energy from the last charge | Explicit assignment, or an optional new-value heuristic. |
+| Vehicle charging history | The selected vehicle profile | The car's newest complete charging record, against the meter over that record's own time span; currently implemented for BavarianData. |
+| Vehicle energy sensor | An existing sensor for battery energy from the last charge | The sensor's value, assigned explicitly or by an optional new-value heuristic, against the meter between plug-in and unplug. |
 
 The two sensors are **Estimated charging loss, last charge** and **Average
 estimated charging loss**. The average weights each accepted charge by energy:
@@ -44,6 +47,8 @@ Correcting the latest assignment replaces that sample instead of adding it twice
 Vehicle profiles retain their own averages when you switch between cars.
 Changing a profile's selected vehicle or energy source starts a new average for
 that source.
+
+A plug cycle without delivered energy changes nothing.
 
 For manual selection, choose the correct profile **before charging begins**.
 Automatic cable/home recognition may arrive after the wallbox detects charging;
@@ -73,11 +78,16 @@ BavarianData's existing local history through its public
 [`get_charging_sessions` action](https://justchr.github.io/BavarianData/docs/services/).
 It never requests a BMW history refresh or spends the BMW API quota.
 
-Only complete, non-overlapping records whose charging boundaries fit the
-observed wallbox cycle are accepted. Separate records caused by a pause may be
-combined. DC charges and open, interrupted, late-start, ambiguous or truncated
-histories remain unmatched. The last loss stays unknown until a suitable record appears; local
-reads are retried a limited number of times and on charging-stop events.
+The last loss compares the car's newest complete record with the wallbox's
+total energy meter over that record's own time span, from the car's start to
+the car's end of charging. A record that follows a pause is measured on its
+own. DC charges, open, interrupted or late-start records and records below
+1 kWh are passed over; a truncated history is not used. The last loss stays
+unknown until a suitable record appears; local reads are retried a limited
+number of times and on charging-stop events. A record counts only when its
+span lies in a plug cycle the service saw at this wallbox from the plug-in on,
+and with vehicle profiles only in a cycle of that car; a charge elsewhere is
+passed over.
 
 BavarianData's `energy_kwh` is estimated battery energy integrated from vehicle
 telemetry. Its `grid_kwh` is grid energy and is deliberately not substituted.
@@ -129,10 +139,13 @@ leave **Network price adjustment** at **None; source is the final price**. This
 also applies when your provider has already included your reduced or time-variable
 network charges. Do not apply the same adjustment twice.
 
-**Estimated charging cost, current charge** shows the running estimate and is
-**disabled by default** to reduce Recorder writes. Enable it on the wallbox's
-entity page if you want a live estimate.
-**Estimated charging cost, last charge** keeps the last completed cycle. Prices
+**Estimated charging cost, current charge** starts at 0.00 when the car is
+plugged in, follows the charge while it runs and returns to 0.00 when the car
+is unplugged. It is **disabled by default** to reduce Recorder writes; enable
+it on the wallbox's entity page if you want a live estimate.
+**Estimated charging cost, last charge** takes that value over whenever
+charging stops, and for the last time at the unplug, including the final meter
+reading that follows it. A plug-in without charging leaves it unchanged. Prices
 are applied to the energy intervals in which they were observed. If a price
 changes between two meter readings, that interval's energy is divided in
 proportion to time. This is an estimate, not a billing-grade interval meter.
@@ -140,13 +153,14 @@ The whole charge is never multiplied by its final price.
 
 Missing prices, failed meter observations, long gaps and HA downtime make the
 result incomplete instead of silently treating those intervals as free. An
-incomplete cost is unknown. Both cost sensors expose `complete`; the last-cost
-sensor also exposes `energy_kwh` and `unpriced_kwh` to describe coverage without
-continually updating energy attributes on the running sensor. Additional
-unobserved energy may exist during a partial running cycle. After completion,
-the wallbox summary provides the whole cycle's energy. No historical prices are invented after a
-restart. A completed result is stored once and is not repriced when settings
-change later.
+incomplete cost shows the amount that could be priced, with the attribute
+`complete` set to false; it is unknown only when nothing could be priced. Both
+cost sensors expose `complete`; the last-cost sensor also exposes `energy_kwh`
+and `unpriced_kwh` to describe coverage without continually updating energy
+attributes on the running sensor. A charge that Home Assistant saw only in
+part, such as after a restart, is priced for the observed part. No historical
+prices are invented after a restart. A stored result is not repriced when
+settings change later.
 
 ### Optional §14a EnWG network tariffs
 
@@ -248,19 +262,22 @@ still values all observed wallbox kWh. No PV/grid cost split is inferred.
 
 ## Storage and restarts
 
-The latest complete wallbox cycle, latest cost result, and bounded loss totals
-with one correctable latest match are retained outside Recorder. There is no
-growing list of sessions, raw vehicle history or price history. The current
-pricing interval keeps at most 256 price changes; overflow makes the estimate incomplete.
+The service saves the meter readings, the plug cycle and the vehicle
+recognized for it. A restart of HA does not interrupt a loss measurement, and
+neither does an ordinary restart of the service that takes less than two
+minutes; after a crash or power loss that charge stays unmeasured. Costs
+are calculated in HA, which knows the prices: a cost across HA downtime stays
+incomplete, even with a fixed price.
 
-Loss values change only when an assignment or completed session changes. Costs
-are rounded to cents and the last-cost energy attributes to 0.01 kWh. No extra
-long-term statistics are created. The current-cost entity is disabled by
-default; leaving it disabled keeps only the final cost in Recorder.
+Home Assistant keeps the latest cost result and, per vehicle, bounded loss
+totals with one correctable latest match, outside Recorder. There is no growing
+list of charges, raw vehicle history or price history. The current pricing
+interval keeps at most 256 price changes; overflow makes the estimate
+incomplete.
 
-The app can continue observing a wallbox cycle while HA restarts. A later
-BavarianData history match may still estimate that cycle's losses. Cost
-calculation runs in HA, so a running app cannot reconstruct a complete cost
-across HA downtime, even with a fixed price. A service restart also loses the
-uncompleted session anchor. Previously completed results remain stored. Storage
-problems affect these optional estimates, not heartbeat or charging commands.
+Loss values change only when an assignment, a completed plug cycle or the
+car's newest record changes. Costs are rounded to cents and the last-cost
+energy attributes to 0.01 kWh. No extra long-term statistics are created. The
+current-cost entity is disabled by default; leaving it disabled keeps only the
+final cost in Recorder. Storage problems affect these optional estimates, not
+heartbeat or charging commands.

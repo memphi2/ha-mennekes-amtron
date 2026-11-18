@@ -16,7 +16,6 @@ from urllib.parse import urlsplit
 from aiohttp import ClientError, ClientSession
 
 from .device.charging_display import DISPLAY_OPTIONS
-from .device.charging_session import CompletedSession
 from .device.client_errors import AmtronConnectionError
 from .device.command_events import CommandEvents, command_source
 from .device.const import (
@@ -31,6 +30,7 @@ from .device.energy_goal import EnergyGoal
 from .device.errors import DeviceError, DeviceValidationError
 from .device.identity import usable_max_evse_current
 from .device.link_quality import CONNECTION_QUALITY_STATES
+from .device.meter_log import parse_charge_meter
 from .device.operation import Operation
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE
@@ -241,21 +241,6 @@ class ServiceClient:
             retried = payload["connection_retries"]
             if retried is not None and (type(retried) is not int or retried < 0):
                 raise ValueError("invalid connection retry count")
-            section = "charging_session"
-            session_supported = False
-            completed_session = None
-            if "charging_session" in payload:
-                summary = payload["charging_session"]
-                if (
-                    not isinstance(summary, dict)
-                    or summary.keys() != {"supported", "latest"}
-                    or type(summary["supported"]) is not bool
-                    or (not summary["supported"] and summary["latest"] is not None)
-                ):
-                    raise ValueError("invalid charging session summary")
-                session_supported = summary["supported"]
-                if summary["latest"] is not None:
-                    completed_session = CompletedSession.parse(summary["latest"])
             section = "energy_sample"
             observed_at: float | None = None
             observed_energy: float | None = None
@@ -272,6 +257,8 @@ class ServiceClient:
                     raise ValueError("invalid meter observation value")
                 observed_at = float(stamp)
                 observed_energy = float(energy) if energy is not None else None
+            section = "charge_meter"
+            charge_meter = parse_charge_meter(payload["charge_meter"])
             section = "values"
             values = payload["values"]
             control = payload["control"]
@@ -511,10 +498,9 @@ class ServiceClient:
             connection_retries=retried,
             energy_goal=goal.snapshot() if goal_supported else None,
             soc_goal=soc_goal.snapshot() if soc_supported else None,
-            charging_session=completed_session.as_dict() if completed_session is not None else None,
-            session_summary_supported=session_supported,
             energy_read=energy_read,
             energy_observed_at=observed_at,
+            charge_meter=charge_meter,
         )
 
     async def execute(self, command: str, **values: Any) -> None:
@@ -528,7 +514,7 @@ class ServiceClient:
                 # already queued command before it reaches the service.
                 cancelling = command == "cancel_pending"
                 soc_metadata = command in {"soc_source", "soc_observation"}
-                departure = command in {"departure_trip", "departure_inputs", "departure_choice"}
+                departure = command in {"departure_trip", "departure_inputs", "departure_choice", "charge_note"}
                 metadata = soc_metadata or departure or command == "unplug_release_config" or (
                     command == "plug_charge_config" and values.get("value") is False
                 )
@@ -558,6 +544,19 @@ class ServiceClient:
             if isinstance(err, ServiceConnectionError) and err.reason == "service_version_mismatch":
                 raise DeviceError("service_version_mismatch") from err
             raise DeviceError("service_unavailable") from err
+
+    async def async_energy_between(self, start: float, end: float) -> float | None:
+        """What the meter delivered in a time span, from the service's log."""
+        # An estimate must not mark the entry unavailable.
+        data = await self.request(
+            "POST", "/v2/energy", {"start": start, "end": end}, update_connection=False,
+        )
+        value = data.get("energy_kwh")
+        if value is None:
+            return None
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise AmtronConnectionError("invalid energy span")
+        return float(value)
 
     async def async_read_error_code(self) -> int:
         """Read the wallbox's error register now, not from the last poll."""

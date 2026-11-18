@@ -8,7 +8,7 @@ older layout simply shows fewer attributes.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from typing import Any
 
 from .data import WallboxData
@@ -16,7 +16,6 @@ from .device.decode import as_integer, as_number, enum_option
 from .device.registers import REGISTERS_BY_KEY
 
 type AttributeReader = Callable[[WallboxData], Any]
-type AttributeReaders = Mapping[str, AttributeReader]
 
 
 def number_attribute(key: str, precision: int) -> AttributeReader:

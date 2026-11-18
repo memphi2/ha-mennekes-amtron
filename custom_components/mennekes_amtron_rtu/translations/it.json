@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Connetti al servizio Modbus",
-        "description": "Le app Supervisor si connettono automaticamente senza inserire URL o token. Questo modulo è per un servizio su un host separato. Per passare da Modbus diretto al servizio, disabilita prima la voce dell'integrazione precedente per liberare la connessione Modbus.",
+        "description": "Le app Supervisor si connettono automaticamente senza inserire URL o token. Questo modulo è per un servizio su un host separato.",
         "data": {
           "server_url": "URL del servizio",
           "server_token": "Token di accesso"
@@ -587,12 +587,48 @@
           "event_type": {
             "name": "Tipo",
             "state": {
-              "command_done": "Comando eseguito",
-              "command_failed": "Comando non riuscito",
-              "command_cancelled": "Comando annullato",
-              "session_started": "Veicolo collegato",
-              "session_ended": "Veicolo scollegato",
-              "wallbox_changed": "Modifica alla wallbox"
+              "paused": "Ricarica in pausa",
+              "resumed": "Ricarica ripresa",
+              "current_set": "Corrente di ricarica impostata",
+              "single_phase_set": "Una fase selezionata",
+              "all_phases_set": "Tutte le fasi disponibili selezionate",
+              "release_enabled": "Consenso alla ricarica attivato",
+              "release_disabled": "Consenso alla ricarica disattivato",
+              "unlocked": "Wallbox sbloccata",
+              "locked": "Wallbox bloccata",
+              "recovered": "Risoluzione dell’errore confermata",
+              "pause_failed": "Non riuscito: metti in pausa la ricarica",
+              "resume_failed": "Non riuscito: riprendere la ricarica",
+              "set_current_failed": "Non riuscito: impostare la corrente di ricarica",
+              "single_phase_failed": "Non riuscito: usare una fase",
+              "all_phases_failed": "Non riuscito: usare tutte le fasi disponibili",
+              "enable_charging_failed": "Non riuscito: autorizzare la ricarica",
+              "disable_charging_failed": "Non riuscito: disabilita il consenso alla ricarica",
+              "unlock_failed": "Non riuscito: sbloccare la wallbox",
+              "lock_failed": "Non riuscito: blocca la wallbox",
+              "recover_failed": "Non riuscito: risolvere l’errore",
+              "pause_cancelled": "Annullato: metti in pausa la ricarica",
+              "resume_cancelled": "Annullato: riprendere la ricarica",
+              "set_current_cancelled": "Annullato: impostare la corrente di ricarica",
+              "single_phase_cancelled": "Annullato: usare una fase",
+              "all_phases_cancelled": "Annullato: usare tutte le fasi disponibili",
+              "enable_charging_cancelled": "Annullato: autorizzare la ricarica",
+              "disable_charging_cancelled": "Annullato: disabilita il consenso alla ricarica",
+              "unlock_cancelled": "Annullato: sbloccare la wallbox",
+              "lock_cancelled": "Annullato: blocca la wallbox",
+              "vehicle_plugged_in": "Veicolo collegato",
+              "vehicle_unplugged": "Veicolo scollegato",
+              "charging_started": "Ricarica avviata",
+              "charging_stopped": "Ricarica terminata",
+              "error_occurred": "Errore rilevato",
+              "error_cleared": "Errore risolto",
+              "authorized": "Autorizzato",
+              "authorization_rejected": "Autorizzazione rifiutata",
+              "downgrade_started": "Riduzione di potenza iniziata",
+              "downgrade_ended": "Riduzione di potenza terminata",
+              "cable_locked": "Cavo bloccato",
+              "cable_unlocked": "Cavo sbloccato",
+              "phases_switched": "Fasi commutate"
             }
           },
           "action": {
@@ -668,24 +704,6 @@
           },
           "occurred_at": {
             "name": "Ora evento"
-          },
-          "change": {
-            "name": "Cambiamento",
-            "state": {
-              "vehicle_plugged_in": "Veicolo collegato",
-              "vehicle_unplugged": "Veicolo scollegato",
-              "charging_started": "Ricarica avviata",
-              "charging_stopped": "Ricarica terminata",
-              "error_occurred": "Errore rilevato",
-              "error_cleared": "Errore risolto",
-              "authorized": "Autorizzato",
-              "authorization_rejected": "Autorizzazione rifiutata",
-              "downgrade_started": "Riduzione di potenza iniziata",
-              "downgrade_ended": "Riduzione di potenza terminata",
-              "cable_locked": "Cavo bloccato",
-              "cable_unlocked": "Cavo sbloccato",
-              "phases_switched": "Fasi commutate"
-            }
           },
           "cp_state": {
             "name": "Stato del control pilot"

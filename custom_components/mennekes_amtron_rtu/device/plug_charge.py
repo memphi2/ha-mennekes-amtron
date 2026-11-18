@@ -213,12 +213,12 @@ class PlugChargeController:
         # Explicit read-only configuration forbids even protective writes.
         if self._stopping or not self.state.blocked or self._control._options.read_only:
             return
-        current = await self._control._async_read_switch(CHARGING_RELEASE, stopping=True)
+        current = await self._control.writes.async_read_switch(CHARGING_RELEASE, stopping=True)
         if current != 0:
             # Gate denial is a stop, never a delayed manual mode transition.
             # Do not overwrite the user's release/pause intent or pending work.
-            absent = await self._control._async_vehicle_absent()
-            await self._control._async_write(CHARGING_RELEASE, 0, refresh=False)
+            absent = await self._control.writes.async_vehicle_absent()
+            await self._control.writes.async_write(CHARGING_RELEASE, 0, refresh=False)
             self._control.events.record("executed", "disable_charging", source="plug_charge")
             if not absent:
                 self._control.write_state.mode_change_at = self._control._monotonic()
@@ -312,17 +312,17 @@ class PlugChargeController:
                 raise self._control.stop_error()
             await self._live_presence(self._control._client.async_read_register)
             self._check_request(session, deadline)
-            current = await self._control._async_read_switch(CHARGING_RELEASE)
-            switches = current != 1 and await self._control._async_release_switches_charge()
+            current = await self._control.writes.async_read_switch(CHARGING_RELEASE)
+            switches = current != 1 and await self._control.writes.async_release_switches_charge()
             if switches:
                 try:
-                    await self._control._async_check_transition_interval()
+                    await self._control.writes.async_check_transition_interval()
                 except AmtronRateLimitedError as err:
                     raise validation_error("write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}) from err
             self._check_request(session, deadline)
             self._authorizing = session, deadline
             try:
-                await self._control._async_write(
+                await self._control.writes.async_write(
                     CHARGING_RELEASE, 1, refresh=False, precondition=self._live_presence,
                 )
                 self._check_request(session, deadline)

@@ -26,7 +26,7 @@ belong to and never compile long-term statistics of their own.
 
 The **Activity** event entity is enabled by default. Its state changes on
 reported wallbox changes, such as a plug-in, charge start or fault, and on each
-command outcome; command outcomes also add a readable line to HA Activity.
+command outcome.
 Consecutive identical successful current settings from the same source are
 shown once; changed requests, errors and intervening actions or observations
 remain visible. Unsent slider values replaced by newer ones are omitted.
@@ -100,8 +100,7 @@ recorder:
       - event.mennekes_amtron_activity
 ```
 
-Excluding **Activity** stops recording both its state changes and its readable
-command messages. The entity remains usable for live automation triggers; the
+Excluding **Activity** stops recording its state changes. The entity remains usable for live automation triggers; the
 service's recent command results also remain available. Existing database
 entries are retained until normal purging. Do not exclude the whole `event`
 domain unless you intend to remove history for other integrations as well.

@@ -7,10 +7,6 @@ from typing import Literal, Protocol
 
 from homeassistant.core import CALLBACK_TYPE
 
-from custom_components.mennekes_amtron_rtu.device.charging_session import (
-    CompletedSession,
-)
-
 Capability = Literal["soc", "charge_limit", "capacity", "departure", "charge_history", "detection"]
 
 DETECTION_MAX_AGE_SECONDS = 1800
@@ -114,11 +110,12 @@ class ProviderSelection:
 
 
 @dataclass(frozen=True, slots=True)
-class HistoryMatch:
-    """A complete matching history interval, with estimated battery energy."""
+class ChargeRecord:
+    """One complete charge as the vehicle recorded it, with battery energy."""
 
+    start: float
+    end: float
     vehicle_kwh: float
-    records: int
 
 
 class DepartureSource(Protocol):
@@ -139,6 +136,6 @@ class ChargeHistorySource(Protocol):
     @property
     def available(self) -> bool: ...
 
-    async def async_match(self, session: CompletedSession) -> HistoryMatch | None: ...
+    async def async_latest(self, *, since: float, until: float) -> ChargeRecord | None: ...
 
     def subscribe(self, on_change: Callable[[], None]) -> CALLBACK_TYPE: ...

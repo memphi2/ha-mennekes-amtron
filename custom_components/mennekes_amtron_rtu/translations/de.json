@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Modbus-Dienst verbinden",
-        "description": "Supervisor-Apps werden automatisch verbunden, ohne URL oder Token einzugeben. Dieses Formular ist für einen separat betriebenen Dienst. Beim Wechsel von direktem Modbus den bisherigen Integrationseintrag zuerst deaktivieren, damit die Modbus-Verbindung frei ist.",
+        "description": "Supervisor-Apps werden automatisch verbunden, ohne URL oder Token einzugeben. Dieses Formular ist für einen separat betriebenen Dienst.",
         "data": {
           "server_url": "Dienst-URL",
           "server_token": "Zugriffstoken"
@@ -587,12 +587,48 @@
           "event_type": {
             "name": "Art",
             "state": {
-              "command_done": "Befehl ausgeführt",
-              "command_failed": "Befehl fehlgeschlagen",
-              "command_cancelled": "Befehl verworfen",
-              "session_started": "Fahrzeug angesteckt",
-              "session_ended": "Fahrzeug abgesteckt",
-              "wallbox_changed": "Änderung an der Wallbox"
+              "paused": "Laden pausiert",
+              "resumed": "Laden fortgesetzt",
+              "current_set": "Ladestrom eingestellt",
+              "single_phase_set": "Auf eine Phase umgestellt",
+              "all_phases_set": "Auf alle verfügbaren Phasen umgestellt",
+              "release_enabled": "Ladefreigabe eingeschaltet",
+              "release_disabled": "Ladefreigabe ausgeschaltet",
+              "unlocked": "Wallbox entsperrt",
+              "locked": "Wallbox gesperrt",
+              "recovered": "Fehlerbehebung bestätigt",
+              "pause_failed": "Laden pausieren fehlgeschlagen",
+              "resume_failed": "Laden fortsetzen fehlgeschlagen",
+              "set_current_failed": "Ladestrom einstellen fehlgeschlagen",
+              "single_phase_failed": "Eine Phase verwenden fehlgeschlagen",
+              "all_phases_failed": "Alle verfügbaren Phasen verwenden fehlgeschlagen",
+              "enable_charging_failed": "Ladefreigabe einschalten fehlgeschlagen",
+              "disable_charging_failed": "Ladefreigabe ausschalten fehlgeschlagen",
+              "unlock_failed": "Wallbox entsperren fehlgeschlagen",
+              "lock_failed": "Wallbox sperren fehlgeschlagen",
+              "recover_failed": "Fehler beheben fehlgeschlagen",
+              "pause_cancelled": "Laden pausieren verworfen",
+              "resume_cancelled": "Laden fortsetzen verworfen",
+              "set_current_cancelled": "Ladestrom einstellen verworfen",
+              "single_phase_cancelled": "Eine Phase verwenden verworfen",
+              "all_phases_cancelled": "Alle verfügbaren Phasen verwenden verworfen",
+              "enable_charging_cancelled": "Ladefreigabe einschalten verworfen",
+              "disable_charging_cancelled": "Ladefreigabe ausschalten verworfen",
+              "unlock_cancelled": "Wallbox entsperren verworfen",
+              "lock_cancelled": "Wallbox sperren verworfen",
+              "vehicle_plugged_in": "Fahrzeug eingesteckt",
+              "vehicle_unplugged": "Fahrzeug abgesteckt",
+              "charging_started": "Laden gestartet",
+              "charging_stopped": "Laden beendet",
+              "error_occurred": "Fehler aufgetreten",
+              "error_cleared": "Fehler behoben",
+              "authorized": "Autorisiert",
+              "authorization_rejected": "Autorisierung abgelehnt",
+              "downgrade_started": "Downgrade begonnen",
+              "downgrade_ended": "Downgrade beendet",
+              "cable_locked": "Kabel verriegelt",
+              "cable_unlocked": "Kabel entriegelt",
+              "phases_switched": "Phasen umgeschaltet"
             }
           },
           "action": {
@@ -668,24 +704,6 @@
           },
           "occurred_at": {
             "name": "Ereigniszeit"
-          },
-          "change": {
-            "name": "Änderung",
-            "state": {
-              "vehicle_plugged_in": "Fahrzeug eingesteckt",
-              "vehicle_unplugged": "Fahrzeug abgesteckt",
-              "charging_started": "Laden gestartet",
-              "charging_stopped": "Laden beendet",
-              "error_occurred": "Fehler aufgetreten",
-              "error_cleared": "Fehler behoben",
-              "authorized": "Autorisiert",
-              "authorization_rejected": "Autorisierung abgelehnt",
-              "downgrade_started": "Downgrade begonnen",
-              "downgrade_ended": "Downgrade beendet",
-              "cable_locked": "Kabel verriegelt",
-              "cable_unlocked": "Kabel entriegelt",
-              "phases_switched": "Phasen umgeschaltet"
-            }
           },
           "cp_state": {
             "name": "Control-Pilot-Zustand"

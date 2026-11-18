@@ -16,6 +16,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.tasks import CommitTask
 from homeassistant.setup import async_setup_component
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
@@ -97,6 +98,13 @@ async def measure(
             recorder = get_instance(hass)
             await recorder.async_block_till_done()
 
+            async def committed() -> None:
+                # Rows reach the database file only with the Recorder's commit.
+                await hass.async_block_till_done()
+                await recorder.async_block_till_done()
+                recorder.queue_task(CommitTask())
+                await recorder.async_block_till_done()
+
             def summary():
                 with closing(sqlite3.connect(target / "recorder.db")) as conn:
                     rows = dict(
@@ -111,6 +119,16 @@ async def measure(
                     size = conn.execute("PRAGMA page_size").fetchone()[0]
                 return rows, attrs, pages * size
 
+            # The display settles over its first polls and seconds (checking,
+            # then the real status): that is the start of the entity, not an
+            # unchanged value writing a row. Measure from the settled state,
+            # on the replay's own clock rather than the host's uptime.
+            poller._charging_display.reset()
+            for now in (-30, -15, 0):  # noqa: B007 - the poller's clock reads it
+                await service.refresh()
+                coordinator.async_set_updated_data(await coordinator._async_update_data())
+                await hass.async_block_till_done()
+            await committed()
             before, _, _ = summary()
             for now in range(0, duration, interval):
                 if scenario != "constant":
@@ -171,8 +189,7 @@ async def measure(
                 await asyncio.sleep(0)
                 if now % (interval * 200) == 0:
                     await recorder.async_block_till_done()
-            await hass.async_block_till_done()
-            await recorder.async_block_till_done()
+            await committed()
             after, attrs, size = summary()
             differences = {
                 k: n - before.get(k, 0)
