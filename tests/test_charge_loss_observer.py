@@ -33,6 +33,9 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.meter_log import MeterLog
+from custom_components.mennekes_amtron_rtu.device.persistence import (
+    StorageCommitUncertainError,
+)
 from custom_components.mennekes_amtron_rtu.device.registers import (
     CP_STATE,
     EVSE_STATE,
@@ -961,6 +964,64 @@ def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path
             assert observer.available
         finally:
             named.stop()
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", [OSError("full"), StorageCommitUncertainError("fsync")])
+def test_a_failing_disk_is_tried_once_a_minute_while_a_newer_cycle_is_open(tmp_path, failure):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        now = time.time()
+        client = observer._entry.runtime_data.client
+        try:
+            await observer.async_start()
+            saves = AsyncMock(side_effect=failure)
+            with patch.object(observer._store, "async_save", saves):
+                charge = coordinator.complete(at=now - 2000)
+                await hass.async_block_till_done()
+                assert not observer.available
+                # The next cycle stays open: the service does not answer.
+                client.async_energy_between.side_effect = AmtronConnectionError("down")
+                coordinator.complete(at=now - 1000)
+                await hass.async_block_till_done()
+                asked = saves.await_count
+                for _ in range(5):
+                    coordinator.async_update_listeners()
+                    await hass.async_block_till_done()
+                assert saves.await_count == asked
+            observer._last_storage_attempt = float("-inf")
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer.available
+            assert observer.statistics.waiting == charge
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_a_restart_after_a_plug_in_without_charging_keeps_the_waiting_charge(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        now = time.time()
+        try:
+            await observer.async_start()
+            charge = coordinator.complete(at=now - 2000)
+            await hass.async_block_till_done()
+            coordinator.meter.observe(now - 500, coordinator.total)
+            coordinator.meter.observe(now - 100, coordinator.total)
+            coordinator.cycle(now - 400, now - 200)
+            await observer.async_stop()
+            again = ChargeLossObserver(hass, observer._entry)
+            await again.async_start()
+            await hass.async_block_till_done()
+            assert again._assignable == charge
+            await again.async_stop()
+        finally:
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())

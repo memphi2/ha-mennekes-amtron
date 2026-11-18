@@ -130,6 +130,11 @@ class LossStatistics:
     def vehicle_kwh(self) -> float | None:
         return self._last_match.vehicle_kwh if self.status == "matched" and self._last_match is not None else None
 
+    @property
+    def waiting(self) -> Charge | None:
+        """The charge that still waits for the car's energy value."""
+        return self._current_session
+
     def known(self, start: float, end: float) -> Charge | None:
         """The charge of that span, if it is the one already accounted for."""
         for charge in (self._current_session, self._last_match.session if self._last_match is not None else None):

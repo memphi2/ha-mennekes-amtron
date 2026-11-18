@@ -73,6 +73,9 @@ def vehicle_energy(state: State | None) -> float | None:
     return value if math.isfinite(value) and value > 0 else None
 
 
+_STORAGE_RETRY_SECONDS = 60
+
+
 @dataclass(frozen=True, slots=True)
 class Booking:
     """What a decided plug cycle still has to book: its charge, or none if unmeasurable."""
@@ -114,6 +117,9 @@ class ChargeLossObserver:
         self._cycle: PlugCycle | None = None
         self._charge: Charge | None = None
         self._booking: Booking | None = None
+        # What the last failed save tried to book: the same again waits for
+        # the storage retry, so a failing disk is not written on every poll.
+        self._tried: tuple[Booking | None, tuple[float, float] | None] | None = None
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -241,7 +247,7 @@ class ChargeLossObserver:
         elif (cycle := last_cycle(self._entry)) is not None and cycle != self._cycle:
             self._queue()
             return
-        if not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
+        if not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= _STORAGE_RETRY_SECONDS:
             # A failed save discarded the candidate: form it again.
             self._queue()
 
@@ -270,9 +276,13 @@ class ChargeLossObserver:
         if energy is None and time.time() - cycle.unplugged_at <= MAX_INTERPOLATION_SECONDS:
             # The reading after the unplug is still to come.
             return
-        self._cycle = cycle
+        first, self._cycle = self._cycle is None, cycle
         if energy == 0:
-            # Plugged in without charging: everything stays as it was.
+            # Plugged in without charging: everything stays as it was. As
+            # the first cycle seen since a restart, it leaves the charge that
+            # still waits for the car's value.
+            if first:
+                self._charge = self.statistics.waiting
             return
         # A cycle the meter cannot measure is no longer the charge before it.
         self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy) if energy is not None else None
@@ -307,6 +317,12 @@ class ChargeLossObserver:
                 if self._started_at <= charge.end <= at <= charge.end + LOSS_MATCH_WINDOW_SECONDS:
                     energy = value
                     change = self._change
+            attempt = (booking, change)
+            if (
+                not self._storage_ok and attempt == self._tried
+                and time.monotonic() - self._last_storage_attempt < _STORAGE_RETRY_SECONDS
+            ):
+                continue
             async with self._lock:
                 if self._stopping:
                     continue
@@ -317,7 +333,9 @@ class ChargeLossObserver:
                     candidate.observe_charge(charge)
                 if charge is not None and energy is not None and self._change is change:
                     candidate.apply(charge, energy, association="changed_value")
-                if await self._save(candidate):
+                saved = await self._save(candidate)
+                self._tried = None if saved else attempt
+                if saved:
                     if self._booking is booking:
                         self._booking = None
                     if change is not None and self._change is change:
