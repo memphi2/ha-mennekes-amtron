@@ -9,8 +9,9 @@ class FailureNotice:
     """``Area: what (reason)``: the first failure warns, repeats stay at debug.
 
     A failure that recurs on every poll or retry would otherwise fill the log.
-    A reason that changes is reported again, so the log never names an
-    outdated cause; a reason must therefore not carry a counter or a time.
+    Each new reason of an episode is reported once, so the log names every
+    cause but two that alternate do not fill it; a reason must therefore not
+    carry a counter or a time.
     The recovery is reported once, so a reader sees that it ended.
     """
 
@@ -20,7 +21,7 @@ class FailureNotice:
         self._logger = logger
         self._area = area
         self._failing = False
-        self._reason: str | None = None
+        self._reason: set[str] = set()
 
     @property
     def failing(self) -> bool:
@@ -37,9 +38,11 @@ class FailureNotice:
         """
         first = not self._failing
         text = f" ({reason})" if reason else ""
-        news = first or text != self._reason
+        if first:
+            self._reason.clear()
+        news = text not in self._reason
         self._failing = True
-        self._reason = text
+        self._reason.add(text)
         self._logger.log(
             level if news else logging.DEBUG, "%s: %s%s", self._area, what, text,
             exc_info=exc_info if news else False,

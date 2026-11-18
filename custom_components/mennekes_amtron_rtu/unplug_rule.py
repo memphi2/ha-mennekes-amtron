@@ -237,6 +237,10 @@ class UnplugRule:
                 # Plugged in again, or unknown: the release of a car that is
                 # there is not this rule's to close.
                 raise _NotAwayError
+            if self._queued and control.pending_action == "disable_charging":
+                # Our switch-off already waits in the queue: sending it
+                # again would only time it anew.
+                raise _NotAwayError
             wrote = self._runtime.coordinator.current_data().get(CHARGING_RELEASE.key) != 0
             if wrote:
                 await control.async_set_charging_release(False)

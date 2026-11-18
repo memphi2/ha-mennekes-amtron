@@ -174,6 +174,11 @@ class EmbeddedService:
         """Whether it ended on its own or is being stopped."""
         return self._stopping or self._died
 
+    @property
+    def stopped(self) -> bool:
+        """Whether its connection is closed."""
+        return self._stopped
+
     def credentials_rejected(self) -> bool:
         """Whether the gateway refused the saved password on the newest poll."""
         return isinstance(self._service.failure, WaveshareAuthenticationRejectedError)
@@ -214,9 +219,11 @@ class EmbeddedService:
                     # Its end was reported when it happened; everything was
                     # still saved and closed.
                     if not self._died:
+                        self._stopped = True
                         raise
-                finally:
-                    self._stopped = True
+                # A stop cancelled half-way is not one: whoever asks next
+                # finishes it before anyone else opens the bus.
+                self._stopped = True
 
 
 async def _async_stop_registered(
@@ -229,7 +236,8 @@ async def _async_stop_registered(
     try:
         await host.async_stop()
     finally:
-        if hosts.get(entry_id) is host:
+        # A stop cancelled half-way keeps the place for whoever finishes it.
+        if host.stopped and hosts.get(entry_id) is host:
             del hosts[entry_id]
 
 
@@ -260,6 +268,9 @@ async def async_acquire(
 
     ``expected_serial`` binds a new service to the configured wallbox.
     """
+    if hass.is_stopping:
+        # Every service was just stopped; nobody would stop a new one.
+        raise DeviceError("service_unavailable")
     config = embedded_config(entry)
     hosts = _hosts(hass)
     entry_id = entry.entry_id

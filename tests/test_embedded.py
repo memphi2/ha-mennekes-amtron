@@ -627,11 +627,13 @@ def test_one_service_failing_to_stop_does_not_keep_the_others_running(monkeypatc
         stopped = []
 
         class Broken:
+            # Its connection is closed although the stop raised.
+            stopped = True
+
             async def async_stop(self):
                 stopped.append("broken")
                 raise RuntimeError("stop failed")
 
-        # Stopped in reverse order: the broken one first.
         _hosts(hass)["other"] = Broken()
         await hass.bus.fire(EVENT_HOMEASSISTANT_STOP)
         assert stopped == ["broken"]
@@ -1150,5 +1152,50 @@ def test_a_wallbox_that_cannot_say_its_maximum_keeps_its_running_current(monkeyp
             assert service.data.get("charging_current_ems") == 16
         finally:
             await embedded.async_release(hass, entry.entry_id, force=True)
+
+    asyncio.run(run())
+
+
+def test_a_stop_cancelled_half_way_is_finished_by_whoever_asks_next(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        host = await embedded.async_acquire(hass, entry)
+        service = host._service
+        entered = asyncio.Event()
+        stop = service.stop
+        hang = [True]
+
+        async def slow_stop():
+            if hang[0]:
+                entered.set()
+                await asyncio.Future()
+            await stop()
+
+        monkeypatch.setattr(service, "stop", slow_stop)
+        stopping = asyncio.create_task(embedded.async_release(hass, entry.entry_id, force=True))
+        await asyncio.wait_for(entered.wait(), 5)
+        stopping.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stopping
+        # Not closed yet: it keeps its place, so nobody opens the bus beside it.
+        assert wallbox.close_calls == 0
+        assert _hosts(hass) == {entry.entry_id: host}
+        hang[0] = False
+        await embedded.async_release(hass, entry.entry_id, force=True)
+        assert wallbox.close_calls == 1
+        assert _hosts(hass) == {}
+
+    asyncio.run(run())
+
+
+def test_no_service_starts_while_home_assistant_stops(monkeypatch, tmp_path):
+    async def run():
+        hass, entry, wallbox = _setup(monkeypatch, tmp_path)
+        hass.is_stopping = True
+        # Every service was just stopped; nothing would stop this one.
+        with pytest.raises(DeviceError, match="service_unavailable"):
+            await embedded.async_acquire(hass, entry)
+        assert _hosts(hass) == {}
+        assert wallbox.connect_calls == 0 if hasattr(wallbox, "connect_calls") else True
 
     asyncio.run(run())

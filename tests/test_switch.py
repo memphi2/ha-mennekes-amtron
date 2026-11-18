@@ -635,6 +635,11 @@ def test_a_car_plugged_in_again_keeps_its_release_and_its_pause(monkeypatch) -> 
         assert (len(calls), resumed, cancelled) == (3, [], [1])
         assert rule._owed
         assert len(_waiting(timers)) == 1
+        # While it waits in the queue, a retry does not send it again.
+        await _fire(timers, entry)
+        assert len(calls) == 3
+        assert rule._owed
+        assert len(_waiting(timers)) == 1
         # The car returns before the queue has run: the switch-off is
         # withdrawn then, however the rule learns of it.
         connected[0] = True

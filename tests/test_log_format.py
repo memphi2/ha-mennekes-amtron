@@ -103,6 +103,16 @@ def test_a_notice_reports_a_changed_cause_again_and_its_traceback_once(caplog):
         (logging.WARNING, "Control: command deferred (read_only_mode)"),
         (logging.DEBUG, "Control: command deferred (read_only_mode)"),
     ]
+    # Two causes that take turns do not fill the log.
+    caplog.clear()
+    for _ in range(3):
+        notice.failed("command deferred", "phase_pause_state_unknown")
+        notice.failed("command deferred", "read_only_mode")
+    assert {record.levelno for record in caplog.records} == {logging.DEBUG}
+    assert notice.recovered("command accepted again")
+    # A new episode names its cause again.
+    assert notice.failed("command deferred", "read_only_mode")
+    assert caplog.records[-1].levelno == logging.WARNING
     assert notice.recovered("command accepted again")
     caplog.clear()
     for _ in range(2):
