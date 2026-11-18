@@ -717,3 +717,20 @@ def test_an_unusable_saved_estimate_is_dropped_and_replaced(tmp_path):
         assert again.last.result.cost == pytest.approx(3)
         await again.async_stop()
     observed(tmp_path, body)
+
+
+def test_a_plug_in_no_poll_showed_ends_the_charge_before_it(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [(0, 100, "idle"), (10, 100, "plugged"), (40, 102, "charging")])
+        # Home Assistant misses the service for a moment; it sees another plug-in.
+        observer._service_meter.observe(at + 50, present=False)
+        observer._service_meter.observe(at + 55, present=True)
+        await play(observer, at, [(70, 110, "charging")])
+        # The charge before is the last one, without its end; this one starts here.
+        assert not observer.last.result.complete
+        assert observer.last.result.energy_kwh == pytest.approx(10)
+        assert observer.current.energy_kwh == 0
+        await play(observer, at, [(100, 113, "charging")])
+        assert observer.current.energy_kwh == pytest.approx(3)
+        assert not observer.current.complete
+    observed(tmp_path, body)

@@ -60,6 +60,7 @@ API_VERSION = 3
 # published state unless that is older than the second value.
 _PATIENCE_SECONDS = 2.0
 _METER_SAVE_SECONDS = 300.0
+_METER_RETRY_SECONDS = 60.0
 # A kWh goal pauses for a missing meter only after the bus failed this long.
 METER_GRACE_SECONDS = 60.0
 _PUBLISHED_SECONDS = 60.0
@@ -100,6 +101,7 @@ class ModbusService:
         # What of the plug cycle was last saved, and when.
         self._meter_saved: tuple[object, float] | None = None
         self._meter_lock = asyncio.Lock()
+        self._meter_retry_at = 0.0
         self._meter_notice = FailureNotice(_LOGGER, "Charging loss")
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
@@ -440,7 +442,10 @@ class ModbusService:
         cycle = (meter.present, meter.plugged_at, meter.charging_at, meter.note, meter.last, meter.last_note)
         saved = self._meter_saved
         now = time.monotonic()
-        if not force and saved is not None and saved[0] == cycle and now - saved[1] < _METER_SAVE_SECONDS:
+        if not force and (
+            now < self._meter_retry_at
+            or (saved is not None and saved[0] == cycle and now - saved[1] < _METER_SAVE_SECONDS)
+        ):
             return
         # Shielded and one at a time: the write of a cancelled poll must not
         # overtake the one at stop and leave the older state on disk.
@@ -453,7 +458,8 @@ class ModbusService:
             try:
                 await asyncio.to_thread(store.save, payload)
             except (OSError, ValueError) as err:
-                # Not recorded as saved: the next poll tries again.
+                # Not recorded as saved: tried again in a minute.
+                self._meter_retry_at = at + _METER_RETRY_SECONDS
                 self._meter_notice.failed("meter log not saved", type(err).__name__)
             else:
                 self._meter_saved = (cycle, at)

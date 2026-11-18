@@ -143,11 +143,13 @@ def test_the_meter_is_saved_at_a_change_and_else_every_five_minutes(tmp_path, mo
                 await observe(service, transport, clock, 1050, EvseState.CHARGING, 102)
                 assert saves == [1030, 1030]
                 # A disk that refuses is reported once and costs no measurement.
-                # It is tried again at the next poll, not five minutes later.
+                # It is tried again after a minute, not five minutes later.
                 failing.extend([OSError("full"), OSError("full")])
                 service._meter_saved = None
                 for at in (1060, 1070, 1080, 1090):
                     await observe(service, transport, clock, at, EvseState.CHARGING, 103)
+                    assert service._meter_retry_at > 0 or len(saves) == 5
+                    service._meter_retry_at -= 61
                 assert len(saves) == 5
                 assert [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING] == [
                     "Charging loss: meter log not saved (OSError)",

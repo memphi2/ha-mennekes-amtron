@@ -376,13 +376,13 @@ class CostAccumulator:
 
     def set_price(self, at: float, price: float | None) -> None:
         timestamp = self._touch(at)
-        if timestamp is None:
-            return
         price = _price(price)
         if price == self._price:
             return
+        # Kept even at an unusable time: that interval is incomplete, but the
+        # next one must not be priced with what no longer applies.
         self._price = price
-        if self._meter_at is None or self._invalid_interval:
+        if timestamp is None or self._meter_at is None or self._invalid_interval:
             return
         if timestamp == self._meter_at:
             self._meter_price = price

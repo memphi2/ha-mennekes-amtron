@@ -14,10 +14,11 @@ from typing import Any
 
 from .presence_gap import PresenceGap
 
-_MAX_READINGS = 4096
+_MAX_READINGS = 8192
 # While the meter rises, one reading per this span is kept: a long charge at
-# a short poll interval must not push its own plug-in out of the log.
-_RISING_SPACING_SECONDS = 60.0
+# a short poll interval must not push its own plug-in out of the log. Where a
+# rise begins or ends, the readings stay exact.
+_RISING_SPACING_SECONDS = 20.0
 # Two readings further apart than this, with energy between them, cannot
 # place a boundary: nobody saw when that energy flowed.
 MAX_INTERPOLATION_SECONDS = 600.0
@@ -71,14 +72,11 @@ class MeterLog:
         if len(self._values) >= 2 and self._values[-1] == self._values[-2] == kwh:
             self._times[-1] = at
             return
-        if (
-            len(self._values) >= 2 and self._values[-2] < self._values[-1] < kwh
-            and at - self._times[-2] < _RISING_SPACING_SECONDS
-        ):
-            # Inside an even rise the newer reading replaces the last one;
-            # where a rise begins or ends, both readings stay.
-            self._times[-1], self._values[-1] = at, kwh
-            return
+        if self._values and kwh > self._values[-1]:
+            # The meter rose: this reading stands for the ones just before
+            # it, also for the short steps of a meter read faster than it counts.
+            while len(self._times) >= 2 and at - self._times[-2] < _RISING_SPACING_SECONDS:
+                del self._times[-1], self._values[-1]
         self._times.append(at)
         self._values.append(kwh)
         if len(self._times) > _MAX_READINGS:

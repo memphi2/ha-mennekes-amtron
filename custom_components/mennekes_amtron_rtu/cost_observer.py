@@ -114,6 +114,7 @@ class ChargingCostObserver:
         self._closing_partial = False
         # Since when the service has known the plug state without a long gap.
         self._known_since: float | None = None
+        self._plugged_at: float | None = None
         self._started_at = time.time()
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
@@ -281,6 +282,15 @@ class ChargingCostObserver:
             checkpoint = self._accumulator.checkpoint()
         fresh = checkpoint is not None
         if present is True:
+            plugged_at = meter.get("plugged_at")
+            if self._active and plugged_at is not None and plugged_at != self._plugged_at:
+                # The service saw an unplug and a new plug-in that no poll of
+                # ours showed: the earlier charge ends here without its last
+                # reading, and this one has no known start.
+                self._cycle_partial = True
+                self._take_over(self.current)
+                self._cycle_start, self._cycle_partial = None, False
+            self._plugged_at = plugged_at
             replugged, self._unplugged, self._active = self._unplugged, False, True
             self._closing_start = None
             if self._cycle_start is None and fresh:

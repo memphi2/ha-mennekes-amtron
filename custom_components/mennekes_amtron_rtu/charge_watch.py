@@ -32,6 +32,8 @@ from .vehicle_profiles import (
 
 # A second name for one cycle makes it nobody's.
 NOBODY = "x"
+# The car's clock and the service's may differ by this much.
+CLOCK_SLACK_SECONDS = 120.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +113,24 @@ def last_cycle(entry: MennekesAmtronConfigEntry) -> PlugCycle | None:
     named = _named(entry.options, meter["last_note"])
     start, end = meter["last"]
     return PlugCycle(start, end, named[0] if named is not None else None)
+
+
+def cycle_around(entry: MennekesAmtronConfigEntry, start: float, end: float) -> PlugCycle | None:
+    """The plug cycle a charging span of the car lies in; None when it was not here.
+
+    A car's own record says when it charged, not where. Only a span inside a
+    cycle the service saw from the plug-in on was charged at this wallbox.
+    """
+    meter = _meter(entry)
+    if meter is None:
+        return None
+    plugged_at, last = meter["plugged_at"], meter["last"]
+    if plugged_at is not None and plugged_at <= start + CLOCK_SLACK_SECONDS:
+        named = _named(entry.options, meter["note"])
+        return PlugCycle(plugged_at, end, named[0] if named is not None else None)
+    if last is not None and last[0] <= start + CLOCK_SLACK_SECONDS and end <= last[1] + CLOCK_SLACK_SECONDS:
+        return last_cycle(entry)
+    return None
 
 
 def owner(entry: MennekesAmtronConfigEntry) -> VehicleProfile | None:

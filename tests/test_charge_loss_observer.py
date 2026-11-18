@@ -313,10 +313,12 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
             data.values[EVSE_STATE.key] = state
             data.energy_observed_at = at
             data.charge_meter = {
-                "first_reading_at": meter.first_at, "known_since": None, "present": False,
-                "plugged_at": None, "charging_at": None, "note": None, "last": None, "last_note": None,
+                "first_reading_at": meter.first_at, "known_since": 1000, "present": True,
+                "plugged_at": plugged[0], "charging_at": None, "note": None, "last": None, "last_note": None,
             }
             coordinator.async_update_listeners()
+
+        plugged = [1030]
 
         client = observer._entry.runtime_data.client
         with patch(READ, new=AsyncMock(return_value=None)) as read, patch(LATER, return_value=lambda: None):
@@ -353,6 +355,20 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                 await hass.async_block_till_done()
                 assert observer.statistics.sample_count == 1
                 assert observer.statistics.last_loss_percent == pytest.approx(10)
+                # A record from before this plug-in was charged elsewhere,
+                # whatever another car drew here meanwhile; so was one of a
+                # plug-in the service did not see.
+                for plugged[0], record in ((1400, ChargeRecord(1200, 1390, 3)), (None, ChargeRecord(1410, 1490, 3))):
+                    for at, kwh in ((1200, 506), (1390, 510), (1410, 510), (1490, 514), (1500, 514)):
+                        meter.observe(at, kwh)
+                    read.return_value = record
+                    observer._last_query = float("-inf")
+                    asked = client.async_energy_between.await_count
+                    poll(1500 + (plugged[0] or 0), 514, EvseState.IDLE)
+                    hass.bus.async_fire("bavariandata_charging_stopped", {})
+                    await hass.async_block_till_done()
+                    assert client.async_energy_between.await_count == asked
+                    assert observer.statistics.sample_count == 1
             finally:
                 await observer.async_stop()
                 await hass.async_stop()
@@ -852,6 +868,12 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
             await hass.async_block_till_done()
             assert observer._charge == charge
             assert observer.statistics.status == "waiting_for_vehicle"
+            # A later cycle the meter cannot measure is no longer that charge:
+            # nothing of the car's can be assigned to the one before.
+            await cycle(now - 9500, now - 8500)
+            assert observer._charge is None
+            assert not observer._unmeasured
+            assert observer.statistics.status == "waiting_for_session"
         finally:
             named.stop()
             await observer.async_stop()

@@ -27,7 +27,7 @@ from .charge_loss_const import (
     LOSS_SOURCE_SENSOR,
     LOSS_SOURCE_VEHICLE_HISTORY,
 )
-from .charge_watch import PlugCycle, last_cycle, loss_vehicle_options
+from .charge_watch import PlugCycle, cycle_around, last_cycle, loss_vehicle_options
 from .device.charge_loss import Charge, LossStatistics
 from .device.client_errors import AmtronConnectionError
 from .device.enums import EvseState
@@ -95,6 +95,8 @@ class ChargeLossObserver:
         self._charging = False
         self._cycle: PlugCycle | None = None
         self._charge: Charge | None = None
+        # A cycle of this car that the meter could not measure.
+        self._unmeasured = False
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -235,9 +237,10 @@ class ChargeLossObserver:
         energy = await self._energy(cycle.plugged_at, cycle.unplugged_at)
         if energy is None:
             # The reading after the unplug is still to come; it does not come
-            # any more once the meter log cannot place the boundary.
+            # any more once the meter log cannot place the boundary. The
+            # charge before it is then no longer the last one.
             if time.time() - cycle.unplugged_at > MAX_INTERPOLATION_SECONDS:
-                self._cycle = cycle
+                self._cycle, self._charge, self._unmeasured = cycle, None, True
             return
         self._cycle = cycle
         if energy > 0:
@@ -262,6 +265,11 @@ class ChargeLossObserver:
             await self._take_plug_cycle()
             charge = self._charge
             if charge is None:
+                if self._unmeasured:
+                    async with self._lock:
+                        candidate = LossStatistics.restore(self.statistics.snapshot())
+                        if not self._stopping and (not candidate.observe_charge(None) or await self._save(candidate)):
+                            self._unmeasured = False
                 continue
             energy: float | None = None
             change: tuple[float, float] | None = None
@@ -297,6 +305,11 @@ class ChargeLossObserver:
                 # the same bounded retry policy applies to this provider.
                 # Do not log exception messages that may contain VINs.
                 _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
+        if record is not None:
+            cycle = cycle_around(self._entry, record.start, record.end)
+            if cycle is None or (self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id)):
+                # Charged elsewhere, or another car was plugged in here meanwhile.
+                return
         wallbox = await self._energy(record.start, record.end) if record is not None else None
         if record is None or wallbox is None or wallbox <= 0:
             # No record yet, or the meter reading after its end is still to come.

@@ -71,13 +71,24 @@ def test_a_long_charge_at_a_short_poll_interval_keeps_its_plug_in() -> None:
     for step in range(1, 21601):
         log.observe(1000 + 2 * step, 100 + step * 0.001)
     log.observe(50000, 121.6)
-    assert len(log._times) < 1000
+    assert len(log._times) < 2500
     # Where the rise begins and ends, the readings are exact.
     assert log._times[:2] == [0, 1000]
     assert log._times[-2:] == [44200, 50000]
     assert log.energy_between(1000, 44200) == pytest.approx(21.6)
     assert log.energy_between(500, 46000) == pytest.approx(21.6)
     assert log.energy_between(1000, 1000 + 7200) == pytest.approx(3.6)
+    # A meter that counts in steps slower than it is read thins out as well.
+    stepped = MeterLog()
+    stepped.observe(0, 100)
+    stepped.observe(1000, 100)
+    for step in range(1, 21601):
+        stepped.observe(1000 + 2 * step, 100 + (step // 4) * 0.01)
+    stepped.observe(50000, 154)
+    assert len(stepped._times) < 3000
+    assert stepped._times[:2] == [0, 1006]
+    assert stepped._times[-2:] == [44200, 50000]
+    assert stepped.energy_between(500, 46000) == pytest.approx(54)
 
 
 def test_a_clock_that_moves_back_ends_the_cycle_unmeasured() -> None:
