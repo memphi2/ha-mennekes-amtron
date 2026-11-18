@@ -996,22 +996,23 @@ def test_a_failing_disk_is_tried_once_a_minute_while_a_newer_cycle_is_open(tmp_p
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
-            assert observer.statistics.waiting == charge
+            assert observer.statistics.known(charge.start, charge.end) == charge
         finally:
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
 
 
-def test_a_restart_after_a_plug_in_without_charging_keeps_the_waiting_charge(tmp_path):
+def test_after_a_restart_a_plug_in_without_charging_leaves_nothing_assignable(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass)
         now = time.time()
         try:
             await observer.async_start()
-            charge = coordinator.complete(at=now - 2000)
+            coordinator.complete(at=now - 2000)
             await hass.async_block_till_done()
+            # The car may have charged again unseen before this plug-in.
             coordinator.meter.observe(now - 500, coordinator.total)
             coordinator.meter.observe(now - 100, coordinator.total)
             coordinator.cycle(now - 400, now - 200)
@@ -1019,7 +1020,8 @@ def test_a_restart_after_a_plug_in_without_charging_keeps_the_waiting_charge(tmp
             again = ChargeLossObserver(hass, observer._entry)
             await again.async_start()
             await hass.async_block_till_done()
-            assert again._assignable == charge
+            assert again._cycle.plugged_at == now - 400
+            assert again._assignable is None
             await again.async_stop()
         finally:
             await observer.async_stop()

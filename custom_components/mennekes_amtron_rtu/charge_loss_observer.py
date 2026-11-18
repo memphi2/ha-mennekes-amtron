@@ -276,13 +276,11 @@ class ChargeLossObserver:
         if energy is None and time.time() - cycle.unplugged_at <= MAX_INTERPOLATION_SECONDS:
             # The reading after the unplug is still to come.
             return
-        first, self._cycle = self._cycle is None, cycle
+        self._cycle = cycle
         if energy == 0:
-            # Plugged in without charging: everything stays as it was. As
-            # the first cycle seen since a restart, it leaves the charge that
-            # still waits for the car's value.
-            if first:
-                self._charge = self.statistics.waiting
+            # Plugged in without charging: everything stays as it was. After
+            # a restart nothing is assignable: a charge unseen meanwhile may
+            # lie between the saved one and this plug-in.
             return
         # A cycle the meter cannot measure is no longer the charge before it.
         self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy) if energy is not None else None
