@@ -44,13 +44,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   recognized vehicle as a note on the plug cycle (command `charge_note`), so
   that name survives a restart as well.
   The charging cost takes the plug state and its gaps from there as well.
+  The log keeps only what the running and the last plug cycle need, and the
+  file is written at a change of the plug cycle and every five minutes while
+  a car charges; an idle wallbox writes nothing.
+- A record from the car's history counts only when it was charged at this
+  wallbox, and with vehicle profiles only in a plug cycle of that car. A plug
+  cycle the meter cannot measure makes the last loss unknown instead of
+  leaving the charge before assignable.
 - The charging cost follows the charge itself: the current charge starts at
   0.00 at the plug-in, runs while charging and is 0.00 again after the
   unplug; the last charge takes its value over whenever charging stops and at
   the unplug. It no longer waits for the service's session summary, which
   often left it unknown. An incomplete cost shows the priced part with
   `complete` false instead of unknown. A stored last cost from an earlier
-  version is not taken over.
+  version is not taken over. A plug-in that Home Assistant missed while the
+  service saw it starts the cost again.
 - The app and the integration must both be 0.10.0b2; update them together.
   Home Assistant refuses an older service.
 - The service no longer reports the field `choice_revision` in its state; the
