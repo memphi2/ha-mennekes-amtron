@@ -7,6 +7,7 @@ import logging
 import math
 import time
 from contextlib import suppress
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.core import (
@@ -72,6 +73,13 @@ def vehicle_energy(state: State | None) -> float | None:
     return value if math.isfinite(value) and value > 0 else None
 
 
+@dataclass(frozen=True, slots=True)
+class Booking:
+    """What a decided plug cycle still has to book: its charge, or none if unmeasurable."""
+
+    charge: Charge | None
+
+
 class ChargeLossObserver:
     """One optional, bounded session matcher and one durable weighted aggregate."""
 
@@ -99,12 +107,13 @@ class ChargeLossObserver:
         )
         self.statistics = LossStatistics()
         self._charging = False
-        # The last plug cycle that was decided, the charge an energy value
-        # of the car may go to, and whether that cycle was this car's but
-        # could not be measured.
+        # The last plug cycle that was decided, and the charge an energy
+        # value of the car may go to. What the decision still has to book
+        # until a save succeeds is kept apart: a later cycle of another car
+        # must neither lose it nor delay it.
         self._cycle: PlugCycle | None = None
         self._charge: Charge | None = None
-        self._lost = False
+        self._booking: Booking | None = None
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -247,11 +256,11 @@ class ChargeLossObserver:
             return
         if self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id):
             # Another car's charge: this profile keeps its last match and average.
-            self._cycle, self._charge, self._lost = cycle, None, False
+            self._cycle, self._charge = cycle, None
             return
         if (known := self.statistics.known(cycle.plugged_at, cycle.unplugged_at)) is not None:
             # Seen again after a restart: it is accounted for.
-            self._cycle, self._charge, self._lost = cycle, known, False
+            self._cycle, self._charge = cycle, known
             return
         try:
             energy = await self._energy(cycle.plugged_at, cycle.unplugged_at)
@@ -261,18 +270,13 @@ class ChargeLossObserver:
         if energy is None and time.time() - cycle.unplugged_at <= MAX_INTERPOLATION_SECONDS:
             # The reading after the unplug is still to come.
             return
+        self._cycle = cycle
         if energy == 0:
-            # Plugged in without charging: everything stays as it was, also
-            # when this is the first cycle seen since a restart.
-            self._cycle = cycle
-            if self._charge is None and not self._lost:
-                self._charge = self.statistics.last_charge
-        elif energy is None:
-            # The meter cannot measure it: the charge before is no longer the last one.
-            self._cycle, self._charge, self._lost = cycle, None, True
-        else:
-            self._cycle, self._lost = cycle, False
-            self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy)
+            # Plugged in without charging: everything stays as it was.
+            return
+        # A cycle the meter cannot measure is no longer the charge before it.
+        self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy) if energy is not None else None
+        self._booking = Booking(self._charge)
 
     @callback
     def _queue(self) -> None:
@@ -290,19 +294,15 @@ class ChargeLossObserver:
             if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
                 await self._measure_record()
                 continue
-            # What could not be saved is booked first, whatever came after;
-            # otherwise nothing is booked while a newer cycle is still open.
-            retry = not self._storage_ok
-            if not retry:
-                await self._take_plug_cycle()
-            settled = retry or self._decided
-            charge = self._charge if settled else None
-            lost = self._lost and settled
-            if charge is None and not lost and not retry:
+            await self._take_plug_cycle()
+            # Nothing is matched while a newer cycle is still open.
+            charge = self._assignable
+            booking = self._booking
+            if charge is None and booking is None and self._storage_ok:
                 continue
             energy: float | None = None
             change: tuple[float, float] | None = None
-            if charge is not None and self._decided and self._auto and self._change is not None and self._unplugged():
+            if charge is not None and self._auto and self._change is not None and self._unplugged():
                 at, value = self._change
                 if self._started_at <= charge.end <= at <= charge.end + LOSS_MATCH_WINDOW_SECONDS:
                     energy = value
@@ -311,12 +311,17 @@ class ChargeLossObserver:
                 if self._stopping:
                     continue
                 candidate = LossStatistics.restore(self.statistics.snapshot())
-                if charge is not None or lost:
+                if booking is not None:
+                    candidate.observe_charge(booking.charge)
+                elif charge is not None:
                     candidate.observe_charge(charge)
                 if charge is not None and energy is not None and self._change is change:
                     candidate.apply(charge, energy, association="changed_value")
-                if await self._save(candidate) and change is not None and self._change is change:
-                    self._change = None
+                if await self._save(candidate):
+                    if self._booking is booking:
+                        self._booking = None
+                    if change is not None and self._change is change:
+                        self._change = None
 
     async def _measure_record(self) -> None:
         """Compare the vehicle's newest record with the meter over the same span."""

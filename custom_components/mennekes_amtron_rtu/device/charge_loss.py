@@ -137,13 +137,6 @@ class LossStatistics:
                 return charge
         return None
 
-    @property
-    def last_charge(self) -> Charge | None:
-        """The charge the last loss waits for or was formed from."""
-        if self._current_session is not None:
-            return self._current_session
-        return self._last_match.session if self._last_match is not None and self.status == "matched" else None
-
     def configure_source(self, source: str | None) -> bool:
         """Start a new aggregate when the selected vehicle/source changes."""
         if source is not None and (

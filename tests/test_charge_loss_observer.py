@@ -891,7 +891,7 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
                 coordinator.async_update_listeners()
                 await hass.async_block_till_done()
             assert observer._cycle == unanswered
-            assert observer._lost
+            assert observer._booking is not None
             assert observer._assignable is None
             assert not observer.available
             observer._last_storage_attempt = float("-inf")
@@ -906,7 +906,7 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
     asyncio.run(run())
 
 
-def test_a_charge_that_could_not_be_saved_is_booked_before_what_came_after(tmp_path):
+def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass)
@@ -920,50 +920,45 @@ def test_a_charge_that_could_not_be_saved_is_booked_before_what_came_after(tmp_p
         try:
             await observer.async_start()
             coordinator.owner = mine
-            with patch.object(observer._store, "async_save", AsyncMock(side_effect=OSError("full"))):
+            saves = AsyncMock(side_effect=OSError("full"))
+            with patch.object(observer._store, "async_save", saves):
                 charge = coordinator.complete(at=now - 2000)
                 await hass.async_block_till_done()
                 assert not observer.available
-                # Another car follows before the disk works again.
+                # Another car follows before the disk works again: its cycle is
+                # decided at once, and polls in between do not hammer the disk.
                 coordinator.owner = SimpleNamespace(id="b" * 32)
                 coordinator.complete(at=now - 1000)
                 await hass.async_block_till_done()
-            assert observer._cycle.unplugged_at == now - 2000
+                asked = saves.await_count
+                for _ in range(5):
+                    coordinator.async_update_listeners()
+                    await hass.async_block_till_done()
+                assert saves.await_count == asked <= 2
+            assert observer._cycle.unplugged_at == now - 1000
+            assert observer._assignable is None
+            assert observer._booking.charge == charge
             observer._last_storage_attempt = float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
-            assert observer.statistics.last_charge == charge
-            # Only then the other car's cycle is taken; it changes nothing.
-            coordinator.async_update_listeners()
-            await hass.async_block_till_done()
-            assert observer._cycle.unplugged_at == now - 1000
-            assert observer._assignable is None
+            assert observer._booking is None
             assert observer.statistics.status == "waiting_for_vehicle"
-            # After a restart a plug-in without charging keeps that charge assignable.
+            # A plug-in without charging changes nothing, and revives nothing
+            # that another car's cycle made unassignable.
             coordinator.owner = mine
-            observer._cycle = None
             coordinator.meter.observe(now - 500, coordinator.total)
             coordinator.meter.observe(now - 100, coordinator.total)
             coordinator.cycle(now - 400, now - 200)
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
-            assert observer._assignable == charge
-            coordinator.meter.observe(now - 50, coordinator.total)
-            coordinator.cycle(now - 90, now - 80)
-            coordinator.async_update_listeners()
-            await hass.async_block_till_done()
-            assert observer._assignable == charge
-            # A save whose outcome stayed open is repeated, also with nothing new to book.
-            coordinator.owner = None
-            coordinator.complete(at=now - 10)
-            await hass.async_block_till_done()
+            assert observer._cycle.plugged_at == now - 400
             assert observer._assignable is None
+            # A save whose outcome stayed open is repeated, also with nothing new to book.
             observer._storage_ok, observer._last_storage_attempt = False, float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
-            assert observer.statistics.last_charge == charge
         finally:
             named.stop()
             await observer.async_stop()
