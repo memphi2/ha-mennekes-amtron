@@ -877,23 +877,27 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
             await hass.async_block_till_done()
             assert client.async_energy_between.await_count == asked
             assert observer._charge == charge
-            # A service that does not answer has measured nothing: asked again.
+            # A service that does not answer has measured nothing: asked
+            # again, and meanwhile nothing goes to the charge before.
+            assert observer._assignable == charge
             unanswered = await cycle(now - 9500, now - 8500)
             assert observer._cycle != unanswered
+            assert observer._assignable is None
             assert observer.statistics.status == "waiting_for_vehicle"
             client.async_energy_between.side_effect = answer
-            # A cycle the meter cannot measure is no longer the charge before:
-            # nothing of the car's can be assigned to that one. A failed save
-            # takes the cycle again.
-            with patch.object(observer, "_save", AsyncMock(return_value=False)):
+            # A cycle the meter cannot measure is no longer the charge before.
+            # A save that fails is tried again by the ordinary storage retry.
+            with patch.object(observer._store, "async_save", AsyncMock(side_effect=OSError("full"))):
                 coordinator.async_update_listeners()
                 await hass.async_block_till_done()
-            assert observer._cycle is None
-            assert observer.statistics.status == "waiting_for_vehicle"
+            assert observer._cycle == unanswered
+            assert observer._lost
+            assert observer._assignable is None
+            assert not observer.available
+            observer._last_storage_attempt = float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
-            assert observer._cycle == unanswered
-            assert observer._charge is None
+            assert observer.available
             assert observer.statistics.status == "waiting_for_session"
         finally:
             named.stop()

@@ -99,8 +99,12 @@ class ChargeLossObserver:
         )
         self.statistics = LossStatistics()
         self._charging = False
+        # The last plug cycle that was decided, the charge an energy value
+        # of the car may go to, and whether that cycle was this car's but
+        # could not be measured.
         self._cycle: PlugCycle | None = None
         self._charge: Charge | None = None
+        self._lost = False
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -131,8 +135,18 @@ class ChargeLossObserver:
     def can_assign(self) -> bool:
         return (
             self.mode == LOSS_SOURCE_SENSOR and self.available
-            and self._charge is not None and self._unplugged()
+            and self._assignable is not None and self._unplugged()
         )
+
+    @property
+    def _decided(self) -> bool:
+        """Whether the service's last plug cycle is the one decided here."""
+        return self._cycle is not None and last_cycle(self._entry) == self._cycle
+
+    @property
+    def _assignable(self) -> Charge | None:
+        """The charge a value of the car may go to; none while a newer cycle is open."""
+        return self._charge if self._decided else None
 
     def _unplugged(self) -> bool:
         data = self._coordinator.current_data()
@@ -226,37 +240,36 @@ class ChargeLossObserver:
         """What the meter delivered in a span; None when its log does not cover it."""
         return await self._entry.runtime_data.client.async_energy_between(start, end)
 
-    async def _take_plug_cycle(self) -> bool:
-        """Take the last plug cycle; true when it is a new charge of this car.
-
-        That charge is then in ``_charge``, or None when the meter cannot
-        measure it: the charge before it is no longer the last one.
-        """
+    async def _take_plug_cycle(self) -> None:
+        """Decide the service's last plug cycle once, as soon as that is possible."""
         cycle = last_cycle(self._entry)
         if cycle is None or cycle == self._cycle:
-            return False
+            return
         if self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id):
             # Another car's charge: this profile keeps its last match and average.
-            self._cycle, self._charge = cycle, None
-            return False
+            self._cycle, self._charge, self._lost = cycle, None, False
+            return
         if (known := self.statistics.known(cycle.plugged_at, cycle.unplugged_at)) is not None:
             # Seen again after a restart: it is accounted for.
-            self._cycle, self._charge = cycle, known
-            return False
+            self._cycle, self._charge, self._lost = cycle, known, False
+            return
         try:
             energy = await self._energy(cycle.plugged_at, cycle.unplugged_at)
         except (AmtronConnectionError, DeviceError):
             # No answer is no measurement: asked again at the next poll.
-            return False
+            return
         if energy is None and time.time() - cycle.unplugged_at <= MAX_INTERPOLATION_SECONDS:
             # The reading after the unplug is still to come.
-            return False
-        self._cycle = cycle
+            return
         if energy == 0:
             # Plugged in without charging: everything stays as it was.
-            return False
-        self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy) if energy is not None else None
-        return True
+            self._cycle = cycle
+        elif energy is None:
+            # The meter cannot measure it: the charge before is no longer the last one.
+            self._cycle, self._charge, self._lost = cycle, None, True
+        else:
+            self._cycle, self._lost = cycle, False
+            self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy)
 
     @callback
     def _queue(self) -> None:
@@ -274,19 +287,14 @@ class ChargeLossObserver:
             if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
                 await self._measure_record()
                 continue
-            taken = await self._take_plug_cycle()
-            charge = self._charge
-            if charge is None:
-                if taken:
-                    async with self._lock:
-                        candidate = LossStatistics.restore(self.statistics.snapshot())
-                        if not self._stopping and candidate.observe_charge(None) and not await self._save(candidate):
-                            # Not saved: the cycle is taken again with the retry.
-                            self._cycle = None
+            await self._take_plug_cycle()
+            # Nothing is booked while a newer cycle is still open.
+            charge = self._assignable
+            if charge is None and not (self._lost and self._decided):
                 continue
             energy: float | None = None
             change: tuple[float, float] | None = None
-            if self._auto and self._change is not None and self._unplugged():
+            if charge is not None and self._auto and self._change is not None and self._unplugged():
                 at, value = self._change
                 if self._started_at <= charge.end <= at <= charge.end + LOSS_MATCH_WINDOW_SECONDS:
                     energy = value
@@ -296,7 +304,7 @@ class ChargeLossObserver:
                     continue
                 candidate = LossStatistics.restore(self.statistics.snapshot())
                 candidate.observe_charge(charge)
-                if energy is not None and self._change is change:
+                if charge is not None and energy is not None and self._change is change:
                     candidate.apply(charge, energy, association="changed_value")
                 if await self._save(candidate) and change is not None and self._change is change:
                     self._change = None
@@ -392,16 +400,17 @@ class ChargeLossObserver:
     async def async_assign(self) -> None:
         """Explicitly associate a last-energy value; never change charging state."""
         async with self._lock:
-            if self._stopping or not self.can_assign or self._charge is None:
+            charge = self._assignable
+            if self._stopping or not self.can_assign or charge is None:
                 raise service_validation_error("loss_unavailable")
             energy = vehicle_energy(self._hass.states.get(self._entity))
-            if energy is None or energy > self._charge.wallbox_kwh:
+            if energy is None or energy > charge.wallbox_kwh:
                 raise service_validation_error("loss_energy_invalid")
             # The explicit assignment supersedes older buffered estimates.
             # Events arriving during the save form a new candidate and survive.
             self._change = None
             candidate = LossStatistics.restore(self.statistics.snapshot())
-            candidate.apply(self._charge, energy, association="manual")
+            candidate.apply(charge, energy, association="manual")
             if not await self._save(candidate):
                 raise service_validation_error("loss_storage_unavailable")
 
