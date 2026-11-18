@@ -10,7 +10,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.control import _PendingCommand
+from custom_components.mennekes_amtron_rtu.device.control_state import (
+    _PendingCommand,
+)
 from custom_components.mennekes_amtron_rtu.device.data import (
     ConnectionState,
     WallboxData,

@@ -18,7 +18,7 @@ from .data import WallboxData
 from .device.client_errors import AmtronConnectionError
 from .device.command_events import CommandEvents, command_source
 from .device.const import CHARGING_CURRENT_MINIMUM
-from .device.control import pause_state
+from .device.control_state import pause_state
 from .device.decode import is_hex32
 from .device.departure_plan import DepartureInputs, DepartureState
 from .device.energy_goal import EnergyGoal

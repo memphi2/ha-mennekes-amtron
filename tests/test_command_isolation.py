@@ -7,7 +7,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.device import control as control_module
+from custom_components.mennekes_amtron_rtu.device import (
+    control_state as control_module,
+)
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from tests.test_timed_control import Harness
 
