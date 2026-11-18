@@ -328,7 +328,8 @@ bounded log of total-energy readings and follows the plug cycle from plug-in
 to unplug; a gap too long to rule out an unplug ends the cycle unmeasured.
 Every loss is a vehicle's energy against the meter's difference over a time
 span, which Home Assistant asks for with `POST /v2/energy`: the span of the
-car's own charging record, or the plug cycle for a vehicle energy sensor. The
+car's own charging record inside a plug cycle, or the plug cycle itself for a
+vehicle energy sensor. The
 cost observer prices the energy of the running cycle and takes the plug state
 and its gaps from the same meter.
 

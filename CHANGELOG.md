@@ -31,8 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - The charging loss from the BavarianData history compares the car's newest
   complete record with the wallbox's total energy meter over that record's
-  own time span. It no longer needs the record to fit the plug cycle and the
-  service's session energy, which left the loss unknown.
+  own time span, when that span lies in a plug cycle the service saw at this
+  wallbox. It no longer needs the service's session energy, which left the
+  loss unknown.
 - The charging loss from a vehicle energy sensor compares that value with the
   meter's difference between plug-in and unplug.
 - The service keeps a bounded log of meter readings and the last plug cycle

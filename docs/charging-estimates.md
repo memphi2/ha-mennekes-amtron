@@ -84,8 +84,10 @@ the car's end of charging. A record that follows a pause is measured on its
 own. DC charges, open, interrupted or late-start records and records below
 1 kWh are passed over; a truncated history is not used. The last loss stays
 unknown until a suitable record appears; local reads are retried a limited
-number of times and on charging-stop events. A record whose span began
-before the service started cannot be measured.
+number of times and on charging-stop events. A record counts only when its
+span lies in a plug cycle the service saw at this wallbox from the plug-in on,
+and with vehicle profiles only in a cycle of that car; a charge elsewhere is
+passed over.
 
 BavarianData's `energy_kwh` is estimated battery energy integrated from vehicle
 telemetry. Its `grid_kwh` is grid energy and is deliberately not substituted.
