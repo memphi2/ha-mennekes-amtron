@@ -269,8 +269,8 @@ entity is unknown until the next event.
 |---|---|
 | `paused`, `resumed`, `current_set`, `single_phase_set`, `all_phases_set`, `release_enabled`, `release_disabled`, `unlocked`, `locked` | The service carried out that command (result `executed`). This means the service completed the command, not that the vehicle has started charging; check **Charging** and actual power for that. |
 | `recovered` | Error recovery was confirmed (`recovery_succeeded`). |
-| `command_failed` | A command failed (`failed`, including a phase-pause timeout), its write could not be confirmed (`uncertain`, inspect readback before retrying) or error recovery failed (`recovery_failed`). The `action` attribute names the command. |
-| `command_cancelled` | Queued work was cancelled (`cancelled`) or replaced by a newer request (`replaced`). The `action` attribute names the command. |
+| `<action>_failed`, such as `pause_failed` or `set_current_failed` | That command failed (`failed`, including a phase-pause timeout), its write could not be confirmed (`uncertain`, inspect readback before retrying) or, as `recover_failed`, error recovery failed (`recovery_failed`). |
+| `<action>_cancelled`, such as `resume_cancelled` | Queued work for that command was cancelled (`cancelled`) or replaced by a newer request (`replaced`). |
 | `vehicle_plugged_in`, `vehicle_unplugged`, `charging_started`, `charging_stopped`, `error_occurred`, `error_cleared`, `authorized`, `authorization_rejected`, `downgrade_started`, `downgrade_ended`, `cable_locked`, `cable_unlocked`, `phases_switched` | A change the wallbox reported. |
 
 Command events carry these attributes:

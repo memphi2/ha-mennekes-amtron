@@ -275,10 +275,10 @@ def test_event_entity_subscribes_without_replaying_and_stays_available(monkeypat
         assert entity.state_attributes["result"] == "executed"
         assert entity.state_attributes["trigger"] == "plug_charge"
         feed.record("recovery_failed", "recover", "error_still_active")
-        assert entity.state_attributes["event_type"] == "command_failed"
+        assert entity.state_attributes["event_type"] == "recover_failed"
         assert entity.state_attributes["result"] == "recovery_failed"
         feed.record("uncertain", "recover", "unknown")
-        assert entity.state_attributes["event_type"] == "command_failed"
+        assert entity.state_attributes["event_type"] == "recover_failed"
         assert entity.state_attributes["result"] == "uncertain"
         assert len(writes) == 3
         for remove in removals:

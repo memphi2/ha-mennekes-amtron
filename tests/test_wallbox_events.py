@@ -181,7 +181,7 @@ def test_the_entity_reports_changes_after_a_baseline_and_restarts_after_a_failed
         await command("cancelled", "pause", "user_cancelled")
         assert entity.state_attributes["action"] == "pause"
         # The type alone says what happened: it is the whole logbook row.
-        assert [kind for kind, _at in written] == ["resumed", "current_set", "command_cancelled"]
+        assert [kind for kind, _at in written] == ["resumed", "current_set", "pause_cancelled"]
         written.clear()
 
         put(transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)

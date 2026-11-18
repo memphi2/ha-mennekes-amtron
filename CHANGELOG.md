@@ -13,10 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Its event types are now `paused`, `resumed`, `current_set`,
   `single_phase_set`, `all_phases_set`, `release_enabled`, `release_disabled`,
   `unlocked`, `locked` and `recovered` for completed commands,
-  `command_failed` and `command_cancelled`, and the wallbox changes by their
+  `<action>_failed` and `<action>_cancelled` per command, such as
+  `pause_failed` or `resume_cancelled`, and the wallbox changes by their
   own name, such as `vehicle_plugged_in`, `vehicle_unplugged`,
   `charging_started` or `error_occurred`. The types `command_done`,
-  `session_started`, `session_ended` and `wallbox_changed`, the `change`
+  `command_failed`, `command_cancelled`, `session_started`, `session_ended`
+  and `wallbox_changed`, the `change`
   attribute and the extra logbook sentence are gone. Automations need the new
   types.
 

@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .data import WallboxData
-from .device.command_events import CommandEvent
+from .device.command_events import ACTIONS, CONTROL_ACTIONS, CommandEvent
 from .device.const import CHARGING_CURRENT_DECIMALS
 from .device.registers import CHARGING_CURRENT_EMS, CP_STATE
 from .device.wallbox_events import EVENT_TYPES as WALLBOX_EVENT_TYPES
@@ -23,22 +23,26 @@ from .entry_types import MennekesAmtronConfigEntry
 
 PARALLEL_UPDATES = 0
 
-COMMAND_FAILED = "command_failed"
-COMMAND_CANCELLED = "command_cancelled"
-# What a completed command did. The logbook row of the entity shows the event
-# type and nothing else, so the type itself has to say what happened.
+# The logbook row of the entity shows the event type and nothing else, so the
+# type itself says what happened: what a completed command did, or which
+# command failed or was dropped.
 _DONE_TYPES = {
     "pause": "paused", "resume": "resumed", "set_current": "current_set",
     "single_phase": "single_phase_set", "all_phases": "all_phases_set",
     "enable_charging": "release_enabled", "disable_charging": "release_disabled",
     "unlock": "unlocked", "lock": "locked", "recover": "recovered",
 }
-_OTHER_TYPES = {
-    "failed": COMMAND_FAILED, "uncertain": COMMAND_FAILED, "recovery_failed": COMMAND_FAILED,
-    "cancelled": COMMAND_CANCELLED, "replaced": COMMAND_CANCELLED,
+_ENDINGS = {
+    "failed": "failed", "uncertain": "failed", "recovery_failed": "failed",
+    "cancelled": "cancelled", "replaced": "cancelled",
 }
 # Changes the wallbox reported carry their own name as the type.
-EVENT_TYPES = (*_DONE_TYPES.values(), COMMAND_FAILED, COMMAND_CANCELLED, *WALLBOX_EVENT_TYPES)
+EVENT_TYPES = (
+    *_DONE_TYPES.values(),
+    *(f"{action}_failed" for action in ACTIONS),
+    *(f"{action}_cancelled" for action in CONTROL_ACTIONS),
+    *WALLBOX_EVENT_TYPES,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -136,7 +140,8 @@ class AmtronActivity(AmtronEntity, EventEntity):
         # final outcome is activity.
         if self._repeats(event) or (event.action == "set_current" and event.outcome == "replaced"):
             return
-        kind = _OTHER_TYPES.get(event.outcome) or _DONE_TYPES[event.action]
+        ending = _ENDINGS.get(event.outcome)
+        kind = _DONE_TYPES[event.action] if ending is None else f"{event.action}_{ending}"
         self._trigger_event(kind, {
             "action": event.action, "result": event.outcome, "reason": event.reason,
             "trigger": event.source, "value": event.requested_value,

@@ -137,7 +137,7 @@ actions:
       - conditions:
           - condition: template
             value_template: >-
-              {{ trigger.to_state.attributes.event_type == 'command_failed' }}
+              {{ trigger.to_state.attributes.event_type.endswith('_failed') }}
         sequence:
           - action: persistent_notification.create
             data:
