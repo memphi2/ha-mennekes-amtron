@@ -657,7 +657,8 @@
               "energy_goal": "Protezione obiettivo energetico",
               "soc_goal": "Obiettivo percentuale veicolo",
               "recovery": "Ripristino dopo errore",
-              "guest": "Ricarica ospite"
+              "guest": "Ricarica ospite",
+              "unplug": "Scollegato"
             }
           },
           "value": {

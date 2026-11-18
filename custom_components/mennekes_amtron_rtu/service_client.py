@@ -527,7 +527,7 @@ class ServiceClient:
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.
                 cancelling = command == "cancel_pending"
-                soc_metadata = command in {"soc_source", "soc_observation"}
+                soc_metadata = command in {"soc_source", "soc_observation", "unplug_release_config"}
                 departure = command in {"departure_trip", "departure_inputs", "departure_choice"}
                 metadata = soc_metadata or departure or (
                     command == "plug_charge_config" and values.get("value") is False

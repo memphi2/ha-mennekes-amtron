@@ -19,7 +19,7 @@ from uuid import uuid4
 
 _LOGGER = logging.getLogger(__name__)
 MAX_EVENTS = 32
-SOURCES = ("unknown", "home_assistant", "app", "plug_charge", "departure_plan", "energy_goal", "soc_goal", "recovery", "guest")
+SOURCES = ("unknown", "home_assistant", "app", "plug_charge", "departure_plan", "energy_goal", "soc_goal", "recovery", "guest", "unplug")
 command_source: ContextVar[str] = ContextVar("amtron_command_source", default="unknown")
 
 

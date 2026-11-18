@@ -39,7 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   target.
 - Switching the charging release off when the vehicle is unplugged is an
   option of the integration instead of a switch entity. It starts switched
-  off; switch it on again in the options if you used it.
+  off; switch it on again in the options if you used it. The service that
+  talks to the wallbox applies it, with the app also while Home Assistant is
+  not running.
 - The diagnostic sensors Connection quality, Authorization, Cable lock,
   Detected vehicle phases and Wallbox settings are disabled by default.
 - The blueprint for grid-operator downgrade notifications takes the Charging

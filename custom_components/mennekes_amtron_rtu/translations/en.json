@@ -657,7 +657,8 @@
               "energy_goal": "Energy target protection",
               "soc_goal": "Vehicle percentage target",
               "recovery": "Error recovery",
-              "guest": "Guest charging"
+              "guest": "Guest charging",
+              "unplug": "Unplugged"
             }
           },
           "value": {

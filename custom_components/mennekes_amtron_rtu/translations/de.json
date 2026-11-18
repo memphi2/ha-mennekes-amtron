@@ -657,7 +657,8 @@
               "energy_goal": "Schutz des Energieziels",
               "soc_goal": "Fahrzeug-Prozentziel",
               "recovery": "Fehlerbehebung",
-              "guest": "Gastladen"
+              "guest": "Gastladen",
+              "unplug": "Ausgesteckt"
             }
           },
           "value": {

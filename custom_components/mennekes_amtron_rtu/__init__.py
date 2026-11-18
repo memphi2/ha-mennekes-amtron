@@ -47,6 +47,7 @@ from .data import (
 )
 from .device.client_errors import AmtronBusError, AmtronIdentityError
 from .device.const import (
+    CONF_RELEASE_OFF_ON_UNPLUG,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SERIAL_NUMBER,
     DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -100,7 +101,6 @@ from .timed_goal_const import (
     timed_goal_is_enabled,
 )
 from .timed_goal_observer import TimedGoalObserver
-from .unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG, PlugMemoryStore, UnplugRule
 from .vehicle_binding import VehicleBinding, VehicleBindingStore
 from .vehicle_detection import (
     VehicleDetectionObserver,
@@ -214,6 +214,7 @@ async def async_setup_entry(
             # service saved is not the app's state. Until then it is kept for
             # a way back.
             await async_leave(hass, entry.entry_id)
+        await _async_hand_over_unplug_rule(client, entry, controls=remote or control_mode_is_master(dict(entry.options)))
         validate_vehicle_selection()
     except BaseException as err:
         if client is not None:
@@ -263,7 +264,10 @@ async def async_setup_entry(
                 and getattr(getattr(entry, "runtime_data", None), "coordinator", None) is coordinator
                 and (push is None or push.done())
             ):
-                push = hass.async_create_task(coordinator.async_refresh(), "amtron_state_push")
+                # The entry's own: an unload cancels a fetch still under way.
+                push = entry.async_create_background_task(
+                    hass, coordinator.async_refresh(), "amtron_state_push",
+                )
 
         entry.async_on_unload(host.async_on_polled(polled))
 
@@ -426,17 +430,6 @@ async def async_setup_entry(
 
             entry.async_on_unload(async_track_tariff_midnight(hass, refresh_new_tariff_year))
         async_setup_repairs(hass, entry)
-        if entry.runtime_data.controls and entry.options.get(CONF_RELEASE_OFF_ON_UNPLUG) is True:
-            entry.runtime_data.unplug_rule = UnplugRule(hass, entry)
-            await entry.runtime_data.unplug_rule.async_start()
-        else:
-            # A plug state from before the rule was switched off says nothing
-            # about now.
-            try:
-                await PlugMemoryStore(hass, entry.entry_id, "").async_remove()
-            except OSError as err:
-                # The rule is off; its leftover is removed by a later setup.
-                _LOGGER.debug("Control: old plug state not removed (%s)", type(err).__name__)
     except BaseException as err:
         try:
             try:
@@ -701,6 +694,20 @@ async def _async_release_after_failure(
         await async_release(hass, entry.entry_id, force=True)
 
 
+async def _async_hand_over_unplug_rule(client: ServiceClient, entry: MennekesAmtronConfigEntry, *, controls: bool) -> None:
+    """Tell the service whether to switch the release off after an unplug.
+
+    The service that owns the bus applies the rule. After a rejected saved
+    state it takes no setting; the reload that follows hands it over.
+    """
+    wanted = controls and entry.options.get(CONF_RELEASE_OFF_ON_UNPLUG) is True
+    if (
+        client.snapshot.get("control", {}).get("release_off_on_unplug") is not wanted
+        and not _service_intent_rejected(client)
+    ):
+        await client.execute("unplug_release_config", value=wanted)
+
+
 def _service_intent_rejected(client: ServiceClient) -> bool:
     return client.snapshot.get("control", {}).get("intent_rejected") is True
 
@@ -802,8 +809,6 @@ async def _async_stop_runtime(
     Detach source and polling listeners before their consumers; the client
     is closed last.
     """
-    if runtime.unplug_rule is not None:
-        runtime.unplug_rule.stop()
     if runtime.vehicle_detection is not None:
         runtime.vehicle_detection.stop()
     if runtime.vehicle_binding is not None:
@@ -902,7 +907,6 @@ async def async_remove_entry(
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
     await VehicleBindingStore(hass, entry.entry_id, "").async_remove()
-    await PlugMemoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())
     await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()

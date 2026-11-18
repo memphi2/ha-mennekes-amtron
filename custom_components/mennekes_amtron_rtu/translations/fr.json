@@ -657,7 +657,8 @@
               "energy_goal": "Protection de l’objectif énergétique",
               "soc_goal": "Objectif de charge du véhicule",
               "recovery": "Récupération après erreur",
-              "guest": "Recharge invité"
+              "guest": "Recharge invité",
+              "unplug": "Débranché"
             }
           },
           "value": {

@@ -201,6 +201,7 @@ device/_client_write.py      writes, write rate limiting, value validation
 device/client.py             the pymodbus client, the bus lock, the only transport
 device/transport.py          typed transport and response interfaces
 device/write_state.py        shared write guards retained across entry reloads
+device/unplug_release.py     the whole release-off-on-unplug rule: state, observation, write
 device/identity.py           the read-once device facts
 device/heartbeat.py          the heartbeat task
 device/control.py            the only write path
@@ -227,7 +228,6 @@ charge_loss_observer.py  bounded matching and durable loss aggregate
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
 number.py select.py switch.py button.py datetime.py  control tables
 event.py              the Activity event entity
-unplug_rule.py        the release-off-on-unplug option
 services.py           actions and their registration
 recorder_profile.py   read-only Recorder suggestions using registered IDs
 diagnostics.py        allowlist dump + raw register image

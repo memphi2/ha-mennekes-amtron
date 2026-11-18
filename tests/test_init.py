@@ -45,7 +45,7 @@ from custom_components.mennekes_amtron_rtu.entry_connection import (
 )
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass, heartbeat_running
+from tests.ha_fakes import FakeConfigEntry, FakeHass, build_runtime, heartbeat_running
 
 
 def _patch_client(monkeypatch: pytest.MonkeyPatch, transport: FakeModbusClient) -> None:
@@ -541,7 +541,11 @@ def test_an_entry_moved_to_the_app_gives_up_the_bus_and_its_own_saved_state(
 
         monkeypatch.setattr(integration.ServiceClient, "async_connect", answers)
         monkeypatch.setattr(integration.ServiceClient, "bind_identity", lambda _self, _serial: None)
+        async def hand_over(*_args: object, **_kwargs: object) -> None:
+            return None
+
         monkeypatch.setattr(integration, "ServiceCoordinator", coordinator)
+        monkeypatch.setattr(integration, "_async_hand_over_unplug_rule", hand_over)
         with pytest.raises(ReachedError):
             await async_setup_entry(hass, entry)
         assert left == [entry.entry_id]
@@ -610,30 +614,6 @@ def test_a_failing_cleanup_after_a_failed_setup_still_frees_the_bus(
     asyncio.run(run())
 
 
-def test_a_leftover_plug_state_that_cannot_be_removed_does_not_fail_the_setup(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def run() -> None:
-        hass = FakeHass()
-        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
-        _patch_client(monkeypatch, FakeModbusClient(device_bank()))
-        _patch_issues(monkeypatch)
-        removals = []
-
-        async def unremovable(_self: object) -> None:
-            removals.append(1)
-            raise PermissionError("read-only storage")
-
-        monkeypatch.setattr(integration.PlugMemoryStore, "async_remove", unremovable)
-        # The rule is off; its old file is no reason to stop the wallbox.
-        assert await async_setup_entry(hass, entry)
-        assert removals == [1]
-        assert _host(hass, entry)._service.heartbeat.running
-        assert await async_unload_entry(hass, entry)
-
-    asyncio.run(run())
-
-
 def test_an_acknowledged_reset_reloads_only_a_loaded_entry(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         hass = FakeHass()
@@ -661,5 +641,44 @@ def test_an_acknowledged_reset_reloads_only_a_loaded_entry(monkeypatch: pytest.M
         await asyncio.sleep(0)
         assert reloads == [True]
         assert await async_unload_entry(hass, entry)
+
+    asyncio.run(run())
+
+
+def test_setup_hands_the_unplug_rule_to_the_service_only_when_it_differs(monkeypatch) -> None:
+    async def run() -> None:
+        _hass, entry, _transport = await build_runtime()
+        client = entry.runtime_data.client
+        state = entry.service.client.write_state.unplug_release
+        sent: list[bool] = []
+        execute = client.execute
+
+        async def counted(command: str, **values: object) -> None:
+            sent.append(values["value"])
+            await execute(command, **values)
+
+        monkeypatch.setattr(client, "execute", counted)
+        hand_over = integration._async_hand_over_unplug_rule
+        # Off at the service and not wanted: nothing to say.
+        await hand_over(client, entry, controls=True)
+        entry.options = {**entry.options, "release_off_on_unplug": True}
+        # An entry that only reads never wants it.
+        await hand_over(client, entry, controls=False)
+        assert sent == []
+        await hand_over(client, entry, controls=True)
+        await hand_over(client, entry, controls=True)
+        assert sent == [True]
+        assert state.enabled
+        # A service that rejected its saved state takes no setting yet.
+        entry.options = {}
+        monkeypatch.setattr(integration, "_service_intent_rejected", lambda _client: True)
+        await hand_over(client, entry, controls=True)
+        assert sent == [True]
+        monkeypatch.setattr(integration, "_service_intent_rejected", lambda _client: False)
+        await hand_over(client, entry, controls=True)
+        assert sent == [True, False]
+        assert not state.enabled
+        await client.async_close()
+        await entry.service.stop()
 
     asyncio.run(run())

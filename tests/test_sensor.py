@@ -371,7 +371,7 @@ def test_two_refreshes_never_fetch_at_the_same_time() -> None:
 
         coordinator._fetch = counted
         # A pushed poll and a command's own refresh meet.
-        await asyncio.gather(coordinator._async_update_data(), coordinator._async_update_data())
+        await asyncio.gather(coordinator.async_refresh(), coordinator.async_refresh())
         assert most == 1
         await entry.runtime_data.client.async_close()
         await entry.service.stop()

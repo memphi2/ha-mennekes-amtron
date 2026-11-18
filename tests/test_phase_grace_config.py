@@ -15,6 +15,7 @@ from custom_components.mennekes_amtron_rtu.config_schemas import advanced_schema
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_PHASE_SWITCH_GRACE_SECONDS,
+    CONF_RELEASE_OFF_ON_UNPLUG,
 )
 from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
@@ -22,7 +23,6 @@ from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusS
 from custom_components.mennekes_amtron_rtu.embedded import embedded_config
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
-from custom_components.mennekes_amtron_rtu.unplug_rule import CONF_RELEASE_OFF_ON_UNPLUG
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_modbus_service import TOKEN, service_fixture

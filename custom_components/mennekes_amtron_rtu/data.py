@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from .service_client import ServiceClient
     from .service_control import ServiceControl, ServiceHeartbeat
     from .timed_goal_observer import TimedGoalObserver
-    from .unplug_rule import UnplugRule
     from .vehicle_binding import VehicleBinding
     from .vehicle_detection import VehicleDetectionObserver, VehicleEvidence
     from .vehicle_soc import VehicleSocObserver
@@ -59,7 +58,6 @@ class MennekesAmtronRuntimeData:
     vehicle_binding: VehicleBinding | None = None
     vehicle_evidence: VehicleEvidence | None = None
     plug_charge: PlugChargeObserver | None = None
-    unplug_rule: UnplugRule | None = None
     timed_goal: TimedGoalObserver | None = None
     charge_loss: ChargeLossObserver | None = None
     charging_cost: ChargingCostObserver | None = None

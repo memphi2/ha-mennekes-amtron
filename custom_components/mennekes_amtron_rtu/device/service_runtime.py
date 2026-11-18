@@ -329,6 +329,7 @@ class ModbusService:
                     await self.refresh()
                 await self._recover()
                 await self._enforce_current_cap()
+                await self._close_release_after_unplug()
                 await self._save_intent()
                 self._wallbox_notice.recovered("wallbox communication restored")
                 self._startup_error = None
@@ -416,6 +417,7 @@ class ModbusService:
             )
             if self.control is not None:
                 self.control.observe_plug_charge(self.data, observed_at=observed_at)
+                self.control.unplug_release.observe(self.data)
                 self.control.observe_recovery(
                     self.data.fresh("error_code"), self.data.current_write_generation,
                 )
@@ -474,6 +476,12 @@ class ModbusService:
         finally:
             await self._persist()
 
+    async def _close_release_after_unplug(self) -> None:
+        if self.control is not None:
+            self._phase = "closing the release after an unplug"
+            async with self._command_lock:
+                await self.control.unplug_release.async_apply()
+
     async def _enforce_current_cap(self) -> None:
         """Never leave a confirmed charging current above a lowered cap."""
         control = self.control
@@ -517,6 +525,7 @@ class ModbusService:
                     soc_goal=SocGoal.restore(original.soc_goal.snapshot()),
                     session_history=SessionHistory.restore(history),
                     plug_charge=replace(original.plug_charge, session=None, authorized=False),
+                    unplug_release=replace(original.unplug_release),
                 )
                 saving = asyncio.create_task(asyncio.to_thread(self._store.save, state))
                 cancelled = False
@@ -595,6 +604,7 @@ class ModbusService:
                 "plug_charge": self.client.write_state.plug_charge.snapshot(),
                 # Manual permission is distinct from automatic vehicle authorization.
                 "plug_charge_manual": self.client.write_state.plug_charge.manual,
+                "release_off_on_unplug": self.client.write_state.unplug_release.enabled,
                 "supports_energy_goal": control.supports_energy_goal if control else False,
                 "supports_soc_goal": control.supports_soc_goal if control else False,
                 "soc_goal_revision": self._soc_goal_revision,
@@ -722,7 +732,7 @@ class ModbusService:
             # it against the same current state that the API reports as usable.
             command = payload.get("command")
             cancelling = command == "cancel_pending"
-            metadata = command in ("soc_source", "soc_observation") or (
+            metadata = command in ("soc_source", "soc_observation", "unplug_release_config") or (
                 command == "plug_charge_config" and payload.get("value") is False
             )
             if control is None or self._stopping or (not cancelling and not metadata and not self._is_available()):
@@ -772,6 +782,9 @@ class ModbusService:
                     if type(enabled) is not bool or not isinstance(policy, str):
                         raise ValueError("invalid Plug & Charge configuration")
                     await control.async_configure_plug_charge(enabled, policy=policy)
+                elif command == "unplug_release_config":
+                    # A setting of the rule only: nothing is written to the wallbox.
+                    self.client.write_state.unplug_release.configure(payload.get("value"))
                 elif command == "plug_charge_authorize":
                     session = payload.get("session")
                     deadline = payload.get("deadline")

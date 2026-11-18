@@ -91,7 +91,7 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
         runtime = SimpleNamespace(
             loaded_platforms=[], retain_cost_on_unload=False,
             retain_attribution_on_unload=True, vehicle_profile_id="a" * 32,
-            unplug_rule=None, vehicle_detection=None, vehicle_binding=None,
+            vehicle_detection=None, vehicle_binding=None,
             loss_attribution_unsubscribe=None,
             plug_charge=None, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
             timed_goal=timed, vehicle_soc=None,

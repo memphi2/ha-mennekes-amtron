@@ -9,6 +9,11 @@
   Integration and app must both be 0.10.0b1; update them together. The API
   is version 3, so an older integration reports a version mismatch instead of
   sending commands the service no longer has.
+- The service switches the charging release off after a confirmed unplug
+  when Home Assistant asks for it with the new command
+  `unplug_release_config`, also while Home Assistant is not running. Its
+  state reports the setting as `control.release_off_on_unplug`. Control state
+  saved by an older version is not taken over; acknowledge the reset.
 - The service no longer accepts the commands `solar`, `timed_current` and
   `cancel_timed_current`; nothing sent them. Its state no longer carries the
   fields `supports_plug_charge`, `supports_cancel_pending`,

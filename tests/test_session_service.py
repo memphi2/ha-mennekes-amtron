@@ -263,6 +263,7 @@ def test_store_discards_only_invalid_optional_history(tmp_path, caplog, history)
         "energy_goal": energy_goal.snapshot(), "soc_goal": soc_goal.snapshot(),
         "charging_session_history": history,
         "plug_charge": WriteState().plug_charge.durable(),
+        "unplug_release": WriteState().unplug_release.snapshot(),
     }
     path.write_text(json.dumps(payload))
     state = WriteState(pause_requested=False, charging_setpoint=6)
@@ -299,6 +300,7 @@ def test_optional_history_recovery_never_accepts_invalid_control_state(tmp_path,
         "guest_permission": None, "charging_release_requested": False,
         "energy_goal": EnergyGoal().snapshot(), "soc_goal": SocGoal().snapshot(),
         "plug_charge": WriteState().plug_charge.durable(),
+        "unplug_release": WriteState().unplug_release.snapshot(),
         "charging_setpoint": 8, "charging_session_history": {"version": 2, "latest": None},
     } | broken
     path.write_text(json.dumps(payload))

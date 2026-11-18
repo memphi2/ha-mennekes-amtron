@@ -20,6 +20,7 @@ from .service_errors import ServiceConnectionError
 _TIMEOUT_SECONDS = 15
 # Longer than any command's own waits between its writes.
 _DRAIN_SECONDS = 30
+_CANCEL_SECONDS = 5
 _MAX_RESPONSE_BYTES = 131072
 
 Reply = tuple[int, dict[str, Any]]
@@ -138,7 +139,8 @@ class EmbeddedTransport:
                 _LOGGER.warning("Service: %d request(s) abandoned while stopping", len(stuck))
                 for task in stuck:
                     task.cancel()
-                await asyncio.gather(*stuck, return_exceptions=True)
+                # Not for ever either: one that ignores even this is left.
+                await asyncio.wait(stuck, timeout=_CANCEL_SECONDS)
                 return
             # Waiting cancels none of them: a command finishes its writes.
             await asyncio.wait(tuple(self._running), timeout=left)

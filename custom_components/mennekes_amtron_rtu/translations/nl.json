@@ -657,7 +657,8 @@
               "energy_goal": "Bescherming energiedoel",
               "soc_goal": "Laadniveau voertuig",
               "recovery": "Foutherstel",
-              "guest": "Gastladen"
+              "guest": "Gastladen",
+              "unplug": "Uitgetrokken"
             }
           },
           "value": {

@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -103,9 +103,15 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
             # including one reported by a command or diagnostics request.
             self.async_update_listeners()
 
-    async def _async_update_data(self) -> WallboxData:
+    async def _async_refresh(self, *args: Any, **kwargs: Any) -> None:
+        # One refresh at a time, from its start to its notification: two
+        # that overlap would each compare with the state before both, and a
+        # recovery right after a failure would notify nobody.
         async with self._update_lock:
-            return await self._fetch()
+            await super()._async_refresh(*args, **kwargs)
+
+    async def _async_update_data(self) -> WallboxData:
+        return await self._fetch()
 
     async def _fetch(self) -> WallboxData:
         try:
