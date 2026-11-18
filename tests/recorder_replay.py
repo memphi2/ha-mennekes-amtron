@@ -111,6 +111,14 @@ async def measure(
                     size = conn.execute("PRAGMA page_size").fetchone()[0]
                 return rows, attrs, pages * size
 
+            # The display settles over its first polls (checking, then the real
+            # status): that is the start of the entity, not an unchanged value
+            # writing a row. Measure from the settled state.
+            for _ in range(3):
+                await service.refresh()
+                coordinator.async_set_updated_data(await coordinator._async_update_data())
+                await hass.async_block_till_done()
+            await recorder.async_block_till_done()
             before, _, _ = summary()
             for now in range(0, duration, interval):
                 if scenario != "constant":
