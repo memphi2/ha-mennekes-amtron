@@ -114,10 +114,10 @@ def test_activity_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 await entry.runtime_data.coordinator.async_refresh()
                 await hass.async_block_till_done()
 
-                # Restore the old timestamp, never replay a buffered command.
+                # A reload shows neither the last command again nor a buffered one.
                 restored = hass.states.get(event_id)
-                assert restored.state == recorded.state
-                assert restored.attributes == recorded.attributes
+                assert restored.state == "unknown"
+                assert restored.attributes["event_type"] is None
                 assert entry.runtime_data.control.events is not old_feed
                 assert entry.runtime_data.control.events.snapshot()["events"] == []
                 assert len(entry.runtime_data.control.events._listeners) == 1

@@ -93,6 +93,9 @@ class AmtronActivity(AmtronEntity, EventEntity):
         # Events are moments, not a state that goes stale with the connection.
         return True
 
+    async def async_get_last_event_data(self) -> None:
+        """Restore nothing: a reload would show the last command as new activity."""
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         # The reading present when the entity appears is the baseline, so a
