@@ -129,10 +129,13 @@ leave **Network price adjustment** at **None; source is the final price**. This
 also applies when your provider has already included your reduced or time-variable
 network charges. Do not apply the same adjustment twice.
 
-**Estimated charging cost, current charge** shows the running estimate and is
-**disabled by default** to reduce Recorder writes. Enable it on the wallbox's
-entity page if you want a live estimate.
-**Estimated charging cost, last charge** keeps the last completed cycle. Prices
+**Estimated charging cost, current charge** starts at 0.00 when the car is
+plugged in, follows the charge while it runs and returns to 0.00 when the car
+is unplugged. It is **disabled by default** to reduce Recorder writes; enable
+it on the wallbox's entity page if you want a live estimate.
+**Estimated charging cost, last charge** takes that value over whenever
+charging stops, and for the last time at the unplug, including the final meter
+reading that follows it. A plug-in without charging leaves it unchanged. Prices
 are applied to the energy intervals in which they were observed. If a price
 changes between two meter readings, that interval's energy is divided in
 proportion to time. This is an estimate, not a billing-grade interval meter.
@@ -140,13 +143,14 @@ The whole charge is never multiplied by its final price.
 
 Missing prices, failed meter observations, long gaps and HA downtime make the
 result incomplete instead of silently treating those intervals as free. An
-incomplete cost is unknown. Both cost sensors expose `complete`; the last-cost
-sensor also exposes `energy_kwh` and `unpriced_kwh` to describe coverage without
-continually updating energy attributes on the running sensor. Additional
-unobserved energy may exist during a partial running cycle. After completion,
-the wallbox summary provides the whole cycle's energy. No historical prices are invented after a
-restart. A completed result is stored once and is not repriced when settings
-change later.
+incomplete cost shows the amount that could be priced, with the attribute
+`complete` set to false; it is unknown only when nothing could be priced. Both
+cost sensors expose `complete`; the last-cost sensor also exposes `energy_kwh`
+and `unpriced_kwh` to describe coverage without continually updating energy
+attributes on the running sensor. A charge that Home Assistant saw only in
+part, such as after a restart, is priced for the observed part. No historical
+prices are invented after a restart. A stored result is not repriced when
+settings change later.
 
 ### Optional §14a EnWG network tariffs
 

@@ -146,9 +146,13 @@ def test_cost_entities_distinguish_unknown_incomplete_zero_and_negative_cost():
         assert current.native_unit_of_measurement == last.native_unit_of_measurement == "EUR"
         assert current.extra_state_attributes == {"complete": True}
         assert last.extra_state_attributes == {"complete": True, "energy_kwh": 20, "unpriced_kwh": 0}
+        # A partly priced charge shows what is known and says it is incomplete.
         observer.current = CostResult(3.4, 2.123, 12.34567, False)
-        assert current.native_value is None
+        assert current.native_value == 3.4
         assert current.extra_state_attributes == {"complete": False}
+        # Nothing could be priced: no amount at all.
+        observer.current = CostResult(0, 2, 2, False)
+        assert current.native_value is None
         observer.current = CostResult(0, 0, 2, True)
         assert current.native_value == 0
         observer.available = False

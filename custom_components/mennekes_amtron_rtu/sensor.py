@@ -199,7 +199,8 @@ def _cost(current: bool) -> Callable[[Runtime], StateType]:
         if cost is None:
             return None
         result = cost.current if current else cost.last.result
-        return result.cost if result is not None else None
+        # An estimate shows what it knows; ``complete`` tells the rest.
+        return result.estimate if result is not None else None
 
     return read
 

@@ -108,45 +108,6 @@ def test_price_units_negative_rates_and_unknown(value, unit, expected):
     assert electricity_price(State("sensor.price", "0.3", {"unit_of_measurement": "EUR/kWh", "restored": True})) is None
 
 
-def test_last_cost_storage_validation_and_roundtrip():
-    last = LastChargingCost()
-    assert LastChargingCost.restore(last.snapshot()).snapshot() == last.snapshot()
-    last.session, last.result = completed(1000), CostResult(3, 0, 10, True)
-    assert LastChargingCost.restore(last.snapshot()).result.cost == 3
-    for bad in (None, {}, {"session": None, "result": last.result.as_dict()}, {"session": last.session.as_dict(), "result": CostResult(1, 0, 5, True).as_dict()}):
-        with pytest.raises(ValueError, match="charging cost"):
-            LastChargingCost.restore(bad)
-
-
-def test_complete_fixed_price_cycle_survives_reload_without_repricing(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        session = completed(at)
-        try:
-            await observer.async_start()
-            assert observer.current is None
-            for offset, energy, present in ((0, 100, False), (10, 102, True), (50, 105, True), (100, 110, False)):
-                with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+offset):
-                    await observer.async_observe(data(at+offset, energy, present=present, session=session if offset == 100 else None))
-                if present:
-                    assert observer.current.complete
-            assert observer.current is None
-            assert observer.last.result.cost == pytest.approx(3)
-            await observer.async_stop()
-            changed = entry()
-            changed.options["charging_price"] = 2.0
-            replacement = ChargingCostObserver(hass, changed)
-            await replacement.async_start()
-            assert replacement.last.result.cost == pytest.approx(3)
-            await replacement.async_stop()
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
 def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -171,109 +132,6 @@ def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
         finally:
             await observer.async_stop()
             assert observer._unsubscribe is None
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_gaps_restart_and_unknown_price_do_not_manufacture_full_cost(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(dynamic=True))
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at):
-                await observer.async_observe(data(at-100, 100))  # Old cache is no baseline.
-                await observer.async_observe(data(at, 101, present=True))
-                assert not observer.current.complete
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+100):
-                await observer.async_observe(data(at+100, 110, session=completed(at)))
-            assert observer.last.result.cost is None
-            assert observer.last.result.unpriced_kwh == 10
-            at += 200
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at):
-                await observer.async_observe(data(at, 110))
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+10):
-                await observer.async_observe(data(at+10, 111, present=True))
-                await observer.async_observe(None)
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+100):
-                await observer.async_observe(data(at+100, 120, session=completed(at)))
-            assert observer.last.result.cost is None
-            unknown = data(at+101, None)
-            unknown.values[EVSE_STATE.key] = None
-            unknown.values[CP_STATE.key] = None
-            await observer.async_observe(unknown)
-            assert observer.last.result is None
-            await observer.async_stop()
-            await observer.async_observe(data(at+200, 120))
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_unplug_without_fresh_meter_cannot_leak_cost_into_next_charge(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time() + 1
-        session = completed(at)
-        try:
-            await observer.async_start()
-            for offset, energy, present, fresh, summary in (
-                (0, 100, False, True, None),
-                (10, 105, True, True, None),
-                (100, 105, False, False, session),
-            ):
-                with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh, session=summary))
-            assert observer.current is None
-            assert observer.last.result is not None
-            assert not observer.last.result.complete
-
-            # Another plug cycle starts before an idle meter baseline arrives.
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 105):
-                await observer.async_observe(data(at + 105, 105, present=True, fresh=False, session=session))
-            assert observer.current is not None
-            assert not observer.current.complete
-            assert observer.current.energy_kwh == 0
-
-            # The first observed value during that cycle cannot reconstruct its
-            # missing idle baseline or count the preceding charge a second time.
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 110):
-                await observer.async_observe(data(at + 110, 110, present=True, session=session))
-            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 120):
-                await observer.async_observe(data(at + 120, 111, present=True, session=session))
-            assert not observer.current.complete
-            assert observer.current.energy_kwh == 1
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_failed_optional_storage_does_not_break_observation_or_unload(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            with patch.object(observer._store, "async_save", side_effect=OSError):
-                with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at+100):
-                    await observer.async_observe(data(at+100, 110, session=completed(at)))
-                assert observer._dirty
-                await observer._save()
-            await observer.async_stop()
-            assert not observer._dirty
-            broken = ChargingCostObserver(hass, entry())
-            with patch.object(broken._store, "async_load", side_effect=OSError):
-                await broken.async_start()
-                assert not broken.available
-                await broken.async_observe(data(at, 100))
-                await broken.async_stop()
-        finally:
-            await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
 
@@ -462,33 +320,6 @@ def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path):
     asyncio.run(run())
 
 
-def test_final_meter_after_the_unplug_poll_still_prices_the_whole_charge(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            for offset, energy, present, fresh, summary in (
-                (0, 100, False, True, None),
-                (25, 102.5, True, True, None),
-                (90, 110, True, True, None),
-                (100, 110, False, False, None),  # Unplugged; meter not read in this poll.
-                (160, 110, False, True, completed(at)),
-            ):
-                with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh, session=summary))
-                if offset == 100:
-                    assert observer.current is None
-            assert observer.last.result.complete
-            assert observer.last.result.cost == pytest.approx(3)
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
 def test_session_published_after_the_next_idle_reading_keeps_its_cost(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -538,76 +369,7 @@ def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
     asyncio.run(run())
 
 
-def test_ha_to_app_outage_does_not_make_the_app_measured_cost_partial(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            with patch(clock, return_value=at):
-                await observer.async_observe(data(at, 100))
-            with patch(clock, return_value=at+25):
-                await observer.async_observe(data(at+25, 102.5, present=True))
-            for offset in (60, 120, 180, 240):  # HA cannot reach the app.
-                with patch(clock, return_value=at+offset):
-                    await observer.async_observe(None)
-            with patch(clock, return_value=at+300):
-                await observer.async_observe(data(at+300, 110, session=completed(at)))
-            assert observer.last.result.complete
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_app_reading_before_the_unplug_still_prices_the_later_session(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            for offset, energy, present, summary in (
-                (0, 100, False, None),
-                (25, 102.5, True, None),
-                (90, 108, False, None),  # HA first sees a pre-unplug reading once unplugged.
-                (160, 110, False, completed(at)),  # The app's final meter completes the session.
-            ):
-                with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, session=summary))
-            assert observer.last.result.complete
-            assert observer.last.result.cost == pytest.approx(3)
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_only_the_newest_reading_may_end_a_priced_session(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            for offset, energy, present in ((0, 100, False), (25, 105, True), (50, 110, True), (60, 112, True)):
-                with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present))
-            # 100 -> 110 also has 10 kWh, but the newest reading is 112.
-            with patch(clock, return_value=at + 70):
-                await observer.async_observe(data(at + 70, 112, present=True, fresh=False, session=completed(at)))
-            assert not observer.last.result.complete
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_long_outage_restarts_the_running_cost_without_claiming_completeness(tmp_path):
+def test_long_outage_keeps_the_running_cost_without_claiming_completeness(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         observer = ChargingCostObserver(hass, entry())
@@ -620,7 +382,7 @@ def test_long_outage_restarts_the_running_cost_without_claiming_completeness(tmp
                 with patch(clock, return_value=at + offset):
                     await observer.async_observe(value)
             assert not observer.current.complete
-            assert observer.current.energy_kwh == 1
+            assert observer.current.energy_kwh == 6
         finally:
             await observer.async_stop()
             await hass.async_stop()
@@ -641,49 +403,6 @@ def test_an_idle_poll_without_a_meter_read_keeps_the_running_cost_baseline(tmp_p
                     await observer.async_observe(value)
             assert observer.current.complete
             assert observer.current.energy_kwh == 5
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_many_charging_readings_do_not_evict_the_session_baseline(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        with patch("custom_components.mennekes_amtron_rtu.cost_observer._MAX_METER_RUNS", 2):
-            observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            readings = [data(at, 100)] + [data(at+i, 100+i, present=True) for i in range(1, 11)]
-            readings += [data(at+20, 110), data(at+30, 110, session=completed(at))]
-            for value in readings:
-                with patch(clock, return_value=value.energy_observed_at):
-                    await observer.async_observe(value)
-            assert observer.last.result.complete
-            assert observer.last.result.cost == pytest.approx(3)
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
-def test_a_newest_reading_taken_while_charging_never_ends_a_session(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry())
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            for offset, energy, present in ((0, 90, False), (10, 95, True), (20, 100, False), (30, 110, True)):
-                with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present))
-            # 90 -> 100 also has 10 kWh, but the newest reading is mid-charge.
-            with patch(clock, return_value=at + 40):
-                await observer.async_observe(data(at + 40, 120, fresh=False, session=completed(at)))
-            assert not observer.last.result.complete
         finally:
             await observer.async_stop()
             await hass.async_stop()
@@ -744,34 +463,6 @@ def test_a_failed_meter_read_after_unplug_does_not_start_the_next_cost_mid_charg
     asyncio.run(run())
 
 
-def test_a_sample_at_the_idle_value_labelled_charging_still_marks_the_baseline(tmp_path):
-    async def run():
-        hass = HomeAssistant(str(tmp_path))
-        configured = entry()
-        observer = ChargingCostObserver(hass, configured)
-        at = time.time()+1
-        try:
-            await observer.async_start()
-            clock = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
-            with patch(clock, return_value=at):
-                await observer.async_observe(data(at, 100))
-            configured.options = {**configured.options, "charging_network_tariff": {
-                "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
-            with patch(clock, return_value=at+5):
-                assert observer.apply_tariff_only_update()
-            for offset, energy, present, summary in (
-                (10, 100, True, None),  # the app sampled just before charging began
-                (20, 105, True, None), (30, 110, False, completed(at)),
-            ):
-                with patch(clock, return_value=at + offset):
-                    await observer.async_observe(data(at + offset, energy, present=present, session=summary))
-            assert observer.last.result.complete
-        finally:
-            await observer.async_stop()
-            await hass.async_stop()
-    asyncio.run(run())
-
-
 @pytest.mark.parametrize("seen_unplugged", [True, False])
 def test_replug_before_a_meter_read_starts_a_complete_running_cost(tmp_path, seen_unplugged):
     async def run():
@@ -797,3 +488,227 @@ def test_replug_before_a_meter_read_starts_a_complete_running_cost(tmp_path, see
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+CLOCK = "custom_components.mennekes_amtron_rtu.cost_observer.time.time"
+
+
+def reading(at, energy, state, *, fresh=True):
+    """A poll: the car is away ("idle"), waiting ("plugged") or charging."""
+    evse, cp = {
+        "idle": (EvseState.IDLE, CpState.A1), "plugged": (EvseState.EV_CONNECTED, CpState.B1),
+        "charging": (EvseState.CHARGING, CpState.C2),
+    }[state]
+    return WallboxData(
+        values={ENERGY_TOTAL.key: energy, EVSE_STATE.key: evse, CP_STATE.key: cp},
+        energy_read=fresh, energy_observed_at=at,
+    )
+
+
+async def play(observer, at, steps):
+    for offset, energy, state, *rest in steps:
+        with patch(CLOCK, return_value=at + offset):
+            await observer.async_observe(
+                None if state is None else reading(at + offset, energy, state, fresh=not rest or rest[0])
+            )
+
+
+def observed(tmp_path, body, *, dynamic=False):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(dynamic=dynamic))
+        try:
+            await observer.async_start()
+            await body(hass, observer, time.time() + 1)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_last_cost_storage_validation_and_roundtrip():
+    last = LastChargingCost()
+    assert LastChargingCost.restore(last.snapshot()).snapshot() == last.snapshot()
+    last = LastChargingCost(CostResult(3, 0, 10, True))
+    assert LastChargingCost.restore(last.snapshot()).result.cost == 3
+    for raw in (None, {}, {"result": None, "session": None}, {"result": {"known_cost": 1}}):
+        with pytest.raises(ValueError, match="cost"):
+            LastChargingCost.restore(raw)
+
+
+def test_a_charge_runs_from_zero_at_the_plug_in_and_becomes_the_last_charge(tmp_path):
+    async def body(hass, observer, at):
+        zero = CostResult(0, 0, 0, True)
+        assert observer.current == zero
+        assert observer.last.result is None
+        await play(observer, at, [(0, 100, "idle"), (10, 100, "plugged")])
+        # Plugged in: zero, and nothing to take over yet.
+        assert observer.current == zero
+        assert observer.last.result is None
+        await play(observer, at, [(40, 102, "charging")])
+        assert observer.current.cost == pytest.approx(0.6)
+        # Still charging: the last charge is untouched.
+        assert observer.last.result is None
+        await play(observer, at, [(70, 110, "charging"), (100, 110, "idle")])
+        # Unplugged: the running cost is zero again, its value is the last charge.
+        assert observer.current == zero
+        assert observer.last.result.cost == pytest.approx(3)
+        assert observer.last.result.energy_kwh == pytest.approx(10)
+        assert observer.last.result.complete
+        await observer.async_stop()
+        changed = entry()
+        changed.options["charging_price"] = 2.0
+        replacement = ChargingCostObserver(hass, changed)
+        await replacement.async_start()
+        # A saved charge is never repriced.
+        assert replacement.last.result.cost == pytest.approx(3)
+        await replacement.async_stop()
+    observed(tmp_path, body)
+
+
+def test_a_stop_while_plugged_in_takes_the_value_over_and_a_resume_runs_on(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [(0, 100, "idle"), (10, 100, "plugged"), (40, 104, "charging"), (70, 104, "plugged")])
+        assert observer.last.result.cost == pytest.approx(1.2)
+        assert observer.current.cost == pytest.approx(1.2)
+        await play(observer, at, [(100, 106, "charging")])
+        # Running on: the last charge keeps the value of the stop.
+        assert observer.current.cost == pytest.approx(1.8)
+        assert observer.last.result.cost == pytest.approx(1.2)
+        await play(observer, at, [(130, 106, "idle")])
+        assert observer.last.result.cost == pytest.approx(1.8)
+        assert observer.current.energy_kwh == 0
+    observed(tmp_path, body)
+
+
+def test_a_plug_in_without_charging_keeps_the_last_charge(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [(0, 100, "idle"), (10, 100, "charging"), (40, 105, "charging"), (70, 105, "idle")])
+        first = observer.last.result
+        assert first.cost == pytest.approx(1.5)
+        await play(observer, at, [(100, 105, "plugged"), (130, 105, "plugged"), (160, 105, "idle")])
+        assert observer.last.result is first
+    observed(tmp_path, body)
+
+
+def test_the_final_meter_reading_after_the_unplug_completes_the_last_charge(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [
+            (0, 100, "idle"), (10, 100, "charging"), (40, 105, "charging"),
+            # The unplug poll comes before the meter was read again.
+            (70, 105, "idle", False),
+        ])
+        assert observer.last.result.cost == pytest.approx(1.5)
+        assert observer.current.energy_kwh == 0
+        await play(observer, at, [(100, 106, "idle")])
+        assert observer.last.result.cost == pytest.approx(1.8)
+        assert observer.last.result.complete
+        # That reading is the start of the next charge, nothing carries over.
+        await play(observer, at, [(130, 106, "plugged"), (160, 107, "charging")])
+        assert observer.current.cost == pytest.approx(0.3)
+        assert observer.last.result.cost == pytest.approx(1.8)
+    observed(tmp_path, body)
+
+
+def test_an_unplug_without_a_meter_reading_does_not_leak_into_the_next_charge(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [(0, 100, "idle"), (10, 105, "charging"), (100, 105, "idle", False)])
+        assert observer.last.result.cost == pytest.approx(1.5)
+        # Another car plugs in before an idle meter reading arrives.
+        await play(observer, at, [(105, 105, "charging", False)])
+        assert observer.current.energy_kwh == 0
+        await play(observer, at, [(110, 110, "charging"), (120, 111, "charging")])
+        # Its first reading cannot stand in for the missing idle baseline.
+        assert not observer.current.complete
+        assert observer.current.energy_kwh == pytest.approx(1)
+        assert observer.last.result.cost == pytest.approx(1.5)
+    observed(tmp_path, body)
+
+
+def test_a_charge_without_a_price_is_incomplete_and_shows_no_amount(tmp_path):
+    async def body(_hass, observer, at):
+        # No price entity state at all.
+        await play(observer, at, [(0, 100, "idle"), (10, 100, "charging"), (60, 104, "charging"), (100, 104, "idle")])
+        last = observer.last.result
+        assert not last.complete
+        assert last.unpriced_kwh == pytest.approx(4)
+        assert last.cost is None
+        assert last.estimate is None
+    observed(tmp_path, body, dynamic=True)
+
+
+def test_an_old_cached_reading_is_no_baseline(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [(-100, 100, "idle")])
+        with patch(CLOCK, return_value=at):
+            await observer.async_observe(reading(at, 101, "charging"))
+        assert not observer.current.complete
+        await play(observer, at, [(60, 110, "charging"), (100, 110, "idle")])
+        # Only the observed part is priced, and it says so.
+        assert observer.last.result.energy_kwh == pytest.approx(9)
+        assert not observer.last.result.complete
+        assert observer.last.result.estimate == pytest.approx(2.7)
+    observed(tmp_path, body)
+
+
+def test_a_long_outage_during_a_charge_keeps_its_cost_but_not_as_complete(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [
+            (0, 100, "idle"), (25, 102.5, "charging"),
+            (60, 0, None), (120, 0, None), (180, 0, None), (240, 0, None),
+            (300, 110, "idle"),
+        ])
+        # Another car could have charged unseen: the amount stands, flagged.
+        assert not observer.last.result.complete
+        assert observer.last.result.estimate == pytest.approx(3)
+    observed(tmp_path, body)
+
+
+def test_a_long_gap_after_the_unplug_drops_the_pending_final_reading(tmp_path):
+    async def body(_hass, observer, at):
+        await play(observer, at, [(0, 100, "idle"), (10, 100, "charging"), (40, 105, "charging"), (70, 105, "idle", False)])
+        unknown = reading(at + 80, 105, "idle", fresh=False)
+        unknown.values[EVSE_STATE.key] = unknown.values[CP_STATE.key] = None
+        with patch(CLOCK, return_value=at + 80):
+            await observer.async_observe(unknown)
+        with patch(CLOCK, return_value=at + 4000):
+            await observer.async_observe(unknown)
+        # Another car may have charged meanwhile: the old charge stays as it was.
+        await play(observer, at, [(4010, 130, "idle")])
+        assert observer.last.result.cost == pytest.approx(1.5)
+    observed(tmp_path, body)
+
+
+def test_failed_optional_storage_does_not_break_observation_or_unload(tmp_path):
+    async def body(hass, observer, at):
+        with patch.object(observer._store, "async_save", side_effect=OSError):
+            await play(observer, at, [(0, 100, "idle"), (10, 100, "charging"), (60, 110, "charging"), (100, 110, "idle")])
+            assert observer._dirty
+            await observer._save()
+        await observer.async_stop()
+        assert not observer._dirty
+        broken = ChargingCostObserver(hass, entry())
+        with patch.object(broken._store, "async_load", side_effect=OSError):
+            await broken.async_start()
+            assert not broken.available
+            await broken.async_observe(reading(at, 100, "idle"))
+            await broken.async_stop()
+    observed(tmp_path, body)
+
+
+def test_an_unusable_saved_estimate_is_dropped_and_replaced(tmp_path):
+    async def body(hass, observer, at):
+        await observer.async_stop()
+        observer._store.path.parent.mkdir(parents=True, exist_ok=True)
+        observer._store.path.write_text('{"version": 1, "data": {"identity": "123", "goal": {"session": null, "result": null}}}')
+        replacement = ChargingCostObserver(hass, entry())
+        await replacement.async_start()
+        assert replacement.last.result is None
+        await play(replacement, at, [(0, 100, "idle"), (10, 100, "charging"), (60, 110, "charging"), (100, 110, "idle")])
+        assert replacement.available
+        await replacement.async_stop()
+        again = ChargingCostObserver(hass, entry())
+        await again.async_start()
+        assert again.last.result.cost == pytest.approx(3)
+        await again.async_stop()
+    observed(tmp_path, body)

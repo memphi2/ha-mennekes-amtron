@@ -253,7 +253,7 @@ class TariffConfig:
 
 @dataclass(frozen=True, slots=True)
 class CostResult:
-    """A bounded completed estimate; incomplete never masquerades as zero cost."""
+    """A bounded estimate; ``complete`` and ``unpriced_kwh`` say what it leaves out."""
 
     known_cost: float
     unpriced_kwh: float
@@ -273,6 +273,13 @@ class CostResult:
     @property
     def cost(self) -> float | None:
         return self.known_cost if self.complete else None
+
+    @property
+    def estimate(self) -> float | None:
+        """What is known of the cost; None only when nothing could be priced."""
+        if self.energy_kwh > 0 and self.unpriced_kwh >= self.energy_kwh:
+            return None
+        return self.known_cost
 
     def as_dict(self) -> dict[str, Any]:
         return {

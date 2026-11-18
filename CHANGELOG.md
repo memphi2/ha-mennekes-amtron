@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changes
 
+- The charging cost follows the charge itself: the current charge starts at
+  0.00 at the plug-in, runs while charging and is 0.00 again after the
+  unplug; the last charge takes its value over whenever charging stops and at
+  the unplug. It no longer waits for the service's session summary, which
+  often left it unknown. An incomplete cost shows the priced part with
+  `complete` false instead of unknown. A stored last cost from an earlier
+  version is not taken over.
 - The app and the integration must both be 0.10.0b2; update them together.
   Home Assistant refuses an older service.
 - The service no longer reports the field `choice_revision` in its state; the

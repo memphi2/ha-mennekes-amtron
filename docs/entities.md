@@ -379,8 +379,8 @@ wallbox is set up.
 |---|---|---|---|---|
 | `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | vehicle profile with an energy source | Last matched charge; unknown when the newest completed charge cannot be matched. The `association` attribute says how it was matched (`history`, `changed_value` or `manual`). |
 | `sensor.*_average_estimated_charging_loss` | Average estimated charging loss | % | vehicle profile with an energy source | Energy-weighted average of accepted matches; `sample_count` counts accepted charges. |
-| `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | EUR | fixed or dynamic price configured; enable the entity | Disabled by default to reduce Recorder writes. Running variable cost estimate; unknown for incomplete observations. |
-| `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | EUR | fixed or dynamic price configured | Cost of the latest completed charge, retained across restarts. |
+| `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | EUR | fixed or dynamic price configured; enable the entity | Disabled by default to reduce Recorder writes. Running cost estimate: 0.00 from the plug-in, 0.00 again after the unplug. An incomplete observation shows the priced part with `complete` false. |
+| `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | EUR | fixed or dynamic price configured | Taken over from the current charge whenever charging stops and at the unplug; retained across restarts. |
 
 All estimates require layout v01.02 or newer. They have no state class and
 create no long-term statistics. Losses update per match; costs are rounded to
