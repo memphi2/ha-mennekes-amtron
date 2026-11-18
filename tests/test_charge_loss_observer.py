@@ -868,11 +868,32 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
             await hass.async_block_till_done()
             assert observer._charge == charge
             assert observer.statistics.status == "waiting_for_vehicle"
-            # A later cycle the meter cannot measure is no longer that charge:
-            # nothing of the car's can be assigned to the one before.
-            await cycle(now - 9500, now - 8500)
+            # Seen again after a restart, it is accounted for: nothing is asked.
+            client = observer._entry.runtime_data.client
+            answer, client.async_energy_between.side_effect = client.async_energy_between.side_effect, AmtronConnectionError("down")
+            asked = client.async_energy_between.await_count
+            observer._cycle = observer._charge = None
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert client.async_energy_between.await_count == asked
+            assert observer._charge == charge
+            # A service that does not answer has measured nothing: asked again.
+            unanswered = await cycle(now - 9500, now - 8500)
+            assert observer._cycle != unanswered
+            assert observer.statistics.status == "waiting_for_vehicle"
+            client.async_energy_between.side_effect = answer
+            # A cycle the meter cannot measure is no longer the charge before:
+            # nothing of the car's can be assigned to that one. A failed save
+            # takes the cycle again.
+            with patch.object(observer, "_save", AsyncMock(return_value=False)):
+                coordinator.async_update_listeners()
+                await hass.async_block_till_done()
+            assert observer._cycle is None
+            assert observer.statistics.status == "waiting_for_vehicle"
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer._cycle == unanswered
             assert observer._charge is None
-            assert not observer._unmeasured
             assert observer.statistics.status == "waiting_for_session"
         finally:
             named.stop()

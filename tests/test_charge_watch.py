@@ -97,9 +97,15 @@ def test_a_cycle_the_service_saw_whole_is_kept_with_its_car(scene):
     scene.poll(10, EvseState.CHARGING)
     assert m.last_cycle(entry) is None
     assert m.owner(entry) is None  # A car chosen by hand owns nothing until the end.
+    # A span of the car's own record lies in the running cycle, or was not here.
+    assert m.cycle_around(entry, plugged + 5, plugged + 8) == m.PlugCycle(plugged, plugged + 8, profile(entry, A))
+    assert m.cycle_around(entry, plugged - 500, plugged - 400) is None
     scene.poll(10)
     unplugged = scene.clock[0]
     assert m.last_cycle(entry) == m.PlugCycle(plugged, unplugged, profile(entry, A))
+    assert m.cycle_around(entry, plugged + 5, unplugged + 60) == m.last_cycle(entry)
+    assert m.cycle_around(entry, plugged + 5, unplugged + 500) is None
+    assert m.cycle_around(SimpleNamespace(options={}), 0, 1) is None
     assert m.owner(entry) == profile(entry, A)
     # The name was handed over once, and idle polls leave the cycle as it is.
     scene.poll(10)

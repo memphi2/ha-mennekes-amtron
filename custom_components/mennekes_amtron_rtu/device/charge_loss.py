@@ -130,6 +130,13 @@ class LossStatistics:
     def vehicle_kwh(self) -> float | None:
         return self._last_match.vehicle_kwh if self.status == "matched" and self._last_match is not None else None
 
+    def known(self, start: float, end: float) -> Charge | None:
+        """The charge of that span, if it is the one already accounted for."""
+        for charge in (self._current_session, self._last_match.session if self._last_match is not None else None):
+            if charge is not None and (charge.start, charge.end) == (start, end):
+                return charge
+        return None
+
     def configure_source(self, source: str | None) -> bool:
         """Start a new aggregate when the selected vehicle/source changes."""
         if source is not None and (

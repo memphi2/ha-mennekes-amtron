@@ -95,8 +95,6 @@ class ChargeLossObserver:
         self._charging = False
         self._cycle: PlugCycle | None = None
         self._charge: Charge | None = None
-        # A cycle of this car that the meter could not measure.
-        self._unmeasured = False
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
         self._unsubscribers: list[CALLBACK_TYPE] = []
@@ -219,32 +217,40 @@ class ChargeLossObserver:
             self._queue()
 
     async def _energy(self, start: float, end: float) -> float | None:
-        """What the meter delivered in a span, as far as the service knows."""
-        try:
-            return await self._entry.runtime_data.client.async_energy_between(start, end)
-        except (AmtronConnectionError, DeviceError):
-            return None
+        """What the meter delivered in a span; None when its log does not cover it."""
+        return await self._entry.runtime_data.client.async_energy_between(start, end)
 
-    async def _take_plug_cycle(self) -> None:
-        """Take the last plug cycle of this car once the meter covers it."""
+    async def _take_plug_cycle(self) -> bool:
+        """Take the last plug cycle; true when it is a new charge of this car.
+
+        That charge is then in ``_charge``, or None when the meter cannot
+        measure it: the charge before it is no longer the last one.
+        """
         cycle = last_cycle(self._entry)
         if cycle is None or cycle == self._cycle:
-            return
+            return False
         if self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id):
             # Another car's charge: this profile keeps its last match and average.
             self._cycle, self._charge = cycle, None
-            return
-        energy = await self._energy(cycle.plugged_at, cycle.unplugged_at)
-        if energy is None:
-            # The reading after the unplug is still to come; it does not come
-            # any more once the meter log cannot place the boundary. The
-            # charge before it is then no longer the last one.
-            if time.time() - cycle.unplugged_at > MAX_INTERPOLATION_SECONDS:
-                self._cycle, self._charge, self._unmeasured = cycle, None, True
-            return
+            return False
+        if (known := self.statistics.known(cycle.plugged_at, cycle.unplugged_at)) is not None:
+            # Seen again after a restart: it is accounted for.
+            self._cycle, self._charge = cycle, known
+            return False
+        try:
+            energy = await self._energy(cycle.plugged_at, cycle.unplugged_at)
+        except (AmtronConnectionError, DeviceError):
+            # No answer is no measurement: asked again at the next poll.
+            return False
+        if energy is None and time.time() - cycle.unplugged_at <= MAX_INTERPOLATION_SECONDS:
+            # The reading after the unplug is still to come.
+            return False
         self._cycle = cycle
-        if energy > 0:
-            self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy)
+        if energy == 0:
+            # Plugged in without charging: everything stays as it was.
+            return False
+        self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy) if energy is not None else None
+        return True
 
     @callback
     def _queue(self) -> None:
@@ -262,14 +268,15 @@ class ChargeLossObserver:
             if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
                 await self._measure_record()
                 continue
-            await self._take_plug_cycle()
+            taken = await self._take_plug_cycle()
             charge = self._charge
             if charge is None:
-                if self._unmeasured:
+                if taken:
                     async with self._lock:
                         candidate = LossStatistics.restore(self.statistics.snapshot())
-                        if not self._stopping and (not candidate.observe_charge(None) or await self._save(candidate)):
-                            self._unmeasured = False
+                        if not self._stopping and candidate.observe_charge(None) and not await self._save(candidate):
+                            # Not saved: the cycle is taken again with the retry.
+                            self._cycle = None
                 continue
             energy: float | None = None
             change: tuple[float, float] | None = None
@@ -310,7 +317,10 @@ class ChargeLossObserver:
             if cycle is None or (self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id)):
                 # Charged elsewhere, or another car was plugged in here meanwhile.
                 return
-        wallbox = await self._energy(record.start, record.end) if record is not None else None
+        try:
+            wallbox = await self._energy(record.start, record.end) if record is not None else None
+        except (AmtronConnectionError, DeviceError):
+            wallbox = None
         if record is None or wallbox is None or wallbox <= 0:
             # No record yet, or the meter reading after its end is still to come.
             self._schedule_retry()
