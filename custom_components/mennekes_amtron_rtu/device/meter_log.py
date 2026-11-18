@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import math
 from bisect import bisect_right
+from typing import Any
+
+from .presence_gap import PresenceGap
 
 _MAX_READINGS = 4096
 # Two readings further apart than this, with energy between them, cannot
@@ -68,3 +71,84 @@ class MeterLog:
         if first is None or last is None:
             return None
         return last - first
+
+
+def _moment(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError("invalid charge meter time")
+    return float(value)
+
+
+class ChargeMeter:
+    """The meter log and the plug cycle the service saw from end to end.
+
+    The service outlives a restart of Home Assistant, so what it measures
+    here is whole where Home Assistant alone would have a gap.
+    """
+
+    def __init__(self) -> None:
+        self.log = MeterLog()
+        self.last: tuple[float, float] | None = None
+        self._gap = PresenceGap()
+        self._lose_cycle()
+
+    def _lose_cycle(self) -> None:
+        """Nobody saw the whole cycle any more: it cannot be measured."""
+        self._present: bool | None = None
+        self.plugged_at: float | None = None
+        self.charging_at: float | None = None
+
+    def observe(
+        self, now: float, *, present: bool | None, charging: bool = False,
+        reading: float | None = None,
+    ) -> None:
+        """One poll: whether a car is plugged in, and the meter if it was read."""
+        if reading is not None:
+            self.log.observe(now, reading)
+        if self._gap.observe(now, known=present is not None):
+            self._lose_cycle()
+        if present is None:
+            return
+        if not present:
+            if self._present and self.plugged_at is not None:
+                self.last = (self.plugged_at, now)
+            self._lose_cycle()
+            self._present = False
+            return
+        if self._present is False:
+            self.plugged_at = now
+        self._present = True
+        if charging and self.charging_at is None and self.plugged_at is not None:
+            self.charging_at = now
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "first_reading_at": self.log.first_at,
+            "plugged_at": self.plugged_at,
+            "charging_at": self.charging_at,
+            "last": list(self.last) if self.last is not None else None,
+        }
+
+
+def parse_charge_meter(raw: object) -> dict[str, Any]:
+    """Validate what a service reports of its charge meter."""
+    if not isinstance(raw, dict) or raw.keys() != {
+        "first_reading_at", "plugged_at", "charging_at", "last",
+    }:
+        raise ValueError("invalid charge meter")
+    last = raw["last"]
+    if last is not None:
+        if not isinstance(last, list) or len(last) != 2:
+            raise ValueError("invalid plug cycle")
+        start, end = _moment(last[0]), _moment(last[1])
+        if start is None or end is None or not start < end:
+            raise ValueError("invalid plug cycle")
+        last = (start, end)
+    return {
+        "first_reading_at": _moment(raw["first_reading_at"]),
+        "plugged_at": _moment(raw["plugged_at"]),
+        "charging_at": _moment(raw["charging_at"]),
+        "last": last,
+    }

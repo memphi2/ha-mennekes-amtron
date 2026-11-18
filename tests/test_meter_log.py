@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import meter_log
-from custom_components.mennekes_amtron_rtu.device.meter_log import MeterLog
+from custom_components.mennekes_amtron_rtu.device.meter_log import (
+    ChargeMeter,
+    MeterLog,
+    parse_charge_meter,
+)
 
 
 def filled(*readings: tuple[float, float]) -> MeterLog:
@@ -57,3 +61,43 @@ def test_the_log_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(meter_log, "_MAX_READINGS", 3)
     log = filled((0, 1), (1, 2), (2, 3), (3, 4))
     assert log._times == [1, 2, 3]
+
+
+def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
+    meter = ChargeMeter()
+    # Started with a car already plugged in: this cycle has no beginning.
+    meter.observe(10, present=True, charging=True, reading=100)
+    meter.observe(20, present=False, reading=101)
+    assert meter.last is None
+    meter.observe(30, present=True)
+    meter.observe(40, present=True, charging=True, reading=101)
+    meter.observe(50, present=True, charging=True, reading=104)
+    assert meter.snapshot() == {
+        "first_reading_at": 10, "plugged_at": 30, "charging_at": 40, "last": None,
+    }
+    # One poll without an answer is bridged.
+    meter.observe(60, present=None)
+    meter.observe(70, present=False, reading=105)
+    assert meter.snapshot() == {
+        "first_reading_at": 10, "plugged_at": None, "charging_at": None, "last": [30, 70],
+    }
+    assert meter.log.energy_between(*meter.last) == pytest.approx(4)
+    assert parse_charge_meter(meter.snapshot())["last"] == (30, 70)
+    # A long silence may hide an unplug: that cycle is not kept.
+    meter.observe(80, present=True)
+    meter.observe(90, present=None)
+    meter.observe(900, present=True)
+    meter.observe(910, present=False)
+    assert meter.last == (30, 70)
+
+
+@pytest.mark.parametrize("changes", [
+    {"extra": 1}, {"last": [1]}, {"last": (1, 2)}, {"last": [2, 1]}, {"last": [None, 2]},
+    {"plugged_at": "1"}, {"charging_at": True}, {"first_reading_at": float("nan")},
+])
+def test_a_reported_charge_meter_is_checked(changes) -> None:
+    raw = {**ChargeMeter().snapshot(), **changes}
+    with pytest.raises(ValueError, match=r"charge meter|plug cycle"):
+        parse_charge_meter(raw)
+    with pytest.raises(ValueError, match="charge meter"):
+        parse_charge_meter(None)

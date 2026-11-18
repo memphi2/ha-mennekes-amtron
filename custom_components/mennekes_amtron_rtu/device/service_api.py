@@ -7,6 +7,7 @@ has one behavior and one error mapping whichever way it arrives.
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import Any
 
 from .client_errors import AmtronBusError
@@ -70,6 +71,16 @@ class ServiceApi:
             raise _NotFoundError(path)
         if not isinstance(payload, dict):
             raise ValueError("expected an object")
+        if path == "/v2/energy":
+            # From the meter log in memory: no bus access.
+            if set(payload) != {"start", "end"} or not all(
+                type(payload[key]) in (int, float) and math.isfinite(payload[key])
+                for key in ("start", "end")
+            ):
+                raise ValueError("invalid energy span")
+            return {"energy_kwh": service.charge_meter.log.energy_between(
+                float(payload["start"]), float(payload["end"]),
+            )}
         if path == "/v2/soc-goal/reserve":
             if payload != {}:
                 raise ValueError("invalid percentage-goal reservation")
@@ -91,6 +102,6 @@ class ServiceApi:
 # Every operation there is; the web server registers exactly these.
 GETS = ("/v2/state", "/v2/diagnostics")
 POSTS = (
-    "/v2/command", "/v2/read", "/v2/soc-goal/reserve", "/v2/soc-goal/commit",
-    "/v2/soc-goal/resolve",
+    "/v2/command", "/v2/read", "/v2/energy", "/v2/soc-goal/reserve",
+    "/v2/soc-goal/commit", "/v2/soc-goal/resolve",
 )

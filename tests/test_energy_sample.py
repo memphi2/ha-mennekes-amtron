@@ -23,10 +23,12 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
 )
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_transport import EmbeddedTransport
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_modbus_service import TOKEN, service_fixture
@@ -268,5 +270,71 @@ def test_remote_coordinator_reads_a_queued_command_when_it_is_due(tmp_path, monk
             coordinator._follow_pending(now + timedelta(seconds=1))
             await coordinator.async_shutdown()
             assert cancelled[-1] == len(scheduled) - 1
+
+    asyncio.run(run())
+
+
+def test_the_service_measures_a_plug_cycle_and_answers_for_any_span(tmp_path):
+    async def run():
+        clock = [1000.0]
+        with patch("custom_components.mennekes_amtron_rtu.device.service_runtime.wall_clock", side_effect=lambda: clock[0]):
+            service, transport = await owner(tmp_path)
+            try:
+                client = ServiceClient(transport=EmbeddedTransport(ServiceApi(service)))
+                await observe(service, transport, clock, 1010, EvseState.CHARGING, 100)
+                await observe(service, transport, clock, 1020, EvseState.CHARGING, 104)
+                # A poll without an answer is a gap the service judges itself.
+                polling, service._poller.async_poll = service._poller.async_poll, AsyncMock(
+                    side_effect=AmtronConnectionError("offline"),
+                )
+                clock[0] = 1025
+                with pytest.raises(AmtronConnectionError):
+                    await service.refresh()
+                service._poller.async_poll = polling
+                await observe(service, transport, clock, 1030, EvseState.IDLE, 106)
+                assert service.snapshot()["charge_meter"] == {
+                    "first_reading_at": 1000, "plugged_at": None, "charging_at": None,
+                    "last": [1010, 1030],
+                }
+                data = client.apply_snapshot(service.snapshot())
+                assert data.charge_meter["last"] == (1010, 1030)
+                assert await client.async_energy_between(1010, 1030) == pytest.approx(6)
+                # The meter is not read on every poll: between two readings it rises evenly.
+                assert await client.async_energy_between(1020, 1030) == pytest.approx(3)
+                # Before the first reading, and after the last: nobody measured that.
+                assert await client.async_energy_between(900, 1030) is None
+                assert await client.async_energy_between(1010, 1100) is None
+                assert client.connected
+                api = ServiceApi(service)
+                for payload in (
+                    {}, {"start": 1010}, {"start": "1010", "end": 1030},
+                    {"start": True, "end": 1030}, {"start": 1010, "end": float("inf")},
+                ):
+                    assert await api.dispatch("POST", "/v2/energy", payload) == (400, {"error": "invalid_request"})
+                # An answer that is no energy does not pass for one.
+                api.dispatch = AsyncMock(return_value=(200, {"energy_kwh": "6"}))
+                broken = ServiceClient(transport=EmbeddedTransport(api))
+                with pytest.raises(AmtronConnectionError, match="invalid energy span"):
+                    await broken.async_energy_between(1010, 1030)
+            finally:
+                await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("meter", [None, {}, {"last": [2, 1], "first_reading_at": None, "plugged_at": None, "charging_at": None}])
+def test_malformed_remote_charge_meter_cannot_be_published(tmp_path, meter):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            async with ClientSession() as session:
+                client = ServiceClient(session, "http://service:8765", TOKEN)
+                payload = service.snapshot()
+                payload["charge_meter"] = meter
+                with pytest.raises(ServiceConnectionError, match=r"snapshot \(charge_meter\)"):
+                    client.apply_snapshot(payload)
+                assert not client.connected
+        finally:
+            await service.stop()
 
     asyncio.run(run())

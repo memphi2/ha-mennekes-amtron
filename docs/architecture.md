@@ -225,8 +225,8 @@ vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapt
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
 charge_loss_observer.py  bounded matching and durable loss aggregate
-charge_watch.py  meter log, plug cycle seen by HA and its recognized vehicle
-device/meter_log.py  bounded total-energy readings to measure a past time span
+charge_watch.py  the vehicle recognized for a plug cycle the service measured
+device/meter_log.py  the service's bounded total-energy readings and plug cycle
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
 number.py select.py switch.py button.py datetime.py  control tables
 event.py              the Activity event entity
@@ -302,9 +302,10 @@ or observation loss prevents attribution. This record supplies only loss
 settings after automatic deselection; it cannot reactivate SoC or departure goals.
 
 The charge watch follows every poll from setup on, before an active vehicle is
-selected. It keeps the wallbox's total-energy readings in a bounded log; every
-loss estimate is the meter difference over a time span, never a session value
-of the service.
+selected. The service keeps the wallbox's total-energy readings in a bounded
+log and the last plug cycle it saw from plug-in to unplug
+(`device/meter_log.py`); every loss estimate is the meter difference over a
+time span.
 Controlled reloads on the same physical connection hand over the live session
 observer and compatible cost observer, including their meter baseline and price
 observations. Transport generation changes discard incomplete measurements;

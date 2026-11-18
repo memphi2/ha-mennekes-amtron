@@ -51,6 +51,8 @@ class WallboxData:
     energy_read: bool = field(default=False, compare=False, repr=False)
     # Actual meter attempt time, never the time of a repeated API/cache read.
     energy_observed_at: float | None = field(default=None, compare=False, repr=False)
+    # The service's meter log and plug cycle, see device/meter_log.py.
+    charge_meter: dict[str, Any] | None = field(default=None, compare=False, repr=False)
     # The session clock and energy were read in this poll, not carried forward.
     session_read: bool = field(default=False, compare=False, repr=False)
     energy_goal_generation: int = field(default=0, compare=False, repr=False)

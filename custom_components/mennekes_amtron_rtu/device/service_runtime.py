@@ -25,10 +25,11 @@ from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
 from .energy_goal import EnergyGoal
 from .energy_goal_controller import EnergyGoalController
-from .enums import RequestedPhases, SolarChargingMode
+from .enums import EvseState, RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
+from .meter_log import ChargeMeter
 from .notice import FailureNotice
 from .persistence import (
     StorageCommitUncertainError,
@@ -38,13 +39,14 @@ from .persistence import (
 from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
 from .register_monitor import RegisterMonitor
-from .registers import ENERGY_TOTAL, ERROR_CODE, REGISTERS_BY_KEY
+from .registers import ENERGY_TOTAL, ERROR_CODE, EVSE_STATE, REGISTERS_BY_KEY
 from .service_config import ServerConfig, integer, number
 from .service_store import IntentStore
 from .service_version import SERVICE_VERSION
 from .soc_goal import SocGoal
 from .soc_goal_controller import SocGoalController
 from .soc_transactions import SocTransactions
+from .vehicle import snapshot_vehicle_connected
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
@@ -86,6 +88,8 @@ class ModbusService:
         self.heartbeat = HeartbeatTask(self.client, self.diagnostics)
         # Passive observations for the app's register page.
         self.register_monitor = RegisterMonitor()
+        # What the meter delivered in any time span, for cost and loss estimates.
+        self.charge_meter = ChargeMeter()
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
         self.goal: EnergyGoalController | None = None
@@ -383,6 +387,7 @@ class ModbusService:
                     self.control.observe_plug_charge(None)
                 self._energy_sample = self._energy_sample_at = None
                 self.data.energy_observed_at = None
+                self.charge_meter.observe(wall_clock(), present=None)
                 now = time.monotonic()
                 if self._meter_failing_since is None:
                     self._meter_failing_since = now
@@ -410,6 +415,13 @@ class ModbusService:
                 }
             self.data.energy_observed_at = (
                 self._energy_sample["observed_at"] if self._energy_sample is not None else None
+            )
+            sample = self._energy_sample if self.data.energy_read else None
+            self.charge_meter.observe(
+                (sample["observed_at"] if sample is not None else None) or wall_clock(),
+                present=snapshot_vehicle_connected(self.data.get, self.identity.layout_version),
+                charging=self.data.get(EVSE_STATE.key) == EvseState.CHARGING,
+                reading=sample["value"] if sample is not None else None,
             )
             if self.control is not None:
                 self.control.observe_plug_charge(self.data, observed_at=observed_at)
@@ -553,6 +565,7 @@ class ModbusService:
             "connection_failures": self.data.connection_failures,
             "connection_retries": self.data.connection_retries,
             "energy_sample": dict(self._energy_sample) if self._energy_sample is not None else None,
+            "charge_meter": self.charge_meter.snapshot(),
             "command_events": control.events.snapshot() if control else None,
             "control": {
                 "plug_charge": self.client.write_state.plug_charge.snapshot(),

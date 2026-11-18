@@ -1,25 +1,19 @@
-"""Watch the meter and the plug cycles, to measure what a charge delivered.
+"""Name the vehicle of a plug cycle the service measured.
 
-One watch per wallbox survives a controlled entry reload. It keeps the meter
-readings, the last complete plug cycle Home Assistant saw from plug-in to
-unplug, and the vehicle profile recognized for that whole cycle. This is
-evidence for an estimate, never a charging permission.
+The service keeps the meter log and sees each plug cycle from plug-in to
+unplug. One watch per wallbox, surviving a controlled entry reload, adds what
+only Home Assistant knows: the vehicle profile recognized for that whole
+cycle. This is evidence for an estimate, never a charging permission.
 """
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 
 from .device.const import DOMAIN
-from .device.enums import EvseState
-from .device.meter_log import MeterLog
-from .device.presence_gap import PresenceGap
-from .device.registers import ENERGY_TOTAL, EVSE_STATE
-from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
@@ -50,7 +44,7 @@ class _Claim:
 
 
 class ChargeWatch:
-    """Meter readings, the running plug cycle and the last complete one."""
+    """The claim on the running plug cycle and the last complete cycle."""
 
     def __init__(self) -> None:
         self._identity: str | None = None
@@ -58,16 +52,12 @@ class ChargeWatch:
         self._forget()
 
     def _forget(self) -> None:
-        self.meter = MeterLog()
         self.last: PlugCycle | None = None
-        self._gap = PresenceGap()
-        self._lose_cycle()
+        self._start_cycle(None, None)
 
-    def _lose_cycle(self) -> None:
-        """Nobody saw the whole cycle any more: it cannot be measured or owned."""
-        self._present: bool | None = None
-        self._plugged_at: float | None = None
-        self._charging_at: float | None = None
+    def _start_cycle(self, plugged_at: float | None, charging_at: float | None) -> None:
+        self._plugged_at = plugged_at
+        self._charging_at = charging_at
         self._claim: _Claim | None = None
         self._conflicted = False
 
@@ -79,44 +69,21 @@ class ChargeWatch:
         if self._bound and identity != self._identity:
             self._forget()
         self._identity, self._bound = identity, True
-        coordinator = runtime.coordinator
-        data = coordinator.current_data()
-        if not data.values and coordinator.last_update_success:
-            # A replacement coordinator has not polled yet. Its empty initial
-            # value is not evidence that the retained physical link was lost.
+        meter = runtime.coordinator.current_data().charge_meter
+        if meter is None:
+            # Not polled yet, or a poll failed: the service judges the gap.
             return
-        connected = coordinator.last_update_success and (
-            (client := getattr(runtime, "client", None)) is None or client.connected
-        )
-        energy = data.get(ENERGY_TOTAL.key)
-        if (
-            connected and data.energy_read and data.energy_observed_at is not None
-            and isinstance(energy, (int, float)) and not isinstance(energy, bool)
+        last = meter["last"]
+        if last is not None and (
+            self.last is None or (self.last.plugged_at, self.last.unplugged_at) != last
         ):
-            self.meter.observe(data.energy_observed_at, float(energy))
-        present = (
-            snapshot_vehicle_connected(data.get, runtime.identity.layout_version)
-            if connected else None
-        )
-        now = time.time()
-        if self._gap.observe(now, known=present is not None):
-            self._lose_cycle()
-        if present is None:
+            claim = self._claim if self._plugged_at == last[0] and not self._conflicted else None
+            self.last = PlugCycle(last[0], last[1], claim.profile if claim is not None else None)
+        if meter["plugged_at"] != self._plugged_at:
+            self._start_cycle(meter["plugged_at"], None)
+        self._charging_at = meter["charging_at"]
+        if self._plugged_at is None:
             return
-        if not present:
-            if self._present and self._plugged_at is not None:
-                claim = None if self._conflicted else self._claim
-                self.last = PlugCycle(
-                    self._plugged_at, now, claim.profile if claim is not None else None,
-                )
-            self._lose_cycle()
-            self._present = False
-            return
-        if self._present is False:
-            self._plugged_at = now
-        self._present = True
-        if self._charging_at is None and data.get(EVSE_STATE.key) == EvseState.CHARGING:
-            self._charging_at = now
         selected = active_profile(entry.options)
         automatic = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
         claim = self._claim
@@ -153,7 +120,7 @@ class ChargeWatch:
 
     def owner(self, entry: MennekesAmtronConfigEntry) -> VehicleProfile | None:
         """The recognized car of the running cycle, else of the last one."""
-        if self._present:
+        if self._plugged_at is not None:
             profile = (
                 self._claim.profile
                 if self._claim is not None and self._claim.automatic and not self._conflicted

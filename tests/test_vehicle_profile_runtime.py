@@ -217,6 +217,7 @@ def test_switching_profiles_retains_loss_totals_without_reassigning_previous_cha
         coordinator = LossCoordinator()
         entry = SimpleNamespace(entry_id="entry", options=catalog(), runtime_data=SimpleNamespace(
             coordinator=coordinator, identity=SimpleNamespace(serial_number="123", layout_version=310),
+            client=coordinator.client,
         ))
         hass.states.async_set("sensor.first_energy", "8", {"unit_of_measurement": "kWh"})
         hass.states.async_set("sensor.second_energy", "5", {"unit_of_measurement": "kWh"})

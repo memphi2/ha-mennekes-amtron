@@ -29,7 +29,9 @@ from .charge_loss_const import (
 )
 from .charge_watch import PlugCycle, charge_watch, loss_vehicle_options
 from .device.charge_loss import Charge, LossStatistics
+from .device.client_errors import AmtronConnectionError
 from .device.enums import EvseState
+from .device.errors import DeviceError
 from .device.meter_log import MAX_INTERPOLATION_SECONDS
 from .device.notice import FailureNotice
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
@@ -209,40 +211,44 @@ class ChargeLossObserver:
                     self._retry = None
                 self._queue()
                 return
-        elif self._plug_cycle_measured():
+        elif self._watch.last is not None and self._watch.last != self._cycle:
             self._queue()
             return
         if not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
             # A failed save discarded the candidate: form it again.
             self._queue()
 
-    def _plug_cycle_measured(self) -> bool:
+    async def _energy(self, start: float, end: float) -> float | None:
+        """What the meter delivered in a span, as far as the service knows."""
+        try:
+            return await self._entry.runtime_data.client.async_energy_between(start, end)
+        except (AmtronConnectionError, DeviceError):
+            return None
+
+    async def _take_plug_cycle(self) -> None:
         """Take the last plug cycle of this car once the meter covers it."""
         cycle = self._watch.last
         if cycle is None or cycle == self._cycle:
-            return False
+            return
         if self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id):
             # Another car's charge: this profile keeps its last match and average.
             self._cycle, self._charge = cycle, None
-            return False
-        energy = self._watch.meter.energy_between(cycle.plugged_at, cycle.unplugged_at)
+            return
+        energy = await self._energy(cycle.plugged_at, cycle.unplugged_at)
         if energy is None:
             # The reading after the unplug is still to come; it does not come
             # any more once the meter log cannot place the boundary.
             if time.time() - cycle.unplugged_at > MAX_INTERPOLATION_SECONDS:
                 self._cycle = cycle
-            return False
+            return
         self._cycle = cycle
-        if energy <= 0:
-            return False
-        self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy)
-        return True
+        if energy > 0:
+            self._charge = Charge(cycle.plugged_at, cycle.unplugged_at, energy)
 
     @callback
     def _queue(self) -> None:
         if (
             self._stopping or self._storage_corrupt or not self._source_ready
-            or (self.mode != LOSS_SOURCE_VEHICLE_HISTORY and self._charge is None)
         ):
             return
         self._pending = True
@@ -255,6 +261,7 @@ class ChargeLossObserver:
             if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
                 await self._measure_record()
                 continue
+            await self._take_plug_cycle()
             charge = self._charge
             if charge is None:
                 continue
@@ -266,7 +273,7 @@ class ChargeLossObserver:
                     energy = value
                     change = self._change
             async with self._lock:
-                if charge != self._charge or self._stopping:
+                if self._stopping:
                     continue
                 candidate = LossStatistics.restore(self.statistics.snapshot())
                 candidate.observe_charge(charge)
@@ -277,7 +284,8 @@ class ChargeLossObserver:
 
     async def _measure_record(self) -> None:
         """Compare the vehicle's newest record with the meter over the same span."""
-        source, since = self._history_source, self._watch.meter.first_at
+        source = self._history_source
+        since = (self._coordinator.current_data().charge_meter or {}).get("first_reading_at")
         self._last_query = time.monotonic()
         record = None
         if source is not None and since is not None:
@@ -291,7 +299,7 @@ class ChargeLossObserver:
                 # the same bounded retry policy applies to this provider.
                 # Do not log exception messages that may contain VINs.
                 _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
-        wallbox = self._watch.meter.energy_between(record.start, record.end) if record is not None else None
+        wallbox = await self._energy(record.start, record.end) if record is not None else None
         if record is None or wallbox is None or wallbox <= 0:
             # No record yet, or the meter reading after its end is still to come.
             self._schedule_retry()

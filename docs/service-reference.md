@@ -278,6 +278,7 @@ service data rather than maintaining a second queue.
 | `GET /v2/state` | Authenticated cached wallbox state and service status. While a command runs, the request waits up to two seconds and then returns the state published after the last completed command or poll, if that is at most a minute old. |
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
+| `POST /v2/energy` | Authenticated: the energy the meter delivered between `start` and `end` (epoch seconds), from the service's bounded meter log; `null` when the log does not cover the span. No bus access. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
 | `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 

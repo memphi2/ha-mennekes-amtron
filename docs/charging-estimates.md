@@ -46,7 +46,7 @@ Changing a profile's selected vehicle or energy source starts a new average for
 that source.
 
 With a vehicle energy sensor, the wallbox side of a charge is the total
-energy meter's difference between plug-in and unplug, as Home Assistant saw
+energy meter's difference between plug-in and unplug, as the service saw
 them. A plug cycle without delivered energy changes nothing.
 
 For manual selection, choose the correct profile **before charging begins**.
@@ -83,9 +83,8 @@ the car's end of charging. A record that follows a pause is measured on its
 own. DC charges, open, interrupted or late-start records and records below
 1 kWh are passed over; a truncated history is not used. The last loss stays
 unknown until a suitable record appears; local reads are retried a limited
-number of times and on charging-stop events. The meter readings are kept
-while HA runs, so a record whose span began before HA started cannot be
-measured.
+number of times and on charging-stop events. A record whose span began
+before the service started cannot be measured.
 
 BavarianData's `energy_kwh` is estimated battery energy integrated from vehicle
 telemetry. Its `grid_kwh` is grid energy and is deliberately not substituted.
@@ -270,8 +269,10 @@ are rounded to cents and the last-cost energy attributes to 0.01 kWh. No extra
 long-term statistics are created. The current-cost entity is disabled by
 default; leaving it disabled keeps only the final cost in Recorder.
 
-Losses and costs are measured in HA against the wallbox's total energy meter.
-A charge needs HA's own meter readings over its whole span: a plug cycle or a
-BavarianData record that began before HA started cannot be measured, even with
-a fixed price. Previously completed results remain stored. Storage
+Losses are measured against the wallbox's total energy meter. The service
+keeps the meter readings and the last plug cycle in memory, so a restart of
+HA does not interrupt them; a restart of the service does. After a restart of
+HA the plug cycle no longer has a recognized vehicle profile. Cost
+calculation runs in HA, so a cost across HA downtime stays incomplete, even
+with a fixed price. Previously completed results remain stored. Storage
 problems affect these optional estimates, not heartbeat or charging commands.

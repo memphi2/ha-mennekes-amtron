@@ -1,4 +1,4 @@
-"""The watch measures and attributes only a plug cycle it saw from end to end."""
+"""The watch names a car only for a plug cycle it followed from end to end."""
 
 from __future__ import annotations
 
@@ -8,7 +8,11 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu import charge_watch as m
 from custom_components.mennekes_amtron_rtu import vehicle_profiles
-from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.enums import EvseState
+from custom_components.mennekes_amtron_rtu.device.meter_log import (
+    ChargeMeter,
+    parse_charge_meter,
+)
 from tests.test_charge_loss_observer import Coordinator
 from tests.test_vehicle_detection import detection_catalog
 from tests.test_vehicle_profile_runtime import A, B, catalog
@@ -18,16 +22,14 @@ START = 1_700_000_000.0
 
 @pytest.fixture
 def scene(monkeypatch):
-    """One wallbox with two cars, a clock and its watch."""
+    """One wallbox with two cars, the service's charge meter and the watch."""
     clock = [START]
-    monkeypatch.setattr(m, "time", SimpleNamespace(time=lambda: clock[0]))
     monkeypatch.setattr(vehicle_profiles, "time", SimpleNamespace(time=lambda: clock[0]))
     hass = SimpleNamespace(data={})
     coordinator = Coordinator()
-    coordinator.data.energy_observed_at = None
+    meter = ChargeMeter()
     entry = SimpleNamespace(entry_id="entry", options={}, runtime_data=SimpleNamespace(
         coordinator=coordinator, identity=SimpleNamespace(serial_number="123", layout_version=0x0103),
-        client=SimpleNamespace(connected=True),
     ))
 
     def configure(*, automatic=True, selected=None):
@@ -36,16 +38,13 @@ def scene(monkeypatch):
         entry.options["vehicle_profile_selected_at"] = START - 200
         return m.track_charge_watch(hass, entry)
 
-    def poll(after, state=EvseState.IDLE, kwh=None, *, ok=True):
+    def poll(after, state=EvseState.IDLE, *, present=...):
         clock[0] += after
-        values = coordinator.data.values
-        values["evse_state"] = state
-        values["cp_state"] = CpState.A1 if state is EvseState.IDLE else CpState.C2
-        if kwh is not None:
-            values["energy_total"] = kwh
-        coordinator.data.energy_read = kwh is not None
-        coordinator.data.energy_observed_at = clock[0] if kwh is not None else None
-        coordinator.last_update_success = ok
+        meter.observe(
+            clock[0], present=state is not EvseState.IDLE if present is ... else present,
+            charging=state is EvseState.CHARGING,
+        )
+        coordinator.data.charge_meter = parse_charge_meter(meter.snapshot())
         coordinator.async_update_listeners()
 
     return SimpleNamespace(
@@ -58,24 +57,21 @@ def profile(entry, key):
     return vehicle_profiles.profiles(entry.options)[key]
 
 
-def test_a_cycle_seen_from_plug_in_to_unplug_is_kept_with_its_meter_and_car(scene):
+def test_a_cycle_the_service_saw_whole_is_kept_with_its_car(scene):
     unsubscribe = scene.configure(automatic=False, selected=A)
     watch = scene.watch
-    scene.poll(10, kwh=100)
-    scene.poll(10, EvseState.EV_CONNECTED, 100)
+    scene.poll(10)
+    scene.poll(10, EvseState.EV_CONNECTED)
     plugged = scene.clock[0]
-    scene.poll(10, EvseState.CHARGING, 101)
-    scene.poll(10, EvseState.CHARGING, True)
-    scene.poll(10, EvseState.CHARGING, 105)
+    scene.poll(10, EvseState.CHARGING)
     assert watch.last is None
     assert watch.owner(scene.entry) is None  # A car chosen by hand owns nothing until the end.
-    scene.poll(10, kwh=106)
+    scene.poll(10)
     unplugged = scene.clock[0]
     assert watch.last == m.PlugCycle(plugged, unplugged, profile(scene.entry, A))
     assert watch.owner(scene.entry) == profile(scene.entry, A)
-    scene.poll(10, kwh=106)
-    assert watch.meter.energy_between(plugged, unplugged) == pytest.approx(6)
     # Idle polls afterwards leave the cycle as it is.
+    scene.poll(10)
     assert watch.last.unplugged_at == unplugged
     unsubscribe()
     assert not scene.coordinator.listeners
@@ -87,12 +83,11 @@ def test_a_cycle_seen_from_plug_in_to_unplug_is_kept_with_its_meter_and_car(scen
 
 
 def test_a_cycle_that_began_unseen_is_neither_measured_nor_owned(scene):
-    scene.coordinator.data.values.update(evse_state=EvseState.CHARGING, cp_state=CpState.C2)
     scene.configure()
-    scene.poll(10, EvseState.CHARGING, 100)
+    scene.poll(10, EvseState.CHARGING)
     m.confirm_automatic_vehicle(scene.hass, scene.entry, A)
     assert scene.watch.owner(scene.entry) is None
-    scene.poll(10, kwh=105)
+    scene.poll(10)
     assert scene.watch.last is None
 
 
@@ -156,38 +151,31 @@ def test_a_car_selected_by_hand_owns_only_a_charge_that_began_afterwards(scene, 
     assert (scene.watch.last.owner is not None) is owned
 
 
-def test_a_short_unknown_span_is_bridged_and_a_long_one_loses_the_cycle(scene):
+def test_a_cycle_that_ended_while_home_assistant_was_away_has_no_car(scene):
     scene.configure(automatic=False, selected=A)
     scene.poll(10)
     scene.poll(10, EvseState.CHARGING)
-    scene.poll(30, EvseState.CHARGING, ok=False)
-    scene.entry.runtime_data.client.connected = False
-    scene.poll(30, EvseState.CHARGING)
-    scene.entry.runtime_data.client.connected = True
-    scene.poll(30)
-    assert scene.watch.last is not None
-    first = scene.watch.last
-    scene.poll(10, EvseState.CHARGING)
-    scene.poll(60, EvseState.CHARGING, ok=False)
-    scene.poll(100, EvseState.CHARGING, ok=False)
-    scene.poll(10, EvseState.CHARGING)
+    # Home Assistant restarts: the service kept the cycle, the claim is gone.
+    m.forget_charge_watch(scene.hass, "entry")
+    watch = m.charge_watch(scene.hass, "entry")
     scene.poll(10)
-    assert scene.watch.last is first
+    watch.observe(scene.entry)
+    assert watch.last is not None
+    assert watch.last.owner is None
 
 
 def test_another_wallbox_or_an_unpolled_coordinator_is_no_evidence(scene):
     scene.configure(automatic=False, selected=A)
-    scene.poll(10, kwh=100)
-    scene.poll(10, EvseState.CHARGING, 101)
-    # A replacement coordinator that has not polled yet says nothing.
-    kept, scene.coordinator.data.values = scene.coordinator.data.values, {}
+    scene.poll(10)
+    scene.poll(10, EvseState.CHARGING)
+    # A coordinator that has not polled yet, or an entry without runtime, says nothing.
+    kept, scene.coordinator.data.charge_meter = scene.coordinator.data.charge_meter, None
     scene.coordinator.async_update_listeners()
-    scene.coordinator.data.values = kept
-    scene.poll(10, kwh=105)
-    assert scene.watch.last is not None
     scene.watch.observe(SimpleNamespace(options={}))
+    scene.coordinator.data.charge_meter = kept
+    scene.poll(10)
     assert scene.watch.last is not None
     scene.entry.runtime_data.identity.serial_number = "456"
-    scene.poll(10, kwh=5)
+    scene.coordinator.data.charge_meter = parse_charge_meter(ChargeMeter().snapshot())
+    scene.coordinator.async_update_listeners()
     assert scene.watch.last is None
-    assert scene.watch.meter.first_at == scene.clock[0]
