@@ -5,10 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 import secrets
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +14,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from .const import DOMAIN
 from .notice import FailureNotice
+from .persistence import replace_file
 from .service_config import ServerConfig, validate_token
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,23 +29,8 @@ def app_token(path: Path) -> str:
         return validate_token(path.read_text())
     except FileNotFoundError:
         pass
-    path.parent.mkdir(parents=True, exist_ok=True)
     token = secrets.token_urlsafe(32)
-    descriptor, name = tempfile.mkstemp(prefix=".token-", dir=path.parent)
-    temporary = Path(name)
-    try:
-        with os.fdopen(descriptor, "w") as stream:
-            stream.write(token)
-            stream.flush()
-            os.fsync(stream.fileno())
-        temporary.replace(path)
-        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
-    finally:
-        temporary.unlink(missing_ok=True)
+    replace_file(path, token.encode(), prefix=".token-")
     return token
 
 

@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
 from .guest_permission import GuestPermission
-from .persistence import StorageCommitUncertainError
+from .persistence import StorageCommitUncertainError, replace_file
 from .plug_charge import PlugChargeState
 from .service_config import number
 from .soc_goal import SocGoal
@@ -103,28 +101,12 @@ class IntentStore:
         }
         if payload == self._last:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, name = tempfile.mkstemp(prefix=".intent-", dir=self.path.parent)
-        temporary = Path(name)
         try:
-            with os.fdopen(descriptor, "w") as stream:
-                json.dump(payload, stream, allow_nan=False)
-                stream.flush()
-                os.fsync(stream.fileno())
-            temporary.replace(self.path)
-            # A later directory-sync failure must not let an older cached
-            # payload skip the write that would restore it.
+            replace_file(self.path, json.dumps(payload, allow_nan=False).encode(), prefix=".intent-")
+        except StorageCommitUncertainError:
+            # The target file already names the new snapshot: the goal
+            # controllers must not take it for an uncommitted save, and the
+            # older cached payload must not skip the write that restores it.
             self._last = None
-            try:
-                directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
-                try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
-            except OSError as err:
-                # The target file already names the new snapshot. It must not
-                # be treated as an uncommitted save by the goal controllers.
-                raise StorageCommitUncertainError("intent replaced but directory sync failed") from err
-            self._last = payload
-        finally:
-            temporary.unlink(missing_ok=True)
+            raise
+        self._last = payload
