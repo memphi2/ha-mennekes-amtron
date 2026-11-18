@@ -689,6 +689,9 @@ def test_a_stopped_rule_plans_nothing_more(monkeypatch) -> None:
         rule._retry_now(None)
         rule._owe()
         assert not _waiting(timers)
+        # What is owed stays remembered for the rule that follows a reload.
+        assert rule._owed
+        assert rule._memory() is True
 
     asyncio.run(run())
 

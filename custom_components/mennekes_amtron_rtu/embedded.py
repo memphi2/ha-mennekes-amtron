@@ -120,7 +120,7 @@ class EmbeddedService:
         self._stopped = False
         # Called when the service ends on its own, which it does rather than
         # carry on without its heartbeat.
-        self.on_ended: Callable[[str], None] | None = None
+        self.on_ended: Callable[[str, BaseException | None], None] | None = None
 
     async def async_start(self) -> None:
         """Start and wait for the wallbox; a failed start leaves nothing running."""
@@ -155,7 +155,7 @@ class EmbeddedService:
             error = error.exceptions[0]
         reason = type(error).__name__ if error is not None else "no error"
         if self.on_ended is not None:
-            self.on_ended(reason)
+            self.on_ended(reason, error)
         else:
             _LOGGER.error("Service: stopped unexpectedly (%s)", reason)
 
@@ -304,7 +304,7 @@ async def async_acquire(
         # Home Assistant stopped it while it started.
         raise DeviceError("service_unavailable")
 
-    def ended(reason: str) -> None:
+    def ended(reason: str, error: BaseException | None = None) -> None:
         if hosts.get(entry_id) is not host:
             return
         notices: dict[str, FailureNotice] = hass.data.setdefault(_RESTART_NOTICES, {})
@@ -317,7 +317,7 @@ async def async_acquire(
         notice.failed(
             "stopped unexpectedly; starting it again"
             + (f" in {delay:.0f} seconds" if delay else ""),
-            reason, level=logging.ERROR,
+            reason, level=logging.ERROR, exc_info=error if error is not None else False,
         )
 
         @callback

@@ -117,9 +117,12 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
                 auth_error = ConfigEntryAuthFailed(
                     translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
                 )
-                if not self.last_update_success:
+                if not self.last_update_success and not isinstance(
+                    self.last_exception, ConfigEntryAuthFailed
+                ):
                     # HA notifies nobody of a second failed poll in a row;
-                    # an earlier connection repair must still see this cause.
+                    # an earlier connection repair must still see this cause,
+                    # once.
                     self.async_set_update_error(auth_error)
                     self.async_update_listeners()
                 raise auth_error from err

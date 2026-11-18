@@ -390,6 +390,10 @@ def test_a_service_whose_heartbeat_dies_is_stopped_and_the_entry_reloaded(
         assert wallbox.close_calls == 1
         assert "Heartbeat: task stopped unexpectedly (cancelled)" in caplog.text
         assert "Service: stopped unexpectedly; starting it again (" in caplog.text
+        # With the traceback of what ended it.
+        (report,) = [r for r in caplog.records if "stopped unexpectedly; starting" in r.getMessage()]
+        assert report.exc_info is not None
+        assert report.exc_info[1] is not None
         # The restart itself finished without an error.
         assert len(tasks) == 1
         await tasks[0]

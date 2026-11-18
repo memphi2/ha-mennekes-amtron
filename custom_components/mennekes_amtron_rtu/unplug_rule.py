@@ -202,7 +202,10 @@ class UnplugRule:
             )
 
     def _owe(self) -> None:
-        if self._stopped or self._vehicle_connected() is True:
+        if self._stopped:
+            # What is owed stays remembered for the rule that follows.
+            return
+        if self._vehicle_connected() is True:
             self._owed = False
             return
         self._owed = True

@@ -278,6 +278,10 @@ def test_the_charging_loss_exists_with_a_loss_source_and_reports_its_samples() -
         assert average.native_value == 10.0
         assert last.extra_state_attributes == {"sample_count": 4, "association": "vehicle"}
         assert average.extra_state_attributes == {"sample_count": 4}
+        # A kept value of a finished charge stays while the wallbox is away.
+        last.runtime.coordinator.last_update_success = False
+        assert last.available
+        assert average.available
         last.runtime.charge_loss = _loss(available=False)
         assert not last.available
 
@@ -299,6 +303,10 @@ def test_the_estimated_cost_exists_with_a_price_and_reports_its_coverage() -> No
         assert current.native_value == 1.23
         assert current.extra_state_attributes == {"complete": False}
         assert last.extra_state_attributes == {"complete": False, "energy_kwh": 7.26, "unpriced_kwh": 0.0}
+        # The last charge's cost does not go with a failed poll.
+        entry.runtime_data.coordinator.last_update_success = False
+        assert current.available
+        assert last.available
         cost.current = None
         cost.last = SimpleNamespace(result=None)
         assert current.native_value is None

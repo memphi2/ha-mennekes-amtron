@@ -292,26 +292,27 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
     AmtronSensorDescription(
         key="last_charging_loss", value=_loss(last=True), feature=lambda features: LOSS in features,
         native_unit_of_measurement="%", suggested_display_precision=1,
-        ready=_loss_ready, attributes=_loss_details(last=True),
+        # Kept values of finished charges: shown whatever the wallbox does.
+        offline=True, ready=_loss_ready, attributes=_loss_details(last=True),
     ),
     AmtronSensorDescription(
         key="average_charging_loss", value=_loss(last=False), feature=lambda features: LOSS in features,
         native_unit_of_measurement="%", suggested_display_precision=1,
-        ready=_loss_ready, attributes=_loss_details(last=False),
+        offline=True, ready=_loss_ready, attributes=_loss_details(last=False),
     ),
     AmtronSensorDescription(
         key="current_estimated_charging_cost", value=_cost(current=True),
         exists=lambda runtime: runtime.charging_cost is not None,
         device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
         suggested_display_precision=2, entity_registry_enabled_default=False,
-        ready=_cost_ready, attributes=_cost_details(current=True),
+        offline=True, ready=_cost_ready, attributes=_cost_details(current=True),
     ),
     AmtronSensorDescription(
         key="last_estimated_charging_cost", value=_cost(current=False),
         exists=lambda runtime: runtime.charging_cost is not None,
         device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
         suggested_display_precision=2,
-        ready=_cost_ready, attributes=_cost_details(current=False),
+        offline=True, ready=_cost_ready, attributes=_cost_details(current=False),
     ),
     # --- Diagnostics, off until someone needs them.
     AmtronSensorDescription(

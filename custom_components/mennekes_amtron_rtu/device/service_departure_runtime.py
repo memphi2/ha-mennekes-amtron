@@ -52,7 +52,9 @@ class DepartureModbusService(GuestModbusService):
 
     def _configure_control(self, control: AmtronControl) -> None:
         super()._configure_control(control)
-        self._tick_notice = FailureNotice(_LOGGER, "Departure plan")
+        if not hasattr(self, "_tick_notice"):
+            # One for the service's life: a reconnect is no new failure.
+            self._tick_notice = FailureNotice(_LOGGER, "Departure plan")
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
         self.departure = DepartureController(
             DepartureStore(self.state_path.with_name("departure-plan.json"), identity),

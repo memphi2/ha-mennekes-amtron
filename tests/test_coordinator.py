@@ -752,7 +752,7 @@ def test_a_password_rejected_after_a_lost_connection_still_reaches_the_listeners
         rejected = [False]
         coordinator = ServiceCoordinator(
             FakeHass(), FakeConfigEntry(),
-            client=_Client(AmtronConnectionError("lost"), AmtronConnectionError("lost")),
+            client=_Client(*[AmtronConnectionError("lost")] * 3),
             scan_interval=5, credentials_rejected=lambda: rejected[0],
         )
         seen: list[BaseException | None] = []
@@ -769,5 +769,9 @@ def test_a_password_rejected_after_a_lost_connection_still_reaches_the_listeners
             await coordinator._async_update_data()
         (error,) = seen
         assert isinstance(error, ConfigEntryAuthFailed)
+        # Said once: the polls that follow wake nobody for the same cause.
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator._async_update_data()
+        assert len(seen) == 1
 
     asyncio.run(run())

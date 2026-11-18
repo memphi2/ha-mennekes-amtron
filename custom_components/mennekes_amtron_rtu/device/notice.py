@@ -28,12 +28,12 @@ class FailureNotice:
 
     def failed(
         self, what: str, reason: object = None, *,
-        level: int = logging.WARNING, exc_info: bool = False,
+        level: int = logging.WARNING, exc_info: bool | BaseException = False,
     ) -> bool:
         """Log a failure; return whether it was the first of this episode.
 
-        ``exc_info`` adds the traceback of the exception being handled to
-        the lines that are reported, never to the repeats.
+        ``exc_info`` adds the traceback of the exception being handled, or
+        of the one given, to the lines that are reported, never to the repeats.
         """
         first = not self._failing
         text = f" ({reason})" if reason else ""
@@ -42,7 +42,7 @@ class FailureNotice:
         self._reason = text
         self._logger.log(
             level if news else logging.DEBUG, "%s: %s%s", self._area, what, text,
-            exc_info=exc_info and news,
+            exc_info=exc_info if news else False,
         )
         return first
 
