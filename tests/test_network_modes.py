@@ -16,6 +16,7 @@ from custom_components.mennekes_amtron_rtu.device.service_config import ServerCo
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from tests.fakes import device_bank
+from tests.ha_fakes import heartbeat_running
 from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN
@@ -49,7 +50,8 @@ def test_real_ha_network_setup_read_only_master_pause_and_unload(tmp_path, proto
                     "host": "127.0.0.1", "tcp_port": port,
                     "connection_type": protocol, "device_id": 50,
                 })
-                assert entry.runtime_data.client.config.connection_type == protocol
+                host = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]
+                assert host.config.connection.connection_type == protocol
                 assert entry.runtime_data.control.read_only
                 assert all(payload[1] == 3 for payload in requests)
                 await async_options(
@@ -63,14 +65,15 @@ def test_real_ha_network_setup_read_only_master_pause_and_unload(tmp_path, proto
                 await hass.async_block_till_done()
                 assert not entry.runtime_data.control.read_only
                 heartbeat = entry.runtime_data.heartbeat
-                assert heartbeat.running
-                assert await heartbeat.async_beat_once()
+                assert heartbeat_running(heartbeat)
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+                assert await service.heartbeat.async_beat_once()
                 assert hass.states.get("switch.mennekes_amtron_charging_paused").state == "on"
                 # Choosing a network connection or enabling control must never
                 # send a current/resume command to a deliberately paused box.
                 assert not any(payload[1] == 16 for payload in requests)
                 assert await hass.config_entries.async_unload(entry.entry_id)
-                assert not heartbeat.running
+                assert not heartbeat_running(heartbeat)
                 async with asyncio.timeout(1):
                     await asyncio.gather(*(writer.wait_closed() for writer in writers))
             finally:

@@ -223,11 +223,11 @@ def test_network_service_controls_restore_pause_and_log_the_actual_transport(
 
     asyncio.run(run())
     label = "RTU-over-TCP" if protocol == "rtu_over_tcp" else "Modbus TCP"
-    assert f"Opening {label} connection" in caplog.text
+    assert f"Connection: opening {label} connection" in caplog.text
     assert f"{label} connection established; wallbox initialized" in caplog.text
     assert f"{label} connection closed" in caplog.text
-    assert "Heartbeat started" in caplog.text
-    assert "Heartbeat stopped" in caplog.text
+    assert "Heartbeat: started" in caplog.text
+    assert "Heartbeat: stopped" in caplog.text
     assert "serial connection" not in caplog.text.lower()
     assert "2001:db8::1" not in caplog.text
 

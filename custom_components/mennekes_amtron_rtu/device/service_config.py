@@ -54,6 +54,9 @@ class ServerConfig:
     port: int = 8765
     state_change_interval_seconds: float = DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
     phase_switch_grace_seconds: float = DEFAULT_PHASE_SWITCH_GRACE_SECONDS
+    # Use the wallbox's own maximum as the cap; ``current_cap`` applies until
+    # the wallbox has been identified.
+    cap_from_wallbox: bool = False
 
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> ServerConfig:

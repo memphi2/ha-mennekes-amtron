@@ -78,7 +78,7 @@ from .device.const import (
     frame_label,
     frame_parts,
 )
-from .device.identity import async_read_identity, display_identifier
+from .device.identity import display_identifier
 from .device.registers import VALIDATED_LAYOUT, layout_label
 from .device.service_config import validate_token
 from .device.service_discovery import APP_HOSTNAME
@@ -91,10 +91,17 @@ from .device.waveshare_gateway import (
     GatewaySnapshot,
     inspect_gateway,
 )
+from .embedded import async_release
+from .entry_connection import connection_config
 from .entry_types import MennekesAmtronConfigEntry
 from .options_flow import MennekesAmtronOptionsFlow
-from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL, RemoteClient, server_url
-from .remote_errors import ServiceConnectionError
+from .service_client import (
+    CONF_SERVER_TOKEN,
+    CONF_SERVER_URL,
+    ServiceClient,
+    server_url,
+)
+from .service_errors import ServiceConnectionError
 from .supervisor_discovery import async_app_discoveries
 
 _LOGGER = logging.getLogger(__name__)
@@ -238,6 +245,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 return False
             if loaded and not await self._async_unload_for_probe(entry, original_data):
                 raise AmtronConnectionError("cannot release the active connection")
+            await self._async_free_bus(entry, loaded)
             try:
                 identity = await async_test_connection(config)
                 await self.async_set_unique_id(identity.serial_number or f"{DOMAIN}_{config.port}_{config.device_id}")
@@ -285,7 +293,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reauth_entry()
         original_data = dict(entry.data)
         url = str(original_data[CONF_SERVER_URL])
-        client = RemoteClient(async_get_clientsession(self.hass), url, token)
+        client = ServiceClient(async_get_clientsession(self.hass), url, token)
         try:
             try:
                 await client.async_connect()
@@ -514,7 +522,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 token = str(user_input[CONF_SERVER_TOKEN])
                 if len(token) < 32:
                     raise ValueError("invalid token")
-                client = RemoteClient(async_get_clientsession(self.hass), url, token)
+                client = ServiceClient(async_get_clientsession(self.hass), url, token)
                 try:
                     await client.async_connect()
                     if entry is not None and dict(entry.data) != expected_data:
@@ -546,7 +554,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 finally:
                     await client.async_close()
             except ServiceConnectionError as err:
-                _LOGGER.warning("Modbus service setup: %s", err)
+                _LOGGER.warning("Setup: Modbus service rejected (%s)", err)
                 errors["base"] = err.reason
             except ValueError, AmtronBusError:
                 errors["base"] = "cannot_connect_service"
@@ -615,7 +623,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         if data is None:
             return self.async_abort(reason="invalid_service_discovery")
         errors: dict[str, str] = {}
-        client = RemoteClient(
+        client = ServiceClient(
             async_get_clientsession(self.hass),
             data[CONF_SERVER_URL],
             data[CONF_SERVER_TOKEN],
@@ -657,7 +665,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                         data=complete,
                     )
         except ServiceConnectionError as err:
-            _LOGGER.warning("Discovered Modbus app: %s", err)
+            _LOGGER.warning("Setup: discovered Modbus app rejected (%s)", err)
             errors["base"] = err.reason
         except AmtronBusError:
             errors["base"] = "cannot_connect_service"
@@ -686,6 +694,18 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             original = self._reconfigure_data = dict(entry.data)
         return original
 
+    async def _async_free_bus(self, entry: ConfigEntry, loaded: bool) -> None:
+        """Stop a service kept for a setup that Home Assistant will try again.
+
+        An entry that is not loaded can still own the bus; the retry starts
+        its service again.
+        """
+        if entry.state is ConfigEntryState.FAILED_UNLOAD:
+            # It still runs on its service, and nothing would start that again.
+            raise AmtronConnectionError("cannot release the active connection")
+        if not loaded:
+            await async_release(self.hass, entry.entry_id, force=True)
+
     async def _async_unload_for_probe(
         self, entry: ConfigEntry, original_data: dict[str, Any],
     ) -> bool:
@@ -695,10 +715,15 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         interrupted unload, so wait for it and restore only the entry we
         unloaded before propagating cancellation.
         """
-        task = asyncio.create_task(
-            self.hass.config_entries.async_unload(entry.entry_id, _lock=False),
-            name="mennekes_amtron_rtu_probe_unload",
-        )
+        async def unload() -> bool:
+            unloaded = await self.hass.config_entries.async_unload(entry.entry_id, _lock=False)
+            if unloaded:
+                # The probe opens its own connection, so the bus must be free
+                # even while a reload of this entry would keep the service.
+                await async_release(self.hass, entry.entry_id, force=True)
+            return unloaded
+
+        task = asyncio.create_task(unload(), name="mennekes_amtron_rtu_probe_unload")
         try:
             return await asyncio.shield(task)
         except asyncio.CancelledError:
@@ -707,7 +732,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 if unloaded:
                     await self._async_restore_after_probe(entry, original_data)
             except Exception:
-                _LOGGER.exception("Unable to complete cancelled connection probe cleanup")
+                _LOGGER.exception("Setup: cleanup after a cancelled connection probe failed")
             raise
 
     async def _async_restore_after_probe(
@@ -726,7 +751,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 await _async_finish_cleanup(task)
             except Exception:
-                _LOGGER.exception("Unable to restore the entry after a cancelled connection probe")
+                _LOGGER.exception("Setup: entry not restored after a cancelled connection probe")
             raise
 
     async def _async_serial_step(
@@ -792,11 +817,21 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
         saved_data: dict[str, Any] | None = None
-        if loaded and entry is not None and gateway is None and config == entry.runtime_data.client.config:
-            # The existing client owns the bus connection and serializes reads
-            # with polling and heartbeat; an unchanged form needs no new client.
+        if (
+            loaded and entry is not None and gateway is None
+            and CONF_SERVER_URL not in entry.data and config == connection_config(entry)
+        ):
+            # The running service owns the bus connection; an unchanged form
+            # needs no second connection, only the service's current answer.
+            # An app entry has no direct connection to compare with.
             try:
-                identity = await async_read_identity(entry.runtime_data.client)
+                # Through the coordinator: the poll's meter sample and its
+                # outcome belong to the entities, not to this form.
+                coordinator = entry.runtime_data.coordinator
+                await coordinator.async_refresh()
+                if not coordinator.last_update_success:
+                    raise AmtronConnectionError("the wallbox does not answer")
+                identity = entry.runtime_data.client.identity
                 return await self._async_finish(
                     step_id, user_input, identity, config=config, expected_data=original_data,
                 )
@@ -806,6 +841,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 raise
         if loaded and entry is not None and not await self._async_unload_for_probe(entry, original_data):
             raise AmtronConnectionError("cannot release the active connection")
+        if entry is not None:
+            await self._async_free_bus(entry, loaded)
         async def finish() -> ConfigFlowResult:
             nonlocal saved_data
             identity = await async_test_connection(config)
@@ -867,6 +904,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         loaded = entry.state is ConfigEntryState.LOADED
         if loaded and not await self._async_unload_for_probe(entry, original_data):
             raise AmtronConnectionError("cannot release the active serial port")
+        await self._async_free_bus(entry, loaded)
         try:
             result = await async_search(base, all_parameters=all_parameters)
             if dict(entry.data) != original_data:

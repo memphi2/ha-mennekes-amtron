@@ -5,7 +5,57 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.10.0b1 — 2026-11-15
+
+### Breaking changes
+
+- A direct USB or LAN connection now runs the same service inside Home
+  Assistant that the app runs. Guest charging, departure planning and the
+  energy and charge targets work the same on every connection. Targets that
+  a direct connection had saved are not carried over; set them again.
+- The entity set is smaller. Removed: the sensors Operation controller, Next
+  operation, Energy target status, Charge target status, Departure status,
+  Pending change, Virtual Plug & Charge status and Guest charging, and the
+  binary sensors Downgrade active, Heartbeat lost and Master-lost fallback.
+  - **Charging status** is the one sensor that says what the wallbox is
+    doing. Its attributes carry the EVSE state, the CP state and
+    `downgraded_to`, the limit of an active grid-operator downgrade.
+  - **Charging wait reason** says why a requested charge is not running;
+    its attributes carry the details.
+  - **Error** carries the heartbeat and fallback state as attributes.
+  - **Guest charging** is a binary sensor.
+- One event entity, **Activity**, replaces the command, wallbox and session
+  event entities. Its event types are `command_done`, `command_failed`,
+  `command_cancelled`, `session_started`, `session_ended` and
+  `wallbox_changed`; the attributes say what happened. Automations that
+  triggered on the old event entities need the new entity and types.
+- The buttons Use calendar departure, Use vehicle departure and Assign
+  vehicle charge are actions now: `mennekes_amtron_rtu.use_calendar_departure`,
+  `mennekes_amtron_rtu.use_vehicle_departure` and
+  `mennekes_amtron_rtu.assign_vehicle_charge`. With one wallbox they need no
+  target.
+- Switching the charging release off when the vehicle is unplugged is an
+  option of the integration instead of a switch entity. It starts switched
+  off; switch it on again in the options if you used it. The service that
+  talks to the wallbox applies it, with the app also while Home Assistant is
+  not running.
+- The diagnostic sensors Connection quality, Authorization, Cable lock,
+  Detected vehicle phases and Wallbox settings are disabled by default.
+- The blueprint for grid-operator downgrade notifications takes the Charging
+  status sensor instead of the Downgrade active binary sensor.
+- Downloaded diagnostics contain the service state, its counters and the raw
+  registers.
+- The integration and the app must both be 0.10.0b1. Update them together;
+  the service API is now version 3, and each side refuses the other's older
+  version.
+
+### Changes
+
+- Log lines of the integration and the app now start with their area, such as
+  `Connection:`, `Heartbeat:`, `Departure plan:` or `Charging cost:`, followed
+  by what happened and the reason in parentheses. A failure that repeats on
+  every poll or retry is logged once as a warning, its repeats at debug level
+  and its end once. Log filters that match the old wording need updating.
 
 ## 0.9.1
 

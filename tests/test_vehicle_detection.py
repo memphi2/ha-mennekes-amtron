@@ -248,4 +248,4 @@ def test_one_failing_evidence_listener_does_not_hide_the_event(tmp_path, caplog)
     evidence._listeners = [broken, seen.append]
     evidence._notify("event")
     assert seen == ["event"]
-    assert "Vehicle evidence listener failed" in caplog.text
+    assert "Vehicle: evidence listener failed" in caplog.text

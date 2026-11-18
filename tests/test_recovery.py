@@ -1,32 +1,32 @@
-"""Automatic recovery must be bounded, current-aware and stopped on unload."""
+"""Automatic recovery must be bounded, current-aware and stopped with the service."""
 
 from __future__ import annotations
 
 import asyncio
 import shutil
+import time
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
-from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
-from custom_components.mennekes_amtron_rtu.recovery import HeartbeatRecovery
+from custom_components.mennekes_amtron_rtu.sensor import SENSORS
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
-from tests.ha_fakes import build_runtime
+from tests.test_modbus_service import service_fixture
 
 
-async def _runtime(*, current=8, error=200, read_only=False, clear_error=True):
-    hass, entry, transport = await build_runtime(
-        bank=device_bank(error_code=error, charging_current=current),
-        read_only=read_only,
-    )
-    clock = [1000.0]
-    runtime = entry.runtime_data
-    runtime.client._monotonic = lambda: clock[0]
-    runtime.control._monotonic = lambda: clock[0]
-    runtime.heartbeat = HeartbeatTask(runtime.client, runtime.diagnostics)
-    runtime.heartbeat._set_healthy(True)
+async def _runtime(monkeypatch, tmp_path, *, current=8, error=200, read_only=False, clear_error=True):
+    """A service whose wallbox reports ``error`` and clears it on a current write."""
+    service, transport, clock = await service_fixture(tmp_path, read_only=read_only, current=current)
+    # The service's retry window runs on the same simulated clock as its bus.
+    monkeypatch.setattr(service_runtime, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    await service.heartbeat.async_stop()
+    put(transport.bank, R.ERROR_CODE, error)
+    await service.refresh()
+    service.heartbeat._set_healthy(True)
     original = transport.write_registers
 
     async def write(address, values, **kwargs):
@@ -36,46 +36,49 @@ async def _runtime(*, current=8, error=200, read_only=False, clear_error=True):
         return result
 
     transport.write_registers = write
-    recovery = HeartbeatRecovery(hass, entry)
-    runtime.recovery = recovery
-    return runtime, recovery, transport, clock
+    transport.writes.clear()
+    return service, transport, clock
 
 
-async def _finish(recovery):
-    task = recovery._task
-    assert task is not None
-    await asyncio.wait_for(task, 10)
+def _current_writes(transport):
+    return [
+        decode_register(R.CHARGING_CURRENT_EMS, words)
+        for address, words in transport.writes
+        if address == R.CHARGING_CURRENT_EMS.address
+    ]
 
 
-async def _retry(recovery, clock, seconds=31):
-    clock[0] += seconds
-    assert recovery._retry is not None
-    recovery._retry.cancel()
-    recovery._retry_due()
-    await _finish(recovery)
+async def _one_poll_cycle(service):
+    """Run the service's own loop exactly once: poll, then maybe recover."""
+    service._attempted.clear()
+    task = asyncio.create_task(service._polling_loop())
+    try:
+        await asyncio.wait_for(service._attempted.wait(), 5)
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
 
 @pytest.mark.parametrize("current", [0, 1, 6, 8, 16])
-def test_recovery_preserves_the_current_and_clears_the_fault(current):
+def test_recovery_preserves_the_current_and_clears_the_fault(monkeypatch, tmp_path, current):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime(current=current)
-        recovery.start()
-        await _finish(recovery)
-        assert (
-            await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == current
-        )
-        assert runtime.coordinator.current_data().get("error_code") == 0
-        assert runtime.diagnostics.recoveries == 1
-        assert recovery._attempts == 0
-        assert recovery._retry is None
-        assert [address for address, _ in transport.writes] == [
-            R.HEARTBEAT.address,
-            R.CHARGING_RELEASE.address,
-            R.CHARGING_CURRENT_EMS.address,
-        ]
-        await recovery.async_stop()
-        assert not runtime.heartbeat._listeners
-        await runtime.client.async_close()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path, current=current)
+        try:
+            await service._recover()
+            assert await service.client.async_read_register(R.CHARGING_CURRENT_EMS) == current
+            assert service.data.get("error_code") == 0
+            assert service.diagnostics.recoveries == 1
+            assert [address for address, _ in transport.writes] == [
+                R.HEARTBEAT.address,
+                R.CHARGING_RELEASE.address,
+                R.CHARGING_CURRENT_EMS.address,
+            ]
+            # A cleared fault resets the budget and writes nothing more.
+            await service._recover()
+            assert service._attempts == 0
+            assert len(transport.writes) == 3
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
@@ -91,9 +94,10 @@ def test_recovery_preserves_the_current_and_clears_the_fault(current):
         "poll_failed",
     ],
 )
-def test_automatic_recovery_only_runs_when_it_is_appropriate(condition):
+def test_automatic_recovery_only_runs_when_it_is_appropriate(monkeypatch, tmp_path, condition):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime(
+        service, transport, _clock = await _runtime(
+            monkeypatch, tmp_path,
             current=8,
             error=0
             if condition == "healthy"
@@ -102,39 +106,44 @@ def test_automatic_recovery_only_runs_when_it_is_appropriate(condition):
             else 200,
             read_only=condition == "read_only",
         )
-        if condition == "heartbeat_down":
-            runtime.heartbeat._set_healthy(False)
-        elif condition == "no_heartbeat":
-            runtime.heartbeat = None
-        elif condition == "poll_failed":
-            runtime.coordinator.last_update_success = False
-        recovery.start()
-        assert recovery._task is None
-        assert recovery._retry is None
-        assert transport.writes == []
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        try:
+            if condition == "heartbeat_down":
+                service.heartbeat._set_healthy(False)
+            elif condition == "no_heartbeat":
+                service.heartbeat._set_healthy(None)
+            if condition == "poll_failed":
+                transport.read_exceptions[R.ERROR_CODE.address] = raise_connection_error()
+                await _one_poll_cycle(service)
+                assert service._success is False
+            else:
+                await service._recover()
+            assert service._attempts == 0
+            assert service.diagnostics.recoveries == 0
+            assert transport.writes == []
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_a_freshly_cleared_fault_receives_no_recovery_writes():
+def test_a_freshly_cleared_fault_receives_no_recovery_writes(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime()
-        recovery.start()
-        put(transport.bank, R.ERROR_CODE, 0)
-        await _finish(recovery)
-        assert transport.writes == []
-        assert recovery._retry is None
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path)
+        try:
+            put(transport.bank, R.ERROR_CODE, 0)
+            await service._recover()
+            assert transport.writes == []
+            assert service._attempts == 0
+            assert service.data.get("error_code") == 0
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_fault_returning_during_noop_recovery_retains_a_retry():
+def test_fault_returning_during_noop_recovery_retains_a_retry(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, transport, clock = await _runtime()
+        service, transport, clock = await _runtime(monkeypatch, tmp_path)
         original = transport.read_holding_registers
         first_error_read = True
 
@@ -149,78 +158,76 @@ def test_fault_returning_during_noop_recovery_retains_a_retry():
             return await original(address, **kwargs)
 
         transport.read_holding_registers = read
-        recovery.start()
-        await _finish(recovery)
-        assert not transport.writes
-        assert runtime.coordinator.current_data().get("error_code") == 200
-        assert recovery._retry is not None
-        await _retry(recovery, clock)
-        assert runtime.diagnostics.recoveries == 1
-        assert runtime.coordinator.current_data().get("error_code") == 0
-        assert recovery._retry is None
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        try:
+            await service._recover()
+            assert not transport.writes
+            assert service.data.get("error_code") == 200
+            assert service._attempts == 0
+            # The retry waits for its window, then recovers the returned fault.
+            clock[0] += 29
+            await service._recover()
+            assert not transport.writes
+            clock[0] += 2
+            await service._recover()
+            assert service.diagnostics.recoveries == 1
+            assert service.data.get("error_code") == 0
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_startup_write_floor_is_retried_without_manual_confirmation():
+def test_startup_write_floor_is_retried_without_manual_confirmation(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, _transport, clock = await _runtime()
-        runtime.client.write_state.limiter.record(
-            R.CHARGING_CURRENT_EMS.key, now=clock[0]
-        )
-        recovery.start()
-        await _finish(recovery)
-        assert runtime.diagnostics.recoveries == 0
-        assert recovery._attempts == 0
-        await _retry(recovery, clock, 5)
-        assert runtime.diagnostics.recoveries == 1
-        assert recovery._retry is None
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, _transport, clock = await _runtime(monkeypatch, tmp_path)
+        try:
+            service.client.write_state.limiter.record(R.CHARGING_CURRENT_EMS.key, now=clock[0])
+            await service._recover()
+            assert service.diagnostics.recoveries == 0
+            assert service._attempts == 0
+            clock[0] += 5
+            await service._recover()
+            assert service.diagnostics.recoveries == 1
+            assert service.data.get("error_code") == 0
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("failure", ["persistent_error", "read", "write"])
 @pytest.mark.parametrize("current", [1, 8])
-def test_recovery_has_a_bounded_retry_budget(failure, current):
+def test_recovery_has_a_bounded_retry_budget(monkeypatch, tmp_path, failure, current):
     async def run():
-        runtime, recovery, transport, clock = await _runtime(
-            clear_error=False, current=current
+        service, transport, clock = await _runtime(
+            monkeypatch, tmp_path, clear_error=False, current=current
         )
-        if failure == "read":
-            transport.read_exceptions[R.ERROR_CODE.address] = raise_connection_error()
-        elif failure == "write":
-            transport.write_exceptions[R.CHARGING_RELEASE.address] = (
-                raise_connection_error()
-            )
-        recovery.start()
-        await _finish(recovery)
-        for _ in range(2):
-            await _retry(recovery, clock)
-        assert recovery._attempts == 3
-        assert recovery._retry is None
-        recovery.async_check()
-        assert recovery._task is None
-        if current == 1:
-            assert all(
-                decode_register(R.CHARGING_CURRENT_EMS, words) == 1
-                for addr, words in transport.writes
-                if addr == R.CHARGING_CURRENT_EMS.address
-            )
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        try:
+            if failure == "read":
+                transport.read_exceptions[R.ERROR_CODE.address] = raise_connection_error()
+            elif failure == "write":
+                transport.write_exceptions[R.CHARGING_RELEASE.address] = raise_connection_error()
+            for _ in range(3):
+                await service._recover()
+                clock[0] += 31
+            assert service._attempts == 3
+            writes = list(transport.writes)
+            await service._recover()
+            assert transport.writes == writes
+            if current == 1:
+                assert all(value == 1 for value in _current_writes(transport))
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("remembered", [None, 0, 8, 16])
-def test_recovery_reasserts_unlimited_without_an_intermediate_limit(remembered):
+def test_recovery_reasserts_unlimited_without_an_intermediate_limit(monkeypatch, tmp_path, remembered):
     async def run():
-        runtime, recovery, _transport, clock = await _runtime(current=0)
-        runtime.control.charging_setpoint = remembered
+        service, _transport, clock = await _runtime(monkeypatch, tmp_path, current=0)
+        control = service.control
+        control.charging_setpoint = remembered
         slept = []
 
         async def sleep(delay):
@@ -228,160 +235,149 @@ def test_recovery_reasserts_unlimited_without_an_intermediate_limit(remembered):
             clock[0] += delay
             await asyncio.sleep(0)
 
-        runtime.control._sleep = sleep
-        recovery.start()
-        await _finish(recovery)
-        if task := runtime.control._flush_task:
-            await task
-        assert slept == []
-        assert runtime.control._flush_task is None
-        assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == 0
-        assert runtime.control.charging_setpoint == 0
-        await recovery.async_stop()
-        await runtime.control.async_shutdown()
-        await runtime.client.async_close()
+        control._sleep = sleep
+        try:
+            await service._recover()
+            if task := control._flush_task:
+                await task
+            assert slept == []
+            assert control._flush_task is None
+            assert await service.client.async_read_register(R.CHARGING_CURRENT_EMS) == 0
+            assert control.charging_setpoint == 0
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("current", [-1, float("nan"), float("inf")])
-def test_invalid_fresh_current_cannot_trigger_recovery(current):
+def test_invalid_fresh_current_cannot_trigger_recovery(monkeypatch, tmp_path, current):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime()
-        recovery.start()
-        put(transport.bank, R.CHARGING_CURRENT_EMS, current)
-        await _finish(recovery)
-        assert runtime.diagnostics.recoveries == 0
-        assert recovery._attempts == 1
-        assert transport.writes == []
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path)
+        try:
+            put(transport.bank, R.CHARGING_CURRENT_EMS, current)
+            await service._recover()
+            assert service.diagnostics.recoveries == 0
+            assert service._attempts == 1
+            assert transport.writes == []
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_a_different_fresh_fault_is_not_reset():
+def test_a_different_fresh_fault_is_not_reset(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime()
-        recovery.start()
-        put(transport.bank, R.ERROR_CODE, 2011)
-        await _finish(recovery)
-        assert runtime.diagnostics.recoveries == 0
-        assert transport.writes == []
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path)
+        try:
+            put(transport.bank, R.ERROR_CODE, 2011)
+            await service._recover()
+            assert service.diagnostics.recoveries == 0
+            assert transport.writes == []
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_recovery_has_no_delayed_unlimited_write_that_can_lift_a_later_pause():
+def test_recovery_has_no_delayed_unlimited_write_that_can_lift_a_later_pause(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, transport, clock = await _runtime(current=0)
-        recovery.start()
-        await _finish(recovery)
-        assert runtime.control._flush_task is None
-        clock[0] += 5
-        await runtime.control.async_pause_charging()
-        assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == 1
-        assert runtime.control.charging_setpoint == 0
-        assert runtime.control.pause_requested is True
-        assert (
-            len(
-                [
-                    addr
-                    for addr, _ in transport.writes
-                    if addr == R.CHARGING_CURRENT_EMS.address
-                ]
-            )
-            == 2
-        )
-        await recovery.async_stop()
-        await runtime.control.async_shutdown()
-        await runtime.client.async_close()
+        service, transport, clock = await _runtime(monkeypatch, tmp_path, current=0)
+        control = service.control
+        try:
+            await service._recover()
+            assert control._flush_task is None
+            clock[0] += 5
+            await control.async_pause_charging()
+            assert await service.client.async_read_register(R.CHARGING_CURRENT_EMS) == 1
+            assert control.charging_setpoint == 0
+            assert control.pause_requested is True
+            assert len(_current_writes(transport)) == 2
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("current", [0, 1, 8])
-def test_saved_pause_wins_over_changed_current_readback(current):
+def test_saved_pause_wins_over_changed_current_readback(monkeypatch, tmp_path, current):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime(current=current)
-        runtime.control.pause_requested = True
-        runtime.control.charging_setpoint = 10
-        recovery.start()
-        await _finish(recovery)
-        assert runtime.control.charging_setpoint == 10
-        assert runtime.control.pause_requested is True
-        assert runtime.control.is_paused is True
-        assert [
-            decode_register(R.CHARGING_CURRENT_EMS, words)
-            for addr, words in transport.writes
-            if addr == R.CHARGING_CURRENT_EMS.address
-        ] == [1]
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path, current=current)
+        control = service.control
+        control.pause_requested = True
+        control.charging_setpoint = 10
+        try:
+            await service._recover()
+            assert control.charging_setpoint == 10
+            assert control.pause_requested is True
+            assert control.is_paused is True
+            assert _current_writes(transport) == [1]
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_a_device_lock_is_not_removed_or_used_to_skip_recovery():
+def test_a_device_lock_is_not_removed_or_used_to_skip_recovery(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime()
-        put(transport.bank, R.LOCK_EVSE, 1)
-        await runtime.coordinator.async_refresh()
-        recovery.start()
-        await _finish(recovery)
-        assert await runtime.client.async_read_register(R.LOCK_EVSE) == 1
-        assert not any(addr == R.LOCK_EVSE.address for addr, _ in transport.writes)
-        assert runtime.coordinator.current_data().get("error_code") == 0
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path)
+        try:
+            put(transport.bank, R.LOCK_EVSE, 1)
+            await service.refresh()
+            await service._recover()
+            assert await service.client.async_read_register(R.LOCK_EVSE) == 1
+            assert not any(addr == R.LOCK_EVSE.address for addr, _ in transport.writes)
+            assert service.data.get("error_code") == 0
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("when", ["before", "queued"])
-def test_recovery_reasserts_a_blocked_release_instead_of_enabling_it(when):
+def test_recovery_reasserts_a_blocked_release_instead_of_enabling_it(monkeypatch, tmp_path, when):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime()
-        if when == "queued":
-            recovery.start()
-            task = recovery._task
-        await runtime.control.async_set_charging_release(False)
-        if when == "before":
-            recovery.start()
-            task = recovery._task
-        await asyncio.wait_for(task, 10)
-        assert [
-            values
-            for addr, values in transport.writes
-            if addr == R.CHARGING_RELEASE.address
-        ] == [[0], [0]]
-        assert runtime.diagnostics.recoveries == 1
-        assert recovery._retry is None
-        assert runtime.control.charging_release_requested is False
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path)
+        control = service.control
+        try:
+            if when == "queued":
+                # Created, not yet run: the block arrives while it waits.
+                task = asyncio.create_task(service._recover())
+            await control.async_set_charging_release(False)
+            if when == "before":
+                task = asyncio.create_task(service._recover())
+            await asyncio.wait_for(task, 10)
+            assert [
+                values
+                for addr, values in transport.writes
+                if addr == R.CHARGING_RELEASE.address
+            ] == [[0], [0]]
+            assert service.diagnostics.recoveries == 1
+            assert control.charging_release_requested is False
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_manual_repair_is_not_an_explicit_charging_release():
+def test_manual_repair_is_not_an_explicit_charging_release(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, _transport, _clock = await _runtime()
-        await runtime.control.async_set_charging_release(False)
-        assert await runtime.control.async_recover_from_error()
-        assert runtime.control.charging_release_requested is False
-        assert await runtime.client.async_read_register(R.CHARGING_RELEASE) == 0
-        await recovery.async_stop()
-        await runtime.client.async_close()
+        service, _transport, _clock = await _runtime(monkeypatch, tmp_path)
+        control = service.control
+        try:
+            await control.async_set_charging_release(False)
+            assert await control.async_recover_from_error()
+            assert control.charging_release_requested is False
+            assert await service.client.async_read_register(R.CHARGING_RELEASE) == 0
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 
 
-def test_unload_cancels_pending_recovery_and_releases_listeners():
+def test_stopping_the_service_cancels_a_pending_recovery(monkeypatch, tmp_path):
     async def run():
-        runtime, recovery, transport, _clock = await _runtime()
+        service, transport, _clock = await _runtime(monkeypatch, tmp_path)
         entered = asyncio.Event()
         block = asyncio.Event()
         original = transport.read_holding_registers
@@ -392,23 +388,28 @@ def test_unload_cancels_pending_recovery_and_releases_listeners():
             return await original(*args, **kwargs)
 
         transport.read_holding_registers = read
-        recovery.start()
-        task = recovery._task
+        service._task = asyncio.create_task(service._polling_loop())
+        task = service._task
         await asyncio.wait_for(entered.wait(), 10)
-        await recovery.async_stop()
+        await service.stop()
         assert task.cancelled()
-        assert recovery._retry is None
-        assert recovery._remove == []
-        assert not runtime.heartbeat._listeners
+        assert service.diagnostics.recoveries == 0
         assert transport.writes == []
-        await recovery.async_stop()
-        await runtime.client.async_close()
 
     asyncio.run(run())
 
 
+async def _stop_home_assistant(hass):
+    """Stop HA as a restart does: the process ends, and the service with it."""
+    from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
+
+    await hass.async_stop()
+    for host in list(hass.data.get(f"{DOMAIN}_embedded", {}).values()):
+        await host.async_stop()
+
+
 @pytest.mark.parametrize("clear_delay", [0, 2])
-def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_delay):
+def test_recovery_and_repairs_complete_in_real_home_assistant(monkeypatch, tmp_path, clear_delay):
     from homeassistant.components.repairs import issue_handler
     from homeassistant.helpers import issue_registry as ir
 
@@ -487,17 +488,18 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_de
                 # a button press, including the cold-start write floor.
                 put(transport.bank, R.ERROR_CODE, 200)
                 hass.config_entries.async_update_entry(
-                    entry, options={"control_mode": CONTROL_MODE_MASTER}
+                    entry, options={"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 2}
                 )
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
 
                 async def recovered(count):
                     ready = asyncio.Event()
 
                     def check():
                         if (
-                            runtime.diagnostics.recoveries >= count
+                            service.diagnostics.recoveries >= count
                             and issues.async_get_issue(DOMAIN, issue_id) is None
                         ):
                             ready.set()
@@ -510,12 +512,10 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_de
                         pytest.fail(
                             repr(
                                 {
-                                    "recoveries": runtime.diagnostics.recoveries,
-                                    "task": runtime.recovery._task,
-                                    "retry": runtime.recovery._retry,
-                                    "attempts": runtime.recovery._attempts,
-                                    "heartbeat": runtime.heartbeat.healthy,
-                                    "paused": runtime.control.is_paused,
+                                    "recoveries": service.diagnostics.recoveries,
+                                    "attempts": service._attempts,
+                                    "heartbeat": service.heartbeat.healthy,
+                                    "paused": service.control.is_paused,
                                     "error": runtime.coordinator.current_data().get(
                                         "error_code"
                                     ),
@@ -531,32 +531,41 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_de
 
                 await asyncio.wait_for(recovered(1), 15)
                 assert (
-                    await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS)
+                    await service.client.async_read_register(R.CHARGING_CURRENT_EMS)
                     == 8
                 )
-                assert (
-                    hass.states.get("sensor.mennekes_amtron_connection_quality").attributes["heartbeat"]
-                    == "ok"
-                )
+                # The connection-quality sensor is off by default; its row reads
+                # the same runtime that a user enabling it would see.
+                quality = next(row for row in SENSORS if row.key == "connection_quality")
+                assert quality.attributes(runtime)["heartbeat"] == "ok"
 
-                # A new fault fifteen seconds later is its own incident.
-                clock = [runtime.control._monotonic() + 15]
-                runtime.client._monotonic = lambda: clock[0]
-                runtime.control._monotonic = lambda: clock[0]
+                # A new fault after the service's retry window is its own
+                # incident; the service sees that time pass on its own clocks.
+                offset = [31.0]
+                clock = [service.control._monotonic() + offset[0]]
+                service.client._monotonic = lambda: clock[0]
+                service.control._monotonic = lambda: clock[0]
+                monotonic = time.monotonic
+                monkeypatch.setattr(
+                    service_runtime, "time", SimpleNamespace(monotonic=lambda: monotonic() + offset[0])
+                )
                 put(transport.bank, R.ERROR_CODE, 200)
+                await service.refresh()
                 await runtime.coordinator.async_refresh()
                 await asyncio.wait_for(recovered(2), 10)
                 assert (
-                    await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS)
+                    await service.client.async_read_register(R.CHARGING_CURRENT_EMS)
                     == 8
                 )
 
                 # Manual recovery also stays open until the device confirms
                 # success, and then the actual HA manager removes the issue.
-                await runtime.recovery.async_stop()
+                # The automatic recovery is held back so only the repair acts.
+                service._retry_at = float("inf")
                 clear_error = False
                 clock[0] += 10
                 put(transport.bank, R.ERROR_CODE, 200)
+                await service.refresh()
                 await runtime.coordinator.async_refresh()
                 flow_id = await open_repair()
                 result = await manager.async_configure(flow_id, {})
@@ -568,10 +577,9 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_de
                 assert result["type"] == "create_entry"
                 assert issues.async_get_issue(DOMAIN, issue_id) is None
                 assert await hass.config_entries.async_unload(entry.entry_id)
-                assert runtime.recovery._remove == []
-                assert runtime.recovery._retry is None
+                assert entry.entry_id not in hass.data[f"{DOMAIN}_embedded"]
             finally:
-                await hass.async_stop()
+                await _stop_home_assistant(hass)
 
     asyncio.run(asyncio.wait_for(run(), 60))
 
@@ -654,14 +662,15 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                 await hass.async_block_till_done()
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
                 hass.config_entries.async_update_entry(
-                    entry, options={"control_mode": CONTROL_MODE_MASTER}
+                    entry, options={"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 2}
                 )
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
                 # First accept the deliberate stop after the cold-start
                 # transition guard; only executed intent is persisted.
-                clock = [runtime.control._monotonic() + 301]
-                runtime.control._monotonic = runtime.client._monotonic = lambda: clock[
+                clock = [service.control._monotonic() + 301]
+                service.control._monotonic = service.client._monotonic = lambda: clock[
                     0
                 ]
                 entity_id = "switch.mennekes_amtron_" + (
@@ -687,7 +696,7 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                     blocked == "pause"
                 )
             finally:
-                await hass.async_stop()
+                await _stop_home_assistant(hass)
 
             shutil.rmtree(target / "custom_components" / DOMAIN)
             put(transport.bank, R.ERROR_CODE, 200)
@@ -701,6 +710,7 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                 assert await hass.config_entries.async_setup(entry.entry_id)
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
                 assert getattr(runtime.control, intent_key) is (blocked == "pause")
                 complete = asyncio.Event()
 
@@ -714,12 +724,9 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                     await asyncio.wait_for(complete.wait(), 15)
                 finally:
                     remove()
-                if task := runtime.recovery._task:
-                    await asyncio.wait_for(task, 10)
                 await hass.async_block_till_done()
-                assert runtime.diagnostics.recoveries == 1
+                assert service.diagnostics.recoveries == 1
                 assert not any(permitted)
-                assert runtime.recovery._retry is None
                 assert hass.states.get(entity_id).state == (
                     "on" if blocked == "pause" else "off"
                 )
@@ -733,13 +740,15 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                     )
 
                 # The same stopped state must survive an explicit repair too.
-                await runtime.recovery.async_stop()
-                clock = [runtime.control._monotonic() + 30]
-                runtime.control._monotonic = runtime.client._monotonic = lambda: clock[
+                # The automatic recovery is held back so only the repair acts.
+                service._retry_at = float("inf")
+                clock = [service.control._monotonic() + 30]
+                service.control._monotonic = service.client._monotonic = lambda: clock[
                     0
                 ]
                 put(transport.bank, R.ERROR_CODE, 200)
                 seen.clear()
+                await service.refresh()
                 await runtime.coordinator.async_refresh()
                 issue_id = f"{entry.entry_id}_ems_heartbeat_lost"
                 hass.data.setdefault("repairs", {})
@@ -767,6 +776,6 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                     assert current() == 8
                     assert runtime.control.pause_requested is False
             finally:
-                await hass.async_stop()
+                await _stop_home_assistant(hass)
 
     asyncio.run(asyncio.wait_for(run(), 60))

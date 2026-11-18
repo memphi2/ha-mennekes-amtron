@@ -20,7 +20,7 @@ from homeassistant.util import dt as dt_util
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
-from tests.recorder_replay import DEFAULT_STATISTICS, DETAILS, EXTRAS
+from tests.recorder_replay import DEFAULT_STATISTICS, DETAILS, EXTRAS, embedded_service
 from tests.test_home_assistant_smoke import _boot
 
 PREFIX = "sensor.mennekes_amtron_"
@@ -89,8 +89,10 @@ def test_hourly_statistics_and_recorder_exclusions(
                 timestamp += 150
                 put(transport.bank, R.ENERGY_TOTAL, 1234.75)
                 put(transport.bank, R.POWER_TOTAL, 1000.0)
-                coordinator._poller._slow_read_at = None
-                coordinator._poller._active_read_at = None
+                service = embedded_service(hass, entry)
+                service._poller._slow_read_at = None
+                service._poller._active_read_at = None
+                await service.refresh()
                 coordinator.async_set_updated_data(
                     await coordinator._async_update_data()
                 )

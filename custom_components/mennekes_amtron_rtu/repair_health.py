@@ -10,12 +10,12 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .entry_types import MennekesAmtronConfigEntry
-from .remote import RemoteClient
 from .repair_issues import (
     ISSUE_HEARTBEAT_UNAVAILABLE,
     ISSUE_SERVICE_UNAVAILABLE,
     heartbeat_lost,
 )
+from .service_client import CONF_SERVER_URL
 
 HEARTBEAT_REPAIR_DELAY = 60.0
 _ISSUES = (ISSUE_HEARTBEAT_UNAVAILABLE, ISSUE_SERVICE_UNAVAILABLE)
@@ -57,21 +57,22 @@ class HeartbeatRepairMonitor:
             return None
         runtime = self._entry.runtime_data
         if isinstance(runtime.coordinator.last_exception, ConfigEntryAuthFailed):
-            # HA already asks for the corrected credentials. The intentionally
-            # stopped heartbeat must not add an unrelated connectivity repair.
+            # HA already asks for the corrected credentials; the heartbeat it
+            # cannot send meanwhile is no separate connectivity repair.
             return None
         heartbeat = runtime.heartbeat
         if heartbeat is None:
             return None
-        if isinstance(runtime.client, RemoteClient):
-            # RemoteControl.read_only also means temporarily unreachable. Use
-            # the last authenticated app policy instead, including HTTP outages.
-            if runtime.client.snapshot.get("control", {}).get("read_only") is not False:
-                return None
-            if not runtime.client.connected:
-                return ISSUE_SERVICE_UNAVAILABLE
-        elif runtime.control.read_only:
+        # ServiceControl.read_only also means temporarily unreachable. Use the
+        # last valid policy of the service instead, including outages.
+        if runtime.client.snapshot.get("control", {}).get("read_only") is not False:
             return None
+        if not runtime.client.connected:
+            # Only an app runs apart from Home Assistant and may keep its
+            # heartbeat; without one, the heartbeat itself is what is missing.
+            if CONF_SERVER_URL in self._entry.data:
+                return ISSUE_SERVICE_UNAVAILABLE
+            return ISSUE_HEARTBEAT_UNAVAILABLE
         if heartbeat.healthy is not False:
             return None
         coordinator = runtime.coordinator

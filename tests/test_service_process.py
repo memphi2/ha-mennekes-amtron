@@ -17,7 +17,7 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.fakes import device_bank
 from tests.test_home_assistant_smoke import _boot, _start_wallbox
 from tests.test_modbus_service import TOKEN
@@ -76,7 +76,7 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
         )
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, f"http://127.0.0.1:{port}", TOKEN)
+                remote = ServiceClient(session, f"http://127.0.0.1:{port}", TOKEN)
 
                 async def ready():
                     while True:
@@ -119,7 +119,7 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
                         blocking=True,
                     )
                     await remote.update()
-                    assert remote.write_state.pause_requested is True
+                    assert remote.snapshot["control"]["pause_requested"] is True
                     before = remote.snapshot["diagnostics"]["heartbeats_sent"]
                     commands = remote.snapshot["diagnostics"]["writes_sent"]
                 finally:
@@ -163,19 +163,19 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
         assert process.returncode == 0
         log = (stdout + stderr).decode()
         for message in (
-            "Starting Mennekes Amtron Modbus service",
-            "Configuration accepted",
-            "Service API ready",
-            "Serial connection established",
-            "Heartbeat started",
-            "Heartbeat acknowledged",
-            "SIGTERM received",
-            "Heartbeat stopped",
-            "Serial connection closed",
-            "Modbus service shutdown complete",
+            "Service: starting Mennekes Amtron Modbus service",
+            "Service: configuration accepted",
+            "Service: API ready",
+            "Connection: serial connection established",
+            "Heartbeat: started",
+            "Heartbeat: acknowledged",
+            "Service: SIGTERM received",
+            "Heartbeat: stopped",
+            "Connection: serial connection closed",
+            "Service: shutdown complete",
         ):
             assert message in log
-        assert log.count("Heartbeat acknowledged") == 1
+        assert log.count("Heartbeat: acknowledged") == 1
         assert TOKEN not in log
 
     asyncio.run(asyncio.wait_for(run(), 90))

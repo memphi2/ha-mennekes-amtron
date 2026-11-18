@@ -19,7 +19,7 @@ from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
 
 
-def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
+def test_activity_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
     async def run() -> None:
         transport = FakeModbusClient(device_bank())
         with (
@@ -51,38 +51,17 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 registered = er.async_entries_for_config_entry(registry, entry.entry_id)
                 event_id = next(
                     item.entity_id for item in registered
-                    if item.unique_id.endswith("_control_result")
+                    if item.unique_id.endswith("_activity")
                 )
-                wallbox_event_id = next(
-                    item.entity_id for item in registered
-                    if item.unique_id.endswith("_wallbox_event")
-                )
-                # Wallbox changes are enabled by default and start without a baseline event.
-                assert registry.async_get(wallbox_event_id).disabled_by is None
-                assert hass.states.get(wallbox_event_id).state == STATE_UNKNOWN
                 number_id = next(
                     item.entity_id for item in registered
                     if item.unique_id.endswith("_charging_current_limit")
                 )
-                assert registry.async_get(event_id).disabled_by is er.RegistryEntryDisabler.INTEGRATION
-                assert hass.states.get(event_id) is None
-
-                # Explicit registry opt-in uses HA's actual entry reload path.
-                entry.runtime_data.control.events.record("executed", "lock")
-                enabled = asyncio.Event()
-                remove_enabled = hass.bus.async_listen(
-                    EVENT_STATE_CHANGED,
-                    lambda event: enabled.set()
-                    if event.data["entity_id"] == event_id
-                    and event.data["new_state"] is not None
-                    and event.data["new_state"].state == STATE_UNKNOWN else None,
-                )
-                registry.async_update_entity(event_id, disabled_by=None)
-                await asyncio.wait_for(enabled.wait(), 10)
-                await hass.async_block_till_done()
-                remove_enabled()
+                # Activity is enabled by default and starts without a baseline event.
+                assert registry.async_get(event_id).disabled_by is None
                 assert hass.states.get(event_id).state == STATE_UNKNOWN
                 assert hass.states.get(event_id).attributes["event_type"] is None
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
 
                 activity = []
                 remove_activity = hass.bus.async_listen(EVENT_LOGBOOK_ENTRY, activity.append)
@@ -90,17 +69,22 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                     "number", "set_value", {"entity_id": number_id, "value": 10},
                     blocking=True,
                 )
-                if pending := entry.runtime_data.control._flush_task:
+                if pending := service.control._flush_task:
                     await pending
+                await entry.runtime_data.coordinator.async_refresh()
                 await hass.async_block_till_done()
                 recorded = hass.states.get(event_id)
                 assert dt_util.parse_datetime(recorded.state) is not None
-                assert {key: recorded.attributes[key] for key in ("event_type", "action", "reason")} == {
-                    "event_type": "set_current_executed", "action": "set_current", "reason": "completed",
+                assert {
+                    key: recorded.attributes[key]
+                    for key in ("event_type", "action", "result", "reason", "trigger", "value")
+                } == {
+                    "event_type": "command_done", "action": "set_current", "result": "executed",
+                    "reason": "completed", "trigger": "home_assistant", "value": 10,
                 }
 
                 assert len(activity) == 1
-                assert activity[0].data["entity_id"] == wallbox_event_id
+                assert activity[0].data["entity_id"] == event_id
                 assert "Home Assistant" in activity[0].data["message"]
                 assert "10 A" in activity[0].data["message"]
                 activity.clear()
@@ -111,6 +95,7 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                     if event.data["entity_id"] == event_id else None,
                 )
                 for _ in range(3):
+                    await service.refresh()
                     await entry.runtime_data.coordinator.async_refresh()
                 await hass.async_block_till_done()
                 assert changes == []
@@ -119,12 +104,14 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 remove()
 
                 old_feed = entry.runtime_data.control.events
-                assert len(old_feed._listeners) == 2
+                assert len(old_feed._listeners) == 1
                 assert await hass.config_entries.async_unload(entry.entry_id)
                 await hass.async_block_till_done()
                 assert not old_feed._listeners
                 old_feed.record("failed", "resume", "connection_error")
                 assert await hass.config_entries.async_setup(entry.entry_id)
+                await hass.async_block_till_done()
+                await entry.runtime_data.coordinator.async_refresh()
                 await hass.async_block_till_done()
 
                 # Restore the old timestamp, never replay a buffered command.
@@ -133,7 +120,7 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 assert restored.attributes == recorded.attributes
                 assert entry.runtime_data.control.events is not old_feed
                 assert entry.runtime_data.control.events.snapshot()["events"] == []
-                assert len(entry.runtime_data.control.events._listeners) == 2
+                assert len(entry.runtime_data.control.events._listeners) == 1
                 await entry.runtime_data.control.async_set_lock_evse(False)
                 await hass.async_block_till_done()
                 assert hass.states.get(event_id).state > recorded.state

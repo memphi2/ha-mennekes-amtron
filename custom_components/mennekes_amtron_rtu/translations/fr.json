@@ -207,17 +207,19 @@
       "charging": {
         "name": "Charge en cours"
       },
-      "downgrade_active": {
-        "name": "Limitation externe active"
-      },
       "error": {
-        "name": "Erreur"
-      },
-      "master_lost_fallback": {
-        "name": "Repli du gestionnaire d’énergie actif"
+        "name": "Erreur",
+        "state_attributes": {
+          "heartbeat_lost": {
+            "name": "Repli du gestionnaire d’énergie actif"
+          }
+        }
       },
       "vehicle_connected": {
         "name": "Véhicule connecté"
+      },
+      "guest_charging": {
+        "name": "Recharge invité"
       }
     },
     "button": {
@@ -229,15 +231,6 @@
       },
       "cancel_pending_change": {
         "name": "Annuler la modification en attente"
-      },
-      "assign_vehicle_charge": {
-        "name": "Associer l’énergie de charge du véhicule"
-      },
-      "timed_next_calendar_event": {
-        "name": "Utiliser le prochain événement"
-      },
-      "timed_vehicle_departure": {
-        "name": "Utiliser le départ du véhicule"
       },
       "guest_start": {
         "name": "Démarrer la recharge invité"
@@ -327,22 +320,8 @@
         "name": "Température"
       },
       "wallbox_settings": {
-        "name": "Réglages de la wallbox"
-      },
-      "pending_change": {
-        "name": "Changement en attente",
-        "state": {
-          "none": "Aucun changement en attente",
-          "pause": "Mettre la charge en pause",
-          "resume": "Reprendre la charge",
-          "set_current": "Régler le courant de charge",
-          "single_phase": "Utiliser une phase",
-          "all_phases": "Utiliser toutes les phases disponibles",
-          "enable_charging": "Autoriser la charge",
-          "disable_charging": "Désactiver l’autorisation de charge",
-          "unlock": "Déverrouiller la borne",
-          "lock": "Verrouiller la borne"
-        }
+        "name": "Réglages de la wallbox",
+        "state_attributes": {}
       },
       "charging_status": {
         "name": "État de la recharge",
@@ -361,6 +340,11 @@
           "checking_status": "Vérification de l’état",
           "state_uncertain": "État ambigu",
           "data_missing": "En attente de mesures"
+        },
+        "state_attributes": {
+          "downgraded_to": {
+            "name": "Limitation externe active"
+          }
         }
       },
       "connection_quality": {
@@ -376,24 +360,6 @@
           "retried_transactions": {
             "name": "Transactions répétées"
           }
-        }
-      },
-      "energy_goal_status": {
-        "name": "État de l’objectif énergétique",
-        "state": {
-          "disabled": "Désactivé",
-          "active": "Actif",
-          "reached": "Objectif énergétique atteint",
-          "meter_unavailable": "Mesure d’énergie indisponible",
-          "meter_reset": "Valeur du compteur en baisse"
-        }
-      },
-      "soc_goal_status": {
-        "name": "État de l’objectif de charge du véhicule",
-        "state": {
-          "disabled": "Désactivé",
-          "active": "Actif",
-          "reached": "Objectif atteint"
         }
       },
       "last_charging_loss": {
@@ -442,70 +408,50 @@
           }
         }
       },
-      "timed_goal_status": {
-        "name": "État de la charge programmée",
+      "operation_waiting": {
+        "name": "Motif d’attente de la recharge",
         "state": {
-          "disabled": "Désactivé",
-          "waiting_for_target": "En attente de la cible en %",
-          "waiting_for_capacity": "En attente de la capacité",
-          "waiting_for_soc": "En attente du niveau de charge",
-          "waiting_for_device": "En attente de la borne",
+          "none": "Rien ne retient la recharge",
+          "wallbox_unavailable": "Borne injoignable",
+          "no_vehicle": "Aucun véhicule connecté",
+          "release_off": "Autorisation de recharge désactivée",
+          "plug_charge_waiting": "Le Plug & Charge virtuel n’a pas autorisé le véhicule",
+          "meter_unavailable": "En attente du compteur d’énergie",
           "vehicle_unconfirmed": "Véhicule non confirmé",
+          "until_planned_start": "En pause jusqu’au démarrage prévu",
+          "estimated_target_reached": "Chargé jusqu’à l’objectif estimé",
+          "waiting_for_device": "En attente de la borne",
+          "waiting_for_soc": "En attente du niveau de charge",
+          "waiting_for_capacity": "En attente de la capacité",
+          "waiting_for_target": "En attente de la cible en %",
           "read_only": "Lecture seule",
-          "guest_mode": "La recharge invité est prioritaire",
-          "queued": "Modification en attente",
-          "paused_until_start": "En pause jusqu’au démarrage",
-          "minimum_level": "Recharge jusqu’au niveau minimal",
-          "charging": "Charge au courant maximal",
-          "finishing": "Termine au courant minimal",
-          "unreachable": "Cible peut-être inaccessible",
-          "late": "Heure cible dépassée",
-          "estimated_reached": "Chargé jusqu’à l’objectif estimé",
-          "reached": "Cible atteinte",
-          "write_pending": "Écriture en attente",
-          "error": "Erreur"
-        }
-      },
-      "virtual_plug_charge_status": {
-        "name": "État de Plug & Charge virtuel",
-        "state": {
-          "waiting_vehicle": "En attente du véhicule",
-          "waiting_detection": "En attente de données actuelles",
-          "vehicle_not_selected": "Véhicule reconnu non sélectionné",
-          "waiting_release": "En attente de l’autorisation de charge",
-          "authorized": "Véhicule autorisé",
-          "manual_release": "Autorisé manuellement",
-          "blocked": "Charge bloquée",
-          "disabled": "Désactivé"
+          "command_pending": "Modification en attente",
+          "target_reached": "Cible atteinte",
+          "paused": "Recharge en pause"
         },
         "state_attributes": {
-          "blocked_reason": {
-            "name": "Motif du blocage",
+          "controller": {
+            "name": "Pilotage de la recharge",
             "state": {
-              "connection_lost": "Connexion perdue",
-              "gate_inactive": "Verrou d'autorisation inactif",
-              "read_only": "Mode lecture seule",
-              "departure_plan": "La planification du départ prépare le courant",
-              "pause_requested": "Charge en pause",
-              "release_off": "Autorisation de charge désactivée",
-              "energy_goal_stop": "Objectif d'énergie atteint",
-              "wallbox_locked": "Borne verrouillée",
-              "error_code": "Erreur de la borne",
-              "authorization_required": "Authentification activée sur la borne",
-              "register_unavailable": "Valeur de registre indisponible"
+              "unavailable": "Borne injoignable",
+              "departure_plan": "Planification du départ",
+              "direct": "Commande directe",
+              "guest": "Ordre invité"
             }
-          }
-        }
-      },
-      "operation_controller": {
-        "name": "Pilotage de la recharge",
-        "state": {
-          "unavailable": "Borne injoignable",
-          "departure_plan": "Planification du départ",
-          "direct": "Commande directe",
-          "guest": "Ordre invité"
-        },
-        "state_attributes": {
+          },
+          "next_event": {
+            "name": "Prochaine étape de recharge",
+            "state": {
+              "none": "Rien de prévu",
+              "queued_command": "La modification en attente s’exécute",
+              "plan_start": "La recharge planifiée démarre",
+              "target_reached": "Cible attendue",
+              "departure": "Heure cible"
+            }
+          },
+          "next_at": {
+            "name": "Heure"
+          },
           "vehicle": {
             "name": "Véhicule",
             "state": {
@@ -527,70 +473,95 @@
           },
           "target_deadline": {
             "name": "Heure cible"
-          }
-        }
-      },
-      "operation_waiting": {
-        "name": "Motif d’attente de la recharge",
-        "state": {
-          "none": "Rien ne retient la recharge",
-          "wallbox_unavailable": "Borne injoignable",
-          "no_vehicle": "Aucun véhicule connecté",
-          "release_off": "Autorisation de recharge désactivée",
-          "plug_charge_waiting": "Le Plug & Charge virtuel n’a pas autorisé le véhicule",
-          "meter_unavailable": "En attente du compteur d’énergie",
-          "vehicle_unconfirmed": "Véhicule non confirmé",
-          "until_planned_start": "En pause jusqu’au démarrage prévu",
-          "estimated_target_reached": "Chargé jusqu’à l’objectif estimé",
-          "waiting_for_device": "En attente de la borne",
-          "waiting_for_soc": "En attente du niveau de charge",
-          "waiting_for_capacity": "En attente de la capacité",
-          "waiting_for_target": "En attente de la cible en %",
-          "read_only": "Lecture seule",
-          "command_pending": "Modification en attente",
-          "target_reached": "Cible atteinte",
-          "paused": "Recharge en pause"
-        }
-      },
-      "operation_next": {
-        "name": "Prochaine étape de recharge",
-        "state": {
-          "none": "Rien de prévu",
-          "queued_command": "La modification en attente s’exécute",
-          "plan_start": "La recharge planifiée démarre",
-          "target_reached": "Cible attendue",
-          "departure": "Heure cible"
-        },
-        "state_attributes": {
-          "at": {
-            "name": "Heure"
-          }
-        }
-      },
-      "guest_charging": {
-        "name": "Recharge invité",
-        "state": {
-          "inactive": "Inactif",
-          "active": "Actif"
-        },
-        "state_attributes": {
-          "start": {
-            "name": "Début"
           },
-          "finish": {
-            "name": "Fin"
+          "pending": {
+            "name": "Changement en attente",
+            "state": {
+              "none": "Aucun changement en attente",
+              "pause": "Mettre la charge en pause",
+              "resume": "Reprendre la charge",
+              "set_current": "Régler le courant de charge",
+              "single_phase": "Utiliser une phase",
+              "all_phases": "Utiliser toutes les phases disponibles",
+              "enable_charging": "Autoriser la charge",
+              "disable_charging": "Désactiver l’autorisation de charge",
+              "unlock": "Déverrouiller la borne",
+              "lock": "Verrouiller la borne"
+            }
           },
-          "current": {
-            "name": "Courant"
+          "pending_at": {
+            "name": "Modification en attente à"
           },
-          "energy": {
-            "name": "Énergie"
+          "energy_target": {
+            "name": "État de l’objectif énergétique",
+            "state": {
+              "disabled": "Désactivé",
+              "active": "Actif",
+              "reached": "Objectif énergétique atteint",
+              "meter_unavailable": "Mesure d’énergie indisponible",
+              "meter_reset": "Valeur du compteur en baisse"
+            }
           },
-          "delivered": {
-            "name": "Fournie"
+          "vehicle_target": {
+            "name": "État de l’objectif de charge du véhicule",
+            "state": {
+              "disabled": "Désactivé",
+              "active": "Actif",
+              "reached": "Objectif atteint"
+            }
           },
-          "reason": {
-            "name": "Motif"
+          "departure_plan": {
+            "name": "État de la charge programmée",
+            "state": {
+              "disabled": "Désactivé",
+              "waiting_for_target": "En attente de la cible en %",
+              "waiting_for_capacity": "En attente de la capacité",
+              "waiting_for_soc": "En attente du niveau de charge",
+              "waiting_for_device": "En attente de la borne",
+              "vehicle_unconfirmed": "Véhicule non confirmé",
+              "read_only": "Lecture seule",
+              "guest_mode": "La recharge invité est prioritaire",
+              "queued": "Modification en attente",
+              "paused_until_start": "En pause jusqu’au démarrage",
+              "minimum_level": "Recharge jusqu’au niveau minimal",
+              "charging": "Charge au courant maximal",
+              "finishing": "Termine au courant minimal",
+              "unreachable": "Cible peut-être inaccessible",
+              "late": "Heure cible dépassée",
+              "estimated_reached": "Chargé jusqu’à l’objectif estimé",
+              "reached": "Cible atteinte",
+              "write_pending": "Écriture en attente",
+              "error": "Erreur"
+            }
+          },
+          "plug_charge": {
+            "name": "État de Plug & Charge virtuel",
+            "state": {
+              "waiting_vehicle": "En attente du véhicule",
+              "waiting_detection": "En attente de données actuelles",
+              "vehicle_not_selected": "Véhicule reconnu non sélectionné",
+              "waiting_release": "En attente de l’autorisation de charge",
+              "authorized": "Véhicule autorisé",
+              "manual_release": "Autorisé manuellement",
+              "blocked": "Charge bloquée",
+              "disabled": "Désactivé"
+            }
+          },
+          "plug_charge_blocked": {
+            "name": "Motif du blocage",
+            "state": {
+              "connection_lost": "Connexion perdue",
+              "gate_inactive": "Verrou d'autorisation inactif",
+              "read_only": "Mode lecture seule",
+              "departure_plan": "La planification du départ prépare le courant",
+              "pause_requested": "Charge en pause",
+              "release_off": "Autorisation de charge désactivée",
+              "energy_goal_stop": "Objectif d'énergie atteint",
+              "wallbox_locked": "Borne verrouillée",
+              "error_code": "Erreur de la borne",
+              "authorization_required": "Authentification activée sur la borne",
+              "register_unavailable": "Valeur de registre indisponible"
+            }
           }
         }
       }
@@ -607,78 +578,21 @@
       },
       "virtual_plug_charge": {
         "name": "Plug & Charge virtuel"
-      },
-      "release_off_on_unplug": {
-        "name": "Désactiver l'autorisation de charge au débranchement"
       }
     },
     "event": {
-      "control_result": {
-        "name": "Résultat de la commande",
+      "activity": {
+        "name": "Activité",
         "state_attributes": {
           "event_type": {
-            "name": "Commande et résultat",
+            "name": "Type",
             "state": {
-              "pause_executed": "Mettre la charge en pause: Commande terminée",
-              "pause_replaced": "Mettre la charge en pause: Remplacée",
-              "pause_cancelled": "Mettre la charge en pause: Annulée",
-              "pause_failed": "Mettre la charge en pause: Échec",
-              "pause_uncertain": "Mettre la charge en pause: Résultat non confirmé",
-              "resume_executed": "Reprendre la charge: Commande terminée",
-              "resume_replaced": "Reprendre la charge: Remplacée",
-              "resume_cancelled": "Reprendre la charge: Annulée",
-              "resume_failed": "Reprendre la charge: Échec",
-              "resume_uncertain": "Reprendre la charge: Résultat non confirmé",
-              "set_current_executed": "Régler le courant de charge: Commande terminée",
-              "set_current_replaced": "Régler le courant de charge: Remplacée",
-              "set_current_cancelled": "Régler le courant de charge: Annulée",
-              "set_current_failed": "Régler le courant de charge: Échec",
-              "set_current_uncertain": "Régler le courant de charge: Résultat non confirmé",
-              "single_phase_executed": "Utiliser une phase: Commande terminée",
-              "single_phase_replaced": "Utiliser une phase: Remplacée",
-              "single_phase_cancelled": "Utiliser une phase: Annulée",
-              "single_phase_failed": "Utiliser une phase: Échec",
-              "single_phase_uncertain": "Utiliser une phase: Résultat non confirmé",
-              "all_phases_executed": "Utiliser toutes les phases disponibles: Commande terminée",
-              "all_phases_replaced": "Utiliser toutes les phases disponibles: Remplacée",
-              "all_phases_cancelled": "Utiliser toutes les phases disponibles: Annulée",
-              "all_phases_failed": "Utiliser toutes les phases disponibles: Échec",
-              "all_phases_uncertain": "Utiliser toutes les phases disponibles: Résultat non confirmé",
-              "disable_charging_executed": "Désactiver l’autorisation de charge: Commande terminée",
-              "disable_charging_replaced": "Désactiver l’autorisation de charge: Remplacée",
-              "disable_charging_cancelled": "Désactiver l’autorisation de charge: Annulée",
-              "disable_charging_failed": "Désactiver l’autorisation de charge: Échec",
-              "disable_charging_uncertain": "Désactiver l’autorisation de charge: Résultat non confirmé",
-              "enable_charging_executed": "Autoriser la charge: Commande terminée",
-              "enable_charging_replaced": "Autoriser la charge: Remplacée",
-              "enable_charging_cancelled": "Autoriser la charge: Annulée",
-              "enable_charging_failed": "Autoriser la charge: Échec",
-              "enable_charging_uncertain": "Autoriser la charge: Résultat non confirmé",
-              "lock_executed": "Verrouiller la borne: Commande terminée",
-              "lock_replaced": "Verrouiller la borne: Remplacée",
-              "lock_cancelled": "Verrouiller la borne: Annulée",
-              "lock_failed": "Verrouiller la borne: Échec",
-              "lock_uncertain": "Verrouiller la borne: Résultat non confirmé",
-              "unlock_executed": "Déverrouiller la borne: Commande terminée",
-              "unlock_replaced": "Déverrouiller la borne: Remplacée",
-              "unlock_cancelled": "Déverrouiller la borne: Annulée",
-              "unlock_failed": "Déverrouiller la borne: Échec",
-              "unlock_uncertain": "Déverrouiller la borne: Résultat non confirmé",
-              "recovery_succeeded": "Correction de l’erreur confirmée",
-              "recovery_failed": "Échec de la correction de l’erreur",
-              "recovery_uncertain": "Corriger l’erreur: Résultat non confirmé"
-            }
-          },
-          "result": {
-            "name": "Résultat",
-            "state": {
-              "executed": "Commande terminée",
-              "replaced": "Remplacée",
-              "cancelled": "Annulée",
-              "failed": "Échec",
-              "uncertain": "Résultat non confirmé",
-              "recovery_succeeded": "Correction de l’erreur confirmée",
-              "recovery_failed": "Échec de la correction de l’erreur"
+              "command_done": "Commande exécutée",
+              "command_failed": "Échec de la commande",
+              "command_cancelled": "Commande annulée",
+              "session_started": "Véhicule branché",
+              "session_ended": "Véhicule débranché",
+              "wallbox_changed": "Changement à la borne"
             }
           },
           "action": {
@@ -694,6 +608,18 @@
               "unlock": "Déverrouiller la borne",
               "lock": "Verrouiller la borne",
               "recover": "Corriger l’erreur"
+            }
+          },
+          "result": {
+            "name": "Résultat",
+            "state": {
+              "executed": "Commande terminée",
+              "replaced": "Remplacée",
+              "cancelled": "Annulée",
+              "failed": "Échec",
+              "uncertain": "Résultat non confirmé",
+              "recovery_succeeded": "Correction de l’erreur confirmée",
+              "recovery_failed": "Échec de la correction de l’erreur"
             }
           },
           "reason": {
@@ -719,7 +645,7 @@
               "vehicle_waiting": "En attente d’un véhicule autorisé"
             }
           },
-          "source": {
+          "trigger": {
             "name": "Déclencheur",
             "state": {
               "unknown": "Source non transmise",
@@ -730,10 +656,11 @@
               "energy_goal": "Protection de l’objectif énergétique",
               "soc_goal": "Objectif de charge du véhicule",
               "recovery": "Récupération après erreur",
-              "guest": "Recharge invité"
+              "guest": "Recharge invité",
+              "unplug": "Débranché"
             }
           },
-          "requested_value": {
+          "value": {
             "name": "Valeur de registre demandée",
             "state": {
               "0": "Sans limite logicielle de courant"
@@ -741,13 +668,8 @@
           },
           "occurred_at": {
             "name": "Survenu à"
-          }
-        }
-      },
-      "wallbox_event": {
-        "name": "Événement de la wallbox",
-        "state_attributes": {
-          "event_type": {
+          },
+          "change": {
             "name": "Changement",
             "state": {
               "vehicle_plugged_in": "Véhicule branché",
@@ -877,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "Une limite de recharge est atteinte, la recharge reste donc en pause. Pour continuer, augmentez la limite kWh ou l’objectif en pourcentage, ou mettez-la à 0 ; après une remise à zéro du compteur, enregistrez à nouveau la limite. Modifier une limite ne démarre pas la recharge."
     },
-    "energy_goal_state_invalid": {
-      "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
-    },
     "energy_goal_not_supported": {
       "message": "Ce service Modbus ne prend pas en charge les objectifs énergétiques. Mettez d’abord à jour l’application ou le service autonome."
-    },
-    "cancel_pending_not_supported": {
-      "message": "Ce service Modbus ne peut pas annuler les modifications en attente. Mettez d’abord à jour l’application ou le service autonome."
     },
     "soc_goal_invalid": {
       "message": "Saisissez un objectif de 0 à 100 %, sans dépasser la limite du véhicule. 0 désactive cet objectif."
@@ -898,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "Les sources du véhicule ont changé. Rechargez l’intégration avant de modifier son objectif en pourcentage."
     },
-    "soc_goal_app_update_required": {
-      "message": "Mettez à jour l’application du service Modbus Mennekes avant de modifier l’objectif de charge du véhicule. Les autres fonctions restent disponibles."
-    },
     "soc_goal_not_supported": {
       "message": "Le service Modbus ne prend pas en charge les objectifs en pourcentage du véhicule. Mettez l’application à jour pour utiliser cette fonction facultative."
-    },
-    "soc_goal_state_invalid": {
-      "message": "L’objectif de charge du véhicule enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
     },
     "loss_source_invalid": {
       "message": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant."
@@ -948,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "L’autorisation a expiré ou n’est plus valide. Attendez des données actuelles et concordantes avant de réessayer."
-    },
-    "plug_charge_not_supported": {
-      "message": "L’application ou le service Modbus connecté ne prend pas en charge Plug & Charge virtuel. Mettez-le à jour vers une version compatible."
-    },
-    "app_required": {
-      "message": "Cette action nécessite l’application Modbus ; cette borne est connectée directement."
     },
     "wallbox_target_required": {
       "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."
@@ -1020,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Recharge bloquée : réglages enregistrés rejetés",
-            "description": "L’application ne peut pas lire les réglages enregistrés. Le fichier est conservé et la recharge automatique est bloquée. Confirmez pour le remplacer : pause active, autorisation coupée, courant de reprise de 6 A, aucun objectif. La recharge ne démarre pas. Vérifiez ensuite profils, objectifs et Plug & Charge avant de reprendre. En lecture seule, vérifiez la borne : l’application ne peut pas arrêter la recharge."
+            "description": "Les réglages enregistrés ne peuvent pas être lus. Le fichier est conservé et la recharge automatique est bloquée. Confirmez pour le remplacer : pause active, autorisation coupée, courant de reprise de 6 A, aucun objectif. La recharge ne démarre pas. Vérifiez ensuite profils, objectifs et Plug & Charge avant de reprendre. En lecture seule, vérifiez la borne : la recharge ne peut pas être arrêtée d’ici."
           }
         },
         "error": {
@@ -1052,14 +956,18 @@
       },
       "wallbox_service": {
         "title": "Réglages de la borne dans l’application",
-        "description": "Cette borne passe par l’application Modbus. Ses réglages s’y trouvent donc et valent aussi pour Home Assistant.\n\nLimite de courant : {current_cap} A\nDélai minimal entre changements d’état : {state_change_interval} s\nAttente supplémentaire avant un changement de phases : {phase_switch_grace} s\n\nModifiez ces valeurs, les intervalles de lecture et la connexion dans l’application, sous Ouvrir l’interface utilisateur web. L’autorisation d’écriture se trouve dans l’onglet Configuration de l’application."
+        "description": "Cette borne passe par l’application Modbus. Ses réglages s’y trouvent donc et valent aussi pour Home Assistant.\n\nLimite de courant : {current_cap} A\nDélai minimal entre changements d’état : {state_change_interval} s\nAttente supplémentaire avant un changement de phases : {phase_switch_grace} s\n\nModifiez ces valeurs, les intervalles de lecture et la connexion dans l’application, sous Ouvrir l’interface utilisateur web. L’autorisation d’écriture se trouve dans l’onglet Configuration de l’application.",
+        "data": {
+          "release_off_on_unplug": "Désactiver l'autorisation de charge au débranchement"
+        }
       },
       "wallbox_basic": {
         "title": "Limite de courant et interrogation",
         "data": {
           "control_mode": "Mode de commande",
           "current_limit": "Plafond du courant de charge",
-          "scan_interval_seconds": "Intervalle de lecture de l’état"
+          "scan_interval_seconds": "Intervalle de lecture de l’état",
+          "release_off_on_unplug": "Désactiver l'autorisation de charge au débranchement"
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
@@ -1667,6 +1575,36 @@
     "clear_target_time": {
       "name": "Effacer l’heure cible",
       "description": "Efface l’heure commune sans modifier les objectifs d’énergie ou du véhicule."
+    },
+    "use_calendar_departure": {
+      "name": "Utiliser le prochain événement",
+      "description": "Reprend le prochain événement correspondant du calendrier comme heure cible.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
+    },
+    "use_vehicle_departure": {
+      "name": "Utiliser le départ du véhicule",
+      "description": "Reprend le prochain départ du véhicule comme heure cible.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
+    },
+    "assign_vehicle_charge": {
+      "name": "Associer l’énergie de charge du véhicule",
+      "description": "Attribue l'énergie indiquée par le véhicule à la dernière charge.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
     }
   }
 }

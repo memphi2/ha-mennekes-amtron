@@ -115,13 +115,15 @@ Whatever you set, read it back afterwards:
 **percentage of the maximum charging current** with DIP 4 and DIP 5 on bank
 S2: 0 %, 25 %, 50 % or 75 %, with 6 A as the floor.
 
-Read it back as the `current` attribute of `binary_sensor.*_downgrade_active`.
+While a downgrade is active, read it back as the `downgraded_to` attribute of
+`sensor.*_charging_status`.
 
 ### Solar mode — DIP 7
 
-**(Spec)** The solar charging mode has to be enabled with **DIP 7** before the
-`select.*_solar_charging_mode` entity has any effect. The specification names
-the switch but not its bank; check the installation manual.
+**(Spec)** The solar charging mode has to be enabled with **DIP 7**. The
+integration shows and sets the selected mode with
+`select.*_solar_display_mode`. The specification names the switch but not its
+bank; check the installation manual.
 
 ## The §14a EnWG downgrade input
 
@@ -137,8 +139,8 @@ limits the charging current to the smallest of the energy-manager current, the
 downgrade current, the maximum EVSE current and the maximum house current.
 **(Spec)**: values written over Modbus are automatically limited by the
 configuration of the wallbox. The integration makes the state visible through
-`binary_sensor.*_downgrade_active` with its `current` attribute, and
-nothing more.
+the `downgraded_to` attribute of `sensor.*_charging_status`, and nothing
+more.
 
 **It decides whether you may be the master.** If your §14a control box is
 wired to XG1, it is not on the Modbus bus and there is no conflict. If instead
@@ -184,7 +186,7 @@ Log out and in, or restart the service, for the group to take effect.
 
 ## Finding and checking the port
 
-Use the app's **Serial adapter** selector for service mode or the integration
+Use the app's **Serial adapter** selector for an app entry or the integration
 setup form's port list for direct serial mode. Prefer a stable
 `/dev/serial/by-id/...` path. If you already have an administration shell,
 you can inspect ports there; these examples apply to direct serial mode:
@@ -217,8 +219,8 @@ dead bus.
    [quickstart.md](quickstart.md#optional-command-line-bus-check).
 3. After setup, read the DIP-configured values back from the attributes of
    the **Wallbox settings** diagnostic sensor (`max_current_house`,
-   `max_evse_current`, `phase_switching_mode`) and the `current` attribute
-   of **Downgrade active**. If a reading differs
+   `max_evse_current`, `phase_switching_mode`) and, during a downgrade, the
+   `downgraded_to` attribute of **Charging status**. If a reading differs
    from the intended setup, have the installer check the configuration and
    model-specific interpretation before enabling control.
 

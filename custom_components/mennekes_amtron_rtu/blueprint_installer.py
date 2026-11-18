@@ -150,7 +150,7 @@ async def async_install_blueprints(hass: HomeAssistant) -> InstallReport:
         _LOGGER.debug("Blueprint %s was edited locally and is left alone", name)
     for name in report.failed:
         _LOGGER.warning(
-            "Could not update %s; check blueprint files and permissions", name
+            "Blueprints: could not update %s; check blueprint files and permissions", name
         )
     return report
 

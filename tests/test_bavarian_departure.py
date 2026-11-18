@@ -171,7 +171,6 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
         hass.states["sensor.trip"] = state("sensor.trip", (NOW + timedelta(hours=3)).isoformat())
         reader = Mock(return_value=NOW + timedelta(hours=2))
         monkeypatch.setattr(adapter, "read_bavarian_departure", reader)
-        assert observer.vehicle_departure_available
         await observer.async_use_vehicle_departure()
         reader.assert_called_once_with(
             hass, "vehicle", now=NOW, time_zone="Europe/Paris", timer1_days=["mon"], timer2_days=["tue"],
@@ -184,7 +183,6 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
             await observer.async_use_vehicle_departure()
         assert observer.goal is before
         observer._entry.options["timed_vehicle_provider"] = "none"
-        assert not observer.vehicle_departure_available
         with pytest.raises(ServiceValidationError) as error:
             await observer.async_use_vehicle_departure()
         assert error.value.translation_key == "timed_vehicle_unavailable"
@@ -193,10 +191,9 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
     asyncio.run(run())
 
 
-def test_calendar_and_timed_command_cancellation_preserve_new_trip_intent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_calendar_choice_outlasts_the_entity_trip_and_is_withdrawn_for_another_car(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, control, hass = setup_observer(monkeypatch)
-        control.async_cancel_timed_current = AsyncMock()
         observer._entry.options.update({
             "timed_departure_entity": "sensor.trip", "timed_calendar_entity": "calendar.trip",
             "timed_calendar_title": "Trip",
@@ -208,25 +205,29 @@ def test_calendar_and_timed_command_cancellation_preserve_new_trip_intent(monkey
         await observer.async_use_next_calendar_event()
         await observer._evaluate()
         assert observer.goal.deadline == NOW + timedelta(hours=8)
+        source = observer.goal.source
         await observer.async_set_deadline(None)
-        await observer._write_current(16, None)
-        await observer._write_current(16, NOW)
-        # The calendar trip waits for its late start; nothing after the clear.
-        assert control.commands == [("pause", None)]
-        await observer.async_stop()
-        control.async_cancel_timed_current.assert_awaited_once_with(observer._command_owner)
+        await observer._evaluate()
+        # The cleared trip stays cleared while the entity keeps its time.
+        assert (observer.goal.deadline, observer.goal.source) == (None, source)
+        await observer.async_stop(withdraw=True)
+        assert control.trips == [(None, source, True)]
 
     asyncio.run(run())
 
 
-def test_unavailable_service_cancellation_does_not_abort_unload(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unavailable_service_withdrawal_does_not_abort_unload(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
     async def run() -> None:
         observer, control, _hass = setup_observer(monkeypatch)
         observer.goal.set(NOW + timedelta(hours=8))
         await observer._evaluate()
-        control.async_cancel_timed_current = AsyncMock(side_effect=OSError("service offline"))
-        await observer.async_stop()
+        control.async_set_departure_trip = AsyncMock(side_effect=OSError("service offline"))
+        await observer.async_stop(withdraw=True)
+        control.async_set_departure_trip.assert_awaited_once()
         assert observer._stopping
         assert observer._unsubs == []
+        assert "Departure plan: plan for the previous car not withdrawn (OSError)" in caplog.text
 
     asyncio.run(run())

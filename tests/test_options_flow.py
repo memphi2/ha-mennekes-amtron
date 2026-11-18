@@ -87,7 +87,9 @@ def test_independent_sections_and_scoped_wallbox_save():
         menu = await flow.async_step_wallbox()
         assert menu["menu_options"] == ["wallbox_basic", "wallbox_advanced", "back"]
         form = await flow.async_step_wallbox_basic()
-        assert set(fields(form)) == {"scan_interval_seconds", "current_limit", "control_mode"}
+        assert set(fields(form)) == {
+            "scan_interval_seconds", "current_limit", "control_mode", "release_off_on_unplug",
+        }
         values = form["data_schema"](
             {"scan_interval_seconds": 7, "current_limit": 11.5}
         )
@@ -99,6 +101,7 @@ def test_independent_sections_and_scoped_wallbox_save():
         assert result["data"]["state_change_interval_seconds"] == 175
         assert result["data"]["timed_capacity_kwh"] == 80
         assert "control_mode" in result["data"]
+        assert result["data"]["release_off_on_unplug"] is False
 
     asyncio.run(run())
 
@@ -116,13 +119,17 @@ def test_app_connection_only_shows_the_apps_wallbox_settings():
         shown = await flow.async_step_wallbox()
         assert shown["type"] == "form"
         assert shown["step_id"] == "wallbox_service"
-        assert fields(shown) == {}
+        # Submitting saves and closes, so the button must not say "Next".
+        assert shown["last_step"] is True
+        # Only the rule Home Assistant applies itself can be changed here.
+        assert set(fields(shown)) == {"release_off_on_unplug"}
         assert shown["description_placeholders"] == {
             "current_cap": "13.5", "state_change_interval": "300", "phase_switch_grace": "-",
         }
-        # Nothing is saved; confirming leads back to the sections.
-        assert (await flow.async_step_wallbox_service({}))["step_id"] == "init"
-        assert entry.options == {"current_limit": 8}
+        saved = await flow.async_step_wallbox_service({"release_off_on_unplug": True})
+        assert saved["type"] == "create_entry"
+        # The app's own settings stay untouched.
+        assert saved["data"] == {"current_limit": 8, "release_off_on_unplug": True}
         # The forms of a direct connection are not reachable.
         assert (await flow.async_step_wallbox_basic())["step_id"] == "init"
         assert (await flow.async_step_wallbox_advanced())["step_id"] == "init"

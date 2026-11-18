@@ -15,6 +15,7 @@ from .guest_permission import GuestPermission
 from .plug_charge import PlugChargeState
 from .registers import CHARGING_CURRENT_EMS, REQUESTED_PHASES
 from .soc_goal import SocGoal
+from .unplug_release import UnplugReleaseState
 
 
 @dataclass(slots=True)
@@ -38,6 +39,7 @@ class WriteState:
     session_history: SessionHistory = field(default_factory=SessionHistory)
     guest_permission: GuestPermission | None = None
     plug_charge: PlugChargeState = field(default_factory=PlugChargeState)
+    unplug_release: UnplugReleaseState = field(default_factory=UnplugReleaseState)
 
     @classmethod
     def cold_start(cls, now: float) -> WriteState:

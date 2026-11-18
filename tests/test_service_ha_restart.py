@@ -72,7 +72,8 @@ def test_remote_write_repairs_change_without_register_or_entity_updates(tmp_path
                     clock[0] += 6
                     await runtime.control.async_set_charging_release(True)
                     assert issue not in registry.issues
-                    assert not updates
+                    # Only the release the service now wants is new state.
+                    assert updates == [1]
                 finally:
                     unsubscribe()
         finally:
@@ -116,7 +117,6 @@ def test_real_ha_restart_retains_server_state_without_replaying_commands(
                         assert result["type"] == "create_entry"
                         await hass.async_block_till_done()
                         entry = hass.config_entries.async_entries(DOMAIN)[0]
-                        assert entry.runtime_data.recovery is None
                         dump = await async_get_config_entry_diagnostics(hass, entry)
                         assert dump["bus"] == {
                             "transport": "service",

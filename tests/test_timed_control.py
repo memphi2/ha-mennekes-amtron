@@ -6,18 +6,15 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from aiohttp import ClientSession
-from aiohttp.test_utils import TestServer
-from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
-from custom_components.mennekes_amtron_rtu.data import WallboxData, WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device import control as device_control
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceValidationError,
+)
 from tests.test_control import Harness as ControlHarness
-from tests.test_modbus_service import TOKEN, current_writes
+from tests.test_modbus_service import current_writes
 from tests.test_modbus_service import service_fixture as base_service_fixture
 
 OWNER = "timed:entry:one-trip"
@@ -78,7 +75,7 @@ def test_invalid_timed_current_cannot_bypass_current_validation(value) -> None:
     async def run() -> None:
         harness = Harness()
         control = await harness.connect()
-        with pytest.raises(ServiceValidationError):
+        with pytest.raises(DeviceValidationError):
             await control.async_set_timed_current(value, deadline=future(), owner=OWNER)
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
 
@@ -196,43 +193,38 @@ def test_expiry_after_waiting_for_physical_identity_never_sends(monkeypatch) -> 
 
 
 @pytest.mark.parametrize("finish", ["cancel", "expire"])
-def test_remote_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkeypatch, finish) -> None:
+def test_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkeypatch, finish) -> None:
     async def run() -> None:
         service, transport, _clock = await service_fixture(tmp_path)
         release = asyncio.Event()
         try:
             await service.heartbeat.async_stop()
             service.control._sleep = lambda _delay: release.wait()
-            async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
-                await remote.async_connect()
-                control = RemoteControl(remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16), state=lambda: WallboxData(), request_refresh=None)
-                await control.async_set_timed_current(None, deadline=future(), owner=OWNER)
-                deadline = future()
-                await control.async_set_timed_current(6, deadline=deadline, owner=OWNER)
-                assert service.control.pending_action == "set_current"
-                assert current_writes(transport) == [1]
-                if finish == "cancel":
-                    service.control._options = ControlOptions(read_only=True)
-                    service.connection.available = False
-                    remote.apply_snapshot(service.snapshot(), require_available=False)
-                    await control.async_cancel_timed_current(OWNER)
-                else:
-                    # HA has gone away: only the independent service can expire
-                    # a pending resume when its trip's deadline passes.
-                    await remote.async_close()
+            await service.control.async_set_timed_current(None, deadline=future(), owner=OWNER)
+            deadline = future()
+            await service.control.async_set_timed_current(6, deadline=deadline, owner=OWNER)
+            assert service.control.pending_action == "set_current"
+            assert current_writes(transport) == [1]
+            if finish == "cancel":
+                # A plan must still be able to withdraw its own queue after
+                # writes were disabled and the wallbox went away.
+                service.control._options = ControlOptions(read_only=True)
+                service.connection.available = False
+                await service.control.async_cancel_timed_current(OWNER)
+            else:
+                # Nothing outside the service runs: only the service itself can
+                # expire a pending resume when its trip's deadline passes.
 
-                    class ExpiredDatetime(datetime):
-                        @classmethod
-                        def now(cls, tz=None):
-                            return deadline + timedelta(seconds=1)
+                class ExpiredDatetime(datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return deadline + timedelta(seconds=1)
 
-                    monkeypatch.setattr(device_control, "datetime", ExpiredDatetime)
-                    release.set()
-                    await asyncio.wait_for(service.control._flush_task, 2)
-                assert service.control.pending_action is None
-                assert current_writes(transport) == [1]
-                await remote.async_close()
+                monkeypatch.setattr(device_control, "datetime", ExpiredDatetime)
+                release.set()
+                await asyncio.wait_for(service.control._flush_task, 2)
+            assert service.control.pending_action is None
+            assert current_writes(transport) == [1]
         finally:
             release.set()
             await service.stop()
@@ -240,42 +232,37 @@ def test_remote_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkey
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("extra", [
-    {"deadline": "invalid"}, {"deadline": "2026-01-01T00:00:00"},
-    {"deadline": True}, {"deadline": "x" * 65}, {"owner": ""},
-    {"owner": None}, {"owner": "x" * 129}, {"value": True}, {"value": 1},
-])
-def test_service_rejects_malformed_timed_commands(tmp_path, extra) -> None:
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"command": "timed_current", "value": 6},
+        {"command": "cancel_timed_current"},
+    ],
+)
+def test_service_rejects_commands_it_no_longer_has(tmp_path, payload) -> None:
     async def run() -> None:
         service, transport, _clock = await service_fixture(tmp_path)
         try:
-            with pytest.raises(ValueError, match=r"timed command|isoformat|number|numeric|range"):
+            await service.heartbeat.async_stop()
+            before = list(transport.writes)
+            with pytest.raises(ValueError, match="unknown command"):
                 await service.command({
-                    "command": "timed_current", "value": 6, "deadline": future().isoformat(),
-                    "owner": OWNER, "expected_serial_number": service.identity.serial_number, **extra,
+                    **payload, "expected_serial_number": service.identity.serial_number,
                 })
-            assert current_writes(transport) == []
+            assert transport.writes == before
+            assert service.control.pending_action is None
         finally:
             await service.stop()
 
     asyncio.run(run())
 
 
-def test_remote_timed_current_keeps_local_cap_and_rejects_invalid_values(tmp_path) -> None:
+def test_service_timed_current_is_capped_to_the_device_maximum(tmp_path) -> None:
     async def run() -> None:
         service, transport, _clock = await service_fixture(tmp_path)
         try:
-            async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
-                await remote.async_connect()
-                control = RemoteControl(remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 8), state=lambda: WallboxData(), request_refresh=None)
-                for value in (True, float("nan"), 0, 1, "6"):
-                    with pytest.raises(ServiceValidationError):
-                        await control.async_set_timed_current(value, deadline=future(), owner=OWNER)
-                assert current_writes(transport) == []
-                await control.async_set_timed_current(32, deadline=future(), owner=OWNER)
-                assert current_writes(transport) == [8]
-                await remote.async_close()
+            await service.control.async_set_timed_current(32, deadline=future(), owner=OWNER)
+            assert current_writes(transport) == [16]
         finally:
             await service.stop()
 
@@ -374,10 +361,10 @@ def test_service_target_disable_cancels_only_timed_resume_without_ha(tmp_path, p
             service.control._sleep = lambda _delay: release.wait()
             binding = {"expected_serial_number": service.identity.serial_number}
             await service.command({"command": "pause", **binding})
-            pending = {"command": "set_current", "value": 6}
             if pending_owner == "timed":
-                pending = {"command": "timed_current", "value": 6, "owner": OWNER, "deadline": future().isoformat()}
-            await service.command({**pending, **binding})
+                await service.control.async_set_timed_current(6, deadline=future(), owner=OWNER)
+            else:
+                await service.command({"command": "set_current", "value": 6, **binding})
             task = service.control._flush_task
             assert service.control.pending_action == "set_current"
             await service.command({"command": "soc_goal", "value": 0, "source": SOC_SOURCE, **binding})

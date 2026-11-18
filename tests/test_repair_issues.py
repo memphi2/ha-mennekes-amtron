@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron_rtu.data import (
-    DeviceIdentity,
-    WallboxData,
-    WriteDiagnostics,
-)
+import asyncio
+
+from custom_components.mennekes_amtron_rtu.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.device.registers import (
     LAYOUT_V01_02,
     LAYOUT_V01_03,
@@ -16,6 +15,7 @@ from custom_components.mennekes_amtron_rtu.repair_issues import (
     unsupported_layout,
     write_rejected,
 )
+from tests.ha_fakes import build_runtime
 
 
 def test_error_200_raises_the_heartbeat_issue() -> None:
@@ -43,11 +43,17 @@ def test_layout_placeholders_use_the_vendor_notation() -> None:
 
 
 def test_a_refused_write_raises_the_satellite_issue() -> None:
-    diagnostics = WriteDiagnostics()
-    assert not write_rejected(diagnostics)
-    diagnostics.writes_rejected = 1
-    diagnostics.write_errors.add("charging_release")
-    assert write_rejected(diagnostics)
-    diagnostics.write_errors.clear()
-    assert not write_rejected(diagnostics)
-    assert diagnostics.writes_rejected == 1
+    async def run() -> None:
+        _hass, entry, _wallbox = await build_runtime()
+        client, diagnostics = entry.runtime_data.client, entry.service.diagnostics
+        assert not write_rejected(client.snapshot)
+        diagnostics.writes_rejected = 1
+        diagnostics.write_errors.add("charging_release")
+        await entry.runtime_data.coordinator.async_refresh()
+        assert write_rejected(client.snapshot)
+        diagnostics.write_errors.clear()
+        await entry.runtime_data.coordinator.async_refresh()
+        assert not write_rejected(client.snapshot)
+        assert diagnostics.writes_rejected == 1
+
+    asyncio.run(run())

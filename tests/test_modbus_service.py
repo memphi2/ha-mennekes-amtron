@@ -9,7 +9,6 @@ import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import (
@@ -19,7 +18,6 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
 from custom_components.mennekes_amtron_rtu.device.data import (
     WallboxData,
-    WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
@@ -27,13 +25,16 @@ from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
-from custom_components.mennekes_amtron_rtu.remote import (
-    RemoteClient,
-    RemoteControl,
-    RemoteHeartbeat,
+from custom_components.mennekes_amtron_rtu.service_client import (
+    ServiceClient,
     server_url,
 )
+from custom_components.mennekes_amtron_rtu.service_control import (
+    ServiceControl,
+    ServiceHeartbeat,
+)
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
+from tests.ha_fakes import heartbeat_running
 
 TOKEN = "service-test-credential-32-characters"  # noqa: S105 - test fixture
 
@@ -74,7 +75,7 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
             ClientSession() as session,
         ):
             url = str(server.make_url("/"))
-            remote = RemoteClient(session, url, TOKEN)
+            remote = ServiceClient(session, url, TOKEN)
             try:
                 await remote.async_connect()
                 data = WallboxData(values=remote.snapshot["values"])
@@ -83,10 +84,8 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
                     nonlocal data
                     data = await remote.update()
 
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=lambda: data,
                     request_refresh=refresh,
                 )
@@ -101,29 +100,28 @@ def test_client_disconnect_reconnect_never_stops_heartbeat_or_replays_commands(
                 await asyncio.sleep(0.08)
                 assert service.diagnostics.heartbeats_sent > before
                 assert current_writes(transport) == accepted
-                fresh = RemoteClient(session, url, TOKEN)
+                fresh = ServiceClient(session, url, TOKEN)
                 await fresh.async_connect()
-                restored = RemoteControl(
+                restored = ServiceControl(
                     fresh,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=lambda: data,
                     request_refresh=refresh,
                 )
-                restored.pause_requested = not paused
-                restored.charging_setpoint = 32
-                restored.charging_release_requested = False
+                # The intent comes from the service, never from the client.
+                for name in ("pause_requested", "charging_setpoint", "charging_release_requested"):
+                    with pytest.raises(AttributeError):
+                        setattr(restored, name, None)
                 assert restored.pause_requested is paused
                 assert restored.charging_setpoint == (8 if paused else 10)
                 assert current_writes(transport) == accepted
                 assert service.heartbeat.running
-                heartbeat = RemoteHeartbeat(fresh, WriteDiagnostics())
+                heartbeat = ServiceHeartbeat(fresh)
                 assert heartbeat.healthy is True
-                assert heartbeat.running
+                assert heartbeat_running(heartbeat)
                 await fresh.async_close()
                 heartbeat.update()
                 assert heartbeat.healthy is None
-                assert not heartbeat.running
+                assert not heartbeat_running(heartbeat)
             finally:
                 await service.stop()
 
@@ -161,6 +159,9 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                 assert transport.writes == []
                 async with session.get(server.make_url("/health")) as response:
                     assert response.status == 200
+                # A probe that asks with HEAD gets the answer of GET, without a body.
+                async with session.head(server.make_url("/v2/state"), headers=headers) as response:
+                    assert response.status == 200
                 for payload in (
                     [],
                     {"command": "write_register", "expected_serial_number": "ABC123456789"},
@@ -187,7 +188,6 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
         ("set_current", 32, R.CHARGING_CURRENT_EMS, 16),
         ("release", False, R.CHARGING_RELEASE, 0),
         ("lock", True, R.LOCK_EVSE, 1),
-        ("solar", 2, R.SOLAR_CHARGING_MODE, 2),
         ("phases", 1, R.REQUESTED_PHASES, 1),
         ("restart", None, R.SYSTEM_RESTART, 0xBB),
     ],
@@ -335,9 +335,24 @@ def test_a_rejected_saved_state_does_not_keep_the_service_down(tmp_path, caplog)
             assert service.control is not None
             assert service.client.write_state.pause_requested is True
             assert service.control.read_only
-            assert caplog.text.count("Saved control intent rejected") == 1
+            assert caplog.text.count("Control: saved intent rejected") == 1
             # Rejected evidence survives until an explicit acknowledgement.
             assert json.loads(path.read_text())["identity"] == "another-wallbox"
+            # Polls and reconnects neither call it solved nor report it again.
+            caplog.set_level("DEBUG")
+            await service.refresh()
+            await service._initialize()
+            assert "intent saved again" not in caplog.text
+            warnings = [
+                r for r in caplog.records
+                if "saved intent rejected" in r.getMessage() and r.levelname == "WARNING"
+            ]
+            assert len(warnings) == 1
+            await service.command({
+                "command": "acknowledge_intent_reset",
+                "expected_serial_number": service.identity.serial_number,
+            })
+            assert "Control: saved intent reset acknowledged" in caplog.text
         finally:
             await service.stop()
     asyncio.run(run())
@@ -352,7 +367,7 @@ def test_a_failing_disk_does_not_block_the_start(tmp_path, monkeypatch, caplog):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             assert service.control is not None
-            assert "Cannot save control intent" in caplog.text
+            assert "Control: intent not saved" in caplog.text
         finally:
             monkeypatch.undo()
             await service.stop()
@@ -434,7 +449,7 @@ def test_a_failing_intent_save_keeps_the_wallbox_available(tmp_path, monkeypatch
             monkeypatch.setattr(service, "_persist", fail)
             await service._save_intent()
             await service._save_intent()
-            assert caplog.text.count("Cannot save control intent") == 1
+            assert caplog.text.count("Control: intent not saved") == 1
             assert service._is_available()
             monkeypatch.undo()
         finally:

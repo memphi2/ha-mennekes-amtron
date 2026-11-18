@@ -6,7 +6,6 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.errors import (
@@ -30,7 +29,7 @@ from tests.test_energy_goal_controller import (
     _settle,
     _snapshot,
 )
-from tests.test_goal_store import store_at
+from tests.test_goal_store import soc_store, store_at
 from tests.test_modbus_service import current_writes, service_fixture
 
 SOURCE = "sensor.car_soc|number.car_limit"
@@ -52,7 +51,7 @@ def test_configuration_and_missing_soc_never_write_or_resume(read_only):
         assert control.soc_goal.target_percent == 0
         assert harness.transport.writes == []
         if read_only:
-            with pytest.raises(ServiceValidationError):
+            with pytest.raises(DeviceValidationError):
                 await control.async_set_soc_goal(70, source=SOURCE, soc=20)
         else:
             await control.async_set_soc_goal(70, source=SOURCE, soc=20)
@@ -81,7 +80,7 @@ def test_reached_soc_persists_and_pauses_without_long_mode_wait():
         await control.async_observe_soc(None, None, source=SOURCE)
         await _settle(soc)
         assert control.soc_goal.status == "reached"
-        with pytest.raises(ServiceValidationError):
+        with pytest.raises(DeviceValidationError):
             await control.async_resume_charging()
         await control.async_set_soc_goal(0, source=SOURCE)
         assert current_writes(harness.transport) == [1]
@@ -130,9 +129,9 @@ def test_cap_reduction_can_reach_goal_and_old_source_is_rejected():
         assert current_writes(harness.transport) == []
         await control.async_configure_soc("sensor.other|")
         assert control.soc_goal.status == "disabled"
-        with pytest.raises(ServiceValidationError):
+        with pytest.raises(DeviceValidationError):
             await control.async_observe_soc(100, source=SOURCE)
-        with pytest.raises(ServiceValidationError):
+        with pytest.raises(DeviceValidationError):
             await control.async_set_soc_goal(20, source=SOURCE)
         await soc.async_stop()
         await energy.async_stop()
@@ -148,7 +147,7 @@ def test_soc_evidence_fences_a_resume_already_waiting_on_the_lock():
             await asyncio.sleep(0)
             observation = asyncio.create_task(control.async_observe_soc(80, source=SOURCE))
             await asyncio.sleep(0)
-        with pytest.raises(ServiceValidationError):
+        with pytest.raises(DeviceValidationError):
             await start
         await observation
         await _settle(soc)
@@ -435,11 +434,9 @@ def test_uncertain_active_soc_goal_retries_without_another_observation(with_ener
 @pytest.mark.parametrize(("target", "soc_value"), [(0, 20), (50, 80)])
 def test_unknown_soc_store_fences_and_retries_pause_until_saved(tmp_path, target, soc_value):
     async def run():
-        from custom_components.mennekes_amtron_rtu.goal_store import SocGoalStore
-
         harness, control, energy, soc, _ = await _soc_runner()
         base = store_at(tmp_path)
-        store = SocGoalStore(base._hass, "entry", "wallbox")
+        store = soc_store(base._hass)
         soc._persist = lambda: store.async_save(control.soc_goal)
         await soc.async_set_target(80, source=SOURCE, soc=20)
         write, read = store._write, store._validate_file
@@ -502,10 +499,8 @@ def test_unknown_soc_observation_fences_and_retries_without_new_value():
 def test_cancelled_soc_target_waiting_for_store_lock_finishes_or_rolls_back(tmp_path, fails):
     async def run():
         _harness, control, energy, soc, _ = await _soc_runner()
-        from custom_components.mennekes_amtron_rtu.goal_store import SocGoalStore
-
         base = store_at(tmp_path)
-        store = SocGoalStore(base._hass, "entry", "wallbox")
+        store = soc_store(base._hass)
         await store.async_save(control.soc_goal)
         old = control.soc_goal.snapshot()
         started = asyncio.Event()
@@ -616,7 +611,7 @@ def test_bus_failure_is_bounded_and_later_poll_retries_pause(caplog):
         await _settle(soc)
         soc.retry_stop()
         await _settle(soc)
-        assert caplog.text.count("Cannot enforce percentage goal") == 1
+        assert caplog.text.count("Vehicle charge target: cannot be enforced") == 1
         control.async_pause_for_energy_goal = original_pause
         soc.retry_stop()
         await _settle(soc)
@@ -736,7 +731,7 @@ def test_a_cleared_target_names_its_reason(caplog, source, reason):
         await control.async_set_soc_goal(70, source=SOURCE, soc=20)
         with caplog.at_level("INFO"):
             await control.async_configure_soc(source)
-        assert f"Vehicle charge target 70% cleared: {reason}" in caplog.text
+        assert f"Vehicle charge target: 70% cleared, {reason}" in caplog.text
         await energy.async_stop()
 
     asyncio.run(run())

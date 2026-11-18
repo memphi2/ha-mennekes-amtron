@@ -11,17 +11,15 @@ import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import (
-    RemoteClient,
-    RemoteControl,
+from custom_components.mennekes_amtron_rtu.sensor import async_setup_entry
+from custom_components.mennekes_amtron_rtu.service_client import (
+    ServiceClient,
     _pending_status,
 )
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
-from custom_components.mennekes_amtron_rtu.sensor import async_setup_entry
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.ha_fakes import build_runtime, collect
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
@@ -32,17 +30,19 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
         runtime = entry.runtime_data
         control = runtime.control
         coordinator = runtime.coordinator
-        coordinator.control_status = lambda: (control.pending_action, control.pending_until)
-        control._request_refresh = coordinator.async_refresh
         entities = {}
         await async_setup_entry(hass, entry, lambda items: entities.update(collect(items)))
-        action = entities["pending_change"]
+        waiting = entities["operation_waiting"]
+
+        def pending():
+            return waiting.extra_state_attributes["pending"]
 
         def deadline():
-            return (action.extra_state_attributes or {}).get("due")
+            # An attribute without a value is left out.
+            return waiting.extra_state_attributes.get("pending_at")
 
-        assert action.available
-        assert action.native_value == "none"
+        assert waiting.available
+        assert pending() == "none"
         assert deadline() is None
         notifications = []
         remove = coordinator.async_add_listener(lambda: notifications.append(coordinator.data))
@@ -52,7 +52,7 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
             expected = deadline()
             assert isinstance(expected, datetime)
             assert expected.tzinfo == UTC
-            assert action.native_value == "resume"
+            assert pending() == "resume"
             before = len(notifications)
             for _ in range(4):
                 await coordinator.async_refresh()
@@ -61,15 +61,19 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
             # While still paused, a block switches no charge: it applies at
             # once and replaces the queued start.
             await control.async_set_charging_release(False)
-            assert action.native_value == "none"
+            assert pending() == "none"
             assert deadline() is None
             assert transport.bank[R.CHARGING_RELEASE.address] == 0
+            # The service still answers while the wallbox does not: its
+            # reason for waiting is exactly what is worth showing then.
             coordinator.last_update_success = False
-            assert not action.available
+            assert waiting.available
+            entry.runtime_data.client._connected = False
+            assert not waiting.available
         finally:
             remove()
-            await control.async_shutdown()
             await runtime.client.async_close()
+            await entry.service.stop()
 
     asyncio.run(run())
 
@@ -97,27 +101,25 @@ def test_service_queue_survives_client_restart_and_persists_executed_intent(tmp_
             deadline = state["control"]["pending_until"]
             assert current_writes(transport) == [1]
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 first = await remote.update()
-                assert first.pending_change == "resume"
+                assert first.service_control["pending_action"] == "resume"
                 assert first.pending_change_until.isoformat() == deadline
-                remote_control = RemoteControl(
-                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(),
-                    state=lambda: first, request_refresh=remote.update,
+                remote_control = ServiceControl(
+                    remote,                     state=lambda: first, request_refresh=remote.update,
                 )
                 assert remote_control.pending_action == "resume"
                 assert remote_control.pending_until == first.pending_change_until
-                await remote_control.async_shutdown()
                 await remote.async_close()
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 assert remote.snapshot["control"]["pending_until"] == deadline
                 assert service.control.pending_action == "resume"
                 wake.set()
                 await asyncio.wait_for(service.control._flush_task, 2)
                 data = await remote.update()
-                assert data.pending_change is None
+                assert data.service_control["pending_action"] is None
                 assert data.pending_change_until is None
                 assert current_writes(transport) == [1, 8]
                 saved = json.loads((tmp_path / "intent.json").read_text())
@@ -180,7 +182,7 @@ def test_invalid_queue_metadata_invalidates_remote_connection(tmp_path, metadata
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://localhost:8765", TOKEN)
+                remote = ServiceClient(session, "http://localhost:8765", TOKEN)
                 remote.apply_snapshot(service.snapshot())
                 payload = copy.deepcopy(service.snapshot())
                 for key in ("pending_action", "pending_until", "state_change_interval_seconds"):
@@ -200,7 +202,7 @@ def test_missing_queue_metadata_is_rejected_and_timezone_offsets_are_supported(t
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://localhost:8765", TOKEN)
+                remote = ServiceClient(session, "http://localhost:8765", TOKEN)
                 payload = copy.deepcopy(service.snapshot())
                 for key in ("pending_action", "pending_until", "state_change_interval_seconds"):
                     payload["control"].pop(key)

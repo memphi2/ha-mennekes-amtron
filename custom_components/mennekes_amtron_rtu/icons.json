@@ -1,8 +1,12 @@
 {
   "entity": {
     "binary_sensor": {
-      "downgrade_active": {
-        "default": "mdi:transmission-tower-export"
+      "guest_charging": {
+        "default": "mdi:account-clock-outline",
+        "state": {
+          "on": "mdi:account-check",
+          "off": "mdi:account-outline"
+        }
       }
     },
     "button": {
@@ -11,15 +15,6 @@
       },
       "cancel_pending_change": {
         "default": "mdi:timer-cancel-outline"
-      },
-      "assign_vehicle_charge": {
-        "default": "mdi:link-variant-plus"
-      },
-      "timed_next_calendar_event": {
-        "default": "mdi:calendar-import"
-      },
-      "timed_vehicle_departure": {
-        "default": "mdi:car-clock"
       },
       "guest_start": {
         "default": "mdi:account-arrow-right-outline"
@@ -73,12 +68,6 @@
           "three_phases": "mdi:numeric-3-circle"
         }
       },
-      "pending_change": {
-        "default": "mdi:timer-sand",
-        "state": {
-          "none": "mdi:timer-off-outline"
-        }
-      },
       "charging_status": {
         "default": "mdi:ev-station",
         "state": {
@@ -105,63 +94,14 @@
           "degraded": "mdi:alert-circle-outline"
         }
       },
-      "energy_goal_status": {
-        "default": "mdi:target",
-        "state": {
-          "reached": "mdi:check-circle-outline",
-          "meter_unavailable": "mdi:alert-circle-outline",
-          "meter_reset": "mdi:alert-circle-outline"
-        }
-      },
-      "soc_goal_status": {
-        "default": "mdi:battery-outline",
-        "state": {
-          "active": "mdi:battery-charging-outline",
-          "reached": "mdi:battery-check-outline"
-        }
-      },
       "last_charging_loss": {
         "default": "mdi:battery-minus-outline"
       },
       "average_charging_loss": {
         "default": "mdi:chart-line"
       },
-      "timed_goal_status": {
-        "default": "mdi:ev-station",
-        "state": {
-          "paused_until_start": "mdi:timer-pause-outline",
-          "vehicle_unconfirmed": "mdi:help-circle-outline",
-          "charging": "mdi:lightning-bolt",
-          "reached": "mdi:battery-check-outline",
-          "unreachable": "mdi:timer-alert-outline",
-          "error": "mdi:alert-circle-outline",
-          "finishing": "mdi:current-ac"
-        }
-      },
-      "virtual_plug_charge_status": {
-        "default": "mdi:ev-plug-type2",
-        "state": {
-          "waiting_vehicle": "mdi:car-clock",
-          "waiting_detection": "mdi:timer-sand",
-          "vehicle_not_selected": "mdi:lock-outline",
-          "waiting_release": "mdi:timer-sand",
-          "authorized": "mdi:check-circle-outline",
-          "manual_release": "mdi:hand-back-right-outline",
-          "blocked": "mdi:lock-outline",
-          "disabled": "mdi:power-plug-off"
-        }
-      },
       "wallbox_settings": {
         "default": "mdi:tune-vertical"
-      },
-      "operation_controller": {
-        "default": "mdi:account-tie-hat-outline",
-        "state": {
-          "unavailable": "mdi:lan-disconnect",
-          "departure_plan": "mdi:car-clock",
-          "direct": "mdi:gesture-tap",
-          "guest": "mdi:account-clock-outline"
-        }
       },
       "operation_waiting": {
         "default": "mdi:timer-sand",
@@ -171,20 +111,6 @@
           "wallbox_unavailable": "mdi:lan-disconnect",
           "target_reached": "mdi:battery-check-outline",
           "paused": "mdi:pause-circle-outline"
-        }
-      },
-      "operation_next": {
-        "default": "mdi:skip-next-circle-outline",
-        "state": {
-          "none": "mdi:calendar-blank-outline",
-          "departure": "mdi:car-arrow-right"
-        }
-      },
-      "guest_charging": {
-        "default": "mdi:account-clock-outline",
-        "state": {
-          "inactive": "mdi:account-outline",
-          "active": "mdi:account-check"
         }
       }
     },
@@ -204,101 +130,21 @@
       },
       "virtual_plug_charge": {
         "default": "mdi:ev-plug-type2"
-      },
-      "release_off_on_unplug": {
-        "default": "mdi:power-plug-off-outline"
       }
     },
     "event": {
-      "control_result": {
+      "activity": {
         "default": "mdi:clipboard-text-outline",
         "state_attributes": {
           "event_type": {
             "default": "mdi:clipboard-text-outline",
             "state": {
-              "pause_executed": "mdi:clipboard-check-outline",
-              "pause_replaced": "mdi:clipboard-arrow-right-outline",
-              "pause_cancelled": "mdi:clipboard-remove-outline",
-              "pause_failed": "mdi:clipboard-alert-outline",
-              "pause_uncertain": "mdi:help-circle-outline",
-              "resume_executed": "mdi:clipboard-check-outline",
-              "resume_replaced": "mdi:clipboard-arrow-right-outline",
-              "resume_cancelled": "mdi:clipboard-remove-outline",
-              "resume_failed": "mdi:clipboard-alert-outline",
-              "resume_uncertain": "mdi:help-circle-outline",
-              "set_current_executed": "mdi:clipboard-check-outline",
-              "set_current_replaced": "mdi:clipboard-arrow-right-outline",
-              "set_current_cancelled": "mdi:clipboard-remove-outline",
-              "set_current_failed": "mdi:clipboard-alert-outline",
-              "set_current_uncertain": "mdi:help-circle-outline",
-              "single_phase_executed": "mdi:clipboard-check-outline",
-              "single_phase_replaced": "mdi:clipboard-arrow-right-outline",
-              "single_phase_cancelled": "mdi:clipboard-remove-outline",
-              "single_phase_failed": "mdi:clipboard-alert-outline",
-              "single_phase_uncertain": "mdi:help-circle-outline",
-              "all_phases_executed": "mdi:clipboard-check-outline",
-              "all_phases_replaced": "mdi:clipboard-arrow-right-outline",
-              "all_phases_cancelled": "mdi:clipboard-remove-outline",
-              "all_phases_failed": "mdi:clipboard-alert-outline",
-              "all_phases_uncertain": "mdi:help-circle-outline",
-              "disable_charging_executed": "mdi:clipboard-check-outline",
-              "disable_charging_replaced": "mdi:clipboard-arrow-right-outline",
-              "disable_charging_cancelled": "mdi:clipboard-remove-outline",
-              "disable_charging_failed": "mdi:clipboard-alert-outline",
-              "disable_charging_uncertain": "mdi:help-circle-outline",
-              "enable_charging_executed": "mdi:clipboard-check-outline",
-              "enable_charging_replaced": "mdi:clipboard-arrow-right-outline",
-              "enable_charging_cancelled": "mdi:clipboard-remove-outline",
-              "enable_charging_failed": "mdi:clipboard-alert-outline",
-              "enable_charging_uncertain": "mdi:help-circle-outline",
-              "lock_executed": "mdi:clipboard-check-outline",
-              "lock_replaced": "mdi:clipboard-arrow-right-outline",
-              "lock_cancelled": "mdi:clipboard-remove-outline",
-              "lock_failed": "mdi:clipboard-alert-outline",
-              "lock_uncertain": "mdi:help-circle-outline",
-              "unlock_executed": "mdi:clipboard-check-outline",
-              "unlock_replaced": "mdi:clipboard-arrow-right-outline",
-              "unlock_cancelled": "mdi:clipboard-remove-outline",
-              "unlock_failed": "mdi:clipboard-alert-outline",
-              "unlock_uncertain": "mdi:help-circle-outline",
-              "recovery_succeeded": "mdi:check-circle-outline",
-              "recovery_failed": "mdi:alert-circle-outline",
-              "recovery_uncertain": "mdi:help-circle-outline"
-            }
-          },
-          "result": {
-            "default": "mdi:clipboard-text-outline",
-            "state": {
-              "executed": "mdi:clipboard-check-outline",
-              "replaced": "mdi:clipboard-arrow-right-outline",
-              "cancelled": "mdi:clipboard-remove-outline",
-              "failed": "mdi:clipboard-alert-outline",
-              "uncertain": "mdi:help-circle-outline",
-              "recovery_succeeded": "mdi:check-circle-outline",
-              "recovery_failed": "mdi:alert-circle-outline"
-            }
-          }
-        }
-      },
-      "wallbox_event": {
-        "default": "mdi:ev-station",
-        "state_attributes": {
-          "event_type": {
-            "default": "mdi:ev-station",
-            "state": {
-              "vehicle_plugged_in": "mdi:ev-plug-type2",
-              "vehicle_unplugged": "mdi:power-plug-off-outline",
-              "charging_started": "mdi:battery-charging",
-              "charging_stopped": "mdi:battery-check-outline",
-              "error_occurred": "mdi:alert-circle-outline",
-              "error_cleared": "mdi:check-circle-outline",
-              "authorized": "mdi:card-account-details-outline",
-              "authorization_rejected": "mdi:card-off-outline",
-              "downgrade_started": "mdi:arrow-down-bold-circle-outline",
-              "downgrade_ended": "mdi:arrow-up-bold-circle-outline",
-              "cable_locked": "mdi:lock-outline",
-              "cable_unlocked": "mdi:lock-open-variant-outline",
-              "phases_switched": "mdi:sine-wave"
+              "command_done": "mdi:clipboard-check-outline",
+              "command_failed": "mdi:clipboard-alert-outline",
+              "command_cancelled": "mdi:clipboard-remove-outline",
+              "session_started": "mdi:ev-plug-type2",
+              "session_ended": "mdi:power-plug-off-outline",
+              "wallbox_changed": "mdi:ev-station"
             }
           }
         }
@@ -313,6 +159,9 @@
   "services": {
     "set_charging_current": "mdi:current-ac",
     "start_guest_charging": "mdi:account-clock-outline",
-    "clear_target_time": "mdi:calendar-remove"
+    "clear_target_time": "mdi:calendar-remove",
+    "use_calendar_departure": "mdi:calendar-import",
+    "use_vehicle_departure": "mdi:car-clock",
+    "assign_vehicle_charge": "mdi:link-variant-plus"
   }
 }

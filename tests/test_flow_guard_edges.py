@@ -15,7 +15,8 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
 )
 from custom_components.mennekes_amtron_rtu.device.connection import SerialConfig
 from custom_components.mennekes_amtron_rtu.device.waveshare_gateway import GatewayError
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.entry_connection import connection_config
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.ha_fakes import FakeHass
 from tests.test_config_flow import IDENTITY, SearchFlow
 from tests.test_gateway_config_flow import SNAPSHOT
@@ -131,7 +132,7 @@ def test_service_identity_lookup_cannot_commit_an_entry_changed_during_lookup(mo
         flow = _flow()
         client = SimpleNamespace(identity=IDENTITY, async_connect=AsyncMock(), async_close=AsyncMock())
         monkeypatch.setattr(config_flow, "async_get_clientsession", lambda _hass: None)
-        monkeypatch.setattr(config_flow, "RemoteClient", lambda *_args: client)
+        monkeypatch.setattr(config_flow, "ServiceClient", lambda *_args: client)
 
         async def set_unique(_serial):
             _change(flow)
@@ -190,7 +191,7 @@ def test_app_confirmation_rejects_a_connection_changed_at_any_async_stage(monkey
         flow.async_set_unique_id = set_unique
         monkeypatch.setattr(config_flow, "async_app_discoveries", discover)
         monkeypatch.setattr(config_flow, "async_get_clientsession", lambda _hass: None)
-        monkeypatch.setattr(config_flow, "RemoteClient", lambda *_args: client)
+        monkeypatch.setattr(config_flow, "ServiceClient", lambda *_args: client)
         result = await flow.async_step_hassio_confirm({})
         _assert_changed(result)
         if stage != "discovery":
@@ -249,20 +250,26 @@ def test_unchanged_connection_probe_failure_preserves_concurrent_updates(monkeyp
         flow = _flow()
         entry = flow.reconfigure_entry
         entry.state = ConfigEntryState.LOADED
-        config = SerialConfig("/dev/fake")
-        entry.runtime_data = SimpleNamespace(client=SimpleNamespace(config=config))
+        config = connection_config(entry)
 
-        async def identity(_client):
+        async def refresh():
             if entry_changed:
                 _change(flow)
-            raise AmtronConnectionError("offline")
 
-        monkeypatch.setattr(config_flow, "async_read_identity", identity)
+        # An unchanged form asks the running service instead of opening the
+        # bus, through the coordinator that owns the poll.
+        entry.runtime_data = SimpleNamespace(
+            client=SimpleNamespace(identity=None),
+            coordinator=SimpleNamespace(async_refresh=refresh, last_update_success=False),
+        )
+        probe = AsyncMock()
+        monkeypatch.setattr(config_flow, "async_test_connection", probe)
         if entry_changed:
             _assert_changed(await flow._async_test_and_finish("serial_reconfigure", {}, config))
         else:
             with pytest.raises(AmtronConnectionError):
                 await flow._async_test_and_finish("serial_reconfigure", {}, config)
+        probe.assert_not_awaited()
 
     asyncio.run(run())
 
@@ -310,5 +317,60 @@ def test_search_conflict_is_reported_and_a_unchanged_result_remains_accessible()
         result = await flow.async_step_search_result()
         assert result["type"] == "form"
         assert result["step_id"] == "serial_reconfigure"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("probe", ["test", "search"])
+def test_a_service_kept_for_a_retried_setup_gives_up_the_bus_before_a_probe(monkeypatch, probe):
+    async def run():
+        flow = _flow()
+        entry = flow.reconfigure_entry
+        # Not loaded, yet its service may still run for Home Assistant's retry.
+        entry.state = ConfigEntryState.SETUP_RETRY
+        order = []
+
+        async def release(_hass, entry_id, *, force):
+            order.append(("release", entry_id, force))
+
+        async def connect(_config):
+            order.append("probe")
+            raise AmtronConnectionError("no answer")
+
+        async def search(_base, *, all_parameters):
+            order.append("probe")
+
+        monkeypatch.setattr(config_flow, "async_release", release)
+        monkeypatch.setattr(config_flow, "async_test_connection", connect)
+        monkeypatch.setattr(config_flow, "async_search", search)
+        if probe == "test":
+            with pytest.raises(AmtronConnectionError):
+                await flow._async_test_and_finish("serial_reconfigure", {}, SerialConfig("/dev/other"))
+        else:
+            await flow._async_search_bus_locked(entry, dict(entry.data), SerialConfig("/dev/other"), False)
+        assert order == [("release", entry.entry_id, True), "probe"]
+
+    asyncio.run(run())
+
+
+def test_an_entry_that_could_not_be_unloaded_keeps_its_service_through_a_probe(monkeypatch):
+    async def run():
+        flow = _flow()
+        entry = flow.reconfigure_entry
+        # Its entities and heartbeat still run, and nothing would start them again.
+        entry.state = ConfigEntryState.FAILED_UNLOAD
+        order = []
+
+        async def release(_hass, entry_id, *, force):
+            order.append("release")
+
+        async def search(_base, *, all_parameters):
+            order.append("probe")
+
+        monkeypatch.setattr(config_flow, "async_release", release)
+        monkeypatch.setattr(config_flow, "async_search", search)
+        with pytest.raises(AmtronConnectionError, match="cannot release the active connection"):
+            await flow._async_search_bus_locked(entry, dict(entry.data), SerialConfig("/dev/other"), False)
+        assert order == []
 
     asyncio.run(run())

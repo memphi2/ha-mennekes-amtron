@@ -13,11 +13,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import STORAGE_DIR
 from homeassistant.util.file import WriteError, write_utf8_file_atomic
 
-from .device.charging_session import SessionHistory
 from .device.const import DOMAIN
-from .device.energy_goal import EnergyGoal
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
-from .device.soc_goal import SocGoal
 from .device.timed_goal import TimedGoal
 
 
@@ -160,50 +157,6 @@ class ModelStore[Goal: _GoalModel]:
         await self._hass.async_add_executor_job(lambda: self.path.unlink(missing_ok=True))
         self._last = None
         self._write_unconfirmed = False
-
-
-class GoalStore(ModelStore[EnergyGoal]):
-    """Keep the energy baseline durable without saving each meter observation."""
-
-    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
-        super().__init__(hass, entry_id, identity, kind="energy_goal", model=EnergyGoal)
-
-
-class SocGoalStore(ModelStore[SocGoal]):
-    """Keep the vehicle-charge goal in its own file, independent of energy goals."""
-
-    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
-        super().__init__(hass, entry_id, identity, kind="soc_goal", model=SocGoal)
-
-
-class SessionHistoryStore(ModelStore[SessionHistory]):
-    """Keep one completed session, without persisting individual meter readings."""
-
-    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
-        super().__init__(hass, entry_id, identity, kind="charging_session", model=SessionHistory)
-
-
-@dataclass(frozen=True, slots=True)
-class PlanPause:
-    """Whether the departure plan paused the wallbox itself."""
-
-    paused: bool = False
-
-    def snapshot(self) -> dict[str, Any]:
-        return {"paused": self.paused}
-
-    @classmethod
-    def restore(cls, raw: object) -> PlanPause:
-        if not isinstance(raw, dict) or raw.keys() != {"paused"} or type(raw["paused"]) is not bool:
-            raise ValueError("invalid departure plan pause")
-        return cls(raw["paused"])
-
-
-class PlanPauseStore(ModelStore[PlanPause]):
-    """Keep the plan's own pause across a restart, so the plan can end it."""
-
-    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
-        super().__init__(hass, entry_id, identity, kind="timed_pause", model=PlanPause)
 
 
 @dataclass(frozen=True, slots=True)

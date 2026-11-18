@@ -12,19 +12,19 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
 
-from custom_components.mennekes_amtron_rtu import remote_compat
+from custom_components.mennekes_amtron_rtu import service_compat
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_version import SERVICE_VERSION
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_service_reauth import add_entry
 
 
 @pytest.mark.parametrize("phase", ["flow", "setup", "poll"])
-@pytest.mark.parametrize("version", [1, 3, "missing_route", True, "2"])
+@pytest.mark.parametrize("version", [1, 2, "missing_route", True, "3"])
 def test_api_mismatch_is_distinct_from_auth_failure_and_recovers(
     tmp_path, phase, version
 ):
@@ -106,8 +106,8 @@ def test_api_mismatch_is_distinct_from_auth_failure_and_recovers(
     ("missing", "0.5.0", "service_invalid_response"),
     ("missing", "0.5.1", "service_invalid_response"),
     ("0.5.0", "0.5.0", None),
-    ("0.10.0", "0.9.0", None),
-    ("0.9.0", "0.10.0", "service_version_mismatch"),
+    ("0.10.0b1", "0.9.0", None),
+    ("0.9.0", "0.10.0b1", "service_version_mismatch"),
     ("0.5.0b1", "0.5.0", "service_version_mismatch"),
     ("0.5.0-beta.1", "0.5.0", "service_version_mismatch"),
     ("0.5.0-rc.1", "0.5.0", "service_version_mismatch"),
@@ -131,10 +131,10 @@ def test_service_versions_use_numeric_and_prerelease_ordering(
 ):
     async def run():
         service, bus, _clock = await service_fixture(tmp_path, read_only=True)
-        monkeypatch.setattr(remote_compat, "MIN_SERVICE_VERSION", minimum)
+        monkeypatch.setattr(service_compat, "MIN_SERVICE_VERSION", minimum)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 payload = service.snapshot()
                 # Seed a known compatible snapshot before changing its version.
                 payload["service_version"] = minimum
@@ -169,7 +169,7 @@ def test_service_versions_use_numeric_and_prerelease_ordering(
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("advertised", [remote_compat.MIN_SERVICE_VERSION, "0.10.0", "0.9.2b1"])
+@pytest.mark.parametrize("advertised", [service_compat.MIN_SERVICE_VERSION, "0.10.0", "0.11.0b1"])
 def test_supported_services_work_without_a_matching_integration_version(tmp_path, advertised):
     async def run():
         service, bus, _clock = await service_fixture(tmp_path)
@@ -221,7 +221,7 @@ def test_incompatible_service_version_blocks_and_recovers_without_reauth_or_repl
 ):
     async def run():
         service, bus, _clock = await service_fixture(tmp_path)
-        monkeypatch.setattr(remote_compat, "MIN_SERVICE_VERSION", minimum)
+        monkeypatch.setattr(service_compat, "MIN_SERVICE_VERSION", minimum)
         hass = await _boot(tmp_path / "ha")
         incompatible = phase == "flow"
         requests = []
@@ -313,10 +313,10 @@ def test_incompatible_service_version_blocks_and_recovers_without_reauth_or_repl
 
 @pytest.mark.parametrize("advertised", ["0.9.0b7", "0.9.0b8", "0.9.0b9"])
 def test_prerelease_service_is_rejected_by_stable_integration(advertised: str):
-    from custom_components.mennekes_amtron_rtu.remote_errors import (
+    from custom_components.mennekes_amtron_rtu.service_errors import (
         ServiceConnectionError,
     )
 
     with pytest.raises(ServiceConnectionError) as error:
-        remote_compat.validate_service_version({"service_version": advertised})
+        service_compat.validate_service_version({"service_version": advertised})
     assert error.value.reason == "service_version_mismatch"

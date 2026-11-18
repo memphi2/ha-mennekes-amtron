@@ -60,7 +60,6 @@ def test_remote_profile_reload_retains_costs_or_closes_failed_handoff(tmp_path, 
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at):
                     assert await integration.async_setup_entry(hass, entry)
                 old = entry.runtime_data
-                assert old.sessions is None
                 # The connect snapshot is cached; establish the idle baseline
                 # with the next independently observed service measurement.
                 await observe(1, 100, False)
@@ -112,24 +111,15 @@ def test_remote_profile_reload_retains_costs_or_closes_failed_handoff(tmp_path, 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("cancelled_owner", ["sessions", "charging_cost"])
-def test_cancelled_handoff_cleanup_still_closes_all_remaining_owners(cancelled_owner):
+def test_cancelled_handoff_cleanup_releases_the_retained_cost_owner_once():
     async def run():
-        sessions = Mock(async_close=AsyncMock())
-        cost = Mock(async_stop=AsyncMock())
-        client = Mock(async_close=AsyncMock())
-        if cancelled_owner == "sessions":
-            sessions.async_close.side_effect = asyncio.CancelledError
-        else:
-            cost.async_stop.side_effect = asyncio.CancelledError
-        handoff = RuntimeHandoff(identity=Mock(), client=client, sessions=sessions, charging_cost=cost)
+        cost = Mock(async_stop=AsyncMock(side_effect=asyncio.CancelledError))
+        handoff = RuntimeHandoff(identity=Mock(), charging_cost=cost)
         with pytest.raises(asyncio.CancelledError):
             await handoff.async_close()
-        sessions.async_close.assert_awaited_once()
         cost.async_stop.assert_awaited_once()
-        client.async_close.assert_awaited_once()
-        assert handoff.client is handoff.sessions is handoff.charging_cost is None
+        assert handoff.charging_cost is None
         await handoff.async_close()
-        client.async_close.assert_awaited_once()
+        cost.async_stop.assert_awaited_once()
 
     asyncio.run(run())

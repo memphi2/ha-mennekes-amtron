@@ -61,7 +61,6 @@ def test_the_service_charges_and_rests_a_handed_over_departure(departure_service
             assert server.ModbusService is DepartureModbusService
             given, result = await hand_over(s)
             departure = result["control"]["departure"]
-            assert result["control"]["supports_departure_plan"] is True
             assert departure["inputs"] == given.digest
             assert departure["trip"]["source"] == "manual"
             await s.departure.tick()
@@ -150,7 +149,6 @@ def test_departure_commands_are_validated_before_the_plan_sees_them(departure_se
             plan, s.departure = s.departure, None
             with pytest.raises(DeviceError, match="service_unavailable"):
                 await s.command(trip)
-            assert s.snapshot()["control"]["supports_departure_plan"] is True
             assert s.snapshot()["control"]["departure"] is None
             s.departure = plan
     asyncio.run(run())
@@ -190,14 +188,17 @@ def test_a_plan_pause_ends_through_a_resume_with_the_service_cap(departure_servi
     asyncio.run(run())
 
 
-def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(departure_service, monkeypatch):
+def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(
+    departure_service, monkeypatch, caplog,
+):
     async def run():
+        caplog.set_level("DEBUG")
         async with departure_service() as (s, _transport, _clock):
             calls = []
 
             async def tick():
                 calls.append(len(calls))
-                if len(calls) == 1:
+                if len(calls) <= 3:
                     s.departure.wake.set()
                     raise RuntimeError("fixture")
                 raise asyncio.CancelledError
@@ -205,8 +206,14 @@ def test_the_loop_survives_a_failing_tick_and_wakes_on_commands(departure_servic
             s.departure.tick = tick
             with pytest.raises(asyncio.CancelledError):
                 await s._departure_loop()
-            assert calls == [0, 1]
+            assert calls == [0, 1, 2, 3]
             assert s.departure.status == "error"
+            # A tick that fails every five seconds is reported once.
+            reports = [r for r in caplog.records if "tick failed" in r.getMessage()]
+            assert [(r.levelname, bool(r.exc_info)) for r in reports] == [
+                ("ERROR", True), ("DEBUG", False), ("DEBUG", False),
+            ]
+            assert reports[0].getMessage() == "Departure plan: tick failed (RuntimeError)"
             plan, s.departure = s.departure, None
 
             async def stop(_delay):

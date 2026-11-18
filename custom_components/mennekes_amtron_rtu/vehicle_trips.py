@@ -61,14 +61,14 @@ class VehicleTripMemory:
         try:
             return await self._store.async_load()
         except (OSError, ValueError) as err:
-            _LOGGER.warning("Ignoring saved vehicle departures: %s", err)
+            _LOGGER.warning("Departure plan: ignoring saved vehicle departures (%s)", err)
             return VehicleTrips()
 
     async def _async_save(self, trips: VehicleTrips) -> None:
         try:
             await self._store.async_save(trips)
         except OSError as err:
-            _LOGGER.warning("Vehicle departure not remembered: %s", err)
+            _LOGGER.warning("Departure plan: vehicle departure not saved (%s)", err)
 
     async def async_swap(
         self, previous: str | None, trip: TimedGoal | None, selected: str | None,

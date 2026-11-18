@@ -11,11 +11,11 @@ cards:
       {%- if has_value('datetime.mennekes_amtron_orario_obiettivo') %}{% set p.l = p.l + ['fino alle ' ~ as_local(as_datetime(states('datetime.mennekes_amtron_orario_obiettivo'))).strftime('%H:%M')] %}{% endif -%}
       {%- set s = states('number.mennekes_amtron_obiettivo_di_carica_del_veicolo') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
-      {%- set t = states('sensor.mennekes_amtron_stato_ricarica_programmata') -%}
+      {%- set t = state_attr('sensor.mennekes_amtron_motivo_di_attesa_della_ricarica', 'departure_plan') -%}
       {{ 'In attesa della prima lettura' if is_state(entity, 'unknown') else 'Connessione interrotta' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energia_della_sessione', with_unit=True) if has_value('sensor.mennekes_amtron_energia_della_sessione') else '—' }}
 
       {{ 'Limiti: ' ~ p.l | join(' · ') if p.l else 'Nessun limite' }}
-      {%- if t not in ['disabled', 'none', 'unknown', 'unavailable'] %} · Pianificazione: {{ state_translated('sensor.mennekes_amtron_stato_ricarica_programmata') }}{% endif %}
+      {%- if t not in [none, 'disabled'] %} · Pianificazione: {{ state_attr_translated('sensor.mennekes_amtron_motivo_di_attesa_della_ricarica', 'departure_plan') }}{% endif %}
     multiline_secondary: true
     icon: mdi:ev-station
     color: >-
@@ -36,11 +36,11 @@ cards:
           type: template
           entity: switch.mennekes_amtron_plug_charge_virtuale
           content: >-
-            {{ 'P&C pronto' if states('sensor.mennekes_amtron_stato_di_plug_charge_virtuale') in ['authorized', 'manual_release']
+            {{ 'P&C pronto' if state_attr('sensor.mennekes_amtron_motivo_di_attesa_della_ricarica', 'plug_charge') in ['authorized', 'manual_release']
             else 'P&C in attesa' if is_state(entity, 'on') else 'P&C spento' }}
           icon: mdi:car-key
           icon_color: >-
-            {{ 'green' if states('sensor.mennekes_amtron_stato_di_plug_charge_virtuale') in ['authorized', 'manual_release']
+            {{ 'green' if state_attr('sensor.mennekes_amtron_motivo_di_attesa_della_ricarica', 'plug_charge') in ['authorized', 'manual_release']
             else 'amber' if is_state(entity, 'on') else 'grey' }}
           tap_action:
             action: more-info
@@ -137,8 +137,8 @@ cards:
       - type: conditional
         conditions:
           - condition: state
-            entity: sensor.mennekes_amtron_ricarica_ospite
-            state: inactive
+            entity: binary_sensor.mennekes_amtron_ricarica_ospite
+            state: "off"
         chip:
           type: template
           content: "Avvia ospite"
@@ -154,7 +154,7 @@ cards:
       - type: conditional
         conditions:
           - condition: state
-            entity: button.mennekes_amtron_usa_prossimo_evento_calendario
+            entity: select.mennekes_amtron_veicolo_attivo
             state_not: unavailable
         chip:
           type: template
@@ -162,15 +162,13 @@ cards:
           icon: mdi:calendar-import
           tap_action:
             action: perform-action
-            perform_action: button.press
-            target:
-              entity_id: button.mennekes_amtron_usa_prossimo_evento_calendario
+            perform_action: mennekes_amtron_rtu.use_calendar_departure
             confirmation:
               text: "Usare questa partenza? Un piano di partenza può annullare una pausa manuale."
       - type: conditional
         conditions:
           - condition: state
-            entity: button.mennekes_amtron_usa_la_partenza_del_veicolo
+            entity: select.mennekes_amtron_veicolo_attivo
             state_not: unavailable
         chip:
           type: template
@@ -178,8 +176,6 @@ cards:
           icon: mdi:car-clock
           tap_action:
             action: perform-action
-            perform_action: button.press
-            target:
-              entity_id: button.mennekes_amtron_usa_la_partenza_del_veicolo
+            perform_action: mennekes_amtron_rtu.use_vehicle_departure
             confirmation:
               text: "Usare questa partenza? Un piano di partenza può annullare una pausa manuale."

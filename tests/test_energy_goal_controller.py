@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.control import _PendingCommand
@@ -21,7 +20,9 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import 
     EnergyGoalController,
 )
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
-from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceValidationError,
+)
 from custom_components.mennekes_amtron_rtu.device.persistence import (
     StorageCommitUncertainError,
     StorageStateUnknownError,
@@ -356,7 +357,7 @@ def test_waiting_resume_is_fenced_by_terminal_evidence_before_worker_gets_lock()
             runner.observe(_snapshot(harness, 1247))
             assert runner.stop_requested
             assert control.energy_goal.status == "active"
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await resume
         assert error.value.translation_key == "energy_goal_stop_active"
         await _settle(runner)
@@ -410,7 +411,7 @@ def test_terminal_evidence_during_guarded_reads_is_rechecked_before_start(action
             put(harness.transport.bank, R.CHARGING_RELEASE, 0)
         elif action == "unlock":
             put(harness.transport.bank, R.LOCK_EVSE, 1)
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await method()
         assert error.value.translation_key == "energy_goal_stop_active"
         await _settle(runner)
@@ -727,12 +728,12 @@ def test_failed_stop_save_still_pauses_and_does_not_spam_logs(caplog):
         assert current_writes(harness.transport) == [1]
         assert control.energy_goal.stop_requested
         assert control.pause_requested is True
-        assert sum("Cannot enforce energy goal" in record.message for record in caplog.records) == 1
+        assert sum("Energy target: cannot be enforced" in record.message for record in caplog.records) == 1
         assert "private details" not in caplog.text
         runner._persist = AsyncMock()
         runner.observe(_snapshot(harness, 1247))
         await _settle(runner)
-        assert not runner._failure_logged
+        assert not runner._notice.failing
         await runner.async_stop()
     asyncio.run(run())
 
@@ -770,7 +771,7 @@ def test_latched_stop_rejects_start_commands_until_explicit_goal_change(command)
             "release": lambda: control.async_set_charging_release(True),
             "unlock": lambda: control.async_set_lock_evse(False),
         }
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await methods[command]()
         assert error.value.translation_key == "energy_goal_stop_active"
         assert harness.transport.writes == before
@@ -792,7 +793,7 @@ def test_stopped_and_unsupported_controllers_refuse_arming():
         harness.identity.layout_version = R.LAYOUT_V01_00
         with pytest.raises(DeviceValidationError, match="energy_goal_not_supported"):
             await EnergyGoalController(control, harness.client, AsyncMock()).async_set_target(12)
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await control.async_set_energy_goal(12)
         assert error.value.translation_key == "energy_goal_not_supported"
         await control.async_pause_for_energy_goal()
@@ -831,7 +832,7 @@ def test_shutdown_retains_terminal_evidence_queued_behind_another_command(save_f
         assert control.pause_requested is True
         assert harness.transport.writes == []
         if save_failed:
-            assert "Cannot save energy goal stop on shutdown" in caplog.text
+            assert "Energy target: stop not saved on shutdown" in caplog.text
             assert "private details" not in caplog.text
         else:
             assert saved[-1]["status"] == "meter_unavailable"
@@ -856,7 +857,7 @@ def test_ui_observer_errors_do_not_undo_the_goal(caplog):
         _harness, control, runner, _saved = await _runner(notify=broken)
         await runner.async_set_target(12)
         assert control.energy_goal.status == "active"
-        assert "Unable to publish an energy goal update" in caplog.text
+        assert "Energy target: unable to publish an update" in caplog.text
         assert "private details" not in caplog.text
         await runner.async_stop()
     asyncio.run(run())

@@ -6,9 +6,7 @@ import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
-from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.event import async_track_state_change_event
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import (
@@ -26,6 +24,31 @@ from tests.test_modbus_service import current_writes
 
 SOC = "sensor.test_car_soc"
 LIMIT = "number.test_car_charge_limit"
+
+
+def forget_current_write(hass, entry):
+    """Let the next current write through the service's minimum write interval."""
+    host = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]
+    host._service.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
+
+
+async def settle(hass, entry):
+    """Let the service apply queued writes and show them in Home Assistant."""
+    service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+    if pending := service.control._flush_task:
+        await pending
+    await service.refresh()
+    if service.goal is not None and (worker := service.goal._task) is not None:
+        await asyncio.wait_for(asyncio.shield(worker), 5)
+    if pending := service.control._flush_task:
+        await pending
+    await entry.runtime_data.coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+
+def vehicle_target(hass, waiting):
+    """The vehicle target's status as the operation sensor shows it."""
+    return hass.states.get(waiting).attributes.get("vehicle_target")
 
 
 async def _entry(hass):
@@ -72,19 +95,19 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                 entry = await _entry(hass)
                 registry = er.async_get(hass)
                 assert registry.async_get_entity_id("number", DOMAIN, f"{SERIAL_NUMBER}_soc_goal") is None
-                assert registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_soc_goal_status") is None
+                waiting = registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_operation_waiting")
+                assert waiting is not None
+                assert vehicle_target(hass, waiting) is None
 
                 await _options(hass, entry)
                 runtime = entry.runtime_data
                 target = registry.async_get_entity_id("number", DOMAIN, f"{SERIAL_NUMBER}_soc_goal")
-                status = registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_soc_goal_status")
                 pause = registry.async_get_entity_id("switch", DOMAIN, f"{SERIAL_NUMBER}_charging_paused")
                 assert target is not None
-                assert status is not None
                 assert pause is not None
                 assert hass.states.get(target).attributes["max"] == 100
                 assert hass.states.get(target).attributes["unit_of_measurement"] == "%"
-                assert hass.states.get(status).state == "disabled"
+                assert vehicle_target(hass, waiting) == "disabled"
 
                 async def set_target(value):
                     await hass.services.async_call(
@@ -93,21 +116,21 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                     await hass.async_block_till_done()
 
                 # Choosing or clearing a ceiling does not resume a deliberate pause.
-                runtime.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
+                forget_current_write(hass, entry)
                 await hass.services.async_call("switch", "turn_on", {"entity_id": pause}, blocking=True)
                 await runtime.coordinator.async_refresh()
                 await hass.async_block_till_done()
                 paused_writes = current_writes(transport)
                 await set_target(80)
-                assert hass.states.get(status).state == "active"
+                assert vehicle_target(hass, waiting) == "active"
                 assert hass.states.get(pause).state == "on"
                 await set_target(0)
-                assert hass.states.get(status).state == "disabled"
+                assert vehicle_target(hass, waiting) == "disabled"
                 assert hass.states.get(pause).state == "on"
                 assert current_writes(transport) == paused_writes
 
                 # Charging resumes only through the user's separate switch command.
-                runtime.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
+                forget_current_write(hass, entry)
                 await hass.services.async_call("switch", "turn_off", {"entity_id": pause}, blocking=True)
                 await runtime.coordinator.async_refresh()
                 await hass.async_block_till_done()
@@ -116,7 +139,7 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                 charging_writes = current_writes(transport)
                 hass.states.async_set(SOC, "unavailable", {"unit_of_measurement": "%"})
                 await hass.async_block_till_done()
-                assert hass.states.get(status).state == "active"
+                assert vehicle_target(hass, waiting) == "active"
                 assert hass.states.get(pause).state == "off"
                 assert current_writes(transport) == charging_writes
 
@@ -125,7 +148,7 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                 await hass.async_block_till_done()
                 await _options(hass, entry, limit=True)
                 runtime = entry.runtime_data
-                assert hass.states.get(status).state == "disabled"
+                assert vehicle_target(hass, waiting) == "disabled"
                 assert hass.states.get(target).attributes["max"] == 80
                 await set_target(75)
                 hass.states.async_set(LIMIT, "70", {"unit_of_measurement": "%"})
@@ -141,51 +164,38 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                     hass.states.async_set(LIMIT, missing, {"unit_of_measurement": "%"})
                     await hass.async_block_till_done()
                     assert hass.states.get(target).attributes["max"] == 90
-                    assert hass.states.get(status).state == "active"
+                    assert vehicle_target(hass, waiting) == "active"
                 assert current_writes(transport) == charging_writes
 
                 # Lowering the vehicle cap below its present SoC lets the car end
                 # the charge itself: the target is reached, nothing is paused.
                 hass.states.async_set(LIMIT, "60", {"unit_of_measurement": "%"})
                 await hass.async_block_till_done()
-                assert hass.states.get(status).state == "reached"
+                assert vehicle_target(hass, waiting) == "reached"
                 assert hass.states.get(target).state == "60.0"
                 assert hass.states.get(pause).state == "off"
                 assert current_writes(transport) == charging_writes
 
                 # A target below the car's limit requests a real pause.
-                stopped = asyncio.Event()
-
-                @callback
-                def state_changed(event):
-                    state = event.data["new_state"]
-                    if state is not None and state.state == "on":
-                        stopped.set()
-
-                unsubscribe = async_track_state_change_event(hass, pause, state_changed)
-                try:
-                    runtime.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
-                    await set_target(55)
-                    await asyncio.wait_for(stopped.wait(), 15)
-                    await hass.async_block_till_done()
-                finally:
-                    unsubscribe()
-                assert hass.states.get(status).state == "reached"
+                forget_current_write(hass, entry)
+                await set_target(55)
+                await settle(hass, entry)
+                assert hass.states.get(pause).state == "on"
+                assert vehicle_target(hass, waiting) == "reached"
                 assert hass.states.get(target).state == "55.0"
                 assert current_writes(transport)[-1] == 1
 
                 # A cold goal owner must restore from disk without starting the car.
                 before_reload = current_writes(transport)
                 assert await hass.config_entries.async_unload(entry.entry_id)
-                hass.data[f"{DOMAIN}_write_states"].pop(entry.entry_id)
                 assert await hass.config_entries.async_setup(entry.entry_id)
                 await hass.async_block_till_done()
-                assert hass.states.get(status).state == "reached"
+                assert vehicle_target(hass, waiting) == "reached"
                 assert hass.states.get(target).state == "55.0"
                 assert hass.states.get(pause).state == "on"
                 assert current_writes(transport) == before_reload
                 await set_target(0)
-                assert hass.states.get(status).state == "disabled"
+                assert vehicle_target(hass, waiting) == "disabled"
                 assert hass.states.get(pause).state == "on"
                 assert current_writes(transport) == before_reload
                 assert await hass.config_entries.async_unload(entry.entry_id)

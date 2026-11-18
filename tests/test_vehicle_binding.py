@@ -215,6 +215,13 @@ def test_a_car_still_reporting_itself_plugged_in_is_called_stale(tmp_path, caplo
         report(hass)
         await settle(hass)
         assert "still reports" not in caplog.text
+        # Its end is reported once as well.
+        caplog.set_level(logging.INFO, logger=m.__name__)
+        coordinator.plug(True)
+        await settle(hass)
+        coordinator.plug(True)
+        await settle(hass)
+        assert caplog.text.count("Vehicle: plug signal agrees with the wallbox again") == 1
         binding.stop()
         await hass.async_stop()
 
@@ -242,8 +249,8 @@ def test_storage_problems_only_forget_the_binding(tmp_path, caplog):
             coordinator.plug(False)
             coordinator.plug(True)
             await settle(hass)
-        assert "Ignoring saved vehicle binding" in caplog.text
-        assert "Vehicle binding not saved" in caplog.text
+        assert "Vehicle: ignoring saved binding" in caplog.text
+        assert "Vehicle: binding not saved" in caplog.text
         binding.stop()
         await hass.async_stop()
 

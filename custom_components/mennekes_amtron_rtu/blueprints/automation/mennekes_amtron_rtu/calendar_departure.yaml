@@ -2,7 +2,7 @@ blueprint:
   name: MENNEKES AMTRON - plan the next trip from a calendar
   description: >-
     Turn on an input_boolean helper to copy the next matching calendar event
-    into the wallbox's Next departure. Only timed events with the exact title
+    into the wallbox's Target time. Only timed events with the exact title
     are used. The helper turns off after one trip is selected; later events
     do not automatically start another plan. Configure the vehicle's SoC
     target and battery capacity first. This automation sets a departure time,
@@ -34,8 +34,8 @@ blueprint:
           filter:
             - domain: input_boolean
     departure_time:
-      name: Next departure
-      description: The Mennekes Amtron RTU Next departure entity for this wallbox.
+      name: Target time
+      description: The Mennekes Amtron RTU Target time entity for this wallbox.
       selector:
         entity:
           filter:

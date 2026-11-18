@@ -173,7 +173,7 @@ def test_manual_profile_selection_is_available_without_write_permission():
             with pytest.raises(ServiceValidationError):
                 await selector.async_select_option("Missing car")
         finally:
-            await entry.runtime_data.control.async_shutdown()
+            await entry.runtime_data.client.async_close()
             await entry.runtime_data.client.async_close()
 
     asyncio.run(run())

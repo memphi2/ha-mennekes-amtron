@@ -24,18 +24,23 @@ def test_direct_partial_gate_failure_keeps_observer_and_saved_setting_consistent
     async def run():
         _hass, entry, transport, switch = await switch_fixture(monkeypatch)
         runtime = entry.runtime_data
+        # Follow the service's state the way setup starts the observer.
+        runtime.plug_charge.start()
         try:
             if not enabled:
                 await switch.async_turn_on()
-                runtime.client.write_state.limiter.forget(R.CHARGING_RELEASE.key)
+                entry.service.client.write_state.limiter.forget(R.CHARGING_RELEASE.key)
             transport.bank[R.CHARGING_RELEASE.address] = 1
             transport.write_exceptions[R.CHARGING_RELEASE.address] = "error"
             before_current = current_writes(transport)
             with pytest.raises(HomeAssistantError):
                 await (switch.async_turn_on() if enabled else switch.async_turn_off())
-            # The real controller changed its logical gate before the bus
-            # failure. Reporting the failure must not strand an on gate with
-            # an off observer or restore an old setting after a restart.
+            # The service changed its logical gate before the bus failure.
+            # Reporting the failure must not strand an on gate with an off
+            # observer or restore an old setting after a restart: the next
+            # ordinary state read reconciles without another command.
+            assert entry.service.control.plug_charge["enabled"] is enabled
+            await runtime.coordinator.async_refresh()
             assert switch.is_on is enabled
             assert entry.options["virtual_plug_charge"] is enabled
             assert (runtime.plug_charge.status == "disabled") is not enabled
@@ -43,7 +48,6 @@ def test_direct_partial_gate_failure_keeps_observer_and_saved_setting_consistent
             assert current_writes(transport) == before_current
         finally:
             await runtime.plug_charge.async_stop()
-            await runtime.control.async_shutdown()
             await runtime.client.async_close()
 
     asyncio.run(run())

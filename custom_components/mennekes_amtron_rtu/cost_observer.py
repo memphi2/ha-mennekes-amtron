@@ -40,9 +40,9 @@ from .device.charging_cost import (
     TariffConfig,
 )
 from .device.charging_session import CompletedSession, PresenceGap
-from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
 from .device.enums import EvseState
+from .device.notice import FailureNotice
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .device.vehicle import snapshot_metered_vehicle_present
 from .entry_types import MennekesAmtronConfigEntry
@@ -66,8 +66,7 @@ class _MeterRun:
 _PRICE_UNITS = {"EUR/kWh": 1.0, "€/kWh": 1.0, "ct/kWh": 0.01, "EUR/MWh": 0.001, "€/MWh": 0.001}
 _RETAINED_OPTIONS = (
     CONF_CHARGING_COST_SOURCE, CONF_CHARGING_PRICE, CONF_CHARGING_PRICE_ENTITY,
-    CONF_CHARGING_NETWORK_TARIFF, CONF_MEASUREMENT_INTERVAL_SECONDS,
-    CONF_SCAN_INTERVAL_SECONDS,
+    CONF_CHARGING_NETWORK_TARIFF,
 )
 
 
@@ -114,10 +113,10 @@ class LastChargingCost:
 
 
 class ChargingCostObserver:
-    """Price only intervals observed by this HA process, in both connection modes."""
+    """Price only intervals observed by this HA process."""
 
-    def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry, *, remote: bool) -> None:
-        self._hass, self._entry, self._remote = hass, entry, remote
+    def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
+        self._hass, self._entry = hass, entry
         self._entity = str(entry.options.get(CONF_CHARGING_PRICE_ENTITY, ""))
         self._fixed = entry.options.get(CONF_CHARGING_COST_SOURCE) == COST_SOURCE_FIXED
         self._tariff = TariffConfig.parse(entry.options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
@@ -126,7 +125,7 @@ class ChargingCostObserver:
         self._identity = (
             entry.runtime_data.identity.serial_number, entry.runtime_data.identity.layout_version,
         )
-        max_gap = 660 if remote else max(600, float(entry.options.get(CONF_MEASUREMENT_INTERVAL_SECONDS, 30)) + float(entry.options.get(CONF_SCAN_INTERVAL_SECONDS, 5)) + 60)
+        max_gap = 660
         self._accumulator = CostAccumulator(self._tariff, max_gap=max_gap)
         self._store = ModelStore(
             hass, entry.entry_id, entry.runtime_data.identity.serial_number or entry.entry_id,
@@ -152,12 +151,12 @@ class ChargingCostObserver:
         self._expiry: CALLBACK_TYPE | None = None
         self._live_price: float | None = None
         self._closed = False
-        self._storage_failed = False
+        self._storage_notice = FailureNotice(_LOGGER, "Charging cost")
         self._storage_corrupt = False
         self._dirty = False
         self._retry_at = 0.0
 
-    def retain_for_reload(self, entry: MennekesAmtronConfigEntry, *, remote: bool) -> bool:
+    def retain_for_reload(self, entry: MennekesAmtronConfigEntry) -> bool:
         """Keep observed prices and energy only across an unchanged live source.
 
         Continuity across a reconnect is judged by the presence-gap rule.
@@ -166,7 +165,6 @@ class ChargingCostObserver:
         return (
             not self._closed and not self._storage_corrupt
             and entry.entry_id == self._entry.entry_id
-            and remote == self._remote
             and dict(entry.data) == self._configured_data
             and (
                 entry.runtime_data.identity.serial_number,
@@ -180,7 +178,7 @@ class ChargingCostObserver:
 
     def rebind(self, entry: MennekesAmtronConfigEntry) -> None:
         """Hand over the live observer without resubscribing or resetting costs."""
-        if not self.retain_for_reload(entry, remote=self._remote):
+        if not self.retain_for_reload(entry):
             raise ValueError("charging-cost source changed during reload")
         self._entry = entry
         self._configured_options = deepcopy(dict(entry.options))
@@ -237,7 +235,7 @@ class ChargingCostObserver:
             self.last = await self._store.async_load()
         except (ValueError, OSError):
             self._storage_corrupt = True
-            _LOGGER.warning("Charging-cost storage cannot be read; optional cost estimates are unavailable")
+            _LOGGER.warning("Charging cost: storage cannot be read; optional cost estimates are unavailable")
         if self._fixed:
             self._accumulator.set_price(self._started_at, self._price())
         if not self._fixed and self._entity:
@@ -280,10 +278,10 @@ class ChargingCostObserver:
             # gap. A long gap may hide another car for the running estimate.
             self._presence(now, known=False)
             return
-        self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
+        self._supported = data.session_summary_supported and data.energy_observed_at is not None
         present = snapshot_metered_vehicle_present(data.get, self._entry.runtime_data.identity.layout_version)
         self._presence(now, known=present is not None)
-        at = (data.energy_observed_at or 0.0) if self._remote else now
+        at = data.energy_observed_at or 0.0
         fresh = data.energy_read and self._started_at <= at <= now + 5 and at >= self._price_at
         energy = data.get(ENERGY_TOTAL.key)
         energy = float(energy) if isinstance(energy, (float, int)) and not isinstance(energy, bool) else None
@@ -369,12 +367,11 @@ class ChargingCostObserver:
         try:
             await self._store.async_save(self.last)
         except (ValueError, OSError):
-            if not self._storage_failed:
-                _LOGGER.warning("Charging-cost estimate could not be saved; retrying without affecting charging")
-            self._storage_failed = True
+            self._storage_notice.failed("estimate not saved; retrying without affecting charging")
             self._retry_at = time.monotonic() + 60
         else:
-            self._dirty = self._storage_failed = False
+            self._dirty = False
+            self._storage_notice.recovered("estimate saved again")
 
     async def async_stop(self) -> None:
         self._closed = True

@@ -16,14 +16,8 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 
-from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
-from custom_components.mennekes_amtron_rtu.coordinator import MennekesAmtronCoordinator
-from custom_components.mennekes_amtron_rtu.data import (
-    ConnectionState,
-    DeviceIdentity,
-    MennekesAmtronRuntimeData,
-    WriteDiagnostics,
-)
+from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
+from custom_components.mennekes_amtron_rtu.data import MennekesAmtronRuntimeData
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
@@ -35,6 +29,15 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_SERIAL_NUMBER,
     CONTROL_MODE_MASTER,
 )
+from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
+from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
+from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
+    DepartureModbusService,
+)
+from custom_components.mennekes_amtron_rtu.guest_charging import GuestCharging
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_transport import EmbeddedTransport
 from tests.fakes import FakeModbusClient, device_bank
 
 
@@ -108,6 +111,21 @@ class FakeServices:
         self.registered[(domain, service)] = (handler, schema)
 
 
+class FakeBus:
+    """Record one-time listeners and fire them on request."""
+
+    def __init__(self) -> None:
+        self.once: dict[str, list[Callable[[Any], Any]]] = {}
+
+    def async_listen_once(self, event_type: str, listener: Callable[[Any], Any]) -> Callable[[], None]:
+        self.once.setdefault(event_type, []).append(listener)
+        return lambda: self.once[event_type].remove(listener)
+
+    async def fire(self, event_type: str) -> None:
+        for listener in self.once.pop(event_type, []):
+            await listener(SimpleNamespace(event_type=event_type, data={}))
+
+
 class FakeHass:
     """Everything the integration touches on ``hass``."""
 
@@ -116,9 +134,11 @@ class FakeHass:
         self.config = SimpleNamespace(
             config_dir=self.config_dir,
             components=set(),
+            language="en",
             path=lambda *parts: str(Path(self.config_dir, *parts)),
         )
         self.data: dict[str, Any] = {}
+        self.bus = FakeBus()
         self.is_stopping = False
         self.config_entries = FakeConfigEntries()
         self.services = FakeServices()
@@ -159,6 +179,7 @@ class FakeConfigEntry:
         self.version = 1
         self.pref_disable_polling = False
         self.state = ConfigEntryState.SETUP_IN_PROGRESS
+        self.disabled_by = None
         self.data = (
             {CONF_PORT: "/dev/fake", CONF_SERIAL_NUMBER: "ABC123456789"}
             if data is None
@@ -192,6 +213,23 @@ class FakeConfigEntry:
         return task
 
 
+class PollingTransport(EmbeddedTransport):
+    """Reach a service that polls the wallbox whenever its state is read.
+
+    The real service polls on its own clock. A test wants the next refresh to
+    show what the simulated wallbox holds now.
+    """
+
+    def __init__(self, service: DepartureModbusService) -> None:
+        super().__init__(ServiceApi(service))
+        self.service = service
+
+    async def call(self, method: str, path: str, payload: dict[str, Any] | None) -> Any:
+        if path.startswith("/v2/state"):
+            await self.service.refresh()
+        return await super().call(method, path, payload)
+
+
 async def build_runtime(
     *,
     hass: FakeHass | None = None,
@@ -199,56 +237,60 @@ async def build_runtime(
     bank: dict[int, int] | None = None,
     read_only: bool = False,
     layout: int = R.LAYOUT_V01_03,
-    phase_options: int | None = 2,
+    current_cap: float = 32.0,
 ) -> tuple[FakeHass, FakeConfigEntry, FakeModbusClient]:
-    """Return a loaded entry whose runtime data is wired to a fake bus."""
+    """Return a loaded entry whose service runs on a simulated wallbox.
+
+    ``entry.service`` is the service behind the entry; its heartbeat is
+    stopped so that a test sees only the writes it caused.
+    """
 
     hass = hass or FakeHass()
     entry = entry or FakeConfigEntry(
         options={} if read_only else {CONF_CONTROL_MODE: CONTROL_MODE_MASTER}
     )
-    transport = FakeModbusClient(bank if bank is not None else device_bank(layout=layout))
-    client = MennekesModbusClient(
+    wallbox = FakeModbusClient(bank if bank is not None else device_bank(layout=layout))
+    modbus = MennekesModbusClient(
         SerialConfig(port="/dev/fake", device_id=50),
-        client_factory=lambda _config: transport,
+        client_factory=lambda _config: wallbox,
     )
-    await client.async_connect()
+    directory = Path(tempfile.mkdtemp(prefix="amtron-service-"))
+    service = DepartureModbusService(
+        ServerConfig(modbus.config, "", read_only=read_only, current_cap=current_cap),
+        directory / "intent.json",
+        client=modbus,
+    )
+    await service._initialize()
+    await service.heartbeat.async_stop()
+    wallbox.writes.clear()
 
-    identity = DeviceIdentity(
-        layout_version=layout,
-        firmware_version="2023.21.11024",
-        serial_number="ABC123456789",
-        article_number="1313201205",
-        phase_options_hw=phase_options,
-        max_evse_current=16.0,
-    )
-    diagnostics = WriteDiagnostics()
-    coordinator = MennekesAmtronCoordinator(
-        hass,
-        entry,
-        client=client,
-        identity=identity,
-        connection_state=ConnectionState(),
-        scan_interval=5,
-    )
-    control = AmtronControl(
+    client = ServiceClient(transport=PollingTransport(service))
+    await client.async_connect()
+    coordinator = ServiceCoordinator(hass, entry, client=client, scan_interval=5)
+
+    def notify_pending() -> None:
+        coordinator.async_update_listeners()
+
+    control = ServiceControl(
         client,
-        diagnostics=diagnostics,
-        identity=identity,
-        options=ControlOptions(read_only=read_only),
         state=coordinator.current_data,
+        request_refresh=coordinator.async_refresh,
+        notify_pending=notify_pending,
     )
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
         control=control,
-        identity=identity,
-        diagnostics=diagnostics,
-        connection_state=ConnectionState(),
+        guest=GuestCharging(client, coordinator.async_refresh),
+        identity=client.identity,
+        entry_data=dict(entry.data),
+        controls=not read_only,
     )
+    entry.service = service
     hass.config_entries.entries[entry.entry_id] = entry
     await coordinator.async_refresh()
-    return hass, entry, transport
+    entry.state = ConfigEntryState.LOADED
+    return hass, entry, wallbox
 
 
 def collect(entities: Iterable[Any]) -> dict[str, Any]:
@@ -262,3 +304,29 @@ def collect(entities: Iterable[Any]) -> dict[str, Any]:
         )
         result[str(key)] = entity
     return result
+
+
+def capture_timers(monkeypatch: Any, module: Any) -> list[list[Any]]:
+    """Collect ``[seconds, action, waiting]`` for a module's delayed calls.
+
+    A test fires or inspects them instead of waiting for the clock.
+    """
+    timers: list[list[Any]] = []
+
+    def call_later(_hass: Any, seconds: float, action: Any) -> Callable[[], None]:
+        timer = [seconds, action, True]
+        timers.append(timer)
+
+        def cancel() -> None:
+            timer[2] = False
+
+        return cancel
+
+    monkeypatch.setattr(module, "async_call_later", call_later)
+    return timers
+
+
+def heartbeat_running(heartbeat: Any) -> bool:
+    """Whether the service Home Assistant talks to reports a running heartbeat."""
+    client = heartbeat._client
+    return bool(client.connected and client.snapshot.get("heartbeat", {}).get("running") is True)

@@ -52,15 +52,15 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
     settings_runner: web.AppRunner | None = None
 
     def request_stop(sig: signal.Signals) -> None:
-        _LOGGER.info("%s received; stopping Modbus service", sig.name)
+        _LOGGER.info("Service: %s received; stopping", sig.name)
         stop.set()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, request_stop, sig)
     try:
-        _LOGGER.info("Starting service API on port %s", config.port)
+        _LOGGER.info("Service: starting API on port %s", config.port)
         await site.start()
-        _LOGGER.info("Service API ready on port %s", config.port)
+        _LOGGER.info("Service: API ready on port %s", config.port)
         if supervisor_token:
             settings_runner = web.AppRunner(
                 create_console_app(ServiceConsole(
@@ -72,9 +72,9 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
             )
             await settings_runner.setup()
             await web.TCPSite(settings_runner, config.listen, INGRESS_PORT).start()
-            _LOGGER.info("App connection settings ready through Home Assistant ingress")
+            _LOGGER.info("Service: app connection settings ready through Home Assistant ingress")
         if service is None:
-            _LOGGER.info("Connection setup required; open the app Web UI, save and restart the app")
+            _LOGGER.info("Service: connection setup required; open the app Web UI, save and restart the app")
             await stop.wait()
             return
         worker = service.start()
@@ -85,7 +85,7 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
             (stopping, worker), return_when=asyncio.FIRST_COMPLETED
         )
         if worker in done:
-            _LOGGER.error("Modbus worker stopped unexpectedly")
+            _LOGGER.error("Service: Modbus worker stopped unexpectedly")
             await worker
             raise RuntimeError("Modbus worker stopped")
     finally:
@@ -105,7 +105,7 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
             finally:
                 if service is not None:
                     await service.stop()
-                _LOGGER.info("Modbus service shutdown complete")
+                _LOGGER.info("Service: shutdown complete")
 
 
 def main() -> None:
@@ -118,7 +118,7 @@ def main() -> None:
         stream=sys.stdout,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
-    _LOGGER.info("Starting Mennekes Amtron Modbus service")
+    _LOGGER.info("Service: starting Mennekes Amtron Modbus service")
     supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "")
     phase = "reading options"
     try:
@@ -139,7 +139,7 @@ def main() -> None:
     connection = config.connection if isinstance(config, ServerConfig) else None
     if isinstance(config, ServerConfig) and isinstance(connection, SerialConfig):
         _LOGGER.info(
-            "Configuration accepted: mode=%s, transport=serial, Modbus address=%s, "
+            "Service: configuration accepted: mode=%s, transport=serial, Modbus address=%s, "
             "baudrate=%s, frame=%s%s%s",
             "read-only" if config.read_only else "master",
             connection.device_id,
@@ -150,7 +150,7 @@ def main() -> None:
         )
     elif isinstance(config, ServerConfig) and isinstance(connection, NetworkConfig):
         _LOGGER.info(
-            "Configuration accepted: mode=%s, transport=%s, Modbus address=%s, TCP port=%s",
+            "Service: configuration accepted: mode=%s, transport=%s, Modbus address=%s, TCP port=%s",
             "read-only" if config.read_only else "master",
             connection.connection_type,
             connection.device_id,
@@ -162,7 +162,7 @@ def main() -> None:
         # Exception messages can include private paths or credentials. Report
         # the failure class and errno; lifecycle messages identify the phase.
         _LOGGER.error(
-            "Modbus service terminated (%s, errno=%s)",
+            "Service: terminated (%s, errno=%s)",
             type(err).__name__,
             getattr(err, "errno", None),
         )

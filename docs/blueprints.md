@@ -15,9 +15,18 @@ The PV sensor comes from your inverter or energy-management setup.
 | **Plan the next trip from a calendar** | Copy one matching departure into the timed charging plan |
 | **Precondition before the next trip** | Run your vehicle climate action once before the selected departure |
 
+## Notify on a grid-operator downgrade
+
+Create an automation from **Notify on a grid-operator downgrade** and select
+the wallbox's **Charging status** sensor. While a downgrade applies, its
+`downgraded_to` attribute holds the reduced current; the automation notifies
+when the attribute appears and when it clears. Choose a notify action, for
+example `notify.persistent_notification`. The downgrade itself is enforced
+inside the wallbox; see [the §14a downgrade input](hardware.md#the-14a-enwg-downgrade-input).
+
 ## Plan the next trip from a calendar
 
-Configure the vehicle SoC source and SoC target, then enable **Next departure** and
+Configure the vehicle SoC source and SoC target, then enable departure planning under **Next departure** in the vehicle profile and
 choose its battery-capacity source; see
 [Charge for the next departure](user-guide.md#charge-for-the-next-departure). The
 calendar supplies the departure time. It does not create a charge target.
@@ -27,8 +36,8 @@ calendar supplies the departure time. It does not create a charge target.
 2. Under **Settings → Devices & services → Helpers**, create a **Toggle** helper,
    for example **Plan next trip**.
 3. Create an automation from **Plan the next trip from a calendar**. Select the
-   calendar, the exact event title, the helper and the wallbox's **Next
-   departure** entity. Titles are case-sensitive.
+   calendar, the exact event title, the helper and, for **Target time**,
+   the wallbox's **Target time** entity. Titles are case-sensitive.
 4. Choose how far ahead to plan: the default is **12 hours**, adjustable up to
    **14 days**. Allow enough time for the energy your vehicle needs.
 5. Turn on **Plan next trip**. The automation selects the earliest matching
@@ -38,16 +47,17 @@ If no matching event is available yet, the helper stays on and the automation
 checks every 15 minutes and after a Home Assistant restart. An unavailable
 calendar produces no commands. Only this next trip is selected: recurring
 calendar events do not enable another plan automatically. An existing future
-**Next departure** is preserved; cancel it before selecting a different trip.
+**Target time** is preserved; cancel it before selecting a different trip.
 Calendar edits or deletions after selection do not change the copied time.
-Use **Clear departure time**, then turn the helper on again to select an
+Clear **Target time** with `mennekes_amtron_rtu.clear_target_time`, then turn the helper on again to select an
 updated event. Turning the helper off only stops the search; it does not cancel
 an already selected plan.
 
-The built-in **Use next calendar event** button is an alternative for an
-immediate, single lookup using the calendar configured in integration options.
-Manual entry, the configured calendar and an optional vehicle adapter can
-coexist. **Use vehicle departure** copies one upcoming timer from the selected
+The `mennekes_amtron_rtu.use_calendar_departure` action is an alternative for
+an immediate, single lookup using the calendar configured in integration
+options. Manual entry, the configured calendar and an optional vehicle adapter
+can coexist. `mennekes_amtron_rtu.use_vehicle_departure` copies one upcoming
+timer from the selected
 vehicle's locally published states. The adapter currently supports BavarianData;
 see [vehicle timer setup](user-guide.md#charge-for-the-next-departure).
 It does not fetch cloud data or start a repeating HA plan. A separately
@@ -57,7 +67,7 @@ it can select the new trip.
 
 ## Start vehicle climate before departure
 
-This optional companion works with any selected **Next departure**, including
+This optional companion works with any selected **Target time**, including
 one copied from a calendar or a vehicle timer. Reaching the charging target early
 keeps the departure time available until departure, so climate can still start.
 The vehicle integration must provide a working climate-start action or script.

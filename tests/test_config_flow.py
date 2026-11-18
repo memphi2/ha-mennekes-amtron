@@ -15,7 +15,6 @@ from custom_components.mennekes_amtron_rtu.config_flow import (
     _entry_title,
     _serial_config,
 )
-from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronBusError,
@@ -32,6 +31,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
 )
+from custom_components.mennekes_amtron_rtu.device.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.options_flow import MennekesAmtronOptionsFlow
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass, build_runtime

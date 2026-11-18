@@ -25,7 +25,7 @@ from custom_components.mennekes_amtron_rtu.device.waveshare_auth import (
     WaveshareAuthenticationRejectedError,
 )
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeHass
+from tests.ha_fakes import FakeHass, heartbeat_running
 from tests.test_config_flow import Flow
 from tests.test_gateway_config_flow import _http_form
 from tests.test_home_assistant_smoke import _boot
@@ -36,9 +36,8 @@ OLD_PASSWORD = "Old123"  # noqa: S105 - synthetic fixture
 NEW_PASSWORD = "New123"  # noqa: S105 - synthetic fixture
 
 
-@pytest.mark.parametrize("trigger", ["setup", "poll"])
 @pytest.mark.parametrize("master", [False, True])
-def test_definite_auth_rejection_starts_reauth_and_preserves_device_without_adapter_writes(monkeypatch, tmp_path, trigger, master):
+def test_definite_auth_rejection_starts_reauth_and_preserves_device_without_adapter_writes(monkeypatch, tmp_path, master):
     async def run():
         accepted = OLD_PASSWORD
         transports = []
@@ -75,15 +74,11 @@ def test_definite_auth_rejection_starts_reauth_and_preserves_device_without_adap
                 ids = entity_ids(hass, entry)
                 previous = entry.runtime_data
                 accepted = NEW_PASSWORD
-                if trigger == "setup":
-                    assert not await hass.config_entries.async_reload(entry.entry_id)
-                    assert entry.state is ConfigEntryState.SETUP_ERROR
-                else:
-                    previous.client._client.close()
-                    await previous.coordinator.async_refresh()
-                    assert isinstance(previous.coordinator.last_exception, ConfigEntryAuthFailed)
-                    if previous.heartbeat is not None:
-                        assert not previous.heartbeat.running
+                # A reload outside the options flow stops the service, so the
+                # next setup connects again with the stored credential.
+                assert not await hass.config_entries.async_reload(entry.entry_id)
+                assert entry.state is ConfigEntryState.SETUP_ERROR
+                assert not heartbeat_running(previous.heartbeat)
                 await hass.async_block_till_done()
                 flows = manager.async_progress_by_handler(DOMAIN)
                 assert len(flows) == 1
@@ -102,9 +97,10 @@ def test_definite_auth_rejection_starts_reauth_and_preserves_device_without_adap
                 assert entry.state is ConfigEntryState.LOADED
                 assert dict(entry.data) == {**original, "tcp_auth_password": NEW_PASSWORD}
                 assert entity_ids(hass, entry) == ids
-                assert entry.runtime_data.client.config.tcp_auth_password == NEW_PASSWORD
+                host = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]
+                assert host.config.connection.tcp_auth_password == NEW_PASSWORD
                 if master:
-                    assert entry.runtime_data.heartbeat.running
+                    assert heartbeat_running(entry.runtime_data.heartbeat)
                 inspect.assert_not_awaited()
                 from custom_components.mennekes_amtron_rtu.device import registers as R
                 assert all(address == R.HEARTBEAT.address for transport in transports for address, _ in transport.writes)
@@ -142,7 +138,11 @@ def test_transient_tcp_authentication_failure_remains_retryable_without_reauth(m
                     assert not await hass.config_entries.async_reload(entry.entry_id)
                     assert entry.state is ConfigEntryState.SETUP_RETRY
                 else:
-                    entry.runtime_data.client._client.close()
+                    service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+                    service.client._client.close()
+                    # The service's own poll loop catches this and retries.
+                    with pytest.raises(AmtronConnectionError):
+                        await service.refresh()
                     await entry.runtime_data.coordinator.async_refresh()
                     assert not entry.runtime_data.coordinator.last_update_success
                     assert not isinstance(entry.runtime_data.coordinator.last_exception, ConfigEntryAuthFailed)

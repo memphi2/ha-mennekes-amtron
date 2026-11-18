@@ -54,7 +54,7 @@ class VehiclePhaseMemory:
         try:
             return await self._store.async_load()
         except (OSError, ValueError) as err:
-            _LOGGER.warning("Ignoring saved vehicle phases: %s", err)
+            _LOGGER.warning("Vehicle: ignoring saved phases (%s)", err)
             return VehiclePhases()
 
     async def async_phases(self, profile_id: str) -> int | None:
@@ -71,4 +71,4 @@ class VehiclePhaseMemory:
         try:
             await self._store.async_save(saved)
         except OSError as err:
-            _LOGGER.warning("Vehicle phases not remembered: %s", err)
+            _LOGGER.warning("Vehicle: phases not saved (%s)", err)

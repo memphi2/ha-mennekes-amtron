@@ -7,13 +7,9 @@ from copy import deepcopy
 import pytest
 from aiohttp import ClientSession
 
-from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
-from custom_components.mennekes_amtron_rtu.remote import (
-    ControlOptions,
-    RemoteClient,
-    RemoteControl,
-)
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.test_modbus_service import TOKEN, service_fixture
 
 
@@ -22,9 +18,8 @@ def test_cap_policy_loss_notifies_ha_without_register_changes(tmp_path):
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
-                control = RemoteControl(client, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                                        state=lambda: None, request_refresh=lambda: None)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
+                control = ServiceControl(client,                                         state=lambda: None, request_refresh=lambda: None)
                 payload = service.snapshot()
                 payload["control"]["soc_maximum_required"] = True
                 before = client.apply_snapshot(payload)

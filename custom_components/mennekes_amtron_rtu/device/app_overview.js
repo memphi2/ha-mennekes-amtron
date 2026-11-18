@@ -17,6 +17,7 @@
     source_energy_goal: ["Energy target protection", "Schutz des Energieziels", "Protection de l’objectif énergétique", "Bescherming energiedoel", "Protezione obiettivo energetico"],
     source_soc_goal: ["Vehicle percentage target", "Fahrzeug-Prozentziel", "Objectif de charge du véhicule", "Laadniveau voertuig", "Obiettivo percentuale veicolo"],
     source_recovery: ["Error recovery", "Fehlerbehebung", "Récupération automatique", "Automatisch foutherstel", "Ripristino automatico"],
+    source_unplug: ["Unplugged", "Ausgesteckt", "Débranché", "Uitgetrokken", "Scollegato"],
     source_guest: ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"],
 
     limits_details: ["Saved limits and queued actions", "Gespeicherte Grenzen und vorgemerkte Aktionen", "Limites enregistrées et actions en attente", "Opgeslagen grenzen en geplande acties", "Limiti salvati e azioni in attesa"],

@@ -505,6 +505,7 @@ def test_a_lost_reply_is_demoted_but_other_pymodbus_errors_stay(caplog, monkeypa
     # pymodbus keeps its last message module-wide; start from a clean state.
     monkeypatch.setattr(Log, "last_log_text", "")
     monkeypatch.setattr(Log, "repeat_log", False)
+    monkeypatch.setattr(Log, "frame_dump", [])
     # Another pymodbus user in the same process keeps its errors, repeats included.
     with caplog.at_level(logging.INFO, logger="pymodbus.logging"):
         Log.error(lost)

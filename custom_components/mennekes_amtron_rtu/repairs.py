@@ -10,12 +10,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 
-from .device.client import MennekesModbusClient
 from .device.client_errors import AmtronBusError
 from .device.const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
-from .device.registers import ERROR_CODE
 from .entry_types import MennekesAmtronConfigEntry
-from .remote import RemoteClient
 from .repair_health import HeartbeatRepairMonitor
 from .repair_issues import (
     ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
@@ -29,6 +26,7 @@ from .repair_issues import (
     unsupported_layout,
     write_rejected,
 )
+from .service_client import ServiceClient
 
 LEARN_MORE_URL = (
     "https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/safety.md"
@@ -37,7 +35,7 @@ RECOVERY_CONFIRM_SECONDS = 10.0
 RECOVERY_CONFIRM_INTERVAL = 1.0
 
 
-async def _async_confirm_recovery(client: MennekesModbusClient) -> str | None:
+async def _async_confirm_recovery(client: ServiceClient) -> str | None:
     """Allow firmware to leave error 200 after acknowledging the writes.
 
     Read only the error register during this bounded confirmation window. The
@@ -46,7 +44,7 @@ async def _async_confirm_recovery(client: MennekesModbusClient) -> str | None:
     try:
         async with asyncio.timeout(RECOVERY_CONFIRM_SECONDS):
             while True:
-                error = await client.async_read_register(ERROR_CODE)
+                error = await client.async_read_error_code()
                 if error == 0:
                     return None
                 if error != ERROR_CODE_EMS_UNAVAILABLE:
@@ -62,8 +60,8 @@ def async_setup_repairs(
 ) -> None:
     """Evaluate repairs now and when coordinator data or availability changes.
 
-    Control errors also call async_check_repairs directly: a failed write need
-    not change any polled register, and identical polls do not notify listeners.
+    A rejected write shows with the next poll: the service reports it in its
+    state, which the coordinator reads on its own interval.
     """
 
     async_check_repairs(hass, entry)
@@ -92,7 +90,7 @@ def async_check_repairs(
     client = runtime_data.client
     _set_issue(
         hass, entry, ISSUE_SERVICE_INTENT_REJECTED,
-        isinstance(client, RemoteClient) and client.snapshot.get("control", {}).get("intent_rejected") is True,
+        client.snapshot.get("control", {}).get("intent_rejected") is True,
         severity=ir.IssueSeverity.ERROR, is_fixable=True,
     )
 
@@ -128,7 +126,7 @@ def async_check_repairs(
         hass,
         entry,
         ISSUE_WRITE_REJECTED,
-        write_rejected(runtime_data.diagnostics),
+        write_rejected(client.snapshot),
         severity=ir.IssueSeverity.WARNING,
     )
 
@@ -176,7 +174,7 @@ class HeartbeatRecoveryRepairFlow(RepairsFlow):
         try:
             # The error may already have cleared while the dialog was open.
             # Acknowledging a stale issue must not send another recovery.
-            error = await runtime.client.async_read_register(ERROR_CODE)
+            error = await runtime.client.async_read_error_code()
             if error == 0:
                 runtime.repair_state[ISSUE_EMS_HEARTBEAT_LOST] = None
                 return self.async_create_entry(data={})
@@ -213,7 +211,7 @@ class IntentResetRepairFlow(HeartbeatRecoveryRepairFlow):
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
         if entry is None:
             return self.async_create_entry(data={})
-        if not hasattr(entry, "runtime_data") or not isinstance(entry.runtime_data.client, RemoteClient):
+        if not hasattr(entry, "runtime_data"):
             return self._show_error("entry_unavailable")
         try:
             await entry.runtime_data.client.execute("acknowledge_intent_reset")

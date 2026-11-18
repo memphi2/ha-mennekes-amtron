@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 
 from custom_components import mennekes_amtron_rtu as integration
@@ -31,7 +32,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_SOC_ENTITY,
 )
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass
+from tests.ha_fakes import FakeConfigEntry, FakeHass, capture_timers, heartbeat_running
 from tests.test_charging_cost_options import NETWORK
 from tests.test_home_assistant_smoke import _boot
 from tests.test_init import _patch_client, _patch_issues
@@ -49,7 +50,7 @@ def test_annual_import_starts_after_wallbox_setup_and_is_cancelled_on_unload(tmp
 
         async def refresh(_hass, entry):
             runtime = entry.runtime_data
-            assert runtime.heartbeat.running
+            assert heartbeat_running(runtime.heartbeat)
             assert runtime.coordinator.data is not None
             assert runtime.loaded_platforms
             tasks.append(asyncio.current_task())
@@ -91,12 +92,12 @@ def test_annual_import_starts_after_wallbox_setup_and_is_cancelled_on_unload(tmp
                     callbacks[0](None)
                 await asyncio.wait_for(started.wait(), 3)
                 runtime = entry.runtime_data
-                assert runtime.heartbeat.running
+                assert heartbeat_running(runtime.heartbeat)
                 assert await hass.config_entries.async_unload(entry.entry_id)
                 await asyncio.wait_for(cancelled.wait(), 3)
                 assert tasks[-1].cancelled()
                 unsubscribe.assert_called_once()
-                assert not runtime.heartbeat.running
+                assert not heartbeat_running(runtime.heartbeat)
                 assert not runtime.client.connected
             finally:
                 await hass.async_stop()
@@ -104,7 +105,7 @@ def test_annual_import_starts_after_wallbox_setup_and_is_cancelled_on_unload(tmp
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
-@pytest.mark.parametrize("failure", ["timed", "timed_connection", "recovery"])
+@pytest.mark.parametrize("failure", ["timed", "timed_connection"])
 def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_path, monkeypatch, failure):
     async def run():
         hass = FakeHass(str(tmp_path))
@@ -117,26 +118,37 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         _patch_client(monkeypatch, transport)
         _patch_issues(monkeypatch)
         vehicle = Mock(async_start=AsyncMock(), async_stop=AsyncMock())
-        timed_error = {"timed": ValueError("invalid saved trip"), "timed_connection": HomeAssistantError("service offline")}.get(failure)
+        timed_error = {"timed": ValueError("invalid saved trip"), "timed_connection": HomeAssistantError("service offline")}[failure]
         timed = Mock(async_start=AsyncMock(side_effect=timed_error), async_stop=AsyncMock())
-        recovery = Mock(start=Mock(side_effect=RuntimeError("recovery startup failed")), async_stop=AsyncMock())
         monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args, **_kwargs: vehicle)
         monkeypatch.setattr(integration, "TimedGoalObserver", lambda *_args: timed)
-        monkeypatch.setattr(integration, "HeartbeatRecovery", lambda *_args: recovery)
-        with pytest.raises(RuntimeError if failure == "recovery" else ConfigEntryNotReady) as caught:
+        timers = capture_timers(monkeypatch, integration.embedded)
+        with pytest.raises(ConfigEntryNotReady) as caught:
             await integration.async_setup_entry(hass, entry)
-        if failure != "recovery":
-            assert caught.value.translation_key == ("timed_goal_state_invalid" if failure == "timed" else "timed_goal_unavailable")
-            recovery.async_stop.assert_not_awaited()
-        else:
-            recovery.async_stop.assert_awaited_once()
+        assert caught.value.translation_key == ("timed_goal_state_invalid" if failure == "timed" else "timed_goal_unavailable")
         vehicle.async_start.assert_awaited_once()
         vehicle.async_stop.assert_awaited_once()
         timed.async_start.assert_awaited_once()
         timed.async_stop.assert_awaited_once()
         runtime = entry.runtime_data
-        assert not runtime.heartbeat.running
         assert not runtime.client.connected
+        # The wallbox answered: the service keeps its heartbeat for the retry
+        # and stops only when none comes.
+        assert transport.close_calls == 0
+        assert hass.data[f"{entry.domain}_embedded"]
+        ((seconds, check, waiting),) = timers
+        assert (seconds, waiting) == (30, True)
+        # Home Assistant still plans its retry: the service stays.
+        entry.state = ConfigEntryState.SETUP_RETRY
+        timers.clear()
+        await check(None)
+        assert transport.close_calls == 0
+        ((seconds, check, waiting),) = timers
+        # No retry is coming any more.
+        entry.state = ConfigEntryState.NOT_LOADED
+        await check(None)
+        assert not heartbeat_running(runtime.heartbeat)
         assert transport.close_calls == 1
+        assert not hass.data[f"{entry.domain}_embedded"]
 
     asyncio.run(run())

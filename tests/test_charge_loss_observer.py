@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 import time
 from types import SimpleNamespace
@@ -403,9 +404,14 @@ def test_cancelled_assignment_keeps_memory_and_durable_loss_in_sync(tmp_path, mo
     asyncio.run(run())
 
 
+def _levels(caplog, text):
+    return [record.levelno for record in caplog.records if record.getMessage() == text]
+
+
 @pytest.mark.parametrize("failed_attempts", [1, 2])
-def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_path, failed_attempts):
+def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_path, caplog, failed_attempts):
     async def run():
+        caplog.set_level(logging.DEBUG, logger="custom_components.mennekes_amtron_rtu.charge_loss_observer")
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass, "vehicle_history")
         with patch(
@@ -442,6 +448,12 @@ def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_
                 assert read.await_count == failed_attempts + 1
                 restored = await observer._store.async_load()
                 assert restored.snapshot() == observer.statistics.snapshot()
+                # The failure warns once, its repeats stay at debug, and the
+                # recovery is reported once.
+                assert _levels(caplog, "Charging loss: estimate not saved; retrying without affecting charging") == (
+                    [logging.WARNING] + [logging.DEBUG] * (failed_attempts - 1)
+                )
+                assert _levels(caplog, "Charging loss: estimate saved again") == [logging.INFO]
 
                 with patch.object(observer._store, "async_save", wraps=observer._store.async_save) as save:
                     for _ in range(5):
@@ -449,6 +461,7 @@ def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_
                         await hass.async_block_till_done()
                     save.assert_not_awaited()
                     assert read.await_count == failed_attempts + 1
+                assert _levels(caplog, "Charging loss: estimate saved again") == [logging.INFO]
             finally:
                 await observer.async_stop()
                 await hass.async_stop()

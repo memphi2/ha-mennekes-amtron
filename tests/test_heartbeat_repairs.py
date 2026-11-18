@@ -17,22 +17,21 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.mennekes_amtron_rtu import repair_health, repairs
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
 from custom_components.mennekes_amtron_rtu.device.const import (
     CONTROL_MODE_MASTER,
     DOMAIN,
 )
-from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
-from custom_components.mennekes_amtron_rtu.device.waveshare_auth import (
-    WaveshareAuthenticationRejectedError,
-)
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteHeartbeat
 from custom_components.mennekes_amtron_rtu.repair_issues import (
     ISSUE_EMS_HEARTBEAT_LOST,
     ISSUE_HEARTBEAT_UNAVAILABLE,
     ISSUE_SERVICE_UNAVAILABLE,
 )
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceHeartbeat
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
-from tests.ha_fakes import build_runtime
+from tests.ha_fakes import build_runtime, heartbeat_running
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_repairs import _patch
 from tests.test_soc_goal_ha_lifecycle import _entry
@@ -45,34 +44,43 @@ async def _setup(monkeypatch, *, remote=False, read_only=False, healthy=True, er
     )
     entry.state = ConfigEntryState.LOADED
     runtime = entry.runtime_data
-    original_client = runtime.client
     if remote:
         # No HTTP request or socket is used. The authenticated cache and update
         # callback are exactly what the real remote heartbeat observes.
-        client = RemoteClient(SimpleNamespace(), "http://app.invalid:8765", "test")
+        original_client = runtime.client
+        client = ServiceClient(SimpleNamespace(), "http://app.invalid:8765", "test")
         client._connected = True
         client.snapshot = {
             "control": {"read_only": read_only},
             "heartbeat": {"healthy": healthy, "running": not read_only},
         }
-        heartbeat = RemoteHeartbeat(client, runtime.diagnostics)
         runtime.client = client
-
-        def update():
-            heartbeat.update()
-            if not client.connected:
-                runtime.coordinator.async_set_update_error(UpdateFailed("app unavailable"))
-
-        client.on_update = update
+        entry.data = {**entry.data, "server_url": "http://app.invalid:8765"}
         await original_client.async_close()
     else:
-        heartbeat = HeartbeatTask(runtime.client, runtime.diagnostics)
-        heartbeat._set_healthy(healthy)
+        # The service's own report of its heartbeat, as every poll returns it.
+        client = runtime.client
+        client.snapshot["heartbeat"]["healthy"] = healthy
+    heartbeat = ServiceHeartbeat(client)
+
+    def update():
+        heartbeat.update()
+        if not client.connected:
+            runtime.coordinator.async_set_update_error(UpdateFailed("app unavailable"))
+
+    client.on_update = update
     runtime.heartbeat = heartbeat
     repairs.async_setup_repairs(hass, entry)
     monitor = entry.unloads[-1].__self__
     assert isinstance(monitor, repair_health.HeartbeatRepairMonitor)
     return hass, entry, transport, registry, monitor
+
+
+def _set_healthy(entry, healthy):
+    """Publish the heartbeat health the service reports."""
+    client = entry.runtime_data.client
+    client.snapshot["heartbeat"]["healthy"] = healthy
+    client.on_update()
 
 
 def _expire(monitor):
@@ -90,8 +98,7 @@ def test_heartbeat_listener_reports_sustained_problem_without_a_polled_fault(mon
     async def run():
         hass, entry, transport, registry, monitor = await _setup(monkeypatch)
         runtime = entry.runtime_data
-        heartbeat = runtime.heartbeat
-        heartbeat._deadline_expired()
+        _set_healthy(entry, False)
         timer = monitor._timer
         assert timer is not None
         assert timer.when() - hass.loop.time() == pytest.approx(60, abs=0.1)
@@ -112,7 +119,7 @@ def test_heartbeat_listener_reports_sustained_problem_without_a_polled_fault(mon
             runtime.coordinator.async_update_listeners()
         assert registry.created == {}
         assert registry.deleted == []  # No repair storage churn on unchanged polls.
-        heartbeat._set_healthy(True)
+        _set_healthy(entry, True)
         assert registry.deleted == [issue_id]
         assert monitor._active is None
         assert transport.writes == []  # Observing a failure must not resume charging.
@@ -126,13 +133,13 @@ def test_short_failure_recovery_and_new_failure_get_separate_grace(monkeypatch):
     async def run():
         _, entry, _, registry, monitor = await _setup(monkeypatch)
         heartbeat = entry.runtime_data.heartbeat
-        heartbeat._set_healthy(False)
+        _set_healthy(entry, False)
         first = monitor._timer
-        heartbeat._set_healthy(True)
+        _set_healthy(entry, True)
         assert first.cancelled()
         assert monitor._timer is None
         assert registry.created == {}
-        heartbeat._set_healthy(False)
+        _set_healthy(entry, False)
         assert monitor._timer is not first
         _expire(monitor)
         assert _issue(entry, ISSUE_HEARTBEAT_UNAVAILABLE) in registry.created
@@ -164,8 +171,8 @@ def test_disabled_unknown_and_stopping_heartbeats_do_not_raise_repairs(monkeypat
             entry.state = ConfigEntryState.UNLOAD_IN_PROGRESS
         elif suppression == "reauth":
             runtime.coordinator.last_exception = ConfigEntryAuthFailed("credential rejected")
-        if suppression != "unknown" and runtime.heartbeat is not None:
-            runtime.heartbeat._set_healthy(False)
+        if suppression != "unknown":
+            _set_healthy(entry, False)
         monitor.check()
         assert monitor._timer is None
         assert registry.created == {}
@@ -297,7 +304,9 @@ def test_definite_auth_failure_replaces_an_existing_connectivity_repair(monkeypa
         coordinator.async_set_update_error(UpdateFailed("network unavailable"))
         _expire(monitor)
         assert _issue(entry, ISSUE_HEARTBEAT_UNAVAILABLE) in registry.created
-        coordinator._poller.async_poll = AsyncMock(side_effect=WaveshareAuthenticationRejectedError("rejected"))
+        entry.runtime_data.client._transport.call = AsyncMock(
+            side_effect=ServiceConnectionError("service_auth_failed", "credential rejected"),
+        )
         with pytest.raises(ConfigEntryAuthFailed):
             await coordinator._async_update_data()
         assert registry.created == {}
@@ -319,22 +328,32 @@ def test_real_ha_reports_disconnected_bus_and_clears_when_heartbeat_returns(monk
             hass = await _boot(tmp_path / "ha")
             try:
                 entry = await _entry(hass)
+                entities = er.async_get(hass)
+                entity_id = entities.async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_connection_quality")
+                assert entity_id is not None
+                # A diagnostic sensor, off by default; the master reload adds it.
+                entities.async_update_entity(entity_id, disabled_by=None)
                 hass.config_entries.async_update_entry(entry, options={"control_mode": CONTROL_MODE_MASTER})
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
                 registry = ir.async_get(hass)
                 issue_id = _issue(entry, ISSUE_HEARTBEAT_UNAVAILABLE)
-                entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_connection_quality")
-                assert entity_id is not None
+                assert await service.heartbeat.async_beat_once()
+                service.heartbeat._set_healthy(True)
+                await runtime.coordinator.async_refresh()
+                await hass.async_block_till_done()
                 assert hass.states.get(entity_id).attributes["heartbeat"] == "ok"
                 transport.read_exceptions[R.EVSE_STATE.address] = raise_connection_error()
                 transport.write_exceptions[R.HEARTBEAT.address] = raise_connection_error()
-                await runtime.coordinator.async_refresh()
-                assert not runtime.coordinator.last_update_success
+                with pytest.raises(AmtronBusError):
+                    await service.refresh()
                 # This same deadline fires when no acknowledgement arrives. The
                 # sensor is unavailable while nothing can be read; the heartbeat
                 # still tracks its health and raises the repair.
-                runtime.heartbeat._deadline_expired()
+                service.heartbeat._deadline_expired()
+                await runtime.coordinator.async_refresh()
+                assert not runtime.coordinator.last_update_success
                 await asyncio.sleep(0.04)
                 await hass.async_block_till_done()
                 assert hass.states.get(entity_id).state == "unavailable"
@@ -345,9 +364,10 @@ def test_real_ha_reports_disconnected_bus_and_clears_when_heartbeat_returns(monk
 
                 transport.read_exceptions.clear()
                 transport.write_exceptions.clear()
+                await service.refresh()
+                assert await service.heartbeat.async_beat_once()
+                service.heartbeat._set_healthy(True)
                 await runtime.coordinator.async_refresh()
-                assert await runtime.heartbeat.async_beat_once()
-                runtime.heartbeat._set_healthy(True)
                 await hass.async_block_till_done()
                 assert hass.states.get(entity_id).attributes["heartbeat"] == "ok"
                 assert registry.async_get_issue(DOMAIN, issue_id) is None
@@ -357,7 +377,8 @@ def test_real_ha_reports_disconnected_bus_and_clears_when_heartbeat_returns(monk
                 hass.config_entries.async_update_entry(entry, options={})
                 await hass.async_block_till_done()
                 await asyncio.sleep(0.04)
-                assert entry.runtime_data.heartbeat is None
+                assert not heartbeat_running(entry.runtime_data.heartbeat)
+                assert not hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service.heartbeat.running
                 assert registry.async_get_issue(DOMAIN, issue_id) is None
             finally:
                 await hass.async_stop()
@@ -372,3 +393,39 @@ def test_connection_repair_explanations_exist_in_every_language():
         for key in (ISSUE_HEARTBEAT_UNAVAILABLE, ISSUE_SERVICE_UNAVAILABLE):
             assert issues[key]["title"], (path.name, key)
             assert issues[key]["description"], (path.name, key)
+
+
+def test_a_direct_entry_without_its_service_misses_the_heartbeat_not_an_app(monkeypatch):
+    async def run():
+        _, entry, transport, registry, monitor = await _setup(monkeypatch)
+        # There is no app that could keep a heartbeat going on its own.
+        entry.runtime_data.client._mark_unavailable()
+        _expire(monitor)
+        assert set(registry.created) == {_issue(entry, ISSUE_HEARTBEAT_UNAVAILABLE)}
+        assert transport.writes == []
+        monitor.stop()
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_a_failing_heartbeat_listener_fails_neither_the_poll_nor_the_others(monkeypatch, caplog):
+    async def run():
+        _, entry, _transport, _registry, monitor = await _setup(monkeypatch)
+        client = entry.runtime_data.client
+        heartbeat = ServiceHeartbeat(client)
+        seen = []
+
+        def broken():
+            raise RuntimeError("entity write failed")
+
+        heartbeat.async_add_listener(broken)
+        heartbeat.async_add_listener(lambda: seen.append(heartbeat.healthy))
+        client.snapshot["heartbeat"]["healthy"] = False
+        heartbeat.update()
+        assert seen == [False]
+        assert "Heartbeat: listener failed" in caplog.text
+        monitor.stop()
+        await client.async_close()
+
+    asyncio.run(run())

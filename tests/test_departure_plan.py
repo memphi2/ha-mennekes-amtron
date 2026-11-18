@@ -830,7 +830,7 @@ def test_write_failures_defer_and_log_once(tmp_path, caplog):
     async def go():
         box = Box(tmp_path)
         box.fail = DeviceError("service_unavailable")
-        with caplog.at_level(logging.WARNING, logger=dp.__name__):
+        with caplog.at_level(logging.INFO, logger=dp.__name__):
             plan = await box.start()
             assert plan.status == "write_pending"
             box.clock[0] += 300
@@ -838,13 +838,19 @@ def test_write_failures_defer_and_log_once(tmp_path, caplog):
             box.fail = AmtronBusError("lost")
             box.clock[0] += 300
             await plan.tick()
-        assert caplog.text.count("(service_unavailable)") == 1
-        assert caplog.text.count("(AmtronBusError)") == 1
-        box.fail = None
-        box.clock[0] += 300
-        await plan.tick()
+            # One episode warns once per cause, so the log names the current one.
+            assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
+                "Departure plan: command deferred (service_unavailable)",
+                "Departure plan: command deferred (AmtronBusError)",
+            ]
+            box.clock[0] += 300
+            await plan.tick()
+            assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 2
+            box.fail = None
+            box.clock[0] += 300
+            await plan.tick()
+        assert caplog.text.count("Departure plan: command accepted again") == 1
         assert plan.status == "charging"
-        assert plan._last_error is None
     run(go())
 
 
@@ -870,10 +876,12 @@ def test_the_plan_survives_storage_failures(tmp_path, caplog, monkeypatch):
                 await box.plan.set_trip(NOW + timedelta(hours=2), "manual")
             await box.plan.set_inputs(inputs())
         assert box.plan.storage_error
-        assert caplog.text.count("could not be saved") == 1
+        assert caplog.text.count("Departure plan: not saved") == 1
         monkeypatch.undo()
-        await box.plan.tick()
+        with caplog.at_level(logging.INFO, logger=dp.__name__):
+            await box.plan.tick()
         assert not box.plan.storage_error
+        assert caplog.text.count("Departure plan: saved again") == 1
         assert DepartureStore(box.path, "fixture").load()["trip"]["deadline"] == (NOW + timedelta(hours=2)).isoformat()
     run(go())
 
@@ -901,7 +909,7 @@ def test_an_unreadable_plan_waits_for_home_assistant(tmp_path, caplog, content):
             await box.plan.initialize()
         assert box.plan.ready
         assert box.plan.trip.deadline is None
-        assert "Saved departure plan unavailable" in caplog.text
+        assert "Departure plan: saved plan unavailable" in caplog.text
     run(go())
 
 

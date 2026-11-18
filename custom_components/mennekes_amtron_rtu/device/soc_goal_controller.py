@@ -11,6 +11,7 @@ from copy import copy
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .control import AmtronControl
 from .errors import DeviceError, validation_error
+from .notice import FailureNotice
 from .persistence import (
     StorageCommitUncertainError,
     StorageStateUnknownError,
@@ -40,7 +41,7 @@ class SocGoalController:
         self._pending_maximum: float | None = None
         self._dirty = False
         self._stopping = False
-        self._failure_logged = False
+        self._notice = FailureNotice(_LOGGER, "Vehicle charge target")
         self._storage_unknown = False
         control.soc_goal_controller = self
 
@@ -78,7 +79,7 @@ class SocGoalController:
                 if previous > 0:
                     # Name the reason: a cleared target is otherwise a mystery.
                     _LOGGER.info(
-                        "Vehicle charge target %.0f%% cleared: %s", previous,
+                        "Vehicle charge target: %.0f%% cleared, %s", previous,
                         "no vehicle source is selected" if source is None
                         else "the vehicle source changed",
                     )
@@ -145,7 +146,7 @@ class SocGoalController:
                 # already reported uncertainty of the target save.
                 pass
             except Exception as recovery_error:  # noqa: BLE001 - retain the original storage error
-                _LOGGER.error("Cannot cancel goal recovery (%s)", type(recovery_error).__name__)
+                _LOGGER.error("Vehicle charge target: cannot cancel goal recovery (%s)", type(recovery_error).__name__)
             finally:
                 self.retry_stop()
                 self._changed()
@@ -236,9 +237,7 @@ class SocGoalController:
                     except (OSError, RuntimeError, ValueError) as err:
                         if isinstance(err, StorageStateUnknownError):
                             self._storage_unknown = True
-                        if not self._failure_logged:
-                            _LOGGER.error("Cannot save percentage goal stop (%s)", type(err).__name__)
-                            self._failure_logged = True
+                        self._notice.failed("stop not saved", type(err).__name__, level=logging.ERROR)
                 if self._control.read_only or not self.stop_requested:
                     return
                 try:
@@ -247,12 +246,10 @@ class SocGoalController:
                     await self._sleep(err.retry_after)
                 else:
                     if not self._dirty:
-                        self._failure_logged = False
+                        self._notice.recovered("enforced again")
                     return
         except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError) as err:
-            if not self._failure_logged:
-                _LOGGER.error("Cannot enforce percentage goal (%s)", type(err).__name__)
-                self._failure_logged = True
+            self._notice.failed("cannot be enforced", type(err).__name__, level=logging.ERROR)
         finally:
             self._task = None
 
@@ -261,7 +258,7 @@ class SocGoalController:
             try:
                 self._notify()
             except Exception:  # noqa: BLE001 - UI failures must not lose a ceiling
-                _LOGGER.error("Unable to publish a percentage goal update")
+                _LOGGER.error("Vehicle charge target: unable to publish an update")
 
     async def async_stop(self) -> None:
         self._stopping = True
@@ -283,4 +280,4 @@ class SocGoalController:
                     await self._save_state()
                     self._dirty = False
                 except (OSError, RuntimeError, ValueError) as err:
-                    _LOGGER.error("Cannot save percentage goal on shutdown (%s)", type(err).__name__)
+                    _LOGGER.error("Vehicle charge target: not saved on shutdown (%s)", type(err).__name__)

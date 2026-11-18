@@ -32,6 +32,19 @@ DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 APP_ASSET_PATTERN = re.compile(r"app_\w+\.(?:html|js|css)")
 
 
+_RUNTIME = Path(__file__).resolve().parents[1] / (
+    "custom_components/mennekes_amtron_rtu/device/service_runtime.py"
+)
+
+
+def service_api_version() -> int:
+    """The API version the service source declares; the image must report it."""
+    match = re.search(r"^API_VERSION = (\d+)$", _RUNTIME.read_text(encoding="utf-8"), re.MULTILINE)
+    if match is None:
+        raise ValueError("service API version not found")
+    return int(match.group(1))
+
+
 def release_info(repository: str, tag: str) -> dict[str, str]:
     """Keep the app version separate from its reviewed integration source tag."""
     if repository != "memphi2/ha-mennekes-amtron":
@@ -171,7 +184,7 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
             with urllib.request.urlopen(request, timeout=2) as response:  # noqa: S310 - fixed loopback HTTP
                 data = json.load(response)
             if (
-                data.get("api_version") != 2
+                data.get("api_version") != service_api_version()
                 or data.get("available") is not False
                 or data["control"]["read_only"] is not True
                 or data["heartbeat"]["running"] is not False
@@ -192,11 +205,11 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
             if token in lifecycle_log or any(
                 message not in lifecycle_log
                 for message in (
-                    "Starting Mennekes Amtron Modbus service",
-                    "Service API ready",
-                    "Opening serial connection",
+                    "Service: starting Mennekes Amtron Modbus service",
+                    "Service: API ready",
+                    "Connection: opening serial connection",
                     "SIGTERM received",
-                    "Modbus service shutdown complete",
+                    "Service: shutdown complete",
                 )
             ):
                 raise ValueError("container lifecycle logs are missing or expose credentials")

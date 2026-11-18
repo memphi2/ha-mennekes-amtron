@@ -45,7 +45,7 @@ def test_storage_problems_only_forget_the_phases(tmp_path, caplog):
             assert await memory.async_phases("a") is None
         with patch.object(m.VehiclePhaseStore, "async_save", side_effect=OSError("full")):
             await memory.async_remember("a", 1)
-        assert "Ignoring saved vehicle phases" in caplog.text
-        assert "Vehicle phases not remembered" in caplog.text
+        assert "Vehicle: ignoring saved phases" in caplog.text
+        assert "Vehicle: phases not saved" in caplog.text
 
     asyncio.run(run())

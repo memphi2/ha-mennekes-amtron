@@ -45,3 +45,10 @@ def test_installed_authentication_probe_executes_real_full_handshake(tmp_path, m
         service_image.check_installed_authentication("isolated-container")
         assert calls[0].returncode == 0
         assert calls[0].stderr == ""
+
+
+def test_the_image_check_expects_the_api_version_the_service_declares():
+    from custom_components.mennekes_amtron_rtu.device.service_runtime import API_VERSION
+
+    # A literal here once kept expecting the previous version.
+    assert service_image.service_api_version() == API_VERSION

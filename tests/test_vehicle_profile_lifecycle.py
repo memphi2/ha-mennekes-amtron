@@ -26,6 +26,11 @@ from tests.test_vehicle_detection import detection_catalog
 from tests.test_vehicle_profile_runtime import A, B, catalog
 
 
+def _service(hass, entry):
+    """The service the direct entry runs inside Home Assistant."""
+    return hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+
+
 def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause(tmp_path):
     async def run():
         transport = FakeModbusClient(device_bank(charging_current=0))
@@ -66,7 +71,7 @@ def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause
                 assert hass.states.get(target).attributes["max"] == 80
                 pause = registry.async_get_entity_id("switch", DOMAIN, f"{SERIAL_NUMBER}_charging_paused")
                 assert pause is not None
-                entry.runtime_data.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
+                _service(hass, entry).client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
                 await hass.services.async_call("switch", "turn_on", {"entity_id": pause}, blocking=True)
                 await entry.runtime_data.coordinator.async_refresh()
                 await hass.services.async_call("number", "set_value", {"entity_id": target, "value": 75}, blocking=True)
@@ -113,11 +118,9 @@ def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause
                 assert entry.runtime_data.timed_goal is None
                 assert entry.runtime_data is runtime
                 # Vehicle entities stay, unavailable without a selected car.
+                # The departure time stays: without a car the service keeps it.
                 assert {entity.split(".")[1] for entity in unavailable} == {
                     "mennekes_amtron_vehicle_charge_target",
-                    "mennekes_amtron_vehicle_charge_target_status",
-                    "mennekes_amtron_timed_charging_status",
-                    "mennekes_amtron_target_time",
                 }
                 assert hass.states.get(target).state == "unavailable"
                 unsubscribe()
@@ -161,7 +164,7 @@ def test_real_automatic_selection_reloads_goals_and_respects_manual_override(tmp
                 assert pause is not None
                 assert hass.states.get(selector).state == "automatic"
                 assert hass.states.get(selector).attributes["active_vehicle"] == "First car"
-                entry.runtime_data.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
+                _service(hass, entry).client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
                 await hass.services.async_call("switch", "turn_on", {"entity_id": pause}, blocking=True)
                 await entry.runtime_data.coordinator.async_refresh()
                 await hass.services.async_call("number", "set_value", {"entity_id": target, "value": 75}, blocking=True)
@@ -338,7 +341,7 @@ def test_each_car_keeps_its_own_departure_across_switches(tmp_path):
                 await choose("First car")
                 assert planned() == first
                 options = activate_profile(entry.options, B)
-                options["scan_interval_seconds"] = 301
+                options["scan_interval_seconds"] = 299
                 hass.config_entries.async_update_entry(entry, options=options)
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data

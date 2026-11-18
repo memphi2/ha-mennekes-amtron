@@ -18,9 +18,9 @@ cap and enable writes in **one** place:
 | Service app | App **Configuration → Read-only** off, save and restart the app |
 | Direct USB or LAN | Integration **Configure → Wallbox → Current limit and polling → Control mode: Modbus master** |
 
-In service mode, HA receives the app's write permission automatically. There is
-no second HA write switch. Check **Connection quality**: its `heartbeat`
-attribute should become `ok`. Resolve any repair before continuing.
+With the app, HA receives the app's write permission automatically. There is
+no second HA write switch. Enable the diagnostic **Connection quality** sensor
+and check it: its `heartbeat` attribute should become `ok`. Resolve any repair before continuing.
 
 ## First charge
 
@@ -38,7 +38,7 @@ attribute should become `ok`. Resolve any repair before continuing.
 switch to stop charging.
 
 A request can wait for the configured state-change interval (default 300 seconds).
-Check **Pending change** and its due time. Repeated clicks or app restarts do not
+Check the `pending` and `pending_at` attributes of **Charging wait reason**. Repeated clicks or app restarts do not
 make a waiting change safer or faster. [Waits and cancellation](user-guide.md#waiting-between-charging-changes).
 
 ## Check your restart behavior

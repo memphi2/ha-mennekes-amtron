@@ -10,7 +10,6 @@ from unittest.mock import patch
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.goal_store import (
@@ -21,7 +20,7 @@ from tests.fakes import FakeModbusClient, device_bank
 from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_modbus_service import current_writes
-from tests.test_soc_goal_ha_lifecycle import _entry
+from tests.test_soc_goal_ha_lifecycle import _entry, forget_current_write
 from tests.test_vehicle_profiles import A, B, profile_options
 
 
@@ -55,7 +54,7 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 pause = registry.async_get_entity_id("switch", DOMAIN, f"{SERIAL_NUMBER}_charging_paused")
                 assert target is not None
                 assert pause is not None
-                entry.runtime_data.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
+                forget_current_write(hass, entry)
                 await hass.services.async_call("switch", "turn_on", {"entity_id": pause}, blocking=True)
                 await entry.runtime_data.coordinator.async_refresh()
                 await hass.services.async_call("number", "set_value", {"entity_id": target, "value": 75}, blocking=True)

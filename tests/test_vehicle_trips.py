@@ -74,12 +74,12 @@ def test_storage_problems_only_forget_parked_trips(tmp_path, caplog):
         memory = m.VehicleTripMemory(hass, "entry", "serial")
         with patch.object(m.VehicleTripStore, "async_save", AsyncMock(side_effect=OSError("disk"))):
             await memory.async_swap("a", trip(), None)
-        assert "not remembered" in caplog.text
+        assert "Departure plan: vehicle departure not saved" in caplog.text
         await memory.async_swap("a", trip(), None)
         # Another wallbox's file is ignored instead of resuming its trip.
         other = m.VehicleTripMemory(hass, "entry", "other")
         assert await other.async_swap(None, None, "a") is None
-        assert "Ignoring saved vehicle departures" in caplog.text
+        assert "Departure plan: ignoring saved vehicle departures" in caplog.text
 
     asyncio.run(run())
 
@@ -91,7 +91,7 @@ def test_a_resumed_trip_that_cannot_be_saved_leaves_the_car_without_one(tmp_path
             **profile_options(active=B), "timed_goal_reset_pending": True,
         })
         entry.options["vehicle_profiles"][B]["options"]["timed_goal_enabled"] = True
-        entry.runtime_data = SimpleNamespace(client=object(), identity=SimpleNamespace(serial_number="serial"))
+        entry.runtime_data = SimpleNamespace(client=SimpleNamespace(snapshot={}), identity=SimpleNamespace(serial_number="serial"))
         await m.VehicleTripMemory(hass, entry.entry_id, "serial").async_swap(B, trip(), None)
         with patch.object(TimedGoalStore, "async_save", AsyncMock(side_effect=OSError("disk"))):
             await integration._async_resume_trip(hass, entry, True)
@@ -123,7 +123,7 @@ def test_a_car_that_stops_planning_loses_its_parked_trip(tmp_path):
         # Car B plans departures; car A, selected, has none configured.
         entry = FakeConfigEntry(options=profile_options())
         entry.options["vehicle_profiles"][B]["options"]["timed_goal_enabled"] = True
-        entry.runtime_data = SimpleNamespace(client=object(), identity=SimpleNamespace(serial_number="serial"))
+        entry.runtime_data = SimpleNamespace(client=SimpleNamespace(snapshot={}), identity=SimpleNamespace(serial_number="serial"))
         memory = m.VehicleTripMemory(hass, entry.entry_id, "serial")
         await memory.async_swap(B, trip(), None)
         await memory.async_swap(A, trip(), None)

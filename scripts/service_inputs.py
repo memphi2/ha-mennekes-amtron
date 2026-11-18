@@ -16,7 +16,7 @@ from release_version import validate_version
 ROOT = Path(__file__).resolve().parents[1]
 DEVICE = "custom_components/mennekes_amtron_rtu/device"
 SERVICE_VERSION_FILE = f"{DEVICE}/service_version.py"
-COMPAT_FILE = "custom_components/mennekes_amtron_rtu/remote_compat.py"
+COMPAT_FILE = "custom_components/mennekes_amtron_rtu/service_compat.py"
 APP_DOCS = {f"modbus_service/{name}" for name in ("README.md", "DOCS.md", "CHANGELOG.md")}
 FIXED_INPUTS = {
     "Dockerfile", ".dockerignore", "pyproject.toml", "requirements-service.txt",

@@ -46,6 +46,30 @@ start_guest_charging:
         device:
           integration: mennekes_amtron_rtu
           multiple: true
+use_calendar_departure:
+  fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: mennekes_amtron_rtu
+          multiple: true
+use_vehicle_departure:
+  fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: mennekes_amtron_rtu
+          multiple: true
+assign_vehicle_charge:
+  fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: mennekes_amtron_rtu
+          multiple: true
 clear_target_time:
   target:
     entity:

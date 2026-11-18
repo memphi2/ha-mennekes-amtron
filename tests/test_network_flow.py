@@ -293,17 +293,26 @@ def test_unchanged_network_settings_reuse_the_active_client(monkeypatch):
     async def run():
         hass = FakeHass()
         flow = Flow(hass)
-        client = SimpleNamespace(config=NetworkConfig(host=NETWORK_INPUT["host"]))
+        flow.reconfigure_entry.data = {**NETWORK_INPUT, "serial_number": IDENTITY.serial_number}
         flow.reconfigure_entry.state = ConfigEntryState.LOADED
-        flow.reconfigure_entry.runtime_data = SimpleNamespace(client=client)
+
+        async def refresh():
+            client.identity = IDENTITY
+
+        # The running service answers; no second connection is opened, and
+        # the poll goes through the coordinator that owns it.
+        client = SimpleNamespace(update=AsyncMock(), identity=None)
+        coordinator = SimpleNamespace(
+            async_refresh=AsyncMock(side_effect=refresh), last_update_success=True,
+        )
+        flow.reconfigure_entry.runtime_data = SimpleNamespace(client=client, coordinator=coordinator)
         hass.config_entries.async_unload = AsyncMock()
-        read_identity = AsyncMock(return_value=IDENTITY)
         probe = AsyncMock()
-        monkeypatch.setattr(config_flow, "async_read_identity", read_identity)
         monkeypatch.setattr(config_flow, "async_test_connection", probe)
         result = await flow.async_step_network_reconfigure(dict(NETWORK_INPUT))
         assert result["reason"] == "reconfigure_successful"
-        read_identity.assert_awaited_once_with(client)
+        coordinator.async_refresh.assert_awaited_once_with()
+        client.update.assert_not_awaited()
         probe.assert_not_awaited()
         hass.config_entries.async_unload.assert_not_awaited()
 

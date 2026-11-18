@@ -10,19 +10,15 @@ from aiohttp import ClientSession, web
 from aiohttp.test_utils import TestServer
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
-    AmtronWriteRejectedError,
 )
 from custom_components.mennekes_amtron_rtu.device.data import (
     WallboxData,
-    WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.enums import (
     RequestedPhases,
-    SolarChargingMode,
 )
 from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceError,
@@ -30,8 +26,14 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
 )
 from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
 from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
+from custom_components.mennekes_amtron_rtu.device.service_api import (
+    GETS,
+    POSTS,
+    ServiceApi,
+)
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
 
@@ -53,7 +55,7 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
 
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://service:8765", TOKEN)
+                remote = ServiceClient(session, "http://service:8765", TOKEN)
                 remote.request = request
                 poll = asyncio.create_task(remote.update())
                 await asyncio.wait_for(poll_started.wait(), 2)
@@ -63,8 +65,8 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
                 assert not command.done()
                 release_poll.set()
                 await asyncio.wait_for(asyncio.gather(poll, command), 2)
-                assert remote.write_state.pause_requested is True
-                assert remote.write_state.confirmed_current == 1
+                assert remote.snapshot["control"]["pause_requested"] is True
+                assert remote.snapshot["values"]["charging_current_ems"] == 1
                 assert current_writes(transport) == [1]
         finally:
             release_poll.set()
@@ -76,8 +78,8 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("api_version", 1),
-        ("api_version", 3),
+        ("api_version", 2),
+        ("api_version", 4),
         ("api_version", True),
         ("values", []),
         ("values", {"x": float("nan")}),
@@ -107,7 +109,7 @@ def test_malformed_snapshots_are_never_published_as_live_state(tmp_path, field, 
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             async with ClientSession() as session:
-                remote = RemoteClient(session, "http://127.0.0.1:8765", TOKEN)
+                remote = ServiceClient(session, "http://127.0.0.1:8765", TOKEN)
                 original = service.snapshot()
                 remote.apply_snapshot(original)
                 notifications = []
@@ -166,7 +168,7 @@ def test_http_errors_have_stable_types_and_no_retries(status, payload, kind):
         app = web.Application()
         app.router.add_get("/v2/state", respond)
         async with TestServer(app) as server, ClientSession() as session:
-            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(kind):
                 await remote.request("GET", "/v2/state")
             assert calls == [1]
@@ -182,7 +184,7 @@ def test_large_or_streamed_replies_are_bounded():
         app = web.Application()
         app.router.add_get("/v2/state", oversized)
         async with TestServer(app) as server, ClientSession() as session:
-            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(AmtronConnectionError, match="service response too large"):
                 await remote.update()
 
@@ -194,7 +196,6 @@ def test_large_or_streamed_replies_are_bounded():
     [
         ("async_set_charging_release", False),
         ("async_set_lock_evse", True),
-        ("async_set_solar_charging_mode", SolarChargingMode.FAST),
         ("async_set_requested_phases", RequestedPhases.SINGLE_PHASE),
         ("async_restart", None),
         ("async_recover_from_error", None),
@@ -209,12 +210,10 @@ def test_every_remote_action_uses_the_shared_service(tmp_path, method, value):
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=lambda: WallboxData(values=remote.snapshot["values"]),
                     request_refresh=remote.update,
                 )
@@ -242,12 +241,10 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, cap),
                     state=lambda: WallboxData(values=remote.snapshot["values"]),
                     request_refresh=remote.update,
                 )
@@ -256,7 +253,7 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
                 if unknown_target:
                     service.control.charging_setpoint = None
                     await remote.update()
-                await control.async_resume_charging()
+                await control.async_resume_charging(current_cap=cap)
                 assert current_writes(transport) == [
                     1, cap if unknown_target else min(8, cap)
                 ]
@@ -300,12 +297,10 @@ def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, cap),
                     state=lambda: WallboxData(values=remote.snapshot["values"]),
                     request_refresh=remote.update,
                 )
@@ -319,7 +314,7 @@ def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
                 await service.command({"command": "pause", "expected_serial_number": "ABC123456789"})
                 clock[0] += 300
                 assert control.charging_setpoint == cached
-                await control.async_resume_charging()
+                await control.async_resume_charging(current_cap=cap)
                 assert current_writes(transport) == [fresh, 1, expected]
         finally:
             await service.stop()
@@ -335,10 +330,9 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                assert await remote.async_read_register(R.ERROR_CODE) == 0
-                assert await remote.async_read_register(R.CHARGING_CURRENT_EMS) == 8
+                assert await remote.async_read_error_code() == 0
                 block = next(b for b in REGISTER_BLOCKS if b.name == "status")
                 assert (
                     len(
@@ -352,24 +346,11 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
                     AmtronConnectionError, match="unsupported diagnostic"
                 ):
                     await remote.async_read_words(address=123, count=1)
-                with pytest.raises(AmtronWriteRejectedError):
-                    await remote.async_write_register(R.CHARGING_CURRENT_EMS, 16)
-                precondition_called = False
-
-                async def precondition(_read):
-                    nonlocal precondition_called
-                    precondition_called = True
-
-                with pytest.raises(AmtronWriteRejectedError):
-                    await remote.async_write_register(
-                        R.CHARGING_CURRENT_EMS, 16, precondition=precondition,
-                    )
-                assert not precondition_called
+                # The client offers no raw register write at all.
+                assert not hasattr(remote, "async_write_register")
                 await server.close()
-                control = RemoteControl(
+                control = ServiceControl(
                     remote,
-                    diagnostics=WriteDiagnostics(),
-                    options=ControlOptions(False, 16),
                     state=WallboxData,
                     request_refresh=remote.update,
                 )
@@ -414,7 +395,7 @@ def test_optional_diagnostics_failure_does_not_mark_service_offline():
 
         app.router.add_get("/v2/diagnostics", unavailable)
         async with TestServer(app) as server, ClientSession() as session:
-            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             remote._connected = True
             notifications = []
             remote.on_update = lambda: notifications.append(True)
@@ -427,7 +408,7 @@ def test_optional_diagnostics_failure_does_not_mark_service_offline():
 
 
 def test_wallbox_failure_is_distinguished_from_a_lost_service_connection(tmp_path):
-    from custom_components.mennekes_amtron_rtu.remote import RemoteHeartbeat
+    from custom_components.mennekes_amtron_rtu.service_control import ServiceHeartbeat
 
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
@@ -436,9 +417,9 @@ def test_wallbox_failure_is_distinguished_from_a_lost_service_connection(tmp_pat
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
-                heartbeat = RemoteHeartbeat(remote, WriteDiagnostics())
+                heartbeat = ServiceHeartbeat(remote)
                 remote.on_update = heartbeat.update
                 service._success = False
                 service.heartbeat._set_healthy(False)
@@ -480,6 +461,61 @@ def test_service_origin_is_validated_scoped_and_recorded(tmp_path):
             with pytest.raises(ValueError, match="expected_serial_number"):
                 await service.command({"origin": "app"})
             assert command_source.get() == "unknown"
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hidden(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            api = ServiceApi(service)
+            for method, path in (
+                ("GET", "/v2/unknown"), ("POST", "/v2/unknown"),
+                ("PUT", "/v2/command"), ("GET", "/v2/command"),
+            ):
+                assert await api.dispatch(method, path, {}) == (404, {"error": "not_found"})
+
+            async def broken(_payload):
+                raise KeyError("internal")
+
+            service.read = broken
+            # A programming error is no missing operation.
+            with pytest.raises(KeyError, match="internal"):
+                await api.dispatch("POST", "/v2/read", {"register": "error_code"})
+            # Over HTTP it is a server error, and the server keeps answering.
+            headers = {"Authorization": f"Bearer {TOKEN}"}
+            async with TestServer(create_app(service)) as server, ClientSession() as session:
+                async with session.post(
+                    server.make_url("/v2/read"), json={"register": "error_code"}, headers=headers,
+                ) as response:
+                    assert response.status == 500
+                async with session.get(server.make_url("/v2/state"), headers=headers) as response:
+                    assert response.status == 200
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_the_web_server_offers_exactly_the_operations_the_service_has(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            offered = {
+                (route.method, route.resource.canonical)
+                for route in create_app(service).router.routes()
+                if route.resource is not None and route.resource.canonical.startswith("/v2/")
+                and route.method != "HEAD"
+            }
+            assert offered == {("GET", path) for path in GETS} | {("POST", path) for path in POSTS}
+            # Each of them reaches an operation, not the answer for an unknown path.
+            api = ServiceApi(service)
+            for method, path in sorted(offered):
+                status, _body = await api.dispatch(method, path, None if method == "GET" else {})
+                assert status != 404, path
         finally:
             await service.stop()
 

@@ -6,14 +6,14 @@ from collections.abc import Mapping
 
 from packaging.version import Version
 
-from .remote_errors import ServiceConnectionError
+from .service_errors import ServiceConnectionError
 
-SUPPORTED_API_VERSION = 2
-MIN_SERVICE_VERSION = "0.9.1"
+SUPPORTED_API_VERSION = 3
+MIN_SERVICE_VERSION = "0.10.0b1"
 
 
 def validate_service_version(snapshot: Mapping[str, object]) -> None:
-    """Check a snapshot whose API version has already been accepted as API 2."""
+    """Check a snapshot whose API version has already been accepted."""
     raw_version = snapshot.get("service_version")
     if not isinstance(raw_version, str) or not 1 <= len(raw_version) <= 128:
         raise ValueError("invalid service version")

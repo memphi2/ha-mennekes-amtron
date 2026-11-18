@@ -29,8 +29,8 @@ Keep the vehicle disconnected during the first control setup.
 | Who uses the adapter? | Service app | Home Assistant |
 | During an HA Core restart | Heartbeat and last charging state continue | Heartbeat is interrupted; wallbox fallback applies |
 | Where are writes enabled? | App **Configuration → Read-only** off | Integration **Configure → Wallbox → Control mode: Modbus master** |
-| Guest charging | Available; one explicit start button | Not available |
-| Limits and planning while HA is offline | Shared energy limits, active guest time limit and accepted vehicle plan continue | Needs HA running |
+| Features | The same entities, guest charging, targets and departure planning | The same; Home Assistant runs the same wallbox service itself |
+| Limits and planning while HA is offline | Shared energy limits, active guest time limit and accepted vehicle plan continue | Need HA running |
 
 Both support USB and LAN. A LAN adapter needs no local USB device. On HA
 Container, the service can run as a [separate container](service-standalone.md).
@@ -45,7 +45,8 @@ flowchart LR
     APP --> LINK["USB or LAN adapter"] --> WB["Wallbox"]
 ```
 
-Without the service, Home Assistant connects directly to that adapter.
+With a direct connection, Home Assistant runs the same wallbox service itself
+and connects directly to that adapter.
 
 ## 2. Install the integration
 
@@ -139,12 +140,12 @@ on, charging release off, resume current 6 A and no targets. This does not start
 charging. Reconfigure the desired policies before explicitly enabling release
 and resuming. In read-only mode the app cannot stop a physical charge.
 This does not change the supported wallbox families or minimum Home Assistant
-version. The current integration requires service **0.9.1 or newer**, API 2;
+version. The current integration requires service **0.10.0b1 or newer**, API 2;
 app and integration versions do not otherwise have to match.
 
 1. Back up HA and read the release notes, especially the changes marked
    **Breaking**. Keep the existing integration entry.
-2. In service mode, update the app or standalone service first and wait until it
+2. With the app, update the app or standalone service first and wait until it
    has started. Its restart briefly interrupts the heartbeat.
 3. Update the integration through **Settings → Updates**, the Marketplace or
    HACS, then complete the requested HA Core restart.

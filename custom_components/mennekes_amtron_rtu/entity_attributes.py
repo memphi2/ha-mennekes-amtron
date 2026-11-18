@@ -69,7 +69,3 @@ def under_load(reader: AttributeReader) -> AttributeReader:
     return read
 
 
-def read_attributes(data: WallboxData, readers: AttributeReaders) -> dict[str, Any] | None:
-    """Collect the attributes that have a value; ``None`` when none has."""
-    attributes = {name: value for name, reader in readers.items() if (value := reader(data)) is not None}
-    return attributes or None

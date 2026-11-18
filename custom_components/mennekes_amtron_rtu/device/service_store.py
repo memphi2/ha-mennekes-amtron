@@ -16,6 +16,7 @@ from .persistence import StorageCommitUncertainError
 from .plug_charge import PlugChargeState
 from .service_config import number
 from .soc_goal import SocGoal
+from .unplug_release import UnplugReleaseState
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ class IntentStore:
     def _apply(self, payload: Any, state: WriteState) -> None:
         if (
             not isinstance(payload, dict)
-            or payload.keys() != {"version", "identity", "pause_requested",
+            or payload.keys() != {"version", "identity", "pause_requested", "unplug_release",
                                   "charging_release_requested", "charging_setpoint",
                                   "energy_goal", "soc_goal", "plug_charge", "charging_session_history", "guest_permission"}
             or payload.get("version") != 2
@@ -67,13 +68,14 @@ class IntentStore:
         goal = EnergyGoal.restore(payload["energy_goal"])
         soc_goal = SocGoal.restore(payload["soc_goal"])
         plug_charge = PlugChargeState.restore(payload["plug_charge"])
+        unplug_release = UnplugReleaseState.restore(payload["unplug_release"])
         history = SessionHistory()
         try:
             history = SessionHistory.restore(payload["charging_session_history"])
         except ValueError:
             # Optional measurements must not block valid control intent
             # or heartbeat startup. Do not expose stored data in the log.
-            _LOGGER.warning("Ignoring invalid completed charging session history")
+            _LOGGER.warning("Charging session: ignoring invalid saved history")
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current
@@ -82,6 +84,7 @@ class IntentStore:
         state.soc_goal = soc_goal
         state.session_history = history
         state.plug_charge = plug_charge
+        state.unplug_release = unplug_release
         self._last = payload
 
     def save(self, state: WriteState) -> None:
@@ -96,6 +99,7 @@ class IntentStore:
             "soc_goal": state.soc_goal.snapshot(),
             "charging_session_history": state.session_history.snapshot(),
             "plug_charge": state.plug_charge.durable(),
+            "unplug_release": state.unplug_release.snapshot(),
         }
         if payload == self._last:
             return

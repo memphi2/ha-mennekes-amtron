@@ -1,22 +1,34 @@
-"""Shared entity base for the MENNEKES AMTRON platforms."""
+"""Shared entity base: every entity shows one field of the service's state.
+
+A platform is a table of descriptions. A description says what the entity
+shows, when it exists and when it is available; the classes here and in the
+platforms contain no knowledge of single entities.
+"""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import MennekesAmtronCoordinator
+from .coordinator import ServiceCoordinator
 from .data import WallboxData
+from .device.capabilities import capability_is_supported
 from .device.const import CONF_SERIAL_NUMBER, DOMAIN, MANUFACTURER
-from .device.decode import RegisterValue
 from .device.identity import display_identifier, model_name
 from .entry_types import MennekesAmtronConfigEntry
+from .vehicle_features import vehicle_features
 
 if TYPE_CHECKING:
     from .data import MennekesAmtronRuntimeData
+
+type Runtime = MennekesAmtronRuntimeData
+type Attributes = Callable[[Runtime], dict[str, Any]]
 
 
 def entry_device_key(entry: MennekesAmtronConfigEntry) -> str:
@@ -43,8 +55,7 @@ def entry_entity_unique_id(entry: MennekesAmtronConfigEntry, key: str) -> str:
 def entry_device_info(entry: MennekesAmtronConfigEntry) -> DeviceInfo:
     """Return the device registry entry for one wallbox."""
 
-    runtime_data: MennekesAmtronRuntimeData = entry.runtime_data
-    identity = runtime_data.identity
+    identity = entry.runtime_data.identity
     info = DeviceInfo(
         identifiers={(DOMAIN, entry_device_key(entry))},
         manufacturer=MANUFACTURER,
@@ -60,64 +71,106 @@ def entry_device_info(entry: MennekesAmtronConfigEntry) -> DeviceInfo:
     return info
 
 
-class MennekesAmtronEntity(CoordinatorEntity[MennekesAmtronCoordinator]):
-    """Base entity bound to one wallbox and one register key."""
+def _always(_runtime: Runtime) -> bool:
+    return True
+
+
+def _no_feature(_features: frozenset[str]) -> bool:
+    return True
+
+
+@dataclass(frozen=True, kw_only=True)
+class Projection:
+    """What every description says beyond Home Assistant's own fields.
+
+    ``register`` names the register the entity depends on: an entity for a
+    register the wallbox lacks is not created, and one whose register has no
+    value is unavailable. ``writes`` marks a control, unavailable while the
+    service allows no writes. ``exists`` and ``feature`` decide once, at setup;
+    ``ready`` decides on every update.
+    """
+
+    register: str | None = None
+    # A register the wallbox must have although it cannot be read back.
+    capability: str | None = None
+    writes: bool = False
+    # Usable from the service's last state, also while the wallbox is down.
+    offline: bool = False
+    exists: Callable[[Runtime], bool] = _always
+    feature: Callable[[frozenset[str]], bool] = _no_feature
+    ready: Callable[[Runtime], bool] = _always
+    attributes: Attributes | None = None
+
+
+def wanted[D: Projection](
+    entry: MennekesAmtronConfigEntry, descriptions: tuple[D, ...],
+) -> list[D]:
+    """The descriptions this wallbox and its configured vehicles call for."""
+    runtime = entry.runtime_data
+    identity = runtime.identity
+    features = vehicle_features(entry)
+    return [
+        description for description in descriptions
+        if (
+            (needed := description.capability or description.register) is None
+            or capability_is_supported(identity.layout_version, identity.phase_options_hw, needed)
+        )
+        and description.feature(features) and description.exists(runtime)
+    ]
+
+
+class AmtronEntity(CoordinatorEntity[ServiceCoordinator]):
+    """One entity of one wallbox, described by a table row."""
 
     _attr_has_entity_name = True
+    _projection: Projection
 
     def __init__(
-        self,
-        entry: MennekesAmtronConfigEntry,
-        coordinator: MennekesAmtronCoordinator,
-        key: str,
-        *,
-        register_key: str | None = None,
+        self, entry: MennekesAmtronConfigEntry, description: EntityDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(entry.runtime_data.coordinator)
+        if not isinstance(description, Projection):
+            raise TypeError("an entity description must be a Projection")
         self._entry = entry
-        self._register_key = register_key or key
-        self._attr_unique_id = entry_entity_unique_id(entry, key)
+        self._projection = description
+        self.entity_description = description
+        self._attr_translation_key = description.key
+        self._attr_unique_id = entry_entity_unique_id(entry, description.key)
         self._attr_device_info = entry_device_info(entry)
 
     @property
-    def runtime_data(self) -> MennekesAmtronRuntimeData:
-        """Return the runtime data of the owning config entry."""
+    def runtime(self) -> Runtime:
+        runtime: Runtime = self._entry.runtime_data
+        return runtime
 
-        data: MennekesAmtronRuntimeData = self._entry.runtime_data
-        return data
+    @property
+    def wallbox_data(self) -> WallboxData:
+        return self.coordinator.current_data()
 
     @callback
     def _handle_coordinator_update(self) -> None:
         # A vehicle switch replaces observers in place. Publish only its
         # result, never the brief gap between the old and the new car.
-        if self.runtime_data.vehicle_switching:
+        if self.runtime.vehicle_switching:
             return
         super()._handle_coordinator_update()
 
     @property
-    def wallbox_data(self) -> WallboxData:
-        """Return the newest device snapshot."""
-
-        return self.coordinator.current_data()
-
-    @property
-    def register_value(self) -> RegisterValue:
-        """Return this entity's register value from the newest snapshot."""
-
-        return self.wallbox_data.get(self._register_key)
-
-    @property
     def available(self) -> bool:
-        """Return false while the register has no value in the snapshot."""
-
-        if not super().available:
+        projection = self._projection
+        if projection.offline:
+            return projection.ready(self.runtime)
+        if not self.coordinator.last_update_success:
             return False
-        return self.wallbox_data.has(self._register_key)
-
-
-class MennekesAmtronControlEntity(MennekesAmtronEntity):
-    """Keep control identities while following the current write permission."""
+        if projection.register is not None and not self.wallbox_data.has(projection.register):
+            return False
+        if projection.writes and self.runtime.control.read_only:
+            return False
+        return projection.ready(self.runtime)
 
     @property
-    def available(self) -> bool:
-        return super().available and not self.runtime_data.control.read_only
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        if self._projection.attributes is None:
+            return None
+        values = self._projection.attributes(self.runtime)
+        return {name: value for name, value in values.items() if value is not None} or None

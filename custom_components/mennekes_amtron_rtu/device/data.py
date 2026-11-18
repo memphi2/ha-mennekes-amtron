@@ -34,19 +34,11 @@ class WallboxData:
     # Internal ordering only: never make a poll notify entities merely because
     # its generation changed, and never expose this in entity attributes.
     current_write_generation: int = field(default=0, compare=False, repr=False)
-    # A service permission change must notify controls even with identical
-    # register values. This is internal metadata, never an entity attribute.
-    service_read_only: bool | None = field(default=None, repr=False)
-    service_soc_maximum_required: bool | None = field(default=None, repr=False)
-    service_supports_cancel_pending: bool = field(default=False, repr=False)
-    # The service can change the slider range or retained paused setpoint
-    # without changing a register. Compare these stable control values too.
-    service_max_charging_current: float | None = field(default=None, repr=False)
-    service_charging_setpoint: float | None = field(default=None, repr=False)
-    # Draft edits must notify HA even if no Modbus value changed. Internal only.
-    # Fixed queue metadata changes only when intent changes, never each second.
-    pending_change: str | None = field(default=None, repr=False)
+    # When a queued command is due, so its outcome is read then.
     pending_change_until: datetime | None = field(default=None, repr=False)
+    # What the service decided apart from registers: departure, operation,
+    # guest charging, Plug & Charge. Entities show it, so a change notifies.
+    service_control: dict[str, Any] | None = field(default=None, repr=False)
     # Only quality transitions notify entities. Cumulative transaction counts
     # remain fresh for diagnostics without waking every entity on each retry.
     connection_quality: str | None = None
@@ -102,10 +94,9 @@ class WriteDiagnostics:
 
 @dataclass(slots=True)
 class ConnectionState:
-    """Availability of the Modbus connection, tracked for log hygiene."""
+    """Availability of the Modbus connection, so each change is recorded once."""
 
     available: bool = True
-    logged_unavailable: bool = False
 
     def record(self, available: bool) -> bool:
         """Store availability and return true when the state changed."""

@@ -11,11 +11,11 @@ cards:
       {%- if has_value('datetime.mennekes_amtron_target_time') %}{% set p.l = p.l + ['until ' ~ as_local(as_datetime(states('datetime.mennekes_amtron_target_time'))).strftime('%H:%M')] %}{% endif -%}
       {%- set s = states('number.mennekes_amtron_vehicle_charge_target') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
-      {%- set t = states('sensor.mennekes_amtron_timed_charging_status') -%}
+      {%- set t = state_attr('sensor.mennekes_amtron_charging_wait_reason', 'departure_plan') -%}
       {{ 'Waiting for first reading' if is_state(entity, 'unknown') else 'Connection interrupted' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_session_energy', with_unit=True) if has_value('sensor.mennekes_amtron_session_energy') else '—' }}
 
       {{ 'Limits: ' ~ p.l | join(' · ') if p.l else 'No charging limit' }}
-      {%- if t not in ['disabled', 'none', 'unknown', 'unavailable'] %} · Planning: {{ state_translated('sensor.mennekes_amtron_timed_charging_status') }}{% endif %}
+      {%- if t not in [none, 'disabled'] %} · Planning: {{ state_attr_translated('sensor.mennekes_amtron_charging_wait_reason', 'departure_plan') }}{% endif %}
     multiline_secondary: true
     icon: mdi:ev-station
     color: >-
@@ -36,11 +36,11 @@ cards:
           type: template
           entity: switch.mennekes_amtron_virtual_plug_charge
           content: >-
-            {{ 'P&C ready' if states('sensor.mennekes_amtron_virtual_plug_charge_status') in ['authorized', 'manual_release']
+            {{ 'P&C ready' if state_attr('sensor.mennekes_amtron_charging_wait_reason', 'plug_charge') in ['authorized', 'manual_release']
             else 'P&C waiting' if is_state(entity, 'on') else 'P&C off' }}
           icon: mdi:car-key
           icon_color: >-
-            {{ 'green' if states('sensor.mennekes_amtron_virtual_plug_charge_status') in ['authorized', 'manual_release']
+            {{ 'green' if state_attr('sensor.mennekes_amtron_charging_wait_reason', 'plug_charge') in ['authorized', 'manual_release']
             else 'amber' if is_state(entity, 'on') else 'grey' }}
           tap_action:
             action: more-info
@@ -137,8 +137,8 @@ cards:
       - type: conditional
         conditions:
           - condition: state
-            entity: sensor.mennekes_amtron_guest_charging
-            state: inactive
+            entity: binary_sensor.mennekes_amtron_guest_charging
+            state: "off"
         chip:
           type: template
           content: "Start guest"
@@ -154,7 +154,7 @@ cards:
       - type: conditional
         conditions:
           - condition: state
-            entity: button.mennekes_amtron_use_next_calendar_event
+            entity: select.mennekes_amtron_active_vehicle
             state_not: unavailable
         chip:
           type: template
@@ -162,15 +162,13 @@ cards:
           icon: mdi:calendar-import
           tap_action:
             action: perform-action
-            perform_action: button.press
-            target:
-              entity_id: button.mennekes_amtron_use_next_calendar_event
+            perform_action: mennekes_amtron_rtu.use_calendar_departure
             confirmation:
               text: "Use this departure? A departure plan may lift a manual pause."
       - type: conditional
         conditions:
           - condition: state
-            entity: button.mennekes_amtron_use_vehicle_departure
+            entity: select.mennekes_amtron_active_vehicle
             state_not: unavailable
         chip:
           type: template
@@ -178,8 +176,6 @@ cards:
           icon: mdi:car-clock
           tap_action:
             action: perform-action
-            perform_action: button.press
-            target:
-              entity_id: button.mennekes_amtron_use_vehicle_departure
+            perform_action: mennekes_amtron_rtu.use_vehicle_departure
             confirmation:
               text: "Use this departure? A departure plan may lift a manual pause."

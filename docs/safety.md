@@ -54,7 +54,9 @@ The specification states that values written over Modbus are automatically
 limited by the configuration of the wallbox. This integration therefore
 **cannot** circumvent a §14a downgrade and must never be presented as a way to
 do so. What it does is make the state visible:
-`binary_sensor.*_downgrade_active` and the downgrade-current sensor.
+the `downgraded_to` attribute of `sensor.*_charging_status`, present while the
+downgrade is active, and the `downgrade_started`/`downgrade_ended` changes of
+`event.*_activity`.
 
 If your §14a control box is itself a Modbus master on the same bus, see the
 previous section: this integration must not share that bus, even read-only.
@@ -153,7 +155,7 @@ the integration's extra current cap, while hardware limits remain in force.
   status or layouts without CP keep the interval. Register-write guards and
   heartbeat remain active; pending waits check for unplugging every five seconds.
 - Departure-plan commands are cancelled on freshly confirmed unplugging before
-  their write, in service mode also while HA is unavailable. Manual commands retain
+  their write, with the Modbus service app also while HA is unavailable. Manual commands retain
   the no-vehicle interval bypass.
 - Repeating the same state and recovery that preserves existing intent do not
   restart the long timer. Timing guards survive an entry reload in memory.

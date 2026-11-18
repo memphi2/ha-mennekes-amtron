@@ -5,23 +5,30 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from tests.fakes import device_bank, put, raise_connection_error
-from tests.ha_fakes import build_runtime
+from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
+    DeviceValidationError,
+)
+from tests.fakes import put, raise_connection_error
+from tests.test_modbus_service import service_fixture
 
 
 @pytest.mark.parametrize("outcome", ["success", "lost_reply", "cancelled"])
 @pytest.mark.parametrize("command", ["current", "unlimited", "recovery"])
-def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
+def test_poll_finishing_after_pause_cannot_resume_early(tmp_path, outcome, command):
     async def run():
-        _, entry, transport = await build_runtime(bank=device_bank(charging_current=8, error_code=200))
-        runtime = entry.runtime_data
-        control, client, coordinator = runtime.control, runtime.client, runtime.coordinator
-        clock = [1000.0]
-        client._monotonic = control._monotonic = lambda: clock[0]
+        service, transport, clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        put(transport.bank, R.ERROR_CODE, 200)
+        await service.refresh()
+        transport.writes.clear()
+        control, client = service.control, service.client
+        # The service publishes after every command by polling again. That
+        # poll would queue behind the delayed one; only the stale poll counts.
+        control._request_refresh = None
         current_read = asyncio.Event()
         finish_poll = asyncio.Event()
         original_read = client.async_read_block
@@ -34,7 +41,7 @@ def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
             return values
 
         client.async_read_block = delayed_read
-        poll = asyncio.create_task(coordinator._async_update_data())
+        poll = asyncio.create_task(service.refresh())
         try:
             await current_read.wait()
             if outcome == "success":
@@ -49,18 +56,18 @@ def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
                     raise raise_connection_error()
 
                 transport.write_registers = applied_without_reply
-                with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError):
+                with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else DeviceError):
                     await control.async_pause_charging()
                 transport.write_registers = original_write
             clock[0] += 4
             finish_poll.set()
-            coordinator.data = await poll
-            assert coordinator.data.get("charging_current_ems") == 8
+            await poll
+            assert service.data.get("charging_current_ems") == 8
             assert control.is_paused is (True if outcome == "success" else None)
             action = (control.async_recover_from_error() if command == "recovery" else
                       control.async_set_charging_current(0 if command == "unlimited" else 12, allow_unlimited=True))
             if command == "recovery":
-                with pytest.raises(ServiceValidationError) as limited:
+                with pytest.raises(DeviceValidationError) as limited:
                     await action
                 assert limited.value.translation_placeholders == {"seconds": "1"}
             else:
@@ -70,13 +77,12 @@ def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
             # A later poll can still report an actual external state change.
             client.async_read_block = original_read
             put(transport.bank, R.CHARGING_CURRENT_EMS, 9)
-            coordinator.data = await coordinator._async_update_data()
+            await service.refresh()
             assert control.is_paused is False
         finally:
             finish_poll.set()
             await poll
-            await control.async_shutdown()
-            await client.async_close()
+            await service.stop()
 
     asyncio.run(run())
 

@@ -15,6 +15,7 @@ from typing import Any
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from .const import DOMAIN
+from .notice import FailureNotice
 from .service_config import ServerConfig, validate_token
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ async def publish_discovery(config: ServerConfig, supervisor_token: str) -> None
         timeout=ClientTimeout(total=10),
         trust_env=False,
     ) as session:
-        warned = False
+        notice = FailureNotice(_LOGGER, "Service")
         while True:
             try:
                 info = await _request(session, "GET", "/addons/self/info")
@@ -102,12 +103,8 @@ async def publish_discovery(config: ServerConfig, supervisor_token: str) -> None
                     },
                 )
             except ClientError, TimeoutError, ValueError:
-                if not warned:
-                    _LOGGER.warning(
-                        "Supervisor discovery unavailable; retrying in the background"
-                    )
-                    warned = True
+                notice.failed("Supervisor discovery unavailable; retrying in the background")
                 await asyncio.sleep(RETRY_SECONDS)
             else:
-                _LOGGER.info("Modbus service registered with Home Assistant discovery")
+                _LOGGER.info("Service: registered with Home Assistant discovery")
                 return

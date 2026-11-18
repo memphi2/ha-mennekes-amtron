@@ -42,7 +42,7 @@ def test_tariff_only_update_keeps_cost_observer_and_modbus_connection(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
-        observer = ChargingCostObserver(hass, configured, remote=False)
+        observer = ChargingCostObserver(hass, configured)
         original_accumulator = observer._accumulator
         configured.options = {
             **configured.options,
@@ -66,7 +66,7 @@ def test_only_actual_tariff_changes_with_unchanged_connection_can_skip_reload(tm
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
-        observer = ChargingCostObserver(hass, configured, remote=True)
+        observer = ChargingCostObserver(hass, configured)
         if change != "unchanged":
             configured.data = {"server_token": "replacement-credential"}
         if change == "connection_with_tariff":
@@ -118,11 +118,10 @@ def test_last_cost_storage_validation_and_roundtrip():
             LastChargingCost.restore(bad)
 
 
-@pytest.mark.parametrize("remote", [False, True])
-def test_complete_fixed_price_cycle_survives_reload_without_repricing(tmp_path, remote):
+def test_complete_fixed_price_cycle_survives_reload_without_repricing(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=remote)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         session = completed(at)
         try:
@@ -138,7 +137,7 @@ def test_complete_fixed_price_cycle_survives_reload_without_repricing(tmp_path, 
             await observer.async_stop()
             changed = entry()
             changed.options["charging_price"] = 2.0
-            replacement = ChargingCostObserver(hass, changed, remote=remote)
+            replacement = ChargingCostObserver(hass, changed)
             await replacement.async_start()
             assert replacement.last.result.cost == pytest.approx(3)
             await replacement.async_stop()
@@ -152,7 +151,7 @@ def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         hass.states.async_set("sensor.price", "0.20", {"unit_of_measurement": "EUR/kWh"})
-        observer = ChargingCostObserver(hass, entry(dynamic=True), remote=False)
+        observer = ChargingCostObserver(hass, entry(dynamic=True))
         at = time.time()+1
         session = completed(at)
         try:
@@ -179,7 +178,7 @@ def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
 def test_gaps_restart_and_unknown_price_do_not_manufacture_full_cost(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(dynamic=True), remote=True)
+        observer = ChargingCostObserver(hass, entry(dynamic=True))
         at = time.time()+1
         try:
             await observer.async_start()
@@ -213,11 +212,10 @@ def test_gaps_restart_and_unknown_price_do_not_manufacture_full_cost(tmp_path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("remote", [False, True])
-def test_unplug_without_fresh_meter_cannot_leak_cost_into_next_charge(tmp_path, remote):
+def test_unplug_without_fresh_meter_cannot_leak_cost_into_next_charge(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=remote)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time() + 1
         session = completed(at)
         try:
@@ -257,7 +255,7 @@ def test_unplug_without_fresh_meter_cannot_leak_cost_into_next_charge(tmp_path, 
 def test_failed_optional_storage_does_not_break_observation_or_unload(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -268,7 +266,7 @@ def test_failed_optional_storage_does_not_break_observation_or_unload(tmp_path):
                 await observer._save()
             await observer.async_stop()
             assert not observer._dirty
-            broken = ChargingCostObserver(hass, entry(), remote=False)
+            broken = ChargingCostObserver(hass, entry())
             with patch.object(broken._store, "async_load", side_effect=OSError):
                 await broken.async_start()
                 assert not broken.available
@@ -288,7 +286,7 @@ def test_price_expiry_uses_reports_and_missing_data_marks_interval_unknown(tmp_p
             PRICE_VALID_SECONDS,
         )
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(dynamic=True), remote=False)
+        observer = ChargingCostObserver(hass, entry(dynamic=True))
         at = time.time()+1
         callbacks = []
         def schedule(_hass, delay, callback):
@@ -323,13 +321,12 @@ def test_price_expiry_uses_reports_and_missing_data_marks_interval_unknown(tmp_p
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("remote", [False, True])
-def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp_path, remote):
+def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
         configured.options["active_vehicle_profile"] = "first"
-        observer = ChargingCostObserver(hass, configured, remote=remote)
+        observer = ChargingCostObserver(hass, configured)
         at = time.time() + 1
         session = completed(at)
         try:
@@ -339,7 +336,7 @@ def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp
                     await observer.async_observe(data(at + offset, energy, present=present))
             assert observer.current.complete
             configured.options = {**configured.options, "active_vehicle_profile": "second"}
-            assert observer.retain_for_reload(configured, remote=remote)
+            assert observer.retain_for_reload(configured)
             observer.rebind(configured)
             for offset, energy, present in ((50, 105, True), (100, 110, False)):
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
@@ -360,18 +357,17 @@ def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp
 
 
 @pytest.mark.parametrize("change", [
-    "closed", "corrupt", "entry", "connection", "mode", "serial", "layout",
-    "source", "price", "entity", "tariff", "scan", "measurement",
+    "closed", "corrupt", "entry", "connection", "serial", "layout",
+    "source", "price", "entity", "tariff",
 ])
 def test_handoff_rejects_changed_sources_and_connection(tmp_path, change):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
         configured.options["charging_network_tariff"] = {"module": "none"}
-        observer = ChargingCostObserver(hass, configured, remote=False)
+        observer = ChargingCostObserver(hass, configured)
         candidate = entry()
         candidate.options = {**configured.options}
-        remote = False
         if change == "closed":
             await observer.async_stop()
         elif change == "corrupt":
@@ -380,8 +376,6 @@ def test_handoff_rejects_changed_sources_and_connection(tmp_path, change):
             candidate.entry_id = "different"
         elif change == "connection":
             candidate.data = {"host": "changed.invalid"}
-        elif change == "mode":
-            remote = True
         elif change == "serial":
             candidate.runtime_data.identity.serial_number = "different"
         elif change == "layout":
@@ -391,18 +385,15 @@ def test_handoff_rejects_changed_sources_and_connection(tmp_path, change):
                 "source": ("charging_cost_source", "disabled"),
                 "price": ("charging_price", 0.4),
                 "entity": ("charging_price_entity", "sensor.changed_price"),
-                "scan": ("scan_interval_seconds", 300),
-                "measurement": ("measurement_interval_seconds", 300),
                 "tariff": ("charging_network_tariff", {
                     "module": "module_2", "regular_network": 0.1, "price_includes_network": True,
                 }),
             }[change]
             candidate.options[key] = value
         try:
-            assert not observer.retain_for_reload(candidate, remote=remote)
-            if change != "mode":
-                with pytest.raises(ValueError, match="source changed"):
-                    observer.rebind(candidate)
+            assert not observer.retain_for_reload(candidate)
+            with pytest.raises(ValueError, match="source changed"):
+                observer.rebind(candidate)
         finally:
             await observer.async_stop()
             await hass.async_stop()
@@ -414,7 +405,7 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
         hass = HomeAssistant(str(tmp_path))
         hass.states.async_set("sensor.price", "0.20", {"unit_of_measurement": "EUR/kWh"})
         configured = entry(dynamic=True)
-        observer = ChargingCostObserver(hass, configured, remote=False)
+        observer = ChargingCostObserver(hass, configured)
         at = time.time() + 1
         session = completed(at)
         try:
@@ -425,7 +416,7 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 25):
                 await observer.async_observe(data(at + 25, 102.5, present=True))
             configured.options = {**configured.options, "active_vehicle_profile": "second"}
-            assert observer.retain_for_reload(configured, remote=False)
+            assert observer.retain_for_reload(configured)
             # Polling has stopped for the logical reload. Price subscriptions
             # stay live so the next interval still uses the observed boundary.
             with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 50):
@@ -444,11 +435,10 @@ def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("remote", [False, True])
-def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path, remote):
+def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=remote)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -472,11 +462,10 @@ def test_one_failed_poll_and_plug_transition_keep_the_cost_complete(tmp_path, re
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("remote", [False, True])
-def test_final_meter_after_the_unplug_poll_still_prices_the_whole_charge(tmp_path, remote):
+def test_final_meter_after_the_unplug_poll_still_prices_the_whole_charge(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=remote)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -503,7 +492,7 @@ def test_final_meter_after_the_unplug_poll_still_prices_the_whole_charge(tmp_pat
 def test_session_published_after_the_next_idle_reading_keeps_its_cost(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=True)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -529,7 +518,7 @@ def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
-        observer = ChargingCostObserver(hass, configured, remote=False)
+        observer = ChargingCostObserver(hass, configured)
         at = time.time()+1
         try:
             await observer.async_start()
@@ -552,7 +541,7 @@ def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
 def test_ha_to_app_outage_does_not_make_the_app_measured_cost_partial(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=True)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -576,7 +565,7 @@ def test_ha_to_app_outage_does_not_make_the_app_measured_cost_partial(tmp_path):
 def test_app_reading_before_the_unplug_still_prices_the_later_session(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=True)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -600,7 +589,7 @@ def test_app_reading_before_the_unplug_still_prices_the_later_session(tmp_path):
 def test_only_the_newest_reading_may_end_a_priced_session(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -621,7 +610,7 @@ def test_only_the_newest_reading_may_end_a_priced_session(tmp_path):
 def test_long_outage_restarts_the_running_cost_without_claiming_completeness(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -641,7 +630,7 @@ def test_long_outage_restarts_the_running_cost_without_claiming_completeness(tmp
 def test_an_idle_poll_without_a_meter_read_keeps_the_running_cost_baseline(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -662,7 +651,7 @@ def test_many_charging_readings_do_not_evict_the_session_baseline(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         with patch("custom_components.mennekes_amtron_rtu.cost_observer._MAX_METER_RUNS", 2):
-            observer = ChargingCostObserver(hass, entry(), remote=False)
+            observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -683,7 +672,7 @@ def test_many_charging_readings_do_not_evict_the_session_baseline(tmp_path):
 def test_a_newest_reading_taken_while_charging_never_ends_a_session(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -705,7 +694,7 @@ def test_waiting_plugged_in_moves_the_running_cost_start_past_a_tariff_edit(tmp_
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
-        observer = ChargingCostObserver(hass, configured, remote=False)
+        observer = ChargingCostObserver(hass, configured)
         at = time.time()+1
         try:
             await observer.async_start()
@@ -737,7 +726,7 @@ def test_waiting_plugged_in_moves_the_running_cost_start_past_a_tariff_edit(tmp_
 def test_a_failed_meter_read_after_unplug_does_not_start_the_next_cost_mid_charge(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=True)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()
@@ -759,7 +748,7 @@ def test_a_sample_at_the_idle_value_labelled_charging_still_marks_the_baseline(t
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
-        observer = ChargingCostObserver(hass, configured, remote=True)
+        observer = ChargingCostObserver(hass, configured)
         at = time.time()+1
         try:
             await observer.async_start()
@@ -787,7 +776,7 @@ def test_a_sample_at_the_idle_value_labelled_charging_still_marks_the_baseline(t
 def test_replug_before_a_meter_read_starts_a_complete_running_cost(tmp_path, seen_unplugged):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer = ChargingCostObserver(hass, entry(), remote=False)
+        observer = ChargingCostObserver(hass, entry())
         at = time.time()+1
         try:
             await observer.async_start()

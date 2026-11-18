@@ -19,7 +19,7 @@ For standalone setup and execution, follow `docs/service-standalone.md`.
 
 ## Coding Style
 
-Use four-space Python indentation, type annotations, `snake_case` functions/modules, `PascalCase` classes, and uppercase constants. Follow Ruff rules in `pyproject.toml`; avoid unrelated formatting changes. Keep blocking filesystem work off the event loop. Update translated strings and relevant examples when changing controls.
+Use four-space Python indentation, type annotations, `snake_case` functions/modules, `PascalCase` classes, and uppercase constants. Follow Ruff rules in `pyproject.toml`; avoid unrelated formatting changes. Keep blocking filesystem work off the event loop. Write visible log lines as `Area: what (reason)` with an area from `tests/test_log_format.py`, and report a failure that recurs on every poll or retry through `device/notice.py` instead of a private flag. Update translated strings and relevant examples when changing controls.
 
 ## Testing
 

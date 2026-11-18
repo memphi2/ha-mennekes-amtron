@@ -207,17 +207,19 @@
       "charging": {
         "name": "Ricarica"
       },
-      "downgrade_active": {
-        "name": "Limitazione di rete attiva"
-      },
       "error": {
-        "name": "Errore"
-      },
-      "master_lost_fallback": {
-        "name": "Fallback del gestore energetico attivo"
+        "name": "Errore",
+        "state_attributes": {
+          "heartbeat_lost": {
+            "name": "Fallback del gestore energetico attivo"
+          }
+        }
       },
       "vehicle_connected": {
         "name": "Veicolo collegato"
+      },
+      "guest_charging": {
+        "name": "Ricarica ospite"
       }
     },
     "button": {
@@ -229,15 +231,6 @@
       },
       "cancel_pending_change": {
         "name": "Annulla modifica in attesa"
-      },
-      "assign_vehicle_charge": {
-        "name": "Abbina l’energia di ricarica del veicolo"
-      },
-      "timed_next_calendar_event": {
-        "name": "Usa prossimo evento calendario"
-      },
-      "timed_vehicle_departure": {
-        "name": "Usa la partenza del veicolo"
       },
       "guest_start": {
         "name": "Avvia ricarica ospite"
@@ -327,22 +320,8 @@
         "name": "Temperatura"
       },
       "wallbox_settings": {
-        "name": "Impostazioni della wallbox"
-      },
-      "pending_change": {
-        "name": "Modifica in attesa",
-        "state": {
-          "none": "Nessuna modifica in attesa",
-          "pause": "Metti in pausa la ricarica",
-          "resume": "Riprendere la ricarica",
-          "set_current": "Impostare la corrente di ricarica",
-          "single_phase": "Usare una fase",
-          "all_phases": "Usare tutte le fasi disponibili",
-          "enable_charging": "Autorizzare la ricarica",
-          "disable_charging": "Disabilita il consenso alla ricarica",
-          "unlock": "Sbloccare la wallbox",
-          "lock": "Blocca la wallbox"
-        }
+        "name": "Impostazioni della wallbox",
+        "state_attributes": {}
       },
       "charging_status": {
         "name": "Stato di ricarica",
@@ -361,6 +340,11 @@
           "checking_status": "Verifica dello stato",
           "state_uncertain": "Stato non univoco",
           "data_missing": "In attesa di letture"
+        },
+        "state_attributes": {
+          "downgraded_to": {
+            "name": "Limitazione di rete attiva"
+          }
         }
       },
       "connection_quality": {
@@ -376,24 +360,6 @@
           "retried_transactions": {
             "name": "Transazioni ripetute"
           }
-        }
-      },
-      "energy_goal_status": {
-        "name": "Stato dell’obiettivo energetico",
-        "state": {
-          "disabled": "Disattivato",
-          "active": "Attivo",
-          "reached": "Obiettivo energetico raggiunto",
-          "meter_unavailable": "Misurazione energetica non disponibile",
-          "meter_reset": "Lettura del contatore diminuita"
-        }
-      },
-      "soc_goal_status": {
-        "name": "Stato dell’obiettivo di carica del veicolo",
-        "state": {
-          "disabled": "Disattivato",
-          "active": "Attivo",
-          "reached": "Obiettivo raggiunto"
         }
       },
       "last_charging_loss": {
@@ -442,70 +408,50 @@
           }
         }
       },
-      "timed_goal_status": {
-        "name": "Stato ricarica programmata",
+      "operation_waiting": {
+        "name": "Motivo di attesa della ricarica",
         "state": {
-          "disabled": "Disattivato",
-          "waiting_for_target": "In attesa obiettivo %",
-          "waiting_for_capacity": "In attesa capacità",
-          "waiting_for_soc": "In attesa livello di carica",
-          "waiting_for_device": "In attesa wallbox",
+          "none": "Nulla trattiene la ricarica",
+          "wallbox_unavailable": "Wallbox non raggiungibile",
+          "no_vehicle": "Nessun veicolo collegato",
+          "release_off": "Abilitazione alla ricarica disattivata",
+          "plug_charge_waiting": "Il Plug & Charge virtuale non ha abilitato il veicolo",
+          "meter_unavailable": "In attesa del contatore di energia",
           "vehicle_unconfirmed": "Veicolo non confermato",
+          "until_planned_start": "In pausa fino all’avvio pianificato",
+          "estimated_target_reached": "Caricato fino all’obiettivo stimato",
+          "waiting_for_device": "In attesa wallbox",
+          "waiting_for_soc": "In attesa livello di carica",
+          "waiting_for_capacity": "In attesa capacità",
+          "waiting_for_target": "In attesa obiettivo %",
           "read_only": "Sola lettura",
-          "guest_mode": "La ricarica ospite ha priorità",
-          "queued": "Modifica in coda",
-          "paused_until_start": "In pausa fino all’avvio",
-          "minimum_level": "Ricarica fino al livello minimo",
-          "charging": "Ricarica alla corrente massima",
-          "finishing": "Completa alla corrente minima",
-          "unreachable": "Obiettivo forse irraggiungibile",
-          "late": "Scadenza superata",
-          "estimated_reached": "Caricato fino all’obiettivo stimato",
-          "reached": "Obiettivo raggiunto",
-          "write_pending": "Scrittura in attesa",
-          "error": "Errore"
-        }
-      },
-      "virtual_plug_charge_status": {
-        "name": "Stato di Plug & Charge virtuale",
-        "state": {
-          "waiting_vehicle": "In attesa del veicolo",
-          "waiting_detection": "In attesa di dati aggiornati",
-          "vehicle_not_selected": "Veicolo riconosciuto non selezionato",
-          "waiting_release": "In attesa del consenso alla ricarica",
-          "authorized": "Veicolo autorizzato",
-          "manual_release": "Abilitato manualmente",
-          "blocked": "Ricarica bloccata",
-          "disabled": "Disattivato"
+          "command_pending": "Modifica in coda",
+          "target_reached": "Obiettivo raggiunto",
+          "paused": "Ricarica in pausa"
         },
         "state_attributes": {
-          "blocked_reason": {
-            "name": "Motivo del blocco",
+          "controller": {
+            "name": "Controllo della ricarica",
             "state": {
-              "connection_lost": "Connessione persa",
-              "gate_inactive": "Blocco di abilitazione non attivo",
-              "read_only": "Modalità sola lettura",
-              "departure_plan": "La pianificazione della partenza prepara la corrente",
-              "pause_requested": "Ricarica in pausa",
-              "release_off": "Abilitazione alla ricarica disattivata",
-              "energy_goal_stop": "Obiettivo di energia raggiunto",
-              "wallbox_locked": "Wallbox bloccata",
-              "error_code": "Errore della wallbox",
-              "authorization_required": "Autorizzazione attiva sulla wallbox",
-              "register_unavailable": "Valore del registro non disponibile"
+              "unavailable": "Wallbox non raggiungibile",
+              "departure_plan": "Pianificazione della partenza",
+              "direct": "Controllo diretto",
+              "guest": "Ordine ospite"
             }
-          }
-        }
-      },
-      "operation_controller": {
-        "name": "Controllo della ricarica",
-        "state": {
-          "unavailable": "Wallbox non raggiungibile",
-          "departure_plan": "Pianificazione della partenza",
-          "direct": "Controllo diretto",
-          "guest": "Ordine ospite"
-        },
-        "state_attributes": {
+          },
+          "next_event": {
+            "name": "Prossimo passo della ricarica",
+            "state": {
+              "none": "Nulla in programma",
+              "queued_command": "La modifica in coda viene eseguita",
+              "plan_start": "Inizia la ricarica pianificata",
+              "target_reached": "Obiettivo previsto",
+              "departure": "Orario obiettivo"
+            }
+          },
+          "next_at": {
+            "name": "Orario"
+          },
           "vehicle": {
             "name": "Veicolo",
             "state": {
@@ -527,70 +473,95 @@
           },
           "target_deadline": {
             "name": "Orario obiettivo"
-          }
-        }
-      },
-      "operation_waiting": {
-        "name": "Motivo di attesa della ricarica",
-        "state": {
-          "none": "Nulla trattiene la ricarica",
-          "wallbox_unavailable": "Wallbox non raggiungibile",
-          "no_vehicle": "Nessun veicolo collegato",
-          "release_off": "Abilitazione alla ricarica disattivata",
-          "plug_charge_waiting": "Il Plug & Charge virtuale non ha abilitato il veicolo",
-          "meter_unavailable": "In attesa del contatore di energia",
-          "vehicle_unconfirmed": "Veicolo non confermato",
-          "until_planned_start": "In pausa fino all’avvio pianificato",
-          "estimated_target_reached": "Caricato fino all’obiettivo stimato",
-          "waiting_for_device": "In attesa wallbox",
-          "waiting_for_soc": "In attesa livello di carica",
-          "waiting_for_capacity": "In attesa capacità",
-          "waiting_for_target": "In attesa obiettivo %",
-          "read_only": "Sola lettura",
-          "command_pending": "Modifica in coda",
-          "target_reached": "Obiettivo raggiunto",
-          "paused": "Ricarica in pausa"
-        }
-      },
-      "operation_next": {
-        "name": "Prossimo passo della ricarica",
-        "state": {
-          "none": "Nulla in programma",
-          "queued_command": "La modifica in coda viene eseguita",
-          "plan_start": "Inizia la ricarica pianificata",
-          "target_reached": "Obiettivo previsto",
-          "departure": "Orario obiettivo"
-        },
-        "state_attributes": {
-          "at": {
-            "name": "Orario"
-          }
-        }
-      },
-      "guest_charging": {
-        "name": "Ricarica ospite",
-        "state": {
-          "inactive": "Inattivo",
-          "active": "Attivo"
-        },
-        "state_attributes": {
-          "start": {
-            "name": "Inizio"
           },
-          "finish": {
-            "name": "Fine"
+          "pending": {
+            "name": "Modifica in attesa",
+            "state": {
+              "none": "Nessuna modifica in attesa",
+              "pause": "Metti in pausa la ricarica",
+              "resume": "Riprendere la ricarica",
+              "set_current": "Impostare la corrente di ricarica",
+              "single_phase": "Usare una fase",
+              "all_phases": "Usare tutte le fasi disponibili",
+              "enable_charging": "Autorizzare la ricarica",
+              "disable_charging": "Disabilita il consenso alla ricarica",
+              "unlock": "Sbloccare la wallbox",
+              "lock": "Blocca la wallbox"
+            }
           },
-          "current": {
-            "name": "Corrente"
+          "pending_at": {
+            "name": "Modifica in sospeso alle"
           },
-          "energy": {
-            "name": "Energia"
+          "energy_target": {
+            "name": "Stato dell’obiettivo energetico",
+            "state": {
+              "disabled": "Disattivato",
+              "active": "Attivo",
+              "reached": "Obiettivo energetico raggiunto",
+              "meter_unavailable": "Misurazione energetica non disponibile",
+              "meter_reset": "Lettura del contatore diminuita"
+            }
           },
-          "delivered": {
-            "name": "Erogata"
+          "vehicle_target": {
+            "name": "Stato dell’obiettivo di carica del veicolo",
+            "state": {
+              "disabled": "Disattivato",
+              "active": "Attivo",
+              "reached": "Obiettivo raggiunto"
+            }
           },
-          "reason": {
-            "name": "Motivo"
+          "departure_plan": {
+            "name": "Stato ricarica programmata",
+            "state": {
+              "disabled": "Disattivato",
+              "waiting_for_target": "In attesa obiettivo %",
+              "waiting_for_capacity": "In attesa capacità",
+              "waiting_for_soc": "In attesa livello di carica",
+              "waiting_for_device": "In attesa wallbox",
+              "vehicle_unconfirmed": "Veicolo non confermato",
+              "read_only": "Sola lettura",
+              "guest_mode": "La ricarica ospite ha priorità",
+              "queued": "Modifica in coda",
+              "paused_until_start": "In pausa fino all’avvio",
+              "minimum_level": "Ricarica fino al livello minimo",
+              "charging": "Ricarica alla corrente massima",
+              "finishing": "Completa alla corrente minima",
+              "unreachable": "Obiettivo forse irraggiungibile",
+              "late": "Scadenza superata",
+              "estimated_reached": "Caricato fino all’obiettivo stimato",
+              "reached": "Obiettivo raggiunto",
+              "write_pending": "Scrittura in attesa",
+              "error": "Errore"
+            }
+          },
+          "plug_charge": {
+            "name": "Stato di Plug & Charge virtuale",
+            "state": {
+              "waiting_vehicle": "In attesa del veicolo",
+              "waiting_detection": "In attesa di dati aggiornati",
+              "vehicle_not_selected": "Veicolo riconosciuto non selezionato",
+              "waiting_release": "In attesa del consenso alla ricarica",
+              "authorized": "Veicolo autorizzato",
+              "manual_release": "Abilitato manualmente",
+              "blocked": "Ricarica bloccata",
+              "disabled": "Disattivato"
+            }
+          },
+          "plug_charge_blocked": {
+            "name": "Motivo del blocco",
+            "state": {
+              "connection_lost": "Connessione persa",
+              "gate_inactive": "Blocco di abilitazione non attivo",
+              "read_only": "Modalità sola lettura",
+              "departure_plan": "La pianificazione della partenza prepara la corrente",
+              "pause_requested": "Ricarica in pausa",
+              "release_off": "Abilitazione alla ricarica disattivata",
+              "energy_goal_stop": "Obiettivo di energia raggiunto",
+              "wallbox_locked": "Wallbox bloccata",
+              "error_code": "Errore della wallbox",
+              "authorization_required": "Autorizzazione attiva sulla wallbox",
+              "register_unavailable": "Valore del registro non disponibile"
+            }
           }
         }
       }
@@ -607,78 +578,21 @@
       },
       "virtual_plug_charge": {
         "name": "Plug & Charge virtuale"
-      },
-      "release_off_on_unplug": {
-        "name": "Disattiva l'abilitazione alla ricarica allo scollegamento"
       }
     },
     "event": {
-      "control_result": {
-        "name": "Esito del comando",
+      "activity": {
+        "name": "Attività",
         "state_attributes": {
           "event_type": {
-            "name": "Comando ed esito",
+            "name": "Tipo",
             "state": {
-              "pause_executed": "Metti in pausa la ricarica: Comando completato",
-              "pause_replaced": "Metti in pausa la ricarica: Sostituito",
-              "pause_cancelled": "Metti in pausa la ricarica: Annullato",
-              "pause_failed": "Metti in pausa la ricarica: Non riuscito",
-              "pause_uncertain": "Metti in pausa la ricarica: Esito non confermato",
-              "resume_executed": "Riprendere la ricarica: Comando completato",
-              "resume_replaced": "Riprendere la ricarica: Sostituito",
-              "resume_cancelled": "Riprendere la ricarica: Annullato",
-              "resume_failed": "Riprendere la ricarica: Non riuscito",
-              "resume_uncertain": "Riprendere la ricarica: Esito non confermato",
-              "set_current_executed": "Impostare la corrente di ricarica: Comando completato",
-              "set_current_replaced": "Impostare la corrente di ricarica: Sostituito",
-              "set_current_cancelled": "Impostare la corrente di ricarica: Annullato",
-              "set_current_failed": "Impostare la corrente di ricarica: Non riuscito",
-              "set_current_uncertain": "Impostare la corrente di ricarica: Esito non confermato",
-              "single_phase_executed": "Usare una fase: Comando completato",
-              "single_phase_replaced": "Usare una fase: Sostituito",
-              "single_phase_cancelled": "Usare una fase: Annullato",
-              "single_phase_failed": "Usare una fase: Non riuscito",
-              "single_phase_uncertain": "Usare una fase: Esito non confermato",
-              "all_phases_executed": "Usare tutte le fasi disponibili: Comando completato",
-              "all_phases_replaced": "Usare tutte le fasi disponibili: Sostituito",
-              "all_phases_cancelled": "Usare tutte le fasi disponibili: Annullato",
-              "all_phases_failed": "Usare tutte le fasi disponibili: Non riuscito",
-              "all_phases_uncertain": "Usare tutte le fasi disponibili: Esito non confermato",
-              "disable_charging_executed": "Disabilita il consenso alla ricarica: Comando completato",
-              "disable_charging_replaced": "Disabilita il consenso alla ricarica: Sostituito",
-              "disable_charging_cancelled": "Disabilita il consenso alla ricarica: Annullato",
-              "disable_charging_failed": "Disabilita il consenso alla ricarica: Non riuscito",
-              "disable_charging_uncertain": "Disabilita il consenso alla ricarica: Esito non confermato",
-              "enable_charging_executed": "Autorizzare la ricarica: Comando completato",
-              "enable_charging_replaced": "Autorizzare la ricarica: Sostituito",
-              "enable_charging_cancelled": "Autorizzare la ricarica: Annullato",
-              "enable_charging_failed": "Autorizzare la ricarica: Non riuscito",
-              "enable_charging_uncertain": "Autorizzare la ricarica: Esito non confermato",
-              "lock_executed": "Blocca la wallbox: Comando completato",
-              "lock_replaced": "Blocca la wallbox: Sostituito",
-              "lock_cancelled": "Blocca la wallbox: Annullato",
-              "lock_failed": "Blocca la wallbox: Non riuscito",
-              "lock_uncertain": "Blocca la wallbox: Esito non confermato",
-              "unlock_executed": "Sbloccare la wallbox: Comando completato",
-              "unlock_replaced": "Sbloccare la wallbox: Sostituito",
-              "unlock_cancelled": "Sbloccare la wallbox: Annullato",
-              "unlock_failed": "Sbloccare la wallbox: Non riuscito",
-              "unlock_uncertain": "Sbloccare la wallbox: Esito non confermato",
-              "recovery_succeeded": "Risoluzione dell’errore confermata",
-              "recovery_failed": "Risoluzione dell’errore non riuscita",
-              "recovery_uncertain": "Risolvere l’errore: Esito non confermato"
-            }
-          },
-          "result": {
-            "name": "Esito",
-            "state": {
-              "executed": "Comando completato",
-              "replaced": "Sostituito",
-              "cancelled": "Annullato",
-              "failed": "Non riuscito",
-              "uncertain": "Esito non confermato",
-              "recovery_succeeded": "Risoluzione dell’errore confermata",
-              "recovery_failed": "Risoluzione dell’errore non riuscita"
+              "command_done": "Comando eseguito",
+              "command_failed": "Comando non riuscito",
+              "command_cancelled": "Comando annullato",
+              "session_started": "Veicolo collegato",
+              "session_ended": "Veicolo scollegato",
+              "wallbox_changed": "Modifica alla wallbox"
             }
           },
           "action": {
@@ -694,6 +608,18 @@
               "unlock": "Sbloccare la wallbox",
               "lock": "Blocca la wallbox",
               "recover": "Risolvere l’errore"
+            }
+          },
+          "result": {
+            "name": "Esito",
+            "state": {
+              "executed": "Comando completato",
+              "replaced": "Sostituito",
+              "cancelled": "Annullato",
+              "failed": "Non riuscito",
+              "uncertain": "Esito non confermato",
+              "recovery_succeeded": "Risoluzione dell’errore confermata",
+              "recovery_failed": "Risoluzione dell’errore non riuscita"
             }
           },
           "reason": {
@@ -719,7 +645,7 @@
               "vehicle_waiting": "In attesa di un veicolo autorizzato"
             }
           },
-          "source": {
+          "trigger": {
             "name": "Origine",
             "state": {
               "unknown": "Origine non comunicata",
@@ -730,10 +656,11 @@
               "energy_goal": "Protezione obiettivo energetico",
               "soc_goal": "Obiettivo percentuale veicolo",
               "recovery": "Ripristino dopo errore",
-              "guest": "Ricarica ospite"
+              "guest": "Ricarica ospite",
+              "unplug": "Scollegato"
             }
           },
-          "requested_value": {
+          "value": {
             "name": "Valore registro richiesto",
             "state": {
               "0": "Nessun limite software di corrente"
@@ -741,13 +668,8 @@
           },
           "occurred_at": {
             "name": "Ora evento"
-          }
-        }
-      },
-      "wallbox_event": {
-        "name": "Evento della wallbox",
-        "state_attributes": {
-          "event_type": {
+          },
+          "change": {
             "name": "Cambiamento",
             "state": {
               "vehicle_plugged_in": "Veicolo collegato",
@@ -877,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "Un limite di ricarica è raggiunto, quindi la ricarica resta in pausa. Per continuare, aumentare il limite kWh o l’obiettivo percentuale, oppure impostarlo a 0; dopo un azzeramento del contatore, salvare di nuovo il limite. Modificare un limite non avvia la ricarica."
     },
-    "energy_goal_state_invalid": {
-      "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
-    },
     "energy_goal_not_supported": {
       "message": "Questo servizio Modbus non supporta gli obiettivi energetici. Aggiorna prima l’app o il servizio autonomo."
-    },
-    "cancel_pending_not_supported": {
-      "message": "Questo servizio Modbus non può annullare le modifiche in attesa. Aggiorna prima l’app o il servizio autonomo."
     },
     "soc_goal_invalid": {
       "message": "Inserisci un obiettivo da 0 al 100%, senza superare il limite del veicolo. 0 disattiva l’obiettivo percentuale."
@@ -898,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "Le fonti del veicolo sono cambiate. Ricarica l’integrazione prima di modificare l’obiettivo percentuale."
     },
-    "soc_goal_app_update_required": {
-      "message": "Aggiorna l’app del servizio Modbus Mennekes prima di modificare l’obiettivo di carica del veicolo. Le altre funzioni restano disponibili."
-    },
     "soc_goal_not_supported": {
       "message": "Il servizio Modbus non supporta gli obiettivi percentuali del veicolo. Aggiorna l’app per usare questa funzione facoltativa."
-    },
-    "soc_goal_state_invalid": {
-      "message": "Impossibile ripristinare l’obiettivo di carica del veicolo salvato. Controlla i registri prima di consentire nuovamente la ricarica."
     },
     "loss_source_invalid": {
       "message": "Seleziona una fonte supportata per le perdite di ricarica e configura il veicolo o il sensore corrispondente."
@@ -948,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "Il consenso del veicolo è scaduto o non è più valido. Attendi dati recenti e coerenti prima di riprovare."
-    },
-    "plug_charge_not_supported": {
-      "message": "L’app o il servizio Modbus collegato non supporta Plug & Charge virtuale. Aggiornalo a una versione compatibile prima di attivarlo."
-    },
-    "app_required": {
-      "message": "Questa azione richiede l’app Modbus; questa wallbox è collegata direttamente."
     },
     "wallbox_target_required": {
       "message": "Sono configurate più wallbox; indica la wallbox interessata."
@@ -1020,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Ricarica bloccata: impostazioni salvate rifiutate",
-            "description": "L’app non riesce a leggere le impostazioni salvate. Il file resta conservato e la ricarica automatica è bloccata. Conferma per sostituirlo: pausa attiva, consenso disattivato, corrente di ripresa 6 A, nessun obiettivo. La ricarica non parte. Controlla poi profili, obiettivi e Plug & Charge prima di riprendere. In sola lettura l’app non può fermare la ricarica: controlla prima la wallbox."
+            "description": "Non è possibile leggere le impostazioni salvate. Il file resta conservato e la ricarica automatica è bloccata. Conferma per sostituirlo: pausa attiva, consenso disattivato, corrente di ripresa 6 A, nessun obiettivo. La ricarica non parte. Controlla poi profili, obiettivi e Plug & Charge prima di riprendere. In sola lettura la ricarica non può essere fermata da qui: controlla prima la wallbox."
           }
         },
         "error": {
@@ -1052,14 +956,18 @@
       },
       "wallbox_service": {
         "title": "Impostazioni della wallbox nell’app",
-        "description": "Questa wallbox passa dall’app Modbus. Le sue impostazioni si trovano quindi lì e valgono anche per Home Assistant.\n\nLimite di corrente: {current_cap} A\nTempo minimo tra i cambi di stato: {state_change_interval} s\nAttesa aggiuntiva prima dei cambi di fase: {phase_switch_grace} s\n\nModifica questi valori, gli intervalli di lettura e la connessione nell’app, in Apri interfaccia utente web. Il permesso di scrittura si trova nella scheda Configurazione dell’app."
+        "description": "Questa wallbox passa dall’app Modbus. Le sue impostazioni si trovano quindi lì e valgono anche per Home Assistant.\n\nLimite di corrente: {current_cap} A\nTempo minimo tra i cambi di stato: {state_change_interval} s\nAttesa aggiuntiva prima dei cambi di fase: {phase_switch_grace} s\n\nModifica questi valori, gli intervalli di lettura e la connessione nell’app, in Apri interfaccia utente web. Il permesso di scrittura si trova nella scheda Configurazione dell’app.",
+        "data": {
+          "release_off_on_unplug": "Disattiva l'abilitazione alla ricarica allo scollegamento"
+        }
       },
       "wallbox_basic": {
         "title": "Limite di corrente e lettura",
         "data": {
           "control_mode": "Modalità di controllo",
           "current_limit": "Corrente massima di ricarica",
-          "scan_interval_seconds": "Intervallo di lettura dello stato"
+          "scan_interval_seconds": "Intervallo di lettura dello stato",
+          "release_off_on_unplug": "Disattiva l'abilitazione alla ricarica allo scollegamento"
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
@@ -1667,6 +1575,36 @@
     "clear_target_time": {
       "name": "Cancella orario obiettivo",
       "description": "Cancella l’orario condiviso senza cambiare gli obiettivi energetici o del veicolo."
+    },
+    "use_calendar_departure": {
+      "name": "Usa prossimo evento calendario",
+      "description": "Usa il prossimo evento corrispondente del calendario come ora di destinazione.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
+    },
+    "use_vehicle_departure": {
+      "name": "Usa la partenza del veicolo",
+      "description": "Usa la prossima partenza del veicolo come ora di destinazione.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
+    },
+    "assign_vehicle_charge": {
+      "name": "Abbina l’energia di ricarica del veicolo",
+      "description": "Assegna l'energia indicata dal veicolo all'ultima ricarica.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
     }
   }
 }

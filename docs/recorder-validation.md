@@ -40,8 +40,8 @@ only stops new history and statistics. Existing statistics are retained.
 
 `tests/test_recorder_service_plans.py` connects the real service controllers
 and Home Assistant integration to SQLite Recorder, with a simulated Modbus
-transport. It measures the three operation-status sensors and the guest-status
-sensor after setup has settled. For 120 unchanged departure-plan updates, and
+transport. It measures **Charging wait reason** and **Guest charging** after
+setup has settled. For 120 unchanged departure-plan updates, and
 then 120 unchanged updates with guest charging as well, it verifies **zero
 additional state rows** for those sensors and **zero additional Modbus reads**.
 

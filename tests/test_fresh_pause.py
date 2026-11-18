@@ -7,9 +7,8 @@ import asyncio
 import pytest
 from aiohttp import ClientSession
 
-from custom_components.mennekes_amtron_rtu.control import ControlOptions
-from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from tests.test_control import Harness
 from tests.test_modbus_service import TOKEN, service_fixture
 from tests.test_plug_charge_observer import observer_harness, plug_in_paused
@@ -48,10 +47,9 @@ def test_remote_failed_block_keeps_a_cached_pause_out_of_automatic_decisions(tmp
         service, _transport, _clock = await service_fixture(tmp_path, current=1)
         try:
             async with ClientSession() as session:
-                client = RemoteClient(session, "http://service:8765", TOKEN)
+                client = ServiceClient(session, "http://service:8765", TOKEN)
                 data = client.apply_snapshot(service.snapshot())
-                control = RemoteControl(client, diagnostics=WriteDiagnostics(),
-                                        options=ControlOptions(False, 16), state=lambda: data,
+                control = ServiceControl(client,                                         state=lambda: data,
                                         request_refresh=None)
                 assert control.is_paused is True
                 assert control.observed_pause is True

@@ -173,7 +173,7 @@ class VehicleEvidence:
             try:
                 listener(event)
             except Exception:
-                _LOGGER.exception("Vehicle evidence listener failed")
+                _LOGGER.exception("Vehicle: evidence listener failed")
 
     def _track(self) -> None:
         on_change = self._notify

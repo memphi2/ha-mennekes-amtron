@@ -39,6 +39,7 @@ from .departure_step import (
 )
 from .departure_store import DepartureStore
 from .errors import DeviceError
+from .notice import FailureNotice
 from .persistence import finish_goal_save
 from .power_window import PowerWindow
 from .session_mark import SessionMark
@@ -332,7 +333,8 @@ class DepartureController:
         self._trail: list[tuple[float, float]] = []
         self._trail_scope: str | None = None
         self._estimate: float | None = None
-        self._last_error: str | None = None
+        self._command_notice = FailureNotice(_LOGGER, "Departure plan")
+        self._storage_notice = FailureNotice(_LOGGER, "Departure plan")
         # The time of the latest tick's sample.
         self._now: datetime | None = None
         # What this wallbox's cars taught the plan; kept across trips.
@@ -378,7 +380,7 @@ class DepartureController:
             except (OSError, ValueError, ArithmeticError, RecursionError) as err:
                 # Home Assistant hands the trip over again; nothing is
                 # planned until then. An oversized number is as damaged.
-                _LOGGER.warning("Saved departure plan unavailable (%s); waiting for Home Assistant", type(err).__name__)
+                _LOGGER.warning("Departure plan: saved plan unavailable (%s); waiting for Home Assistant", type(err).__name__)
                 self._reset()
             self._durable = self._decision()
             self.ready = True
@@ -436,12 +438,12 @@ class DepartureController:
         try:
             await finish_goal_save(asyncio.to_thread(self.store.save, self._state()))
         except (OSError, ValueError) as err:
-            if not self.storage_error:
-                _LOGGER.warning("Departure plan could not be saved (%s); it continues in memory", type(err).__name__)
+            self._storage_notice.failed("not saved; it continues in memory", type(err).__name__)
             self.storage_error = True
             return
         self._durable = decision
         self.storage_error = False
+        self._storage_notice.recovered("saved again")
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -586,11 +588,9 @@ class DepartureController:
             except (AmtronBusError, DeviceError) as err:
                 self.status = "write_pending"
                 reason = getattr(err, "translation_key", None) or type(err).__name__
-                if reason != self._last_error:
-                    _LOGGER.warning("Departure plan command deferred (%s)", reason)
-                    self._last_error = reason
+                self._command_notice.failed("command deferred", reason)
             else:
-                self._last_error = None
+                self._command_notice.recovered("command accepted again")
             self._learn_power(sample)
             await self._save()
 
@@ -907,7 +907,7 @@ class DepartureController:
                 if s.pending:
                     return
                 await self._resume()
-                _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
+                _LOGGER.info("Departure plan: pause ended, the plan no longer applies to the car")
                 if self.sample().pause_requested is not False:
                     return
         self.plan_paused = self._pause_seen = False

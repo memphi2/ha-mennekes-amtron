@@ -6,12 +6,12 @@ from itertools import pairwise
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.data import WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
+from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 
@@ -454,7 +454,7 @@ def test_a_bad_status_listener_cannot_stop_heartbeats(caplog):
         await client.async_close()
 
     asyncio.run(run())
-    assert "Heartbeat status listener failed" in caplog.text
+    assert "Heartbeat: status listener failed" in caplog.text
 
 
 def test_an_unexpected_writer_exit_marks_heartbeat_unhealthy():

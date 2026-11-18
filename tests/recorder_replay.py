@@ -33,6 +33,11 @@ PROFILES = {"full": [], "detail": DETAILS, "lean": DETAILS + EXTRAS}
 SCENARIOS = ("constant", "idle", "connected_idle", "mixed", "charging")
 
 
+def embedded_service(hass, entry):
+    """Return the service a direct entry runs inside Home Assistant."""
+    return hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+
+
 async def measure(
     target: Path, scenario: str, measurement_interval: int = 30, duration: int = 86400,
     *, profile: str = "full",
@@ -82,11 +87,13 @@ async def measure(
             coordinator = entry.runtime_data.coordinator
             coordinator.update_interval = None
             coordinator.async_set_updated_data(coordinator.data)
+            service = embedded_service(hass, entry)
             now = 0
-            coordinator._poller._monotonic = lambda: now
-            coordinator._poller._slow_read_at = None
-            coordinator._poller._active_read_at = None
-            coordinator._poller._measurement_interval = measurement_interval
+            poller = service._poller
+            poller._monotonic = lambda: now
+            poller._slow_read_at = None
+            poller._active_read_at = None
+            poller._measurement_interval = measurement_interval
             recorder = get_instance(hass)
             await recorder.async_block_till_done()
 
@@ -157,8 +164,10 @@ async def measure(
                         else 1234.5,
                     )
                     put(transport.bank, R.TEMPERATURE, 21.5 + math.sin(now / 1800) * 2)
-                data = await coordinator._async_update_data()
-                coordinator.async_set_updated_data(data)
+                # One service poll per simulated status interval; every result
+                # is pushed to the entities so HA's own suppression is measured.
+                await service.refresh()
+                coordinator.async_set_updated_data(await coordinator._async_update_data())
                 await asyncio.sleep(0)
                 if now % (interval * 200) == 0:
                     await recorder.async_block_till_done()

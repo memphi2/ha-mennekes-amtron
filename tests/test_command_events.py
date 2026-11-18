@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiohttp import ClientSession
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from custom_components.mennekes_amtron_rtu import event as event_platform
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.command_events import (
     MAX_EVENTS,
@@ -21,8 +21,9 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     validation_error,
 )
 from custom_components.mennekes_amtron_rtu.event import async_setup_entry
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
-from custom_components.mennekes_amtron_rtu.remote_errors import ServiceConnectionError
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
+from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
 from tests.fakes import raise_connection_error
 from tests.ha_fakes import build_runtime
 from tests.test_control import Harness
@@ -140,7 +141,7 @@ def test_unacknowledged_write_is_uncertain_but_protocol_rejection_is_failed(reje
         harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = (
             2 if rejected else raise_connection_error()
         )
-        with pytest.raises(HomeAssistantError):
+        with pytest.raises(DeviceError):
             await control.async_pause_charging()
         assert outcomes(control.events) == [(
             "failed" if rejected else "uncertain", "pause",
@@ -218,7 +219,7 @@ def test_service_event_extension_is_optional_and_identity_validated_before_deliv
     async def run():
         service, _transport, clock = await service_fixture(tmp_path)
         async with ClientSession() as session:
-            remote = RemoteClient(session, "http://localhost", TOKEN)
+            remote = ServiceClient(session, "http://localhost", TOKEN)
             remote.apply_snapshot(service.snapshot())
             events = []
             remote.events.listen(events.append)
@@ -227,9 +228,8 @@ def test_service_event_extension_is_optional_and_identity_validated_before_deliv
             remote.apply_snapshot(snapshot)
             remote.apply_snapshot(snapshot)
             assert [event.action for event in events] == ["pause"]
-            wrapper = RemoteControl(
-                remote, diagnostics=service.diagnostics, options=service.control.options,
-                state=lambda: service.data, request_refresh=AsyncMock(),
+            wrapper = ServiceControl(
+                remote,                 state=lambda: service.data, request_refresh=AsyncMock(),
             )
             assert wrapper.events is remote.events
             old = deepcopy(snapshot)
@@ -251,38 +251,49 @@ def test_service_event_extension_is_optional_and_identity_validated_before_deliv
     asyncio.run(run())
 
 
-def test_event_entity_subscribes_without_replaying_and_tracks_feed_support(monkeypatch):
+def test_event_entity_subscribes_without_replaying_and_stays_available(monkeypatch):
     async def run():
         hass, entry, _transport = await build_runtime()
+        hass.config.language = "en"
         feed = entry.runtime_data.control.events
         feed.record("executed", "pause")
         added = []
         await async_setup_entry(hass, entry, added.extend)
         entity = added[0]
-        assert entity.entity_registry_enabled_default is False
+        entity.hass = hass
         assert entity.available
-        assert entity.unique_id.endswith("_control_result")
-        writes, removals = [], []
+        assert entity.unique_id.endswith("_activity")
+        writes, removals, logged = [], [], []
         monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", AsyncMock())
+        monkeypatch.setattr(event_platform, "async_get_translations", AsyncMock(return_value={}))
+        monkeypatch.setattr(event_platform, "async_log_entry", lambda *args, **_kwargs: logged.append(args[2]))
         monkeypatch.setattr(entity, "async_write_ha_state", lambda: writes.append(True))
         monkeypatch.setattr(entity, "async_on_remove", removals.append)
         await entity.async_added_to_hass()
         assert writes == []
         feed.record("executed", "resume", source="plug_charge", requested_value=16)
-        # The type names the command, so HA's history shows which one it was.
-        assert entity.state_attributes["event_type"] == "resume_executed"
+        # The type names what kind of thing happened; attributes say which.
+        assert entity.state_attributes["event_type"] == "command_done"
         assert entity.state_attributes["action"] == "resume"
         assert entity.state_attributes["result"] == "executed"
+        assert entity.state_attributes["trigger"] == "plug_charge"
         feed.record("recovery_failed", "recover", "error_still_active")
-        assert entity.state_attributes["event_type"] == "recovery_failed"
+        assert entity.state_attributes["event_type"] == "command_failed"
+        assert entity.state_attributes["result"] == "recovery_failed"
         feed.record("uncertain", "recover", "unknown")
-        assert entity.state_attributes["event_type"] == "recovery_uncertain"
+        assert entity.state_attributes["event_type"] == "command_failed"
+        assert entity.state_attributes["result"] == "uncertain"
         assert len(writes) == 3
-        removals[0]()
+        assert len(logged) == 3
+        for remove in removals:
+            remove()
         feed.record("executed", "lock")
         assert len(writes) == 3
-        feed.supported = False
-        assert not entity.available
+        # Events are moments: a failed poll does not make the history stale.
+        entry.runtime_data.coordinator.last_update_success = False
+        assert entity.available
+        await entry.runtime_data.client.async_close()
+        await entry.service.stop()
     asyncio.run(run())
 
 
@@ -309,7 +320,7 @@ def test_recovery_write_failure_reports_uncertainty_or_rejection(rejected):
         harness.transport.write_exceptions[R.HEARTBEAT.address] = (
             2 if rejected else raise_connection_error()
         )
-        with pytest.raises(HomeAssistantError):
+        with pytest.raises(DeviceError):
             await control.async_recover_from_error()
         assert outcomes(control.events) == [(
             "recovery_failed" if rejected else "uncertain", "recover",
@@ -320,23 +331,16 @@ def test_recovery_write_failure_reports_uncertainty_or_rejection(rejected):
     asyncio.run(run())
 
 
-def test_recovery_cannot_be_confirmed_by_a_poll_started_before_the_recovery(monkeypatch):
+def test_recovery_cannot_be_confirmed_by_a_poll_started_before_the_recovery(tmp_path, monkeypatch):
     async def run():
-        from custom_components.mennekes_amtron_rtu.coordinator import (
-            MennekesAmtronCoordinator,
-        )
-        from custom_components.mennekes_amtron_rtu.device.data import ConnectionState
-        from tests.ha_fakes import FakeConfigEntry, FakeHass
-
-        harness = Harness(error_code=0)
-        control = await harness.connect()
-        coordinator = MennekesAmtronCoordinator(
-            FakeHass(), FakeConfigEntry(), client=harness.client,
-            identity=harness.identity, connection_state=ConnectionState(), scan_interval=5,
-        )
-        coordinator.observe_recovery = control.observe_recovery
+        service, transport, _clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        control, client = service.control, service.client
+        # The publishing poll after the command would queue behind the delayed
+        # one; this test is about the poll that is already running.
+        control._request_refresh = None
         error_read, release_poll = asyncio.Event(), asyncio.Event()
-        read_block = harness.client.async_read_block
+        read_block = client.async_read_block
 
         async def delayed_block(block):
             result = await read_block(block)
@@ -345,22 +349,26 @@ def test_recovery_cannot_be_confirmed_by_a_poll_started_before_the_recovery(monk
                 await release_poll.wait()
             return result
 
-        monkeypatch.setattr(harness.client, "async_read_block", delayed_block)
-        in_flight = asyncio.create_task(coordinator._async_update_data())
-        await asyncio.wait_for(error_read.wait(), 1)
-        harness.transport.bank[R.ERROR_CODE.address] = 200
-        assert await control.async_recover_from_error() is True
-        release_poll.set()
-        coordinator.data = await asyncio.wait_for(in_flight, 1)
-        assert coordinator.data.get("error_code") == 0
-        assert coordinator.data.current_write_generation < harness.client.write_state.current_write_generation
-        assert outcomes(control.events) == []
-        coordinator.data = await coordinator._async_update_data()
-        assert coordinator.data.get("error_code") == 200
-        assert outcomes(control.events) == []
-        harness.transport.bank[R.ERROR_CODE.address] = 0
-        await coordinator._async_update_data()
-        assert outcomes(control.events) == [("recovery_succeeded", "recover", "completed")]
+        monkeypatch.setattr(client, "async_read_block", delayed_block)
+        try:
+            in_flight = asyncio.create_task(service.refresh())
+            await asyncio.wait_for(error_read.wait(), 1)
+            transport.bank[R.ERROR_CODE.address] = 200
+            assert await control.async_recover_from_error() is True
+            release_poll.set()
+            await asyncio.wait_for(in_flight, 1)
+            assert service.data.get("error_code") == 0
+            assert service.data.current_write_generation < client.write_state.current_write_generation
+            assert outcomes(control.events) == []
+            await service.refresh()
+            assert service.data.get("error_code") == 200
+            assert outcomes(control.events) == []
+            transport.bank[R.ERROR_CODE.address] = 0
+            await service.refresh()
+            assert outcomes(control.events) == [("recovery_succeeded", "recover", "completed")]
+        finally:
+            release_poll.set()
+            await service.stop()
     asyncio.run(run())
 
 

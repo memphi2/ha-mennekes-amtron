@@ -95,16 +95,26 @@ def test_standalone_service_keeps_its_explicit_cryptography_dependency() -> None
 def test_diagnostics_never_report_the_port_or_the_serial_number() -> None:
     import asyncio
 
+    from pymodbus.exceptions import ConnectionException
+
+    from custom_components.mennekes_amtron_rtu.device.capabilities import (
+        supported_blocks,
+    )
     from custom_components.mennekes_amtron_rtu.diagnostics import (
         async_get_config_entry_diagnostics,
     )
     from tests.ha_fakes import build_runtime
 
     async def run() -> None:
-        hass, entry, _transport = await build_runtime()
-        entry.runtime_data.diagnostics.last_error = "ABC123456789 failed on /dev/fake"
-        await entry.runtime_data.client.async_close()
+        hass, entry, wallbox = await build_runtime()
+        message = "ABC123456789 failed on /dev/fake"
+        entry.service.diagnostics.last_error = message
+        # Every raw block read fails with a message naming both identifiers.
+        for block in supported_blocks(entry.runtime_data.identity.layout_version):
+            wallbox.read_exceptions[block.address] = ConnectionException(message)
         dump = await async_get_config_entry_diagnostics(hass, entry)
+        assert dump["registers"]
+        assert all("error" in block for block in dump["registers"].values())
         assert "/dev/fake" not in repr(dump)
         assert "ABC123456789" not in repr(dump)
         assert "serial_number" not in dump["registers"]

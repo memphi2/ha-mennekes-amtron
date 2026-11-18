@@ -28,12 +28,13 @@ from homeassistant.helpers.event import (
 
 from .device.client_errors import AmtronBusError
 from .device.errors import DeviceError
+from .device.notice import FailureNotice
 from .device.soc_goal import SocGoal
 from .exceptions import service_validation_error
 from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
-    from .coordinator import MennekesAmtronCoordinator
+    from .coordinator import ServiceCoordinator
     from .vehicle_binding import VehicleBinding
     from .vehicle_targets import VehicleTargetMemory
 
@@ -157,7 +158,7 @@ class VehicleSocObserver:
 
     def __init__(
         self, hass: HomeAssistant, control: SocControl,
-        coordinator: MennekesAmtronCoordinator,
+        coordinator: ServiceCoordinator,
         soc_entity: str | None, limit_entity: str | None = None,
         *, telemetry: VehicleTelemetrySource | None = None,
         use_vehicle_soc: bool = False, use_vehicle_limit: bool = False,
@@ -205,7 +206,7 @@ class VehicleSocObserver:
         self._configured = False
         self._stopping = False
         self._target_choice_generation = 0
-        self._failure_logged = False
+        self._notice = FailureNotice(_LOGGER, "Vehicle charge target")
         self._was_available = coordinator.last_update_success
 
     def _resting(self) -> bool:
@@ -353,7 +354,7 @@ class VehicleSocObserver:
         except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
             _LOGGER.debug("Reached charge target not released: %s", err)
             return
-        _LOGGER.info("Reached charge target released: the car at the wallbox is not confirmed")
+        _LOGGER.info("Vehicle charge target: reached target released, the car at the wallbox is not confirmed")
 
     @callback
     def _source_configured(self) -> None:
@@ -441,9 +442,7 @@ class VehicleSocObserver:
                         try:
                             await self._control.async_configure_soc(self.source, maximum_required=self._limit_entity is not None or self._use_vehicle_limit)
                         except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
-                            if not self._failure_logged:
-                                _LOGGER.warning("Cannot configure vehicle charge target (%s)", type(err).__name__)
-                                self._failure_logged = True
+                            self._notice.failed("cannot be configured", type(err).__name__)
                             return
                         self._source_configured()
                     if self._resolution_pending():
@@ -494,12 +493,10 @@ class VehicleSocObserver:
                             observations.combine(self._pending)
                             if self._pending is not None else observations
                         )
-                        if not self._failure_logged:
-                            _LOGGER.warning("Cannot update vehicle charge target (%s)", type(err).__name__)
-                            self._failure_logged = True
+                        self._notice.failed("cannot be updated", type(err).__name__)
                         return
                     self._last_sent = observations.latest
-                    self._failure_logged = False
+                    self._notice.recovered("updated again")
         finally:
             self._inflight = None
             self._task = None

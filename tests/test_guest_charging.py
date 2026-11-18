@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
@@ -16,8 +19,8 @@ from custom_components.mennekes_amtron_rtu import services
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.guest_charging import GuestCharging
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
-from tests.ha_fakes import FakeConfigEntry, build_runtime
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from tests.ha_fakes import FakeConfigEntry, build_runtime, collect
 from tests.test_services import _patch_registry
 
 TOKEN = "guest-api-private-test-credential"  # noqa: S105 - fixture
@@ -41,7 +44,7 @@ def test_guest_button_uses_real_snapshot_and_identity_bound_command(tmp_path, mo
             runtime.guest_service(tmp_path) as (service, transport, clock),
             TestServer(create_app(service)) as server, ClientSession() as session,
         ):
-            client = RemoteClient(session, str(server.make_url("/")), runtime.TOKEN)
+            client = ServiceClient(session, str(server.make_url("/")), runtime.TOKEN)
             client.bind_identity(service.identity.serial_number)
             await client.update()
             guest = GuestCharging(client, client.update)
@@ -71,7 +74,7 @@ class _Guest:
         return call
 
 
-def test_every_action_reaches_the_guest_of_an_app_connection(monkeypatch):
+def test_every_action_reaches_the_guest_of_the_wallbox(monkeypatch):
     async def run():
         hass, entry, _transport = await build_runtime()
         _patch_registry(monkeypatch, {"dev": SimpleNamespace(config_entry_id=entry.entry_id)})
@@ -81,15 +84,10 @@ def test_every_action_reaches_the_guest_of_an_app_connection(monkeypatch):
             handler, schema = hass.services.registered[(DOMAIN, name)]
             await handler(SimpleNamespace(context=Context(), data=schema({"device_id": "dev", **fields})))
 
-        # A direct connection has no app to carry guest out.
-        with pytest.raises(ServiceValidationError) as error:
-            await act("start_guest_charging")
-        assert _key(error) == "app_required"
-
         guest = entry.runtime_data.guest = _Guest()
         await act("start_guest_charging")
         assert guest.calls.pop() == ("async_start_guest", {})
-        assert not {"start_charging_job", "start_boost", "cancel_boost"} & services.GUEST_ACTIONS.keys()
+        assert not {"start_charging_job", "start_boost", "cancel_boost"} & services.DEVICE_ACTIONS.keys()
 
         # With one wallbox the target can be left out; with two it cannot.
         handler, schema = hass.services.registered[(DOMAIN, "start_guest_charging")]
@@ -97,6 +95,7 @@ def test_every_action_reaches_the_guest_of_an_app_connection(monkeypatch):
         assert guest.calls.pop() == ("async_start_guest", {})
         other = FakeConfigEntry(entry_id="entry-2")
         other.runtime_data = entry.runtime_data
+        other.state = ConfigEntryState.LOADED
         hass.config_entries.entries["entry-2"] = other
         with pytest.raises(ServiceValidationError) as error:
             await handler(SimpleNamespace(context=Context(), data=schema({})))
@@ -125,24 +124,25 @@ def test_actions_refuse_values_the_app_would_refuse(name, fields):
 
 
 
-def test_single_guest_button_delegates_and_reports_missing_service():
+def test_the_guest_button_delegates_and_needs_a_known_guest_state():
     from unittest.mock import AsyncMock
 
-    from custom_components.mennekes_amtron_rtu.guest_entities import GuestButton
+    from custom_components.mennekes_amtron_rtu.button import async_setup_entry
+
     async def run():
-        _hass, entry, _transport = await build_runtime()
-        button = GuestButton(entry)
-        assert not button.available
-        with pytest.raises(ServiceValidationError):
-            await button.async_press()
-        guest = SimpleNamespace(active=False, async_start_guest=AsyncMock())
+        hass, entry, _transport = await build_runtime()
+        added = {}
+        await async_setup_entry(hass, entry, lambda items: added.update(collect(items)))
+        button = added["guest_start"]
+        guest = SimpleNamespace(active=None, async_start_guest=AsyncMock())
         entry.runtime_data.guest = guest
+        assert not button.available
+        guest.active = False
         assert button.available
         await button.async_press()
         guest.async_start_guest.assert_awaited_once()
         entry.runtime_data.coordinator.last_update_success = False
         assert not button.available
-        await entry.runtime_data.control.async_shutdown()
     asyncio.run(run())
 
 
@@ -165,14 +165,10 @@ def test_failed_refresh_prevents_guest_start_and_reports_service_unavailable():
 def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypatch):
     from datetime import timedelta
 
-    from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
     from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
         DepartureModbusService,
     )
-    from custom_components.mennekes_amtron_rtu.remote import (
-        ControlOptions,
-        RemoteControl,
-    )
+    from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
     from tests import service_guest_fixture as runtime
 
     async def run():
@@ -180,11 +176,10 @@ def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypat
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock), TestServer(
             create_app(service)
         ) as server, ClientSession() as session:
-            client = RemoteClient(session, str(server.make_url("/")), runtime.TOKEN)
+            client = ServiceClient(session, str(server.make_url("/")), runtime.TOKEN)
             await client.update()
-            control = RemoteControl(
-                client, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
-                state=lambda: None, request_refresh=lambda: None,
+            control = ServiceControl(
+                client,                 state=lambda: None, request_refresh=lambda: None,
             )
             deadline = datetime.now(UTC) + timedelta(hours=1)
             await control.async_set_target_time(deadline)
@@ -194,4 +189,25 @@ def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypat
             service._guest_scope = service._connection_sample().scope
             client.apply_snapshot(service.snapshot())
             assert control.guest_active()
+    asyncio.run(run())
+
+
+def test_a_guest_start_leaves_the_meter_sample_to_the_poll():
+    async def run():
+        _hass, entry, _transport = await build_runtime()
+        client = entry.runtime_data.client
+        service = entry.service
+        sample = service.snapshot()["energy_sample"]["observed_at"]
+        # The service has read the meter since the last poll.
+        client._last_energy_observed_at = None
+        with contextlib.suppress(HomeAssistantError):
+            await GuestCharging(client, AsyncMock()).async_start_guest()
+        # Still unseen: the poll's observers price it, not the button.
+        assert client._last_energy_observed_at is None
+        data = await client.update()
+        assert data.energy_read
+        assert client._last_energy_observed_at == sample
+        await client.async_close()
+        await service.stop()
+
     asyncio.run(run())

@@ -3,16 +3,16 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from .control import ha_command
 from .device.client_errors import AmtronConnectionError
 from .device.errors import DeviceError
-from .remote import RemoteClient
+from .service_client import ServiceClient
+from .service_control import ha_command
 
 
 class GuestCharging:
     """Read current guest state and explicitly start the connected guest."""
 
-    def __init__(self, client: RemoteClient, refresh: Callable[[], Awaitable[None]]) -> None:
+    def __init__(self, client: ServiceClient, refresh: Callable[[], Awaitable[None]]) -> None:
         self._client = client
         self._refresh = refresh
 
@@ -27,7 +27,9 @@ class GuestCharging:
         if not client.connected:
             raise DeviceError("service_unavailable")
         try:
-            await client.update()
+            # Only the revision is needed: the meter sample stays for the
+            # poll whose observers price it.
+            await client.update(consume_energy=False)
         except AmtronConnectionError as err:
             raise DeviceError("service_unavailable") from err
         snapshot = client.snapshot

@@ -27,9 +27,9 @@ Find the symptom first; collect diagnostics before restarting if the problem is 
 
 ## A documented feature is missing
 
-These pages describe the current release. Check that the integration and, in
-service mode, the app are both up to date; the app's web pages and guest charging
-come with the app. Do not delete and recreate the wallbox to reveal a feature.
+These pages describe the current release. Check that the integration and, for
+an app entry, the app are both up to date; the app's web pages come with the
+app. Do not delete and recreate the wallbox to reveal a feature.
 
 Optional features stay off until you enable them in their own configuration section.
 A percentage target needs a vehicle SoC source; departure planning also needs
@@ -42,7 +42,7 @@ default and can be enabled in the entity's settings.
 to **Modbus master**. New direct entries start **Read only**, with readings but
 without controls. Check the sensor readings and exclusive bus access first.
 
-**Service:** disable **Read-only** in the app configuration, save and restart the
+**Modbus service app:** disable **Read-only** in the app configuration, save and restart the
 app. HA itself needs no restart for this switch. The app's switch is the only
 write-permission setting. After a fresh, healthy
 service status reaches HA, controls become available automatically. They keep
@@ -77,7 +77,7 @@ while these readings disagree; it does not mean that a new fault occurred.
 
 A confirmed wallbox fault appears immediately. The actual control and safety
 checks continue to use the register values, without this presentation delay.
-These display transitions do not create extra command or wallbox events. Recorder
+These display transitions do not create extra activity events. Recorder
 may still retain a changed sensor state; there is no per-second counter.
 
 An event entity's state is the time of its last event. Before the first event,
@@ -93,7 +93,7 @@ distinguish a waiting interval from a device problem:
 
 | Message or symptom | Next step |
 |---|---|
-| A remaining wait time is shown | Early changes are queued and shown in **Pending change** and its `due` attribute. |
+| A remaining wait time is shown | Early changes are queued and shown in the `pending` and `pending_at` attributes of **Charging wait reason**. |
 | Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
@@ -250,8 +250,8 @@ resume a deliberately stopped charge.
 
 If the error returns, check what interrupted the heartbeat:
 
-- **Direct USB or LAN:** HA Core restarts, entry reloads and read-only mode stop it.
-- **Service:** an HA Core restart leaves it running. An app shutdown, app
+- **Direct USB or LAN:** HA Core restarts and read-only mode stop it; an entry reload keeps it running.
+- **Modbus service app:** an HA Core restart leaves it running. An app shutdown, app
   read-only mode, host restart or USB/LAN failure can interrupt it.
 - **Either connection:** network/gateway outages, bus conflicts, USB disconnects, wiring problems, slow
   responses or delayed processing can make heartbeat delivery fail or arrive late.
@@ -308,8 +308,8 @@ when reporting it; the range may reveal a firmware-specific limitation.
 | Pause/resume is refused just after startup | Early pause and resume requests are queued for the configurable state-change interval and five-second write floor. An HA Core restart does not reset a running service's timing. |
 | The slider maximum is lower than expected | Check the device maximum and the current cap: in the integration options for a direct connection, on the app's **Runtime** page with the app. |
 | Offered current is lower than the slider setting | Installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
-| A current change waits while paused | Setting a current can resume charging. Inspect **Pending change** and its `due` attribute for a queued resume. |
-| Charging continues after requesting pause | The pause shares the state-change interval and the five-second current-write floor. Check **Pending change** and its `due` attribute: the pause replaces an older pending start and runs when permitted. Release-off and lock-on also wait; switching controls does not bypass the interval. |
+| A current change waits while paused | Setting a current can resume charging. Inspect the `pending` and `pending_at` attributes of **Charging wait reason** for a queued resume. |
+| Charging continues after requesting pause | The pause shares the state-change interval and the five-second current-write floor. Check the `pending` and `pending_at` attributes of **Charging wait reason**: the pause replaces an older pending start and runs when permitted. Release-off and lock-on also wait; switching controls does not bypass the interval. |
 | The slider still shows a value during a pause | It shows the remembered resume setting. Check **Charging paused**, **Signaled current** and **Total power** for actual charging. |
 | A manual pause is undone later | Check automations that write the current or pause switch. Disable the PV pause/resume automation if the manual pause should remain. |
 | A pending change disappears after restart | A restart of the bus owner cancels queued commands. Request the action again if still wanted. HA Core restarting alone does not cancel a running service's queue. |
@@ -331,7 +331,7 @@ timers.
 
 This is expected when switching during charging. Resume explicitly after the
 phase change has actually run. The integration uses the configurable state-change interval and queues early
-requests. Check **Pending change** before requesting resume: a new resume
+requests. Check the `pending` attribute of **Charging wait reason** before requesting resume: a new resume
 request replaces a phase change that is still waiting. Check your vehicle's
 support; some vehicles abort the session after a phase change. The selector
 exists only on capable wallbox hardware.
@@ -342,8 +342,8 @@ pause remains and no phase command is sent. Check the wallbox connection and
 vehicle state before trying again; a pause command being accepted does not by
 itself confirm that the vehicle has stopped charging.
 
-While waiting for that confirmation, **Pending change** still shows the requested
-phase action but its `due` attribute is absent. This is expected: the vehicle
+While waiting for that confirmation, the `pending` attribute of **Charging wait
+reason** still shows the requested phase action but `pending_at` is absent. This is expected: the vehicle
 determines when confirmation arrives. Once confirmed, the due time shows the end
 of the configured extra wait. An idle wallbox with no vehicle skips confirmation
 and that extra wait.
@@ -371,8 +371,9 @@ complete signal and freshness rules.
 
 ## Virtual Plug & Charge is waiting
 
-This optional feature is off by default. Check the **Virtual Plug & Charge**
-status sensor on the wallbox device.
+This optional feature is off by default. Check the `plug_charge` and
+`plug_charge_blocked` attributes of **Charging wait reason** on the wallbox
+device.
 
 | Symptom | What to check |
 |---|---|
@@ -380,13 +381,11 @@ status sensor on the wallbox device.
 | Recognized vehicle not selected | Another car, or none, is selected manually. Select the recognized car in **Active vehicle**, or choose **Automatic selection**. |
 | Cable is connected, but permission is still pending | A new cable report for this connection is needed, dated no earlier than two minutes before the last confirmed disconnected wallbox reading. Without a position report in the last 30 minutes, the cable signal must switch to plugged in within two minutes of the wallbox seeing the car. Wait for the normal vehicle-integration update; a manual profile choice does not replace this evidence. |
 | Permission is granted, but charging has not started | Check the manual pause, wallbox lock, Charging release, reached goals and local RFID requirement. Granting permission does not remove them. |
-| It waits again after the app restarted or the bus was lost | The previous connection grant was invalidated. Fresh physical connection and vehicle evidence are required. An HA-only restart leaves the running app's existing grant intact. |
+| It waits again after a restart or a lost bus | A restart of the service (the app, or HA for a direct entry) or a lost bus invalidated the previous connection grant. Fresh physical connection and vehicle evidence are required. With the app, an HA-only restart leaves the running app's existing grant intact. |
 | Disabling the feature did not restart charging | Expected: use Charging release explicitly, and resume only if any remaining pause or lock is also unwanted. |
 
-The status sensor's `decision_reason` attribute names the current wait, also
-when it is not a wallbox fault. Read it in **Developer tools → States**, or with
-`state_attr('sensor.<wallbox>_virtual_plug_charge_status', 'decision_reason')`
-using your entity ID:
+The diagnostics download names the current wait under `plug_charge` →
+`decision` → `reason`, also when it is not a wallbox fault:
 
 | `decision_reason` | Meaning and next check |
 |---|---|
@@ -400,7 +399,7 @@ using your entity ID:
 | `settling` | Recognition passed; the short settle time is running. |
 | `grant_retry` | The last attempt to grant failed; it is retried. |
 
-Other values match the status or the `blocked_reason` attribute, for example
+Other values match the `plug_charge` status or the `plug_charge_blocked` attribute, for example
 `connection_lost`, `departure_plan`, `release_off`, `energy_goal_stop`,
 `wallbox_locked`, `authorization_required` or `register_unavailable`.
 
@@ -432,7 +431,7 @@ when permission was granted.
 [energy-target recovery](user-guide.md#energy-target) and
 [departure setup](departure-planning.md) explain each control's behavior.
 
-## Guest charging in the app
+## Guest charging
 
 | Symptom | What to check |
 |---|---|
@@ -440,7 +439,7 @@ when permission was granted.
 | Values changed in another window | Reload the saved values and review them before pressing start again. |
 | Starts but immediately pauses | The shared kWh limit may already be reached. Guest start never resets its baseline. |
 | Guest is paused but vehicle planning does not resume | This is intentional: the guest connection stays outside vehicle planning until unplugging. Ordinary current and pause controls remain available. |
-| Interrupted after app restart | The wallbox could not prove the same connection. Review limits and explicitly start again. |
+| Interrupted after a restart of the app or HA | The wallbox could not prove the same connection. Review limits and explicitly start again. |
 | Storage unavailable | No fresh start is allowed without saving the session. Check the app log and storage. |
 
 The saved vehicle percentage target need not be disabled for guests. See
@@ -539,8 +538,8 @@ See [Removal](installation.md#removal) before uninstalling.
 
 ## Saved charging settings could not be loaded
 
-If the app rejects its saved control state after an update or because the file
-is damaged, it keeps that file and blocks normal charging commands. With write
+If the wallbox service (the app, or Home Assistant for a direct entry) rejects
+its saved control state after an update or because the file is damaged, it keeps that file and blocks normal charging commands. With write
 access enabled, it requests that charging release be switched off; heartbeat
 communication continues. In read-only mode it cannot stop the wallbox.
 
@@ -564,35 +563,30 @@ hostnames and adapter identifiers.
 
 ## Understand the activity timeline
 
-The enabled **Wallbox event** entity combines readable command messages in
-Home Assistant Activity with observed physical changes. **Control result** is an
-optional diagnostic event entity; leave it disabled unless an automation needs
-its structured command outcomes. In Activity, filter by **Wallbox event** for
-the concise wallbox timeline. The unfiltered HA activity also includes ordinary
-entity changes, such as sensors becoming unavailable during an HA reload.
-A command acknowledgement does not prove that the car has started charging;
-look for the subsequent **Charging started** observation.
+The **Activity** entity combines readable command messages in Home Assistant
+Activity with observed physical changes. In Activity, filter by **Activity**
+for the concise wallbox timeline. The unfiltered HA activity also includes
+ordinary entity changes, such as sensors becoming unavailable during an HA
+reload. A command acknowledgement does not prove that the car has started
+charging; look for the subsequent **Charging started** change.
 
 Command messages name the trigger (Plug & Charge, departure plan, target
 protection, app or Home Assistant), outcome and requested current where relevant.
 Home Assistant means a control or automation; it does not identify a person.
-Unknown sources are labelled explicitly. The original command-event time is
-shown in the app and included in HA's readable message. The HA Activity row and
-native event timestamp mark receipt in HA, which can be later. The optional
-**Control result** also exposes the original time as `occurred_at`.
-Reconnects establish a fresh cursor and do not replay commands that happened
-while HA was disconnected.
+Unknown sources are labelled explicitly. The original command time is shown in
+the app, included in HA's readable message and kept as the `occurred_at`
+attribute. The HA Activity row and native event timestamp mark receipt in HA,
+which can be later. Reconnects establish a fresh cursor and do not replay
+commands that happened while HA was disconnected.
 
 Unsent current-slider values superseded by another request are omitted from
-the readable timeline and app overview; the diagnostic feed retains them.
-HA's readable timeline also folds consecutive identical successful current
-settings from the same source. A different value, source, intervening command,
-error or observed wallbox change makes the next result visible again. This does
-not remove results from the app's bounded feed or optional **Control result**.
-Only discrete outcomes and state transitions create activity. Polls, heartbeats
-and countdowns do not. The app keeps at most 32 command results in memory; HA
-retention follows your Recorder configuration. Frequent changing current commands
-can still create substantial history even with **Control result** disabled.
-[Limit command history](recorder.md#limit-command-history) explains the separate
-event exclusions. Enabling **Control result** adds a structured diagnostic
-record of each command alongside the readable activity message.
+the timeline and app overview; the diagnostic feed retains them. HA also folds
+consecutive identical successful current settings from the same source. A
+different value, source, intervening command, error or observed wallbox change
+makes the next result visible again. This does not remove results from the
+service's bounded feed. Only discrete outcomes and state transitions create
+activity. Polls, heartbeats and countdowns do not. The service keeps at most 32
+command results in memory; HA retention follows your Recorder configuration.
+Frequent changing current commands can still create substantial history.
+[Limit command history](recorder.md#limit-command-history) explains the event
+exclusion.

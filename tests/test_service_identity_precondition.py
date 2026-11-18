@@ -64,7 +64,7 @@ def test_null_identity_is_an_exact_match_not_a_wildcard(tmp_path, actual, expect
                 assert response.status == (200 if accepted else 409)
                 data = await response.json()
                 if accepted:
-                    assert data["api_version"] == 2
+                    assert data["api_version"] == 3
                 else:
                     assert data["error"] == "device_identity_changed"
                     assert SERIAL not in str(data)

@@ -18,7 +18,7 @@ from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
-from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
@@ -100,7 +100,7 @@ def test_physical_identity_rejection_immediately_invalidates_ha_client(tmp_path)
         await service.heartbeat.async_stop()
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
                 await remote.async_connect()
                 remote.bind_identity(SERIAL)
                 bus.bank = device_bank(serial="DIFFERENT-WALLBOX", charging_current=16)

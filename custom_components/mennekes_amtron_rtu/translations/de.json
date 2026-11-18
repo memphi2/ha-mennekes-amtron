@@ -207,17 +207,19 @@
       "charging": {
         "name": "Lädt"
       },
-      "downgrade_active": {
-        "name": "Downgrade aktiv"
-      },
       "error": {
-        "name": "Fehler"
-      },
-      "master_lost_fallback": {
-        "name": "Energiemanager-Fallback aktiv"
+        "name": "Fehler",
+        "state_attributes": {
+          "heartbeat_lost": {
+            "name": "Energiemanager-Fallback aktiv"
+          }
+        }
       },
       "vehicle_connected": {
         "name": "Fahrzeug verbunden"
+      },
+      "guest_charging": {
+        "name": "Gastladen"
       }
     },
     "button": {
@@ -229,15 +231,6 @@
       },
       "cancel_pending_change": {
         "name": "Vorgemerkte Änderung abbrechen"
-      },
-      "assign_vehicle_charge": {
-        "name": "Fahrzeug-Ladeenergie zuordnen"
-      },
-      "timed_next_calendar_event": {
-        "name": "Nächsten Kalendertermin übernehmen"
-      },
-      "timed_vehicle_departure": {
-        "name": "Abfahrt vom Fahrzeug übernehmen"
       },
       "guest_start": {
         "name": "Gastladen starten"
@@ -327,22 +320,8 @@
         "name": "Temperatur"
       },
       "wallbox_settings": {
-        "name": "Wallbox-Einstellungen"
-      },
-      "pending_change": {
-        "name": "Vorgemerkte Änderung",
-        "state": {
-          "none": "Keine Änderung vorgemerkt",
-          "pause": "Laden pausieren",
-          "resume": "Laden fortsetzen",
-          "set_current": "Ladestrom einstellen",
-          "single_phase": "Eine Phase verwenden",
-          "all_phases": "Alle verfügbaren Phasen verwenden",
-          "enable_charging": "Ladefreigabe einschalten",
-          "disable_charging": "Ladefreigabe ausschalten",
-          "unlock": "Wallbox entsperren",
-          "lock": "Wallbox sperren"
-        }
+        "name": "Wallbox-Einstellungen",
+        "state_attributes": {}
       },
       "charging_status": {
         "name": "Ladestatus",
@@ -361,6 +340,11 @@
           "checking_status": "Status wird abgeglichen",
           "state_uncertain": "Zustand nicht eindeutig",
           "data_missing": "Warte auf Messwerte"
+        },
+        "state_attributes": {
+          "downgraded_to": {
+            "name": "Downgrade aktiv"
+          }
         }
       },
       "connection_quality": {
@@ -376,24 +360,6 @@
           "retried_transactions": {
             "name": "Wiederholte Übertragungen"
           }
-        }
-      },
-      "energy_goal_status": {
-        "name": "Ladezielstatus",
-        "state": {
-          "disabled": "Deaktiviert",
-          "active": "Aktiv",
-          "reached": "Ladeziel erreicht",
-          "meter_unavailable": "Energiemessung fehlt",
-          "meter_reset": "Zählerstand zurückgegangen"
-        }
-      },
-      "soc_goal_status": {
-        "name": "Status des Fahrzeug-Ladeziels",
-        "state": {
-          "disabled": "Deaktiviert",
-          "active": "Aktiv",
-          "reached": "Ziel erreicht"
         }
       },
       "last_charging_loss": {
@@ -442,70 +408,50 @@
           }
         }
       },
-      "timed_goal_status": {
-        "name": "Status des zeitgesteuerten Ladens",
+      "operation_waiting": {
+        "name": "Wartegrund beim Laden",
         "state": {
-          "disabled": "Deaktiviert",
-          "waiting_for_target": "Wartet auf Prozentziel",
-          "waiting_for_capacity": "Wartet auf Akkukapazität",
-          "waiting_for_soc": "Wartet auf Fahrzeugladestand",
-          "waiting_for_device": "Wartet auf Wallbox",
+          "none": "Nichts hält das Laden auf",
+          "wallbox_unavailable": "Wallbox nicht erreichbar",
+          "no_vehicle": "Kein Fahrzeug angeschlossen",
+          "release_off": "Ladefreigabe ausgeschaltet",
+          "plug_charge_waiting": "Virtuelles Plug & Charge hat das Fahrzeug nicht freigegeben",
+          "meter_unavailable": "Wartet auf den Energiezähler",
           "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
+          "until_planned_start": "Pausiert bis zum geplanten Start",
+          "estimated_target_reached": "Bis zum errechneten Ziel geladen",
+          "waiting_for_device": "Wartet auf Wallbox",
+          "waiting_for_soc": "Wartet auf Fahrzeugladestand",
+          "waiting_for_capacity": "Wartet auf Akkukapazität",
+          "waiting_for_target": "Wartet auf Prozentziel",
           "read_only": "Nur lesen",
-          "guest_mode": "Gastladen hat Vorrang",
-          "queued": "Änderung vorgemerkt",
-          "paused_until_start": "Pausiert bis zum Start",
-          "minimum_level": "Lädt bis zum Mindestladestand",
-          "charging": "Lädt mit vollem Strom",
-          "finishing": "Lädt mit Mindeststrom bis zur Abfahrt",
-          "unreachable": "Ziel eventuell nicht erreichbar",
-          "late": "Zielzeit überschritten",
-          "estimated_reached": "Bis zum errechneten Ziel geladen",
-          "reached": "Ziel erreicht",
-          "write_pending": "Schreibbefehl ausstehend",
-          "error": "Fehler"
-        }
-      },
-      "virtual_plug_charge_status": {
-        "name": "Status von virtuellem Plug & Charge",
-        "state": {
-          "waiting_vehicle": "Wartet auf Fahrzeug",
-          "waiting_detection": "Wartet auf aktuelle Fahrzeugdaten",
-          "vehicle_not_selected": "Erkanntes Fahrzeug nicht ausgewählt",
-          "waiting_release": "Wartet auf Ladefreigabe",
-          "authorized": "Fahrzeug freigegeben",
-          "manual_release": "Von Hand freigegeben",
-          "blocked": "Laden gesperrt",
-          "disabled": "Deaktiviert"
+          "command_pending": "Änderung vorgemerkt",
+          "target_reached": "Ziel erreicht",
+          "paused": "Laden pausiert"
         },
         "state_attributes": {
-          "blocked_reason": {
-            "name": "Sperrgrund",
+          "controller": {
+            "name": "Ladesteuerung",
             "state": {
-              "connection_lost": "Verbindung verloren",
-              "gate_inactive": "Freigabesperre nicht aktiv",
-              "read_only": "Nur-Lese-Modus",
-              "departure_plan": "Abfahrtsplanung bereitet den Ladestrom vor",
-              "pause_requested": "Laden pausiert",
-              "release_off": "Ladefreigabe ausgeschaltet",
-              "energy_goal_stop": "Energieziel erreicht",
-              "wallbox_locked": "Wallbox gesperrt",
-              "error_code": "Wallbox-Fehler",
-              "authorization_required": "Autorisierung an der Wallbox aktiv",
-              "register_unavailable": "Registerwert nicht verfügbar"
+              "unavailable": "Wallbox nicht erreichbar",
+              "departure_plan": "Abfahrtsplanung",
+              "direct": "Direkte Steuerung",
+              "guest": "Gastauftrag"
             }
-          }
-        }
-      },
-      "operation_controller": {
-        "name": "Ladesteuerung",
-        "state": {
-          "unavailable": "Wallbox nicht erreichbar",
-          "departure_plan": "Abfahrtsplanung",
-          "direct": "Direkte Steuerung",
-          "guest": "Gastauftrag"
-        },
-        "state_attributes": {
+          },
+          "next_event": {
+            "name": "Nächster Ladeschritt",
+            "state": {
+              "none": "Nichts geplant",
+              "queued_command": "Vorgemerkte Änderung wird ausgeführt",
+              "plan_start": "Geplantes Laden startet",
+              "target_reached": "Ziel voraussichtlich erreicht",
+              "departure": "Zielzeitpunkt"
+            }
+          },
+          "next_at": {
+            "name": "Zeitpunkt"
+          },
           "vehicle": {
             "name": "Fahrzeug",
             "state": {
@@ -527,70 +473,95 @@
           },
           "target_deadline": {
             "name": "Zielzeit"
-          }
-        }
-      },
-      "operation_waiting": {
-        "name": "Wartegrund beim Laden",
-        "state": {
-          "none": "Nichts hält das Laden auf",
-          "wallbox_unavailable": "Wallbox nicht erreichbar",
-          "no_vehicle": "Kein Fahrzeug angeschlossen",
-          "release_off": "Ladefreigabe ausgeschaltet",
-          "plug_charge_waiting": "Virtuelles Plug & Charge hat das Fahrzeug nicht freigegeben",
-          "meter_unavailable": "Wartet auf den Energiezähler",
-          "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
-          "until_planned_start": "Pausiert bis zum geplanten Start",
-          "estimated_target_reached": "Bis zum errechneten Ziel geladen",
-          "waiting_for_device": "Wartet auf Wallbox",
-          "waiting_for_soc": "Wartet auf Fahrzeugladestand",
-          "waiting_for_capacity": "Wartet auf Akkukapazität",
-          "waiting_for_target": "Wartet auf Prozentziel",
-          "read_only": "Nur lesen",
-          "command_pending": "Änderung vorgemerkt",
-          "target_reached": "Ziel erreicht",
-          "paused": "Laden pausiert"
-        }
-      },
-      "operation_next": {
-        "name": "Nächster Ladeschritt",
-        "state": {
-          "none": "Nichts geplant",
-          "queued_command": "Vorgemerkte Änderung wird ausgeführt",
-          "plan_start": "Geplantes Laden startet",
-          "target_reached": "Ziel voraussichtlich erreicht",
-          "departure": "Zielzeitpunkt"
-        },
-        "state_attributes": {
-          "at": {
-            "name": "Zeitpunkt"
-          }
-        }
-      },
-      "guest_charging": {
-        "name": "Gastladen",
-        "state": {
-          "inactive": "Inaktiv",
-          "active": "Aktiv"
-        },
-        "state_attributes": {
-          "start": {
-            "name": "Start"
           },
-          "finish": {
-            "name": "Ende"
+          "pending": {
+            "name": "Vorgemerkte Änderung",
+            "state": {
+              "none": "Keine Änderung vorgemerkt",
+              "pause": "Laden pausieren",
+              "resume": "Laden fortsetzen",
+              "set_current": "Ladestrom einstellen",
+              "single_phase": "Eine Phase verwenden",
+              "all_phases": "Alle verfügbaren Phasen verwenden",
+              "enable_charging": "Ladefreigabe einschalten",
+              "disable_charging": "Ladefreigabe ausschalten",
+              "unlock": "Wallbox entsperren",
+              "lock": "Wallbox sperren"
+            }
           },
-          "current": {
-            "name": "Strom"
+          "pending_at": {
+            "name": "Ausstehende Änderung um"
           },
-          "energy": {
-            "name": "Energie"
+          "energy_target": {
+            "name": "Ladezielstatus",
+            "state": {
+              "disabled": "Deaktiviert",
+              "active": "Aktiv",
+              "reached": "Ladeziel erreicht",
+              "meter_unavailable": "Energiemessung fehlt",
+              "meter_reset": "Zählerstand zurückgegangen"
+            }
           },
-          "delivered": {
-            "name": "Geladen"
+          "vehicle_target": {
+            "name": "Status des Fahrzeug-Ladeziels",
+            "state": {
+              "disabled": "Deaktiviert",
+              "active": "Aktiv",
+              "reached": "Ziel erreicht"
+            }
           },
-          "reason": {
-            "name": "Grund"
+          "departure_plan": {
+            "name": "Status des zeitgesteuerten Ladens",
+            "state": {
+              "disabled": "Deaktiviert",
+              "waiting_for_target": "Wartet auf Prozentziel",
+              "waiting_for_capacity": "Wartet auf Akkukapazität",
+              "waiting_for_soc": "Wartet auf Fahrzeugladestand",
+              "waiting_for_device": "Wartet auf Wallbox",
+              "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
+              "read_only": "Nur lesen",
+              "guest_mode": "Gastladen hat Vorrang",
+              "queued": "Änderung vorgemerkt",
+              "paused_until_start": "Pausiert bis zum Start",
+              "minimum_level": "Lädt bis zum Mindestladestand",
+              "charging": "Lädt mit vollem Strom",
+              "finishing": "Lädt mit Mindeststrom bis zur Abfahrt",
+              "unreachable": "Ziel eventuell nicht erreichbar",
+              "late": "Zielzeit überschritten",
+              "estimated_reached": "Bis zum errechneten Ziel geladen",
+              "reached": "Ziel erreicht",
+              "write_pending": "Schreibbefehl ausstehend",
+              "error": "Fehler"
+            }
+          },
+          "plug_charge": {
+            "name": "Status von virtuellem Plug & Charge",
+            "state": {
+              "waiting_vehicle": "Wartet auf Fahrzeug",
+              "waiting_detection": "Wartet auf aktuelle Fahrzeugdaten",
+              "vehicle_not_selected": "Erkanntes Fahrzeug nicht ausgewählt",
+              "waiting_release": "Wartet auf Ladefreigabe",
+              "authorized": "Fahrzeug freigegeben",
+              "manual_release": "Von Hand freigegeben",
+              "blocked": "Laden gesperrt",
+              "disabled": "Deaktiviert"
+            }
+          },
+          "plug_charge_blocked": {
+            "name": "Sperrgrund",
+            "state": {
+              "connection_lost": "Verbindung verloren",
+              "gate_inactive": "Freigabesperre nicht aktiv",
+              "read_only": "Nur-Lese-Modus",
+              "departure_plan": "Abfahrtsplanung bereitet den Ladestrom vor",
+              "pause_requested": "Laden pausiert",
+              "release_off": "Ladefreigabe ausgeschaltet",
+              "energy_goal_stop": "Energieziel erreicht",
+              "wallbox_locked": "Wallbox gesperrt",
+              "error_code": "Wallbox-Fehler",
+              "authorization_required": "Autorisierung an der Wallbox aktiv",
+              "register_unavailable": "Registerwert nicht verfügbar"
+            }
           }
         }
       }
@@ -607,78 +578,21 @@
       },
       "virtual_plug_charge": {
         "name": "Virtuelles Plug & Charge"
-      },
-      "release_off_on_unplug": {
-        "name": "Ladefreigabe beim Abstecken ausschalten"
       }
     },
     "event": {
-      "control_result": {
-        "name": "Steuerungsergebnis",
+      "activity": {
+        "name": "Aktivität",
         "state_attributes": {
           "event_type": {
-            "name": "Befehl und Ergebnis",
+            "name": "Art",
             "state": {
-              "pause_executed": "Laden pausieren: Befehl abgeschlossen",
-              "pause_replaced": "Laden pausieren: Ersetzt",
-              "pause_cancelled": "Laden pausieren: Abgebrochen",
-              "pause_failed": "Laden pausieren: Fehlgeschlagen",
-              "pause_uncertain": "Laden pausieren: Ergebnis unbestätigt",
-              "resume_executed": "Laden fortsetzen: Befehl abgeschlossen",
-              "resume_replaced": "Laden fortsetzen: Ersetzt",
-              "resume_cancelled": "Laden fortsetzen: Abgebrochen",
-              "resume_failed": "Laden fortsetzen: Fehlgeschlagen",
-              "resume_uncertain": "Laden fortsetzen: Ergebnis unbestätigt",
-              "set_current_executed": "Ladestrom einstellen: Befehl abgeschlossen",
-              "set_current_replaced": "Ladestrom einstellen: Ersetzt",
-              "set_current_cancelled": "Ladestrom einstellen: Abgebrochen",
-              "set_current_failed": "Ladestrom einstellen: Fehlgeschlagen",
-              "set_current_uncertain": "Ladestrom einstellen: Ergebnis unbestätigt",
-              "single_phase_executed": "Eine Phase verwenden: Befehl abgeschlossen",
-              "single_phase_replaced": "Eine Phase verwenden: Ersetzt",
-              "single_phase_cancelled": "Eine Phase verwenden: Abgebrochen",
-              "single_phase_failed": "Eine Phase verwenden: Fehlgeschlagen",
-              "single_phase_uncertain": "Eine Phase verwenden: Ergebnis unbestätigt",
-              "all_phases_executed": "Alle verfügbaren Phasen verwenden: Befehl abgeschlossen",
-              "all_phases_replaced": "Alle verfügbaren Phasen verwenden: Ersetzt",
-              "all_phases_cancelled": "Alle verfügbaren Phasen verwenden: Abgebrochen",
-              "all_phases_failed": "Alle verfügbaren Phasen verwenden: Fehlgeschlagen",
-              "all_phases_uncertain": "Alle verfügbaren Phasen verwenden: Ergebnis unbestätigt",
-              "disable_charging_executed": "Ladefreigabe ausschalten: Befehl abgeschlossen",
-              "disable_charging_replaced": "Ladefreigabe ausschalten: Ersetzt",
-              "disable_charging_cancelled": "Ladefreigabe ausschalten: Abgebrochen",
-              "disable_charging_failed": "Ladefreigabe ausschalten: Fehlgeschlagen",
-              "disable_charging_uncertain": "Ladefreigabe ausschalten: Ergebnis unbestätigt",
-              "enable_charging_executed": "Ladefreigabe einschalten: Befehl abgeschlossen",
-              "enable_charging_replaced": "Ladefreigabe einschalten: Ersetzt",
-              "enable_charging_cancelled": "Ladefreigabe einschalten: Abgebrochen",
-              "enable_charging_failed": "Ladefreigabe einschalten: Fehlgeschlagen",
-              "enable_charging_uncertain": "Ladefreigabe einschalten: Ergebnis unbestätigt",
-              "lock_executed": "Wallbox sperren: Befehl abgeschlossen",
-              "lock_replaced": "Wallbox sperren: Ersetzt",
-              "lock_cancelled": "Wallbox sperren: Abgebrochen",
-              "lock_failed": "Wallbox sperren: Fehlgeschlagen",
-              "lock_uncertain": "Wallbox sperren: Ergebnis unbestätigt",
-              "unlock_executed": "Wallbox entsperren: Befehl abgeschlossen",
-              "unlock_replaced": "Wallbox entsperren: Ersetzt",
-              "unlock_cancelled": "Wallbox entsperren: Abgebrochen",
-              "unlock_failed": "Wallbox entsperren: Fehlgeschlagen",
-              "unlock_uncertain": "Wallbox entsperren: Ergebnis unbestätigt",
-              "recovery_succeeded": "Fehlerbehebung bestätigt",
-              "recovery_failed": "Fehlerbehebung fehlgeschlagen",
-              "recovery_uncertain": "Fehler beheben: Ergebnis unbestätigt"
-            }
-          },
-          "result": {
-            "name": "Ergebnis",
-            "state": {
-              "executed": "Befehl abgeschlossen",
-              "replaced": "Ersetzt",
-              "cancelled": "Abgebrochen",
-              "failed": "Fehlgeschlagen",
-              "uncertain": "Ergebnis unbestätigt",
-              "recovery_succeeded": "Fehlerbehebung bestätigt",
-              "recovery_failed": "Fehlerbehebung fehlgeschlagen"
+              "command_done": "Befehl ausgeführt",
+              "command_failed": "Befehl fehlgeschlagen",
+              "command_cancelled": "Befehl verworfen",
+              "session_started": "Fahrzeug angesteckt",
+              "session_ended": "Fahrzeug abgesteckt",
+              "wallbox_changed": "Änderung an der Wallbox"
             }
           },
           "action": {
@@ -694,6 +608,18 @@
               "unlock": "Wallbox entsperren",
               "lock": "Wallbox sperren",
               "recover": "Fehler beheben"
+            }
+          },
+          "result": {
+            "name": "Ergebnis",
+            "state": {
+              "executed": "Befehl abgeschlossen",
+              "replaced": "Ersetzt",
+              "cancelled": "Abgebrochen",
+              "failed": "Fehlgeschlagen",
+              "uncertain": "Ergebnis unbestätigt",
+              "recovery_succeeded": "Fehlerbehebung bestätigt",
+              "recovery_failed": "Fehlerbehebung fehlgeschlagen"
             }
           },
           "reason": {
@@ -719,7 +645,7 @@
               "vehicle_waiting": "Warten auf ein freigegebenes Fahrzeug"
             }
           },
-          "source": {
+          "trigger": {
             "name": "Auslöser",
             "state": {
               "unknown": "Quelle nicht übermittelt",
@@ -730,10 +656,11 @@
               "energy_goal": "Schutz des Energieziels",
               "soc_goal": "Fahrzeug-Prozentziel",
               "recovery": "Fehlerbehebung",
-              "guest": "Gastladen"
+              "guest": "Gastladen",
+              "unplug": "Ausgesteckt"
             }
           },
-          "requested_value": {
+          "value": {
             "name": "Angeforderter Registerwert",
             "state": {
               "0": "Ohne Software-Strombegrenzung"
@@ -741,13 +668,8 @@
           },
           "occurred_at": {
             "name": "Ereigniszeit"
-          }
-        }
-      },
-      "wallbox_event": {
-        "name": "Wallbox-Ereignis",
-        "state_attributes": {
-          "event_type": {
+          },
+          "change": {
             "name": "Änderung",
             "state": {
               "vehicle_plugged_in": "Fahrzeug eingesteckt",
@@ -877,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "Eine Ladegrenze ist erreicht, deshalb bleibt das Laden pausiert. Zum Weiterladen kWh-Grenze oder Fahrzeug-Prozentziel erhöhen oder auf 0 setzen; nach einem Zählerreset die Grenze neu speichern. Eine Änderung allein startet das Laden nicht."
     },
-    "energy_goal_state_invalid": {
-      "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."
-    },
     "energy_goal_not_supported": {
       "message": "Dieser Modbus-Dienst unterstützt keine Ladeziele. Aktualisiere zuerst die App oder den eigenständigen Dienst."
-    },
-    "cancel_pending_not_supported": {
-      "message": "Dieser Modbus-Dienst kann vorgemerkte Änderungen nicht abbrechen. Aktualisiere zuerst die App oder den eigenständigen Dienst."
     },
     "soc_goal_invalid": {
       "message": "Gib ein Ziel von 0 bis 100 % ein, höchstens das Ladelimit des Fahrzeugs. 0 deaktiviert das Prozentziel."
@@ -898,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "Die Fahrzeugquellen wurden geändert. Lade die Integration neu, bevor du ihr Prozentziel änderst."
     },
-    "soc_goal_app_update_required": {
-      "message": "Aktualisiere die Mennekes Modbus-Service-App, bevor du das Fahrzeug-Ladeziel änderst. Die übrigen Wallbox-Funktionen bleiben verfügbar."
-    },
     "soc_goal_not_supported": {
       "message": "Der Modbus-Dienst unterstützt keine Fahrzeug-Prozentziele. Aktualisiere die App, um diese optionale Funktion zu nutzen."
-    },
-    "soc_goal_state_invalid": {
-      "message": "Das gespeicherte Fahrzeug-Ladeziel konnte nicht wiederhergestellt werden. Prüfe die Protokolle, bevor du das Laden wieder freigibst."
     },
     "loss_source_invalid": {
       "message": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein."
@@ -948,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "Die Fahrzeugfreigabe ist abgelaufen oder nicht mehr gültig. Warte auf aktuelle passende Fahrzeugdaten, bevor du es erneut versuchst."
-    },
-    "plug_charge_not_supported": {
-      "message": "Die verbundene Modbus-App oder der Dienst unterstützt virtuelles Plug & Charge nicht. Aktualisiere zuerst auf eine kompatible Version."
-    },
-    "app_required": {
-      "message": "Diese Aktion braucht die Modbus-App; diese Wallbox ist direkt verbunden."
     },
     "wallbox_target_required": {
       "message": "Es sind mehrere Wallboxen eingerichtet; gib die Wallbox an, für die das gilt."
@@ -1020,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Laden gesperrt: gespeicherte Einstellungen abgelehnt",
-            "description": "Die App konnte ihre gespeicherten Ladeeinstellungen nicht lesen. Die alte Datei bleibt erhalten; automatisches Laden ist gesperrt. Bestätige, um sie durch sichere Startwerte zu ersetzen: Pause aktiv, Ladefreigabe aus, 6 A Fortsetzstrom, keine Ladeziele. Es wird keine Ladung gestartet. Prüfe danach Fahrzeugprofile, Ziele und Plug & Charge und schalte Ladefreigabe und Fortsetzen bewusst ein. Im Nur-Lesen-Modus kann die App eine physische Ladung nicht stoppen; prüfe zuerst die Wallbox."
+            "description": "Die gespeicherten Ladeeinstellungen konnten nicht gelesen werden. Die alte Datei bleibt erhalten; automatisches Laden ist gesperrt. Bestätige, um sie durch sichere Startwerte zu ersetzen: Pause aktiv, Ladefreigabe aus, 6 A Fortsetzstrom, keine Ladeziele. Es wird keine Ladung gestartet. Prüfe danach Fahrzeugprofile, Ziele und Plug & Charge und schalte Ladefreigabe und Fortsetzen bewusst ein. Im Nur-Lesen-Modus lässt sich eine physische Ladung von hier nicht stoppen; prüfe zuerst die Wallbox."
           }
         },
         "error": {
@@ -1052,14 +956,18 @@
       },
       "wallbox_service": {
         "title": "Wallbox-Einstellungen der App",
-        "description": "Diese Wallbox läuft über die Modbus-App. Ihre Einstellungen liegen deshalb dort und gelten auch für Home Assistant.\n\nStromgrenze: {current_cap} A\nMindestabstand zwischen Zustandswechseln: {state_change_interval} s\nZusätzliche Wartezeit vor Phasenwechseln: {phase_switch_grace} s\n\nDiese Werte, die Abfrageintervalle und die Verbindung änderst du in der App unter Benutzeroberfläche öffnen. Die Schreibfreigabe steht im Reiter Konfiguration der App."
+        "description": "Diese Wallbox läuft über die Modbus-App. Ihre Einstellungen liegen deshalb dort und gelten auch für Home Assistant.\n\nStromgrenze: {current_cap} A\nMindestabstand zwischen Zustandswechseln: {state_change_interval} s\nZusätzliche Wartezeit vor Phasenwechseln: {phase_switch_grace} s\n\nDiese Werte, die Abfrageintervalle und die Verbindung änderst du in der App unter Benutzeroberfläche öffnen. Die Schreibfreigabe steht im Reiter Konfiguration der App.",
+        "data": {
+          "release_off_on_unplug": "Ladefreigabe beim Abstecken ausschalten"
+        }
       },
       "wallbox_basic": {
         "title": "Stromgrenze und Abfrage",
         "data": {
           "control_mode": "Steuermodus",
           "current_limit": "Obergrenze des Ladestroms",
-          "scan_interval_seconds": "Statusintervall"
+          "scan_interval_seconds": "Statusintervall",
+          "release_off_on_unplug": "Ladefreigabe beim Abstecken ausschalten"
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
@@ -1667,6 +1575,36 @@
     "clear_target_time": {
       "name": "Zielzeitpunkt löschen",
       "description": "Löscht den gemeinsamen Zeitpunkt. Energie- und Fahrzeugziel bleiben erhalten."
+    },
+    "use_calendar_departure": {
+      "name": "Nächsten Kalendertermin übernehmen",
+      "description": "Übernimmt den nächsten passenden Kalendertermin als Zielzeit.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
+    },
+    "use_vehicle_departure": {
+      "name": "Abfahrt vom Fahrzeug übernehmen",
+      "description": "Übernimmt die nächste Abfahrt des Fahrzeugs als Zielzeit.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
+    },
+    "assign_vehicle_charge": {
+      "name": "Fahrzeug-Ladeenergie zuordnen",
+      "description": "Ordnet die vom Fahrzeug gemeldete Energie dem letzten Ladevorgang zu.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
     }
   }
 }

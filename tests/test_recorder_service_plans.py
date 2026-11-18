@@ -15,9 +15,6 @@ from custom_components.mennekes_amtron_rtu.device.service_departure_runtime impo
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.entity import entry_entity_unique_id
-from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-    OPERATION_SENSOR_KEYS,
-)
 from tests import service_guest_fixture as runtime
 from tests.test_home_assistant_smoke import _boot
 from tests.test_service_departure_runtime import hand_over
@@ -43,8 +40,11 @@ def test_service_plans_and_orders_do_not_record_unchanged_polls(tmp_path, monkey
                     recorder = get_instance(hass)
 
                     registry = er.async_get(hass)
-                    ids = [registry.async_get_entity_id("sensor", DOMAIN, entry_entity_unique_id(entry, key))
-                           for key in (*OPERATION_SENSOR_KEYS, "guest_charging")]
+                    ids = [registry.async_get_entity_id(platform, DOMAIN, entry_entity_unique_id(entry, key))
+                           for platform, key in (
+                               ("sensor", "operation_waiting"), ("sensor", "charging_status"),
+                               ("binary_sensor", "guest_charging"),
+                           )]
                     assert all(ids), ids
 
                     async def rows():
@@ -60,7 +60,7 @@ def test_service_plans_and_orders_do_not_record_unchanged_polls(tmp_path, monkey
                     await service.departure.tick()
                     await coordinator.async_refresh()
                     before = await rows()
-                    assert len(before) >= 4, before
+                    assert len(before) == len(ids), before
                     reads = len(transport.reads)
                     for _ in range(120):
                         await service.departure.tick()

@@ -69,6 +69,7 @@ from .registers import (
 )
 from .runtime_events import EventType
 from .soc_goal import SocGoal
+from .unplug_release import UnplugRelease
 from .write_state import WriteState
 
 if TYPE_CHECKING:
@@ -147,6 +148,13 @@ class ControlOptions:
             raise ValueError("phase_switch_grace_seconds must be between 0 and 30")
 
 
+def pause_state(value: object) -> bool | None:
+    """Whether a signalled current is a pause; None without a valid reading."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        return None
+    return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
+
+
 class AmtronControl:
     """Validated, rate-limited write access to one wallbox."""
 
@@ -198,13 +206,18 @@ class AmtronControl:
         self.goal_controller: EnergyGoalController | None = None
         self.soc_goal_controller: SocGoalController | None = None
         self._plug_charge = PlugChargeController(self)
+        self.unplug_release = UnplugRelease(self)
         self.guest_confirmation_required: Callable[[], bool] = lambda: False
         self.time_limit_reached: Callable[[], bool] = lambda: False
         self.guest_active: Callable[[], bool] = lambda: False
 
     @property
-    def supports_plug_charge(self) -> bool:
-        return True
+    def layout_version(self) -> int:
+        return self._identity.layout_version
+
+    def monotonic(self) -> float:
+        """The clock of the write intervals."""
+        return self._monotonic()
 
     @property
     def plug_charge(self) -> dict[str, object]:
@@ -450,14 +463,9 @@ class AmtronControl:
         return self._pending_until
 
     @property
-    def supports_cancel_pending(self) -> bool:
-        """This controller can remove queued work without touching the wallbox."""
-        return True
-
-    @property
     def can_cancel_pending(self) -> bool:
         """Cancellation needs permission and pending work, not a healthy bus."""
-        return self.supports_cancel_pending and not self.read_only and self.pending_action is not None
+        return not self.read_only and self.pending_action is not None
 
     async def async_cancel_pending_change(self) -> None:
         """Discard future work, retaining any pause or setpoint already applied."""
@@ -587,10 +595,7 @@ class AmtronControl:
             current = snapshot.get(CHARGING_CURRENT_EMS.key)
             if isinstance(current, (int, float)) and math.isfinite(current) and current >= 0:
                 self._write_state.confirmed_current = float(current)
-        value = self._write_state.confirmed_current
-        if value is None:
-            return None
-        return CHARGING_CURRENT_UNLIMITED < float(value) < CHARGING_CURRENT_MINIMUM
+        return pause_state(self._write_state.confirmed_current)
 
     @property
     def observed_pause(self) -> bool | None:
@@ -602,9 +607,7 @@ class AmtronControl:
         ):
             return None
         value = snapshot.fresh(CHARGING_CURRENT_EMS.key)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
-            return None
-        return CHARGING_CURRENT_UNLIMITED < value < CHARGING_CURRENT_MINIMUM
+        return pause_state(value)
 
     async def async_set_charging_current(
         self,
@@ -625,7 +628,7 @@ class AmtronControl:
         if current == CHARGING_CURRENT_UNLIMITED:
             if not allow_unlimited:
                 raise validation_error("charging_current_zero")
-            _LOGGER.info("Disabling the EMS current limit (0 A)")
+            _LOGGER.info("Control: disabling the EMS current limit (0 A)")
         elif not math.isfinite(current) or current < CHARGING_CURRENT_MINIMUM:
             raise validation_error(
                 "charging_current_invalid",
@@ -757,12 +760,14 @@ class AmtronControl:
             await self._async_submit_locked(_PendingCommand("lock" if locked else "unlock", int(locked)))
 
     async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
-        """Set the solar charging mode shown on the wallbox HMI (0x0D03)."""
+        """Set the solar charging mode shown on the wallbox (0x0D03).
 
+        It drives the wallbox display and its solar LEDs; the energy manager
+        stays responsible for the solar algorithm, and the wallbox needs DIP 7
+        on for the mode to have any effect. It switches no charge, so it
+        waits for no state-change interval.
+        """
         self._require_write_access()
-        # Command context belongs to the operation holding this lock. An
-        # unrelated solar setting must not inherit a timed current's expiry
-        # or goal cancellation while that current awaits the shared bus.
         async with self._current_lock:
             await self._async_write(SOLAR_CHARGING_MODE, int(mode))
 
@@ -915,6 +920,34 @@ class AmtronControl:
             paused = True
         target_paused = 0 < value < CHARGING_CURRENT_MINIMUM
         return paused is None or paused != target_paused
+
+    async def async_unplugged(self) -> bool:
+        """Whether the wallbox confirms right now that no car is plugged in.
+
+        An older wallbox has no CP state; its idle EVSE state is all it can say.
+        """
+        if self._identity.layout_version >= CP_STATE.min_layout:
+            return await self._async_vehicle_absent()
+        try:
+            state = await self._client.async_read_register(EVSE_STATE)
+        except AmtronBusError:
+            return False
+        return type(state) is int and state == EvseState.IDLE
+
+    async def async_close_release(self, source: str) -> None:
+        """Switch the release off for a rule of the service itself.
+
+        The caller holds ``energy_goal_guard``. This is the ordinary stop:
+        where the wallbox cannot prove that no car is there, it waits for the
+        state-change interval (``AmtronRateLimitedError``) like any other.
+        """
+        if self._pending is not None and self._pending.action == "enable_charging":
+            # A release queued for the car that left must not open it later.
+            self._clear_pending(outcome="cancelled")
+        written = self._release_writes
+        await self._async_apply_release(False)
+        if self._release_writes != written:
+            self.events.record("executed", "disable_charging", source=source)
 
     async def _async_vehicle_absent(self, read: LockedRegisterReader | None = None) -> bool:
         """Grant an exception only from fresh, consistent EVSE and CP readings."""
@@ -1437,7 +1470,7 @@ class AmtronControl:
                             # One attempt only. A lost acknowledgement must
                             # never produce an automatic duplicate start.
                             _LOGGER.warning(
-                                "Queued %s command cancelled (%s)", command.action,
+                                "Control: queued %s command cancelled (%s)", command.action,
                                 err.translation_key if isinstance(err, DeviceError)
                                 else type(err).__name__,
                             )
@@ -1454,7 +1487,7 @@ class AmtronControl:
             # A failing refresh/persistence callback must not leave an
             # unobserved task or a queued start with no owner. Never retry it.
             self._clear_pending()
-            _LOGGER.warning("Deferred command cancelled after %s", type(err).__name__)
+            _LOGGER.warning("Control: deferred command cancelled (%s)", type(err).__name__)
         finally:
             self._flush_task = None
 

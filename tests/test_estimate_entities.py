@@ -8,10 +8,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.const import EntityCategory, Platform
+from homeassistant.const import Platform
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu import _entry_platforms, button, sensor
+from custom_components.mennekes_amtron_rtu import _entry_platforms, sensor
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
     LOSS_SENSOR_KEYS,
@@ -19,10 +19,7 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
 from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
 from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
 from custom_components.mennekes_amtron_rtu.device.charging_cost import CostResult
-from custom_components.mennekes_amtron_rtu.estimate_sensor import AmtronEstimateSensor
-from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
-    ESTIMATE_SENSOR_DESCRIPTIONS,
-)
+from custom_components.mennekes_amtron_rtu.services import DEVICE_ACTIONS
 from tests.ha_fakes import FakeConfigEntry, build_runtime, collect
 from tests.test_charging_session import complete
 
@@ -40,11 +37,23 @@ def cost_observer():
     return SimpleNamespace(available=True, current=None, last=LastChargingCost())
 
 
+COST_SENSOR_KEYS = ("current_estimated_charging_cost", "last_estimated_charging_cost")
+ESTIMATE_SENSOR_DESCRIPTIONS = tuple(
+    description for description in sensor.SENSORS
+    if description.key in (*LOSS_SENSOR_KEYS, *COST_SENSOR_KEYS)
+)
+
+
 def estimate_entities(entry):
     return {
-        item.key: AmtronEstimateSensor(entry, entry.runtime_data.coordinator, item)
+        item.key: sensor.AmtronSensor(entry, item)
         for item in ESTIMATE_SENSOR_DESCRIPTIONS
     }
+
+
+def test_every_estimate_has_its_row_in_the_sensor_table():
+    assert {item.key for item in ESTIMATE_SENSOR_DESCRIPTIONS} == {*LOSS_SENSOR_KEYS, *COST_SENSOR_KEYS}
+    assert len(ESTIMATE_SENSOR_DESCRIPTIONS) == 4
 
 
 @pytest.mark.parametrize("loss_enabled", [False, True])
@@ -160,36 +169,27 @@ def test_cost_entities_distinguish_unknown_incomplete_zero_and_negative_cost():
 @pytest.mark.parametrize("read_only", [False, True])
 @pytest.mark.parametrize("remote", [False, True])
 @pytest.mark.parametrize("mode", [None, "sensor", "bavariandata"])
-def test_assign_button_is_optional_and_never_requires_physical_write_permission(read_only, remote, mode):
+def test_assign_action_never_requires_physical_write_permission(read_only, remote, mode):
     async def run():
-        hass, entry, transport = await build_runtime(read_only=read_only)
+        _hass, entry, transport = await build_runtime(read_only=read_only)
         if remote:
             entry.data = {**entry.data, "server_url": "http://service:8765"}
         entry.options = {**entry.options, CONF_CHARGE_LOSS_SOURCE: mode or "disabled"}
         observer = loss_observer(mode) if mode else None
         entry.runtime_data.charge_loss = observer
-        entities = {}
-        await button.async_setup_entry(hass, entry, lambda rows: entities.update(collect(rows)))
-        assert ("assign_vehicle_charge" in entities) is (mode == "sensor")
-        assert ("recover_from_error" in entities) is (not read_only or remote)
-        assert ("cancel_pending_change" in entities) is (not read_only or remote)
-        assert ("restart" in entities) is (not read_only or remote)
+        assign = DEVICE_ACTIONS["assign_vehicle_charge"]
+        # Assigning is an action, not a control: it never adds a platform.
         if read_only and not remote:
-            assert (Platform.BUTTON in _entry_platforms(entry)) is (mode == "sensor")
-        if mode == "sensor":
-            assign = entities["assign_vehicle_charge"]
-            assert assign.entity_category == EntityCategory.CONFIG
-            assert assign.available
-            await assign.async_press()
+            assert Platform.BUTTON not in _entry_platforms(entry)
+        if mode is not None:
+            await assign(entry.runtime_data)
             observer.async_assign.assert_awaited_once()
             assert not transport.writes
-            observer.can_assign = False
-            assert not assign.available
-            entry.runtime_data.charge_loss = None
-            assert not assign.available
-            with pytest.raises(ServiceValidationError) as raised:
-                await assign.async_press()
-            assert raised.value.translation_key == "loss_unavailable"
+        entry.runtime_data.charge_loss = None
+        with pytest.raises(ServiceValidationError) as raised:
+            await assign(entry.runtime_data)
+        assert raised.value.translation_key == "loss_unavailable"
+        assert not transport.writes
         await entry.runtime_data.client.async_close()
 
     asyncio.run(run())

@@ -15,7 +15,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.plug_charge import PlugChargeObserver
-from custom_components.mennekes_amtron_rtu.switch import AmtronPlugChargeSwitch
+from custom_components.mennekes_amtron_rtu.switch import SWITCHES, AmtronSwitch
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import build_runtime
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
@@ -59,8 +59,9 @@ def test_ha_switch_applies_persists_and_preserves_pause_without_reloading(tmp_pa
             assert runtime.plug_charge._evidence_unsubscribe is None
             if not remote:
                 # Simulate the startup guard having elapsed before pausing.
-                runtime.client.write_state.mode_change_at = None
-                runtime.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
+                write_state = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service.client.write_state
+                write_state.mode_change_at = None
+                write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
             await hass.services.async_call("switch", "turn_on", {"entity_id": pause}, blocking=True)
             await hass.async_block_till_done()
             assert runtime.control.pause_requested is True
@@ -97,7 +98,8 @@ async def switch_fixture(monkeypatch):
     observer = PlugChargeObserver(hass, entry)
     runtime.plug_charge = observer
     monkeypatch.setattr(observer._evidence, "subscribe", lambda _callback: lambda: None)
-    return hass, entry, transport, AmtronPlugChargeSwitch(entry, runtime.coordinator)
+    description = next(row for row in SWITCHES if row.key == "virtual_plug_charge")
+    return hass, entry, transport, AmtronSwitch(entry, description)
 
 
 @pytest.mark.parametrize("change", ["options", "data"])
@@ -122,7 +124,6 @@ def test_concurrent_configuration_save_is_preserved_and_still_reloads(monkeypatc
             assert hass.config_entries.reloaded == [entry.entry_id]
         finally:
             await runtime.plug_charge.async_stop()
-            await runtime.control.async_shutdown()
             await runtime.client.async_close()
     asyncio.run(run())
 
@@ -140,7 +141,6 @@ def test_failed_gate_change_is_not_saved_as_success(monkeypatch):
             assert not runtime.plug_charge.options_applied()
         finally:
             await runtime.plug_charge.async_stop()
-            await runtime.control.async_shutdown()
             await runtime.client.async_close()
     asyncio.run(run())
 
@@ -167,6 +167,5 @@ def test_stale_switch_cannot_configure_a_replaced_owner_or_changed_profile(monke
             assert "virtual_plug_charge" not in entry.options
         finally:
             await observer.async_stop()
-            await runtime.control.async_shutdown()
             await runtime.client.async_close()
     asyncio.run(run())

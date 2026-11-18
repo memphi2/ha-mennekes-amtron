@@ -17,7 +17,7 @@ The service owns the USB or LAN gateway connection, polling, heartbeat and charg
 HA connects to its authenticated HTTP API and never opens the adapter in service
 mode. This separates the hardware process from HA, as with Z-Wave JS, using HTTP
 instead of WebSocket. The shared driver has no Home Assistant dependency; see
-[Architecture](architecture.md#independent-service).
+[Architecture](architecture.md#one-service-runtime).
 
 The service's read-only flag is authoritative for HA write permission. HA keeps
 control entities registered and checks fresh connection/readiness state before
@@ -251,7 +251,7 @@ added to `intent.json` and is cancelled on service restart.
 
 ## Commands and API boundary
 
-Snapshots report `api_version: 2`, and authenticated endpoints use `/v2/`.
+Snapshots report `api_version: 3`, and authenticated endpoints use `/v2/`.
 The integration checks the API version and the snapshot's `service_version`.
 An unsupported API or a too old service produces the compatibility error; a
 malformed version or snapshot produces the data-validation error. Neither
@@ -304,24 +304,9 @@ may have made the safe defaults visible on disk. HA exposes this through
 **Settings → System → Repairs**. Repeated acknowledgements after a successful
 reset leave the current intent unchanged.
 
-Timed plans use two additional commands:
-
-| Command | Additional fields | Behavior |
-|---|---|---|
-| `timed_current` | `value`: requested amperes ≥6 (limited to the configured maximum), or `null` for pause; `owner`: nonempty string up to 128 characters; `deadline`: timezone-aware ISO timestamp up to 64 characters | Applies or queues this plan's requested current/pause only before its deadline. |
-| `cancel_timed_current` | `owner`: the same owner string | Removes only an unsent queued command belonging to that plan; manual queued work is preserved. |
-
-Both require `expected_serial_number` as above. The deadline is checked inside
-the service, so an obsolete queued request expires even while HA is offline.
-Expiry and cancellation do not reverse a command already applied or alter the
-last charging state. The integration cancels its owned pending work when a plan
-is cleared, replaced, completed or unloaded. Pending work remains volatile and
-is not restored after a service restart. The integration uses these two
-commands only with a service that does not plan departures itself.
-
 ### Command activity metadata
 
-Service 0.9.1 adds `origin` to command requests. It is an allowlisted diagnostic
+Command requests may carry `origin`. It is an allowlisted diagnostic
 source, not an authenticated user identity. The service validates and removes it
 before dispatching the command. It is a common optional field in addition to
 the action-specific fields documented here. A queued command retains its origin
@@ -337,16 +322,16 @@ acknowledgement from the independently observed charging state.
 ### Departure plan
 
 The service plans a departure itself; see
-[departure planning](departure-planning.md#with-the-modbus-service-app). The
-snapshot's `control` object reports `supports_departure_plan: true` and
-`departure`, which is `null` while the saved plan loads:
+[departure planning](departure-planning.md#how-the-service-plans). The
+snapshot's `control` object reports `departure`, which is `null` while the
+saved plan loads:
 
 | Field | Meaning |
 |---|---|
 | `trip` | `deadline` (ISO timestamp or `null`), `source` and `finished` (`reached`, `late` or `null`) |
 | `edit_revision` | Opaque persisted identifier changed by explicit trip edits, not by automatic completion; HA uses it to reject stale handovers |
 | `editor`, `selection_vehicle` | Last explicit editor (`ha` or `app`) and its vehicle binding; not public vehicle identity labels |
-| `status` | The plan's state, as shown by **Timed charging status** |
+| `status` | The plan's state, as shown by the `departure_plan` attribute of **Charging wait reason** |
 | `planned_start` | When charging starts or started for this trip, or `null` |
 | `estimated_soc` | The projected charge level in percent, or `null` |
 | `inputs` | Digest of the car data last handed over, or `null` |
@@ -384,7 +369,7 @@ access no bus:
 | `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
 | `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
 
-The plan writes through the same guarded path as `timed_current`, with the
+The plan writes through the same guarded path as other commands, with the
 owner `departure`. It is saved in `/data/departure-plan.json`, together with
 what the plan learned about up to eight cars, at most 8 KiB and bound to the
 wallbox identity. An unreadable file only clears the plan, and what it learned,
@@ -402,16 +387,16 @@ The driver also verifies a known serial over Modbus after a reconnection and
 before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
-unavailable until the original device can be verified again. Direct mode uses
-the same driver checks. Normal heartbeats reuse the verified connection;
+unavailable until the original device can be verified again. A direct entry
+runs this same service inside Home Assistant. Normal heartbeats reuse the verified connection;
 reconnects and a detected identity mismatch require verification again.
 
 Stop the bus owner before deliberately changing a gateway route or connected
 wallbox. Modbus serial numbers are not cryptographic authentication, and a
 physical routing change is not an authenticated identity change notification.
 
-The service enforces the same current-write floor, charging transition guards,
-device limits and bounded error-200 recovery as direct mode. All clients share one
+The service enforces the current-write floor, charging transition guards,
+device limits and bounded error-200 recovery for every client. All clients share one
 serialized command path. A command is rejected if the latest wallbox snapshot
 is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request

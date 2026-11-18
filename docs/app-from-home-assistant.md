@@ -3,8 +3,9 @@
 [Guide home](README.md) · [Everyday charging](user-guide.md) · [App interface](app-guide.md) · [Help](troubleshooting.md)
 
 Choose a ready-to-paste card below. It uses the integration's own entities: no
-extra helpers or separate wallbox card to maintain. HA and the app operate on
-the same shared limits; optional vehicle planning is configured in HA.
+extra helpers or separate wallbox card to maintain. It works for a direct USB
+or LAN entry and for an app entry alike; with the app, HA and the app operate
+on the same shared limits. Optional vehicle planning is configured in HA.
 
 ## Dashboard with Mushroom cards
 
@@ -21,9 +22,9 @@ scripts, packages, custom wallbox card or card-mod are required.
 | Nederlands | [YAML](../examples/dashboard/basic.nl.yaml) | [YAML](../examples/dashboard/app.nl.yaml) |
 | Italiano | [YAML](../examples/dashboard/basic.it.yaml) | [YAML](../examples/dashboard/app.it.yaml) |
 
-1. Install Mushroom. Guest charging requires the [service app](modbus-service.md),
-   write access and the minimum app version required by the integration. Targets and departure
-   planning also work with a direct connection; HA must then remain running.
+1. Install Mushroom. Controls, guest charging and targets need write access:
+   **Modbus master** for a direct entry, or the app's **Read-only** off with the
+   [service app](modbus-service.md).
 2. Copy the YAML for your language using GitHub's **Raw** view.
 3. Check IDs under **Settings → Devices & services → Entities**. The examples use
    `mennekes_amtron` and translated names. HA chooses IDs when entities are created;
@@ -51,10 +52,12 @@ One status tile and two rows of chips, so it fits next to other tiles:
    percentage target. Tap a chip to edit it: the time chip opens date and time
    input; **hold** it to clear the time. **Start guest** appears only while no
    guest is charging; **Pause** stops a guest. **Calendar** and **Vehicle
-   timer** appear only when vehicle planning offers them.
+   timer** appear with vehicle profiles; they run the `use_calendar_departure`
+   and `use_vehicle_departure` actions, which report an error when that source
+   is not configured.
 
-The card uses only the integration's entities and
-`mennekes_amtron_rtu.clear_target_time`; no helpers are needed.
+The card uses only the integration's entities and actions; no helpers are
+needed.
 
 ## Charge target
 
@@ -67,7 +70,8 @@ Saving a limit does not start charging. **0** disables an energy or percentage l
 Configure the recognized vehicle's SoC and usable capacity in HA, then set its
 percentage target and next trip time. [Departure planning](departure-planning.md)
 explains waiting, actual-power learning, calendar imports and preconditioning.
-The app shows the same shared time; it needs no separate planning editor.
+With the app, its pages show the same shared time; there is no separate
+planning editor.
 
 ## Guest charging
 
@@ -84,10 +88,12 @@ profile. [Set up vehicles](vehicle-setup.md).
 
 ## Storage and failed handovers
 
-HA and the app read the same saved limits. Guest permission itself is temporary;
-there is no saved guest order. An HA Core restart leaves the service running.
-After an app restart, the permission is restored only for the proven same plug-in.
-Otherwise the app stops charging and needs a new explicit guest start.
+The wallbox service keeps the saved limits; with the app, HA and the app read
+the same ones. Guest permission itself is temporary; there is no saved guest
+order. With the app, an HA Core restart leaves the service running; a direct
+entry's service restarts with HA. After a service restart, the permission is
+restored only for the proven same plug-in. Otherwise the service stops charging
+and needs a new explicit guest start.
 If a start response is lost, refresh and inspect the current state before retrying.
 
 ## Automation actions
@@ -99,5 +105,5 @@ Supply `device_id` if you have more than one wallbox. Stop with the ordinary pau
 - action: mennekes_amtron_rtu.start_guest_charging
 ```
 
-Old guest drafts, duration/current fields, stop/clear actions and the job API have
-been removed. Replace old dashboard YAML instead of adding missing helper entities.
+**Start guest charging** and **Guest charging** are the matching button and
+binary sensor; see [Entity reference](entities.md#guest-charging-and-shared-time).

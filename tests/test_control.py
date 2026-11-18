@@ -10,25 +10,30 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
-from custom_components.mennekes_amtron_rtu.data import (
-    DeviceIdentity,
-    WallboxData,
-    WriteDiagnostics,
-)
+from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.device.control import (
+    AmtronControl,
+    ControlOptions,
+)
+from custom_components.mennekes_amtron_rtu.device.data import (
+    DeviceIdentity,
+    WriteDiagnostics,
 )
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.enums import (
     CpState,
     EvseState,
     RequestedPhases,
-    SolarChargingMode,
+)
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
+    DeviceValidationError,
 )
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 
@@ -129,7 +134,7 @@ def test_zero_ampere_is_refused_without_an_explicit_opt_in() -> None:
 
     async def run() -> None:
         control = await harness.connect()
-        with pytest.raises(ServiceValidationError) as excinfo:
+        with pytest.raises(DeviceValidationError) as excinfo:
             await control.async_set_charging_current(0)
         assert excinfo.value.translation_key == "charging_current_zero"
 
@@ -154,7 +159,7 @@ def test_the_invalid_band_is_always_refused(value: float) -> None:
 
     async def run() -> None:
         control = await harness.connect()
-        with pytest.raises(ServiceValidationError) as excinfo:
+        with pytest.raises(DeviceValidationError) as excinfo:
             await control.async_set_charging_current(value)
         assert excinfo.value.translation_key == "charging_current_invalid"
 
@@ -167,7 +172,7 @@ def test_the_invalid_band_is_refused_even_with_the_opt_in() -> None:
 
     async def run() -> None:
         control = await harness.connect()
-        with pytest.raises(ServiceValidationError):
+        with pytest.raises(DeviceValidationError):
             await control.async_set_charging_current(1.0, allow_unlimited=True)
 
     asyncio.run(run())
@@ -341,13 +346,11 @@ def test_release_and_lock_write_their_registers() -> None:
         lambda control: _sequence(
             control.async_set_charging_release(True),
             control.async_set_lock_evse(True),
-            control.async_set_solar_charging_mode(SolarChargingMode.SUNSHINE),
         )
     )
     assert harness.written(R.CHARGING_RELEASE) == [[1]]
     assert harness.written(R.LOCK_EVSE) == [[1]]
-    assert harness.written(R.SOLAR_CHARGING_MODE) == [[2]]
-    assert harness.refreshes == 3
+    assert harness.refreshes == 2
 
 
 def test_the_phase_switch_needs_capable_hardware() -> None:
@@ -355,7 +358,7 @@ def test_the_phase_switch_needs_capable_hardware() -> None:
 
     async def run() -> None:
         control = await harness.connect()
-        with pytest.raises(ServiceValidationError) as excinfo:
+        with pytest.raises(DeviceValidationError) as excinfo:
             await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         assert excinfo.value.translation_key == "phase_switch_unsupported"
 
@@ -417,7 +420,7 @@ def test_a_rejected_pause_keeps_the_previously_accepted_setpoint() -> None:
         control.charging_setpoint = 10.0
         control.pause_requested = False
         harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 3
-        with pytest.raises(HomeAssistantError):
+        with pytest.raises(DeviceError):
             await control.async_pause_charging()
         assert control.charging_setpoint == 10.0
         assert control.pause_requested is False
@@ -508,7 +511,7 @@ def test_recovery_retains_a_pause_and_obeys_the_write_floor() -> None:
         await control.async_pause_charging()
         harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
         harness.clock[0] += 1
-        with pytest.raises(ServiceValidationError) as err:
+        with pytest.raises(DeviceValidationError) as err:
             await control.async_recover_from_error()
         assert err.value.translation_key == "write_rate_limited"
         assert err.value.translation_placeholders == {"seconds": "4"}
@@ -542,7 +545,7 @@ def test_restart_is_refused_outside_the_idle_state() -> None:
 
     async def run() -> None:
         control = await harness.connect()
-        with pytest.raises(ServiceValidationError) as excinfo:
+        with pytest.raises(DeviceValidationError) as excinfo:
             await control.async_restart()
         assert excinfo.value.translation_key == "restart_requires_idle"
 
@@ -577,12 +580,11 @@ def test_read_only_mode_refuses_every_write() -> None:
             control.async_resume_charging(),
             control.async_set_charging_release(True),
             control.async_set_lock_evse(True),
-            control.async_set_solar_charging_mode(SolarChargingMode.FAST),
             control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE),
             control.async_recover_from_error(),
             control.async_restart(),
         ):
-            with pytest.raises(ServiceValidationError) as excinfo:
+            with pytest.raises(DeviceValidationError) as excinfo:
                 await call
             assert excinfo.value.translation_key == "read_only_mode"
 
@@ -598,7 +600,7 @@ def test_a_bus_failure_becomes_a_translated_error_and_is_counted() -> None:
 
     async def run() -> None:
         control = await harness.connect()
-        with pytest.raises(HomeAssistantError) as excinfo:
+        with pytest.raises(DeviceError) as excinfo:
             await control.async_set_charging_release(True)
         assert excinfo.value.translation_key == "write_failed"
 
@@ -673,7 +675,7 @@ def test_lost_or_old_readback_cannot_lift_a_confirmed_pause(missing, command):
                   control.async_set_charging_current(
                       0 if command == "unlimited" else 8, allow_unlimited=True))
         if command == "recovery":
-            with pytest.raises(ServiceValidationError) as error:
+            with pytest.raises(DeviceValidationError) as error:
                 await action
             assert error.value.translation_placeholders == {"seconds": "4"}
         else:
@@ -714,7 +716,7 @@ def test_rejected_setpoint_does_not_change_the_later_resume(rejection: str) -> N
         harness.clock[0] += 1 if rejection == "cooldown" else 6
         if rejection == "device":
             harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 3
-        with pytest.raises(HomeAssistantError):
+        with pytest.raises(DeviceError):
             await control.async_set_charging_current(16)
         assert control.charging_setpoint == 8.0
         harness.transport.write_exceptions.clear()
@@ -870,7 +872,7 @@ def test_uncertain_pause_discards_an_older_queued_current(outcome):
         harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = (
             asyncio.CancelledError() if outcome == "cancelled" else raise_connection_error()
         )
-        with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError):
+        with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else DeviceError):
             await control.async_pause_charging()
         harness.transport.write_exceptions.clear()
         await flush
@@ -907,7 +909,7 @@ def test_uncertain_lower_current_discards_an_older_queued_increase(outcome, foll
 
         harness.transport.write_registers = apply_without_confirmation
         with pytest.raises(
-            asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError
+            asyncio.CancelledError if outcome == "cancelled" else DeviceError
         ):
             await control.async_set_charging_current(6)
         harness.transport.write_registers = original
@@ -961,7 +963,7 @@ def test_recovery_cannot_bypass_the_current_write_interval() -> None:
         await control.async_set_charging_current(6)
         harness.transport.bank[R.CHARGING_RELEASE.address] = 0
         harness.clock[0] += 4
-        with pytest.raises(ServiceValidationError) as err:
+        with pytest.raises(DeviceValidationError) as err:
             await control.async_recover_from_error()
         assert err.value.translation_key == "write_rate_limited"
         assert err.value.translation_placeholders == {"seconds": "1"}
@@ -1050,7 +1052,7 @@ def test_uncertain_pause_keeps_hysteresis_even_with_old_readback(outcome):
         control = await harness.connect()
         error = asyncio.CancelledError() if outcome == "cancelled" else raise_connection_error()
         harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = error
-        with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError):
+        with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else DeviceError):
             await control.async_pause_charging()
         harness.transport.write_exceptions.clear()
         harness.clock[0] += 1
@@ -1104,7 +1106,7 @@ def test_guarded_operations_refuse_unconfirmed_status_without_writes(operation, 
         control = await harness.connect()
         action = (control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
                   if operation == "phase" else control.async_restart())
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await action
         assert error.value.translation_key == f"{operation}_state_unknown"
         assert not harness.transport.writes
@@ -1128,7 +1130,7 @@ def test_restart_uses_fresh_device_status(cached, actual):
         if actual == EvseState.IDLE:
             await control.async_restart()
         else:
-            with pytest.raises(ServiceValidationError) as error:
+            with pytest.raises(DeviceValidationError) as error:
                 await control.async_restart()
             assert error.value.translation_key == "restart_requires_idle"
         assert bool(harness.written(R.SYSTEM_RESTART)) == (actual == EvseState.IDLE)
@@ -1156,7 +1158,7 @@ def test_an_uncertain_pause_retains_the_actual_resume_current(previous, outcome)
 
         harness.transport.write_registers = apply_without_confirmation
         with pytest.raises(
-            asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError
+            asyncio.CancelledError if outcome == "cancelled" else DeviceError
         ):
             await control.async_pause_charging()
         assert control.pause_requested is True
@@ -1187,7 +1189,7 @@ def test_uncertain_paused_recovery_retains_intent_over_fallback_current():
         harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = (
             raise_connection_error()
         )
-        with pytest.raises(HomeAssistantError):
+        with pytest.raises(DeviceError):
             await control.async_recover_from_error()
         assert control.pause_requested is True
         assert control.charging_setpoint == 8.0

@@ -207,17 +207,19 @@
       "charging": {
         "name": "Laden"
       },
-      "downgrade_active": {
-        "name": "Vermogensbeperking actief"
-      },
       "error": {
-        "name": "Storing"
-      },
-      "master_lost_fallback": {
-        "name": "Terugvalmodus energiemanager actief"
+        "name": "Storing",
+        "state_attributes": {
+          "heartbeat_lost": {
+            "name": "Terugvalmodus energiemanager actief"
+          }
+        }
       },
       "vehicle_connected": {
         "name": "Voertuig aangesloten"
+      },
+      "guest_charging": {
+        "name": "Gastladen"
       }
     },
     "button": {
@@ -229,15 +231,6 @@
       },
       "cancel_pending_change": {
         "name": "Wachtende wijziging annuleren"
-      },
-      "assign_vehicle_charge": {
-        "name": "Laadenergie van voertuig koppelen"
-      },
-      "timed_next_calendar_event": {
-        "name": "Volgende agenda-afspraak gebruiken"
-      },
-      "timed_vehicle_departure": {
-        "name": "Vertrektijd van voertuig overnemen"
       },
       "guest_start": {
         "name": "Gastladen starten"
@@ -327,22 +320,8 @@
         "name": "Temperatuur"
       },
       "wallbox_settings": {
-        "name": "Wallbox-instellingen"
-      },
-      "pending_change": {
-        "name": "Geplande wijziging",
-        "state": {
-          "none": "Geen wijziging gepland",
-          "pause": "Laden pauzeren",
-          "resume": "Laden hervatten",
-          "set_current": "Laadstroom instellen",
-          "single_phase": "Eén fase gebruiken",
-          "all_phases": "Alle beschikbare fasen gebruiken",
-          "enable_charging": "Laden toestaan",
-          "disable_charging": "Laadtoestemming uitschakelen",
-          "unlock": "Wallbox ontgrendelen",
-          "lock": "Wallbox vergrendelen"
-        }
+        "name": "Wallbox-instellingen",
+        "state_attributes": {}
       },
       "charging_status": {
         "name": "Laadstatus",
@@ -361,6 +340,11 @@
           "checking_status": "Status wordt gecontroleerd",
           "state_uncertain": "Status niet eenduidig",
           "data_missing": "Wachten op metingen"
+        },
+        "state_attributes": {
+          "downgraded_to": {
+            "name": "Vermogensbeperking actief"
+          }
         }
       },
       "connection_quality": {
@@ -376,24 +360,6 @@
           "retried_transactions": {
             "name": "Herhaalde transacties"
           }
-        }
-      },
-      "energy_goal_status": {
-        "name": "Status energiedoel",
-        "state": {
-          "disabled": "Uitgeschakeld",
-          "active": "Actief",
-          "reached": "Energiedoel bereikt",
-          "meter_unavailable": "Energiemeting niet beschikbaar",
-          "meter_reset": "Meterstand gedaald"
-        }
-      },
-      "soc_goal_status": {
-        "name": "Status van laaddoel van voertuig",
-        "state": {
-          "disabled": "Uitgeschakeld",
-          "active": "Actief",
-          "reached": "Doel bereikt"
         }
       },
       "last_charging_loss": {
@@ -442,70 +408,50 @@
           }
         }
       },
-      "timed_goal_status": {
-        "name": "Status geplande lading",
+      "operation_waiting": {
+        "name": "Wachtreden bij het laden",
         "state": {
-          "disabled": "Uitgeschakeld",
-          "waiting_for_target": "Wacht op procentdoel",
-          "waiting_for_capacity": "Wacht op accucapaciteit",
-          "waiting_for_soc": "Wacht op laadniveau",
-          "waiting_for_device": "Wacht op laadpaal",
+          "none": "Niets houdt het laden tegen",
+          "wallbox_unavailable": "Wallbox niet bereikbaar",
+          "no_vehicle": "Geen voertuig aangesloten",
+          "release_off": "Laadvrijgave uitgeschakeld",
+          "plug_charge_waiting": "Virtueel Plug & Charge heeft het voertuig niet vrijgegeven",
+          "meter_unavailable": "Wacht op de energiemeter",
           "vehicle_unconfirmed": "Voertuig niet bevestigd",
+          "until_planned_start": "Gepauzeerd tot de geplande start",
+          "estimated_target_reached": "Geladen tot het berekende doel",
+          "waiting_for_device": "Wacht op laadpaal",
+          "waiting_for_soc": "Wacht op laadniveau",
+          "waiting_for_capacity": "Wacht op accucapaciteit",
+          "waiting_for_target": "Wacht op procentdoel",
           "read_only": "Alleen lezen",
-          "guest_mode": "Gastladen heeft voorrang",
-          "queued": "Wijziging in wachtrij",
-          "paused_until_start": "Gepauzeerd tot start",
-          "minimum_level": "Laadt tot het minimumniveau",
-          "charging": "Laadt met volle stroom",
-          "finishing": "Rondt af met minimale stroom",
-          "unreachable": "Doel mogelijk onhaalbaar",
-          "late": "Streeftijd verstreken",
-          "estimated_reached": "Geladen tot het berekende doel",
-          "reached": "Doel bereikt",
-          "write_pending": "Schrijfopdracht wacht",
-          "error": "Fout"
-        }
-      },
-      "virtual_plug_charge_status": {
-        "name": "Status virtuele Plug & Charge",
-        "state": {
-          "waiting_vehicle": "Wacht op voertuig",
-          "waiting_detection": "Wacht op actuele voertuiggegevens",
-          "vehicle_not_selected": "Herkend voertuig niet geselecteerd",
-          "waiting_release": "Wacht op laadtoestemming",
-          "authorized": "Voertuig toegestaan",
-          "manual_release": "Handmatig vrijgegeven",
-          "blocked": "Laden geblokkeerd",
-          "disabled": "Uitgeschakeld"
+          "command_pending": "Wijziging in wachtrij",
+          "target_reached": "Doel bereikt",
+          "paused": "Laden gepauzeerd"
         },
         "state_attributes": {
-          "blocked_reason": {
-            "name": "Reden van blokkering",
+          "controller": {
+            "name": "Laadsturing",
             "state": {
-              "connection_lost": "Verbinding verloren",
-              "gate_inactive": "Vrijgavepoort niet actief",
-              "read_only": "Alleen-lezen-modus",
-              "departure_plan": "Vertrekplanning bereidt de laadstroom voor",
-              "pause_requested": "Laden gepauzeerd",
-              "release_off": "Laadvrijgave uitgeschakeld",
-              "energy_goal_stop": "Energiedoel bereikt",
-              "wallbox_locked": "Wallbox vergrendeld",
-              "error_code": "Wallboxfout",
-              "authorization_required": "Autorisatie op de wallbox ingeschakeld",
-              "register_unavailable": "Registerwaarde niet beschikbaar"
+              "unavailable": "Wallbox niet bereikbaar",
+              "departure_plan": "Vertrekplanning",
+              "direct": "Directe bediening",
+              "guest": "Gastopdracht"
             }
-          }
-        }
-      },
-      "operation_controller": {
-        "name": "Laadsturing",
-        "state": {
-          "unavailable": "Wallbox niet bereikbaar",
-          "departure_plan": "Vertrekplanning",
-          "direct": "Directe bediening",
-          "guest": "Gastopdracht"
-        },
-        "state_attributes": {
+          },
+          "next_event": {
+            "name": "Volgende laadstap",
+            "state": {
+              "none": "Niets gepland",
+              "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
+              "plan_start": "Gepland laden start",
+              "target_reached": "Doel verwacht",
+              "departure": "Doeltijd"
+            }
+          },
+          "next_at": {
+            "name": "Tijdstip"
+          },
           "vehicle": {
             "name": "Voertuig",
             "state": {
@@ -527,70 +473,95 @@
           },
           "target_deadline": {
             "name": "Streeftijd"
-          }
-        }
-      },
-      "operation_waiting": {
-        "name": "Wachtreden bij het laden",
-        "state": {
-          "none": "Niets houdt het laden tegen",
-          "wallbox_unavailable": "Wallbox niet bereikbaar",
-          "no_vehicle": "Geen voertuig aangesloten",
-          "release_off": "Laadvrijgave uitgeschakeld",
-          "plug_charge_waiting": "Virtueel Plug & Charge heeft het voertuig niet vrijgegeven",
-          "meter_unavailable": "Wacht op de energiemeter",
-          "vehicle_unconfirmed": "Voertuig niet bevestigd",
-          "until_planned_start": "Gepauzeerd tot de geplande start",
-          "estimated_target_reached": "Geladen tot het berekende doel",
-          "waiting_for_device": "Wacht op laadpaal",
-          "waiting_for_soc": "Wacht op laadniveau",
-          "waiting_for_capacity": "Wacht op accucapaciteit",
-          "waiting_for_target": "Wacht op procentdoel",
-          "read_only": "Alleen lezen",
-          "command_pending": "Wijziging in wachtrij",
-          "target_reached": "Doel bereikt",
-          "paused": "Laden gepauzeerd"
-        }
-      },
-      "operation_next": {
-        "name": "Volgende laadstap",
-        "state": {
-          "none": "Niets gepland",
-          "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
-          "plan_start": "Gepland laden start",
-          "target_reached": "Doel verwacht",
-          "departure": "Doeltijd"
-        },
-        "state_attributes": {
-          "at": {
-            "name": "Tijdstip"
-          }
-        }
-      },
-      "guest_charging": {
-        "name": "Gastladen",
-        "state": {
-          "inactive": "Inactief",
-          "active": "Actief"
-        },
-        "state_attributes": {
-          "start": {
-            "name": "Start"
           },
-          "finish": {
-            "name": "Einde"
+          "pending": {
+            "name": "Geplande wijziging",
+            "state": {
+              "none": "Geen wijziging gepland",
+              "pause": "Laden pauzeren",
+              "resume": "Laden hervatten",
+              "set_current": "Laadstroom instellen",
+              "single_phase": "Eén fase gebruiken",
+              "all_phases": "Alle beschikbare fasen gebruiken",
+              "enable_charging": "Laden toestaan",
+              "disable_charging": "Laadtoestemming uitschakelen",
+              "unlock": "Wallbox ontgrendelen",
+              "lock": "Wallbox vergrendelen"
+            }
           },
-          "current": {
-            "name": "Stroom"
+          "pending_at": {
+            "name": "Wachtende wijziging om"
           },
-          "energy": {
-            "name": "Energie"
+          "energy_target": {
+            "name": "Status energiedoel",
+            "state": {
+              "disabled": "Uitgeschakeld",
+              "active": "Actief",
+              "reached": "Energiedoel bereikt",
+              "meter_unavailable": "Energiemeting niet beschikbaar",
+              "meter_reset": "Meterstand gedaald"
+            }
           },
-          "delivered": {
-            "name": "Geladen"
+          "vehicle_target": {
+            "name": "Status van laaddoel van voertuig",
+            "state": {
+              "disabled": "Uitgeschakeld",
+              "active": "Actief",
+              "reached": "Doel bereikt"
+            }
           },
-          "reason": {
-            "name": "Reden"
+          "departure_plan": {
+            "name": "Status geplande lading",
+            "state": {
+              "disabled": "Uitgeschakeld",
+              "waiting_for_target": "Wacht op procentdoel",
+              "waiting_for_capacity": "Wacht op accucapaciteit",
+              "waiting_for_soc": "Wacht op laadniveau",
+              "waiting_for_device": "Wacht op laadpaal",
+              "vehicle_unconfirmed": "Voertuig niet bevestigd",
+              "read_only": "Alleen lezen",
+              "guest_mode": "Gastladen heeft voorrang",
+              "queued": "Wijziging in wachtrij",
+              "paused_until_start": "Gepauzeerd tot start",
+              "minimum_level": "Laadt tot het minimumniveau",
+              "charging": "Laadt met volle stroom",
+              "finishing": "Rondt af met minimale stroom",
+              "unreachable": "Doel mogelijk onhaalbaar",
+              "late": "Streeftijd verstreken",
+              "estimated_reached": "Geladen tot het berekende doel",
+              "reached": "Doel bereikt",
+              "write_pending": "Schrijfopdracht wacht",
+              "error": "Fout"
+            }
+          },
+          "plug_charge": {
+            "name": "Status virtuele Plug & Charge",
+            "state": {
+              "waiting_vehicle": "Wacht op voertuig",
+              "waiting_detection": "Wacht op actuele voertuiggegevens",
+              "vehicle_not_selected": "Herkend voertuig niet geselecteerd",
+              "waiting_release": "Wacht op laadtoestemming",
+              "authorized": "Voertuig toegestaan",
+              "manual_release": "Handmatig vrijgegeven",
+              "blocked": "Laden geblokkeerd",
+              "disabled": "Uitgeschakeld"
+            }
+          },
+          "plug_charge_blocked": {
+            "name": "Reden van blokkering",
+            "state": {
+              "connection_lost": "Verbinding verloren",
+              "gate_inactive": "Vrijgavepoort niet actief",
+              "read_only": "Alleen-lezen-modus",
+              "departure_plan": "Vertrekplanning bereidt de laadstroom voor",
+              "pause_requested": "Laden gepauzeerd",
+              "release_off": "Laadvrijgave uitgeschakeld",
+              "energy_goal_stop": "Energiedoel bereikt",
+              "wallbox_locked": "Wallbox vergrendeld",
+              "error_code": "Wallboxfout",
+              "authorization_required": "Autorisatie op de wallbox ingeschakeld",
+              "register_unavailable": "Registerwaarde niet beschikbaar"
+            }
           }
         }
       }
@@ -607,78 +578,21 @@
       },
       "virtual_plug_charge": {
         "name": "Virtuele Plug & Charge"
-      },
-      "release_off_on_unplug": {
-        "name": "Laadvrijgave uitschakelen bij loskoppelen"
       }
     },
     "event": {
-      "control_result": {
-        "name": "Besturingsresultaat",
+      "activity": {
+        "name": "Activiteit",
         "state_attributes": {
           "event_type": {
-            "name": "Opdracht en resultaat",
+            "name": "Soort",
             "state": {
-              "pause_executed": "Laden pauzeren: Opdracht voltooid",
-              "pause_replaced": "Laden pauzeren: Vervangen",
-              "pause_cancelled": "Laden pauzeren: Geannuleerd",
-              "pause_failed": "Laden pauzeren: Mislukt",
-              "pause_uncertain": "Laden pauzeren: Resultaat niet bevestigd",
-              "resume_executed": "Laden hervatten: Opdracht voltooid",
-              "resume_replaced": "Laden hervatten: Vervangen",
-              "resume_cancelled": "Laden hervatten: Geannuleerd",
-              "resume_failed": "Laden hervatten: Mislukt",
-              "resume_uncertain": "Laden hervatten: Resultaat niet bevestigd",
-              "set_current_executed": "Laadstroom instellen: Opdracht voltooid",
-              "set_current_replaced": "Laadstroom instellen: Vervangen",
-              "set_current_cancelled": "Laadstroom instellen: Geannuleerd",
-              "set_current_failed": "Laadstroom instellen: Mislukt",
-              "set_current_uncertain": "Laadstroom instellen: Resultaat niet bevestigd",
-              "single_phase_executed": "Eén fase gebruiken: Opdracht voltooid",
-              "single_phase_replaced": "Eén fase gebruiken: Vervangen",
-              "single_phase_cancelled": "Eén fase gebruiken: Geannuleerd",
-              "single_phase_failed": "Eén fase gebruiken: Mislukt",
-              "single_phase_uncertain": "Eén fase gebruiken: Resultaat niet bevestigd",
-              "all_phases_executed": "Alle beschikbare fasen gebruiken: Opdracht voltooid",
-              "all_phases_replaced": "Alle beschikbare fasen gebruiken: Vervangen",
-              "all_phases_cancelled": "Alle beschikbare fasen gebruiken: Geannuleerd",
-              "all_phases_failed": "Alle beschikbare fasen gebruiken: Mislukt",
-              "all_phases_uncertain": "Alle beschikbare fasen gebruiken: Resultaat niet bevestigd",
-              "disable_charging_executed": "Laadtoestemming uitschakelen: Opdracht voltooid",
-              "disable_charging_replaced": "Laadtoestemming uitschakelen: Vervangen",
-              "disable_charging_cancelled": "Laadtoestemming uitschakelen: Geannuleerd",
-              "disable_charging_failed": "Laadtoestemming uitschakelen: Mislukt",
-              "disable_charging_uncertain": "Laadtoestemming uitschakelen: Resultaat niet bevestigd",
-              "enable_charging_executed": "Laden toestaan: Opdracht voltooid",
-              "enable_charging_replaced": "Laden toestaan: Vervangen",
-              "enable_charging_cancelled": "Laden toestaan: Geannuleerd",
-              "enable_charging_failed": "Laden toestaan: Mislukt",
-              "enable_charging_uncertain": "Laden toestaan: Resultaat niet bevestigd",
-              "lock_executed": "Wallbox vergrendelen: Opdracht voltooid",
-              "lock_replaced": "Wallbox vergrendelen: Vervangen",
-              "lock_cancelled": "Wallbox vergrendelen: Geannuleerd",
-              "lock_failed": "Wallbox vergrendelen: Mislukt",
-              "lock_uncertain": "Wallbox vergrendelen: Resultaat niet bevestigd",
-              "unlock_executed": "Wallbox ontgrendelen: Opdracht voltooid",
-              "unlock_replaced": "Wallbox ontgrendelen: Vervangen",
-              "unlock_cancelled": "Wallbox ontgrendelen: Geannuleerd",
-              "unlock_failed": "Wallbox ontgrendelen: Mislukt",
-              "unlock_uncertain": "Wallbox ontgrendelen: Resultaat niet bevestigd",
-              "recovery_succeeded": "Foutherstel bevestigd",
-              "recovery_failed": "Foutherstel mislukt",
-              "recovery_uncertain": "Fout verhelpen: Resultaat niet bevestigd"
-            }
-          },
-          "result": {
-            "name": "Resultaat",
-            "state": {
-              "executed": "Opdracht voltooid",
-              "replaced": "Vervangen",
-              "cancelled": "Geannuleerd",
-              "failed": "Mislukt",
-              "uncertain": "Resultaat niet bevestigd",
-              "recovery_succeeded": "Foutherstel bevestigd",
-              "recovery_failed": "Foutherstel mislukt"
+              "command_done": "Opdracht uitgevoerd",
+              "command_failed": "Opdracht mislukt",
+              "command_cancelled": "Opdracht geannuleerd",
+              "session_started": "Voertuig aangesloten",
+              "session_ended": "Voertuig losgekoppeld",
+              "wallbox_changed": "Wijziging aan de wallbox"
             }
           },
           "action": {
@@ -694,6 +608,18 @@
               "unlock": "Wallbox ontgrendelen",
               "lock": "Wallbox vergrendelen",
               "recover": "Fout verhelpen"
+            }
+          },
+          "result": {
+            "name": "Resultaat",
+            "state": {
+              "executed": "Opdracht voltooid",
+              "replaced": "Vervangen",
+              "cancelled": "Geannuleerd",
+              "failed": "Mislukt",
+              "uncertain": "Resultaat niet bevestigd",
+              "recovery_succeeded": "Foutherstel bevestigd",
+              "recovery_failed": "Foutherstel mislukt"
             }
           },
           "reason": {
@@ -719,7 +645,7 @@
               "vehicle_waiting": "Wachten op een toegestaan voertuig"
             }
           },
-          "source": {
+          "trigger": {
             "name": "Aanleiding",
             "state": {
               "unknown": "Bron niet gemeld",
@@ -730,10 +656,11 @@
               "energy_goal": "Bescherming energiedoel",
               "soc_goal": "Laadniveau voertuig",
               "recovery": "Foutherstel",
-              "guest": "Gastladen"
+              "guest": "Gastladen",
+              "unplug": "Uitgetrokken"
             }
           },
-          "requested_value": {
+          "value": {
             "name": "Gevraagde registerwaarde",
             "state": {
               "0": "Geen softwarematige stroomlimiet"
@@ -741,13 +668,8 @@
           },
           "occurred_at": {
             "name": "Tijdstip"
-          }
-        }
-      },
-      "wallbox_event": {
-        "name": "Wallbox-gebeurtenis",
-        "state_attributes": {
-          "event_type": {
+          },
+          "change": {
             "name": "Wijziging",
             "state": {
               "vehicle_plugged_in": "Voertuig aangesloten",
@@ -877,14 +799,8 @@
     "energy_goal_stop_active": {
       "message": "Een laadgrens is bereikt, daarom blijft het laden gepauzeerd. Verhoog om verder te laden de kWh-grens of het procentdoel, of zet deze op 0; sla na een meterreset de grens opnieuw op. Een wijziging alleen start het laden niet."
     },
-    "energy_goal_state_invalid": {
-      "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
-    },
     "energy_goal_not_supported": {
       "message": "Deze Modbus-dienst ondersteunt geen energiedoelen. Werk eerst de app of de zelfstandige dienst bij."
-    },
-    "cancel_pending_not_supported": {
-      "message": "Deze Modbus-dienst kan wachtende wijzigingen niet annuleren. Werk eerst de app of de zelfstandige dienst bij."
     },
     "soc_goal_invalid": {
       "message": "Voer een doel van 0 tot 100% in, niet hoger dan de laadlimiet van het voertuig. 0 schakelt het percentagedoel uit."
@@ -898,14 +814,8 @@
     "soc_goal_source_changed": {
       "message": "De voertuigbronnen zijn gewijzigd. Herlaad de integratie voordat je het percentagedoel wijzigt."
     },
-    "soc_goal_app_update_required": {
-      "message": "Werk de Mennekes Modbus-serviceapp bij voordat je het laadpercentage van de auto wijzigt. Andere wallboxfuncties blijven beschikbaar."
-    },
     "soc_goal_not_supported": {
       "message": "De Modbus-dienst ondersteunt geen percentagedoelen voor het voertuig. Werk de app bij om deze optionele functie te gebruiken."
-    },
-    "soc_goal_state_invalid": {
-      "message": "Het opgeslagen laaddoel van het voertuig kon niet worden hersteld. Controleer de logboeken voordat je laden opnieuw toestaat."
     },
     "loss_source_invalid": {
       "message": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in."
@@ -948,12 +858,6 @@
     },
     "plug_charge_authorization_expired": {
       "message": "De voertuigtoestemming is verlopen of niet meer geldig. Wacht op actuele passende voertuiggegevens voordat je opnieuw probeert."
-    },
-    "plug_charge_not_supported": {
-      "message": "De verbonden Modbus-app of dienst ondersteunt virtuele Plug & Charge niet. Werk deze eerst bij naar een compatibele versie."
-    },
-    "app_required": {
-      "message": "Deze actie vereist de Modbus-app; deze wallbox is rechtstreeks verbonden."
     },
     "wallbox_target_required": {
       "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."
@@ -1020,7 +924,7 @@
         "step": {
           "confirm": {
             "title": "Laden geblokkeerd: opgeslagen instellingen geweigerd",
-            "description": "De app kan de opgeslagen instellingen niet lezen. Het bestand blijft behouden en automatisch laden is geblokkeerd. Bevestig veilige beginwaarden: pauze aan, laadvrijgave uit, hervatstroom 6 A, geen doelen. Laden start niet. Controleer daarna profielen, doelen en Plug & Charge voordat je vrijgeeft en hervat. In alleen-lezenmodus kan de app laden niet stoppen; controleer eerst de wallbox."
+            "description": "De opgeslagen instellingen kunnen niet worden gelezen. Het bestand blijft behouden en automatisch laden is geblokkeerd. Bevestig veilige beginwaarden: pauze aan, laadvrijgave uit, hervatstroom 6 A, geen doelen. Laden start niet. Controleer daarna profielen, doelen en Plug & Charge voordat je vrijgeeft en hervat. In alleen-lezenmodus kan het laden van hieruit niet worden gestopt; controleer eerst de wallbox."
           }
         },
         "error": {
@@ -1052,14 +956,18 @@
       },
       "wallbox_service": {
         "title": "Wallbox-instellingen van de app",
-        "description": "Deze wallbox loopt via de Modbus-app. De instellingen staan daarom daar en gelden ook voor Home Assistant.\n\nStroomlimiet: {current_cap} A\nMinimale tijd tussen statuswijzigingen: {state_change_interval} s\nExtra wachttijd vóór fasewissels: {phase_switch_grace} s\n\nWijzig deze waarden, de uitleesintervallen en de verbinding in de app onder Open webinterface. De schrijftoestemming staat op het tabblad Configuratie van de app."
+        "description": "Deze wallbox loopt via de Modbus-app. De instellingen staan daarom daar en gelden ook voor Home Assistant.\n\nStroomlimiet: {current_cap} A\nMinimale tijd tussen statuswijzigingen: {state_change_interval} s\nExtra wachttijd vóór fasewissels: {phase_switch_grace} s\n\nWijzig deze waarden, de uitleesintervallen en de verbinding in de app onder Open webinterface. De schrijftoestemming staat op het tabblad Configuratie van de app.",
+        "data": {
+          "release_off_on_unplug": "Laadvrijgave uitschakelen bij loskoppelen"
+        }
       },
       "wallbox_basic": {
         "title": "Stroomlimiet en uitlezen",
         "data": {
           "control_mode": "Besturingsmodus",
           "current_limit": "Maximale laadstroom",
-          "scan_interval_seconds": "Statusinterval"
+          "scan_interval_seconds": "Statusinterval",
+          "release_off_on_unplug": "Laadvrijgave uitschakelen bij loskoppelen"
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
@@ -1667,6 +1575,36 @@
     "clear_target_time": {
       "name": "Doeltijd wissen",
       "description": "Wist de gedeelde tijd zonder energie- of voertuigdoelen te wijzigen."
+    },
+    "use_calendar_departure": {
+      "name": "Volgende agenda-afspraak gebruiken",
+      "description": "Neemt de volgende passende agenda-afspraak over als doeltijd.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        }
+      }
+    },
+    "use_vehicle_departure": {
+      "name": "Vertrektijd van voertuig overnemen",
+      "description": "Neemt het volgende vertrek van het voertuig over als doeltijd.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        }
+      }
+    },
+    "assign_vehicle_charge": {
+      "name": "Laadenergie van voertuig koppelen",
+      "description": "Wijst de door het voertuig gemelde energie toe aan de laatste laadbeurt.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        }
+      }
     }
   }
 }

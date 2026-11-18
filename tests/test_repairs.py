@@ -68,8 +68,9 @@ def test_the_remaining_conditions_raise_their_issues(
             bank=device_bank(layout=R.LAYOUT_V01_02, fallback_current=0),
             layout=R.LAYOUT_V01_02,
         )
-        entry.runtime_data.diagnostics.writes_rejected = 1
-        entry.runtime_data.diagnostics.write_errors.add("charging_release")
+        entry.service.diagnostics.writes_rejected = 1
+        entry.service.diagnostics.write_errors.add("charging_release")
+        await entry.runtime_data.coordinator.async_refresh()
         repairs.async_check_repairs(hass, entry)
         assert "entry-1_ems_fallback_not_configured" in registry.created
         assert "entry-1_write_rejected" in registry.created
@@ -141,8 +142,9 @@ def test_failed_register_read_does_not_clear_a_confirmed_repair(
             bank=device_bank(error_code=200, fallback_current=0)
         )
         coordinator = entry.runtime_data.coordinator
-        clock = [coordinator._poller._monotonic()]
-        coordinator._poller._monotonic = lambda: clock[0]
+        poller = entry.service._poller
+        clock = [poller._monotonic()]
+        poller._monotonic = lambda: clock[0]
         repairs.async_setup_repairs(hass, entry)
         issue_id = f"{entry.entry_id}_{issue}"
         assert issue_id in registry.created
@@ -249,7 +251,7 @@ def test_expected_repair_failures_stay_in_the_dialog(monkeypatch, scenario, erro
         elif scenario == "write_failure":
             transport.write_exceptions[R.HEARTBEAT.address] = raise_connection_error()
         elif scenario == "rate_limit":
-            entry.runtime_data.client.write_state.limiter.record("charging_current_ems", now=time.monotonic())
+            entry.service.client.write_state.limiter.record("charging_current_ems", now=time.monotonic())
         flow = await repairs.async_create_fix_flow(hass, "x", {"entry_id": entry.entry_id})
         flow.hass = hass
         flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
@@ -309,19 +311,20 @@ def test_a_different_fault_during_confirmation_is_not_treated_as_recovered():
         flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
         result = await flow.async_step_confirm({})
         assert result["errors"] == {"base": "different_error"}
-        assert entry.runtime_data.diagnostics.recoveries == 1
+        assert entry.service.diagnostics.recoveries == 1
         await entry.runtime_data.client.async_close()
 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("state", ["missing", "unloaded", "direct", "offline"])
-def test_intent_reset_repair_handles_unavailable_entries(state):
+@pytest.mark.parametrize("state", ["missing", "unloaded", "offline", "loaded"])
+def test_intent_reset_repair_handles_unavailable_entries(monkeypatch, state):
     from unittest.mock import AsyncMock, Mock
 
     from homeassistant.exceptions import HomeAssistantError
 
     async def run():
+        registry = _patch(monkeypatch)
         hass, entry, _transport = await build_runtime()
         entry_id = entry.entry_id
         if state == "missing":
@@ -329,7 +332,7 @@ def test_intent_reset_repair_handles_unavailable_entries(state):
         elif state == "unloaded":
             hass.config_entries.entries[entry_id] = SimpleNamespace()
         elif state == "offline":
-            client = Mock(spec=repairs.RemoteClient)
+            client = Mock(spec=repairs.ServiceClient)
             client.execute = AsyncMock(side_effect=HomeAssistantError("offline"))
             entry.runtime_data.client = client
         flow = await repairs.async_create_fix_flow(
@@ -340,10 +343,15 @@ def test_intent_reset_repair_handles_unavailable_entries(state):
         flow.async_create_entry = lambda **kwargs: {"type": "create_entry"}
         flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
         result = await flow.async_step_confirm({})
-        if state == "missing":
+        if state in ("missing", "loaded"):
             assert result["type"] == "create_entry"
+            # Only an acknowledged reset clears its issue.
+            assert registry.deleted == (
+                [f"{entry_id}_{repairs.ISSUE_SERVICE_INTENT_REJECTED}"] if state == "loaded" else []
+            )
         else:
             assert result["errors"]["base"] == (
                 "recovery_failed" if state == "offline" else "entry_unavailable"
             )
+            assert registry.deleted == []
     asyncio.run(run())

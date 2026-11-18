@@ -48,7 +48,7 @@ def test_a_cancelled_switch_reloads_only_a_running_entry(monkeypatch, state, sto
     async def run():
         options = {"active_vehicle_profile": "b" * 32}
         runtime = SimpleNamespace(
-            client=object(), entry_data={}, vehicle_base_options=without_selection(options),
+            client=SimpleNamespace(snapshot={}), entry_data={}, vehicle_base_options=without_selection(options),
             vehicle_selection={"previous": True},
             coordinator=SimpleNamespace(retry_soc_goal=None), vehicle_switching=False,
         )
@@ -57,13 +57,21 @@ def test_a_cancelled_switch_reloads_only_a_running_entry(monkeypatch, state, sto
             state=ConfigEntryState(state),
         )
         reloaded = []
+
+        async def reload(_hass, reloading, *, force):
+            # Forced: no option changed, and the embedded service is kept.
+            assert force
+            reloaded.append(reloading.entry_id)
+
+        monkeypatch.setattr(integration, "async_reload_entry", reload)
         hass = SimpleNamespace(
             is_stopping=stopping,
-            config_entries=SimpleNamespace(async_schedule_reload=reloaded.append),
+            async_create_task=lambda target, _name: asyncio.create_task(target),
         )
         monkeypatch.setattr(integration, "_async_park_trip", AsyncMock(side_effect=asyncio.CancelledError))
         with pytest.raises(asyncio.CancelledError):
             await integration._async_switch_vehicle(hass, entry)
+        await asyncio.sleep(0)
         assert reloaded == (["entry"] if reloads else [])
         assert runtime.vehicle_switching is False
 
@@ -81,13 +89,12 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
     async def run():
         timed = SimpleNamespace(async_stop=AsyncMock())
         runtime = SimpleNamespace(
-            loaded_platforms=[], retain_client_on_unload=False, retain_cost_on_unload=False,
+            loaded_platforms=[], retain_cost_on_unload=False,
             retain_attribution_on_unload=True, vehicle_profile_id="a" * 32,
-            vehicle_detection=None, vehicle_binding=None, loss_attribution_unsubscribe=None,
+            vehicle_detection=None, vehicle_binding=None,
+            loss_attribution_unsubscribe=None,
             plug_charge=None, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
-            sessions=None, timed_goal=timed, vehicle_soc=None, soc_goal=None, goal=None,
-            recovery=None, heartbeat=None,
-            control=SimpleNamespace(async_shutdown=AsyncMock()),
+            timed_goal=timed, vehicle_soc=None,
             client=SimpleNamespace(async_close=AsyncMock()),
         )
         options = {**detection_catalog(), "active_vehicle_profile": selected}
@@ -98,7 +105,35 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
             data={f"{integration.DOMAIN}_reload_clients": {"entry": handoff}},
             config_entries=SimpleNamespace(async_unload_platforms=AsyncMock(return_value=True)),
         )
+        # No embedded service runs behind this entry.
+        monkeypatch.setattr(integration, "async_release", AsyncMock())
         assert await integration.async_unload_entry(hass, entry)
         timed.async_stop.assert_awaited_once_with(withdraw=withdraw)
+
+    asyncio.run(run())
+
+
+def test_a_forced_reload_rebuilds_the_runtime_although_no_option_changed(monkeypatch):
+    async def run():
+        runtime = SimpleNamespace(
+            plug_charge=None, charging_cost=None, entry_data={"other": 1}, identity=None,
+            retain_cost_on_unload=False, retain_attribution_on_unload=False,
+        )
+        entry = SimpleNamespace(entry_id="entry", data={}, options={}, runtime_data=runtime, state=None)
+        switch = AsyncMock(return_value=True)
+        monkeypatch.setattr(integration, "_async_switch_vehicle", switch)
+        monkeypatch.setattr(integration, "async_release", AsyncMock())
+        marks = []
+        monkeypatch.setattr(integration, "mark_reloading", lambda _hass, _id, on: marks.append(on))
+        reload = AsyncMock()
+        hass = SimpleNamespace(data={}, config_entries=SimpleNamespace(async_reload=reload))
+        # An option reload that only switched the car in place reloads nothing.
+        await integration.async_reload_entry(hass, entry)
+        reload.assert_not_awaited()
+        await integration.async_reload_entry(hass, entry, force=True)
+        reload.assert_awaited_once_with("entry")
+        switch.assert_awaited_once()
+        # The embedded service is kept through it.
+        assert marks == [True, False]
 
     asyncio.run(run())

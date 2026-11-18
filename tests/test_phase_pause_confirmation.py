@@ -5,13 +5,15 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import (
     CpState,
     EvseState,
     RequestedPhases,
+)
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceValidationError,
 )
 from tests.fakes import put, raise_connection_error
 from tests.test_control import Harness
@@ -102,7 +104,7 @@ def test_invalid_or_unreadable_cp_aborts_phase_command(cp):
             harness.transport.read_exceptions[R.CP_STATE.address] = raise_connection_error()
         else:
             put(harness.transport.bank, R.CP_STATE, cp)
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         assert error.value.translation_key == "phase_pause_state_unknown"
         assert harness.written(R.REQUESTED_PHASES) == []
@@ -121,7 +123,7 @@ def test_unsafe_initial_evse_state_is_rejected_before_any_write(state):
     async def run():
         harness = _harness(state=state)
         control = await harness.connect()
-        with pytest.raises(ServiceValidationError) as error:
+        with pytest.raises(DeviceValidationError) as error:
             await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         assert error.value.translation_key == "phase_pause_state_unknown"
         assert harness.transport.writes == []
