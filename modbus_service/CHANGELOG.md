@@ -1,5 +1,10 @@
 # Changes
 
+## 0.10.0b2
+
+- Integration and app must both be 0.10.0b2; update them together.
+- The state no longer carries the field `choice_revision`.
+
 ## 0.10.0b1
 
 - Log lines start with their area, such as `Service:`, `Connection:` or

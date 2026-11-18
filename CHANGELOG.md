@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0b2 — 2026-11-18
+
+### Changes
+
+- The app and the integration must both be 0.10.0b2; update them together.
+  Home Assistant refuses an older service.
+- The service no longer reports the field `choice_revision` in its state; the
+  integration never read it.
+- The documentation and the connection form no longer carry upgrade hints for
+  versions before 0.10.0.
+- Internal: the service's register monitor and live settings are part of the
+  service itself, and members nothing used are gone.
+- Test: the Recorder row check waits until the charging display has settled.
+
 ## 0.10.0b1 — 2026-11-15
 
 ### Breaking changes
