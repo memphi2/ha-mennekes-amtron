@@ -54,6 +54,7 @@ from .device.const import (
     DOMAIN,
 )
 from .device.errors import DeviceError
+from .device.notice import FailureNotice
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .embedded import (
     EmbeddedService,
@@ -430,6 +431,7 @@ async def async_setup_entry(
 
             entry.async_on_unload(async_track_tariff_midnight(hass, refresh_new_tariff_year))
         async_setup_repairs(hass, entry)
+        _keep_unplug_rule_handed_over(hass, entry, controls=entry.runtime_data.controls)
     except BaseException as err:
         try:
             try:
@@ -692,6 +694,38 @@ async def _async_release_after_failure(
         async_release_unless_retried(hass, entry)
     else:
         await async_release(hass, entry.entry_id, force=True)
+
+
+def _keep_unplug_rule_handed_over(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, *, controls: bool,
+) -> None:
+    """Hand the option over again when the service lost it, e.g. a reinstalled app."""
+    runtime = entry.runtime_data
+    notice = FailureNotice(_LOGGER, "Control")
+    busy: list[asyncio.Task[None]] = []
+
+    async def hand_over() -> None:
+        try:
+            await _async_hand_over_unplug_rule(runtime.client, entry, controls=controls)
+        except (DeviceError, HomeAssistantError) as err:
+            notice.failed(
+                "switching the release off after unplugging not handed to the service",
+                getattr(err, "translation_key", None) or type(err).__name__,
+            )
+        else:
+            notice.recovered("switching the release off after unplugging handed to the service")
+
+    def compare() -> None:
+        wanted = controls and entry.options.get(CONF_RELEASE_OFF_ON_UNPLUG) is True
+        if (
+            entry.state is ConfigEntryState.LOADED
+            and not (busy and not busy[0].done())
+            and runtime.client.connected
+            and runtime.client.snapshot.get("control", {}).get("release_off_on_unplug") is not wanted
+        ):
+            busy[:] = [entry.async_create_background_task(hass, hand_over(), "amtron_unplug_rule")]
+
+    entry.async_on_unload(runtime.coordinator.async_add_listener(compare))
 
 
 async def _async_hand_over_unplug_rule(client: ServiceClient, entry: MennekesAmtronConfigEntry, *, controls: bool) -> None:

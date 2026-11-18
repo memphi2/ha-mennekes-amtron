@@ -12,6 +12,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
+from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.unplug_release import (
     UnplugReleaseState,
 )
@@ -280,3 +281,91 @@ def test_an_older_wallbox_without_cp_state_goes_by_its_idle_state(tmp_path, monk
 
     asyncio.run(run())
 
+
+
+def test_a_release_queued_for_the_car_that_left_never_opens_later(tmp_path):
+    async def run():
+        service, transport, _clock = await _rule(tmp_path)
+        control = service.control
+        # Off and on again inside the state-change interval: the on waits.
+        await control.async_set_charging_release(False)
+        await control.async_set_charging_release(True)
+        assert control.pending_action == "enable_charging"
+        transport.writes.clear()
+        _plug(transport, False)
+        await _poll(service)
+        assert control.pending_action is None
+        assert control.charging_release_requested is False
+        assert transport.bank[R.CHARGING_RELEASE.address] == 0
+        assert _release_writes(transport)[-1] == 0
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_wallbox_that_cannot_prove_the_car_is_gone_waits_for_the_interval(tmp_path, monkeypatch):
+    async def run():
+        service, transport, clock = await _rule(tmp_path)
+        control = service.control
+        state = control.write_state.unplug_release
+        monkeypatch.setattr(service.identity, "layout_version", R.CP_STATE.min_layout - 1)
+        control.write_state.mode_change_at = clock[0]
+        transport.bank[R.EVSE_STATE.address] = 1
+        await _poll(service)
+        # No failure and nothing written: only later.
+        assert state.owed
+        assert _release_writes(transport) == []
+        clock[0] += 301
+        await service._close_release_after_unplug()
+        assert not state.owed
+        assert _release_writes(transport) == [0]
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_pause_that_cannot_be_ended_leaves_the_release_closed_and_nothing_owed(tmp_path, monkeypatch, caplog):
+    async def run():
+        service, transport, clock = await _rule(tmp_path)
+        control = service.control
+        await control.async_pause_charging()
+        clock[0] += 10
+
+        async def refused(**_kwargs):
+            raise DeviceError("write_failed")
+
+        monkeypatch.setattr(control, "async_resume_charging", refused)
+        _plug(transport, False)
+        await _poll(service)
+        assert not control.write_state.unplug_release.owed
+        assert transport.bank[R.CHARGING_RELEASE.address] == 0
+        assert "Control: pause not ended after unplugging (write_failed)" in caplog.text
+        assert "not switched off" not in caplog.text
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_failure_that_ended_with_the_car_coming_back_is_reported_anew_next_time(tmp_path, caplog):
+    async def run():
+        caplog.set_level(logging.DEBUG)
+        service, transport, _clock = await _rule(tmp_path)
+        write = transport.write_register
+
+        async def refused(address, value, **kwargs):
+            if address == R.CHARGING_RELEASE.address:
+                raise AmtronConnectionError("no answer")
+            return await write(address, value, **kwargs)
+
+        transport.write_register = refused
+        for _ in range(2):
+            _plug(transport, False)
+            await _poll(service)
+            # The car is back: nothing owed, and no wait left over.
+            _plug(transport, True)
+            await _poll(service)
+        failed = [r.levelno for r in caplog.records if "not switched off after unplugging" in r.getMessage()]
+        assert failed == [logging.WARNING, logging.WARNING]
+        await service.stop()
+
+    asyncio.run(run())

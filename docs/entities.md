@@ -279,7 +279,7 @@ Command events carry these attributes:
 | `action` | The command: `pause`, `resume`, `set_current`, `single_phase`, `all_phases`, `enable_charging`, `disable_charging`, `unlock`, `lock` or `recover`. |
 | `result` | The outcome alone: `executed`, `replaced`, `cancelled`, `failed`, `uncertain`, `recovery_succeeded` or `recovery_failed`. |
 | `reason` | Why: `completed`, `replaced`, `shutdown`, `phase_timeout`, `phase_unconfirmed`, `connection_error`, `write_rejected`, `permission_denied`, `status_refresh_failed`, `error_still_active`, `user_cancelled`, `energy_goal` (a charge target stopped it), `deadline_expired`, `time_limit` (an expired guest time prevents further starts), `guest_confirmation`, `vehicle_authorized`, `vehicle_waiting` or `unknown`. |
-| `trigger` | Which function asked for it, not an authenticated person: `home_assistant`, `app`, `plug_charge`, `departure_plan`, `energy_goal`, `soc_goal`, `recovery`, `guest` or `unknown`. |
+| `trigger` | Which function asked for it, not an authenticated person: `home_assistant`, `app`, `plug_charge`, `departure_plan`, `energy_goal`, `soc_goal`, `recovery`, `guest`, `unplug` or `unknown`. |
 | `value` | The requested setting where relevant, not measured current; 0 for `set_current` means no software current limit. |
 | `occurred_at` | When the service ran the command. The event's own timestamp is when HA received it. |
 

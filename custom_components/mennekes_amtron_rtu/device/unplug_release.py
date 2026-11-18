@@ -12,15 +12,12 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self
 
-from .client_errors import AmtronBusError
+from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .errors import DeviceError
 from .notice import FailureNotice
-from .registers import CP_STATE, EVSE_STATE
-from .vehicle import vehicle_connected
+from .vehicle import snapshot_vehicle_connected
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from .control import AmtronControl
     from .data import WallboxData
 
@@ -72,9 +69,8 @@ class UnplugReleaseState:
 class UnplugRelease:
     """Observe every poll; close the release once the wallbox confirms the car is gone."""
 
-    def __init__(self, control: AmtronControl, monotonic: Callable[[], float]) -> None:
+    def __init__(self, control: AmtronControl) -> None:
         self._control = control
-        self._monotonic = monotonic
         self._retry_at = 0.0
         self._notice = FailureNotice(_LOGGER, "Control")
 
@@ -84,38 +80,53 @@ class UnplugRelease:
 
     def observe(self, data: WallboxData) -> None:
         # Only values read in this poll decide: a held one is no evidence.
-        self.state.observe(vehicle_connected(
-            data.fresh(EVSE_STATE.key), data.fresh(CP_STATE.key),
-            cp_supported=self._control.layout_version >= CP_STATE.min_layout,
-        ))
+        self.state.observe(snapshot_vehicle_connected(data.fresh, self._control.layout_version))
 
     async def async_apply(self) -> None:
         """Switch off what is owed; the caller owns the command lock."""
         control = self._control
         state = self.state
-        if not state.owed or control.read_only or self._monotonic() < self._retry_at:
-            return
         if control.write_state.plug_charge.enabled:
             # The gate owns the release and keeps it closed without a car.
             state.owed = False
+        if not state.owed:
+            # Nothing left to do, however it ended: a later failure is a new one.
+            self._retry_at = 0.0
+            self._notice.recovered("no charging release left to switch off after unplugging")
+            return
+        if control.read_only or control.monotonic() < self._retry_at:
             return
         try:
             closed = await self._async_close()
-            if closed and control.pause_requested is True and not control.energy_goal_stop_requested:
-                # Without a car and with the release off, ending the pause
-                # lets no current flow; the next release starts at once.
-                await control.async_resume_charging()
+        except AmtronRateLimitedError as err:
+            # The state-change interval of a wallbox that cannot prove the
+            # car is gone: no failure, only later.
+            self._retry_at = control.monotonic() + err.retry_after
+            return
         except (DeviceError, AmtronBusError, OSError) as err:
-            self._retry_at = self._monotonic() + _RETRY_SECONDS
+            self._retry_at = control.monotonic() + _RETRY_SECONDS
             self._notice.failed(
                 "charging release not switched off after unplugging;"
                 f" retrying every {_RETRY_SECONDS} seconds",
                 err.translation_key if isinstance(err, DeviceError) else type(err).__name__,
             )
             return
-        if closed:
-            state.owed = False
-            self._notice.recovered("charging release switched off after unplugging")
+        if not closed:
+            return
+        state.owed = False
+        self._notice.recovered("charging release switched off after unplugging")
+        if control.pause_requested is True and not control.energy_goal_stop_requested:
+            # Without a car and with the release off, ending the pause lets
+            # no current flow; the next release starts at once.
+            try:
+                await control.async_resume_charging()
+            except (DeviceError, AmtronBusError, OSError) as err:
+                # The release is off, which is what the rule owes. The pause
+                # stays and its switch shows it.
+                _LOGGER.warning(
+                    "Control: pause not ended after unplugging (%s)",
+                    err.translation_key if isinstance(err, DeviceError) else type(err).__name__,
+                )
 
     async def _async_close(self) -> bool:
         """Write the release off; False while the wallbox does not confirm the car is gone."""

@@ -476,6 +476,7 @@ class ModbusService:
         finally:
             await self._persist()
 
+    @attributed("unplug")
     async def _close_release_after_unplug(self) -> None:
         if self.control is not None:
             self._phase = "closing the release after an unplug"

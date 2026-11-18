@@ -682,3 +682,43 @@ def test_setup_hands_the_unplug_rule_to_the_service_only_when_it_differs(monkeyp
         await entry.service.stop()
 
     asyncio.run(run())
+
+
+def test_a_service_that_lost_the_unplug_setting_gets_it_again(monkeypatch, caplog) -> None:
+    async def run() -> None:
+        hass, entry, _transport = await build_runtime()
+        entry.options = {**entry.options, "release_off_on_unplug": True}
+        runtime = entry.runtime_data
+        state = entry.service.client.write_state.unplug_release
+        integration._keep_unplug_rule_handed_over(hass, entry, controls=True)
+        failing = [True]
+        hand_over = integration._async_hand_over_unplug_rule
+
+        async def flaky(*args: object, **kwargs: object) -> None:
+            if failing[0]:
+                raise integration.DeviceError("service_unavailable")
+            await hand_over(*args, **kwargs)
+
+        monkeypatch.setattr(integration, "_async_hand_over_unplug_rule", flaky)
+        # The service does not have it: every poll compares, one task at a time.
+        runtime.coordinator.async_update_listeners()
+        runtime.coordinator.async_update_listeners()
+        assert len(entry.background_tasks) == 1
+        await asyncio.gather(*entry.background_tasks)
+        assert "not handed to the service (service_unavailable)" in caplog.text
+        assert not state.enabled
+        failing[0] = False
+        runtime.coordinator.async_update_listeners()
+        await asyncio.gather(*entry.background_tasks)
+        assert state.enabled
+        # Now they agree: nothing more is started, nor for an entry that is not loaded.
+        runtime.coordinator.async_update_listeners()
+        assert len(entry.background_tasks) == 2
+        entry.options = {}
+        entry.state = ConfigEntryState.NOT_LOADED
+        runtime.coordinator.async_update_listeners()
+        assert len(entry.background_tasks) == 2
+        await runtime.client.async_close()
+        await entry.service.stop()
+
+    asyncio.run(run())

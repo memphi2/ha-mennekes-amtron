@@ -205,7 +205,7 @@ class AmtronControl:
         self.goal_controller: EnergyGoalController | None = None
         self.soc_goal_controller: SocGoalController | None = None
         self._plug_charge = PlugChargeController(self)
-        self.unplug_release = UnplugRelease(self, lambda: self._monotonic())
+        self.unplug_release = UnplugRelease(self)
         self.guest_confirmation_required: Callable[[], bool] = lambda: False
         self.time_limit_reached: Callable[[], bool] = lambda: False
         self.guest_active: Callable[[], bool] = lambda: False
@@ -213,6 +213,10 @@ class AmtronControl:
     @property
     def layout_version(self) -> int:
         return self._identity.layout_version
+
+    def monotonic(self) -> float:
+        """The clock of the write intervals."""
+        return self._monotonic()
 
     @property
     def plug_charge(self) -> dict[str, object]:
@@ -918,15 +922,19 @@ class AmtronControl:
         return type(state) is int and state == EvseState.IDLE
 
     async def async_close_release(self, source: str) -> None:
-        """Switch the release off at once, for a rule of the service itself.
+        """Switch the release off for a rule of the service itself.
 
-        The caller holds ``energy_goal_guard``. No car is plugged in, so this
-        is no state change that has to wait.
+        The caller holds ``energy_goal_guard``. This is the ordinary stop:
+        where the wallbox cannot prove that no car is there, it waits for the
+        state-change interval (``AmtronRateLimitedError``) like any other.
         """
-        if await self._async_read_switch(CHARGING_RELEASE, stopping=True) != 0:
-            await self._async_write(CHARGING_RELEASE, 0, refresh=False)
+        if self._pending is not None and self._pending.action == "enable_charging":
+            # A release queued for the car that left must not open it later.
+            self._clear_pending(outcome="cancelled")
+        written = self._release_writes
+        await self._async_apply_release(False)
+        if self._release_writes != written:
             self.events.record("executed", "disable_charging", source=source)
-        self.charging_release_requested = False
 
     async def _async_vehicle_absent(self, read: LockedRegisterReader | None = None) -> bool:
         """Grant an exception only from fresh, consistent EVSE and CP readings."""
