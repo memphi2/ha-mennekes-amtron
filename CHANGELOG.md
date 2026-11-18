@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   integration never read it.
 - The documentation and the connection form no longer carry upgrade hints for
   versions before 0.10.0.
+- The Activity logbook text names the event time only when the command ran a
+  minute or more before Home Assistant received it; the row has its own time.
 - Internal: the service's register monitor and live settings are part of the
   service itself, and members nothing used are gone.
 - Test: the Recorder row check waits until the charging display has settled.

@@ -574,7 +574,7 @@ Command messages name the trigger (Plug & Charge, departure plan, target
 protection, app or Home Assistant), outcome and requested current where relevant.
 Home Assistant means a control or automation; it does not identify a person.
 Unknown sources are labelled explicitly. The original command time is shown in
-the app, included in HA's readable message and kept as the `occurred_at`
+the app, named in HA's readable message when it is a minute or more off, and kept as the `occurred_at`
 attribute. The HA Activity row and native event timestamp mark receipt in HA,
 which can be later. Reconnects establish a fresh cursor and do not replay
 commands that happened while HA was disconnected.

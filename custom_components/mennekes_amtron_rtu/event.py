@@ -42,6 +42,8 @@ _COMMAND_TYPES = {
     "failed": COMMAND_FAILED, "uncertain": COMMAND_FAILED, "recovery_failed": COMMAND_FAILED,
     "cancelled": COMMAND_CANCELLED, "replaced": COMMAND_CANCELLED,
 }
+# From this age on the logbook text names when the service ran the command.
+_LATE_SECONDS = 60
 # A car arriving or leaving frames a session; everything else is a change.
 _SESSION_TYPES = {"vehicle_plugged_in": SESSION_STARTED, "vehicle_unplugged": SESSION_ENDED}
 
@@ -175,9 +177,11 @@ class AmtronActivity(AmtronEntity, EventEntity):
         if event.reason != "completed":
             text += f". {self._label('reason', event.reason)}"
         text += "."
-        if event.occurred_at is not None:
-            # The logbook row is written now; the text keeps the service's
-            # own time, with the offset for a repeated hour at a clock change.
-            at = dt_util.as_local(datetime.fromisoformat(event.occurred_at))
+        occurred = datetime.fromisoformat(event.occurred_at) if event.occurred_at is not None else None
+        if occurred is not None and abs((dt_util.utcnow() - occurred).total_seconds()) >= _LATE_SECONDS:
+            # The logbook row carries its own time; only an event delivered
+            # late names the service's time, with the offset for a repeated
+            # hour at a clock change.
+            at = dt_util.as_local(occurred)
             text += f" {self._name('occurred_at', 'Occurred at')}: {at.isoformat(sep=' ', timespec='seconds')}."
         return text

@@ -179,7 +179,8 @@ def test_the_entity_reports_changes_after_a_baseline_and_restarts_after_a_failed
 
         await command("executed", "resume", source="plug_charge", requested_value=16)
         assert len(activity) == 1
-        assert activity[0].startswith("plug_charge: resume (16 A) - command_done. vehicle_authorized. Occurred at: ")
+        # A fresh event leaves its time to the logbook row.
+        assert activity[0] == "plug_charge: resume (16 A) - command_done. vehicle_authorized."
         assert entity.state_attributes["result"] == "executed"
         assert entity.state_attributes["trigger"] == "plug_charge"
         # Dragging the slider supersedes values; only the final outcome counts.
