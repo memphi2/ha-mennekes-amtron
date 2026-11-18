@@ -311,6 +311,7 @@ def test_the_service_measures_a_plug_cycle_and_answers_for_any_span(tmp_path):
                 for payload in (
                     {}, {"start": 1010}, {"start": "1010", "end": 1030},
                     {"start": True, "end": 1030}, {"start": 1010, "end": float("inf")},
+                    {"start": 1010, "end": 10**400},
                 ):
                     assert await api.dispatch("POST", "/v2/energy", payload) == (400, {"error": "invalid_request"})
                 # An answer that is no energy does not pass for one.

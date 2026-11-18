@@ -243,7 +243,8 @@ service data directory and private token in protected backups. A rejected
 intent file never counts as charging permission; the acknowledgement is
 described in [Updates](installation.md#updates).
 
-Heartbeats and polls do not create entries in that state file. The heartbeat
+Heartbeats and polls do not write `intent.json` or `departure-plan.json`; the
+charge meter is the only file saved on a timer. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
@@ -378,9 +379,10 @@ is derived from their published state and decides nothing:
 The overview page receives the same object as `operation` from
 `/api/overview`, or `null` when it does not validate.
 
-Two commands hand the plan over. Both need `expected_serial_number`, reject
-other fields and are accepted while the wallbox is unreachable, because they
-access no bus:
+Three commands carry data from Home Assistant without accessing the bus: two
+hand the plan over, one names the car of the plug cycle. Each needs
+`expected_serial_number`, rejects other fields and is accepted while the
+wallbox is unreachable:
 
 | Command | Additional fields | Behavior |
 |---|---|---|

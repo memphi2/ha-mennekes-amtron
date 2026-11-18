@@ -7,11 +7,11 @@ has one behavior and one error mapping whichever way it arrives.
 from __future__ import annotations
 
 import asyncio
-import math
 from typing import Any
 
 from .client_errors import AmtronBusError
 from .errors import DeviceError, DeviceValidationError
+from .meter_log import moment
 from .service_runtime import ModbusService
 
 Reply = tuple[int, dict[str, Any]]
@@ -73,13 +73,10 @@ class ServiceApi:
             raise ValueError("expected an object")
         if path == "/v2/energy":
             # From the meter log in memory: no bus access.
-            if set(payload) != {"start", "end"} or not all(
-                type(payload[key]) in (int, float) and math.isfinite(payload[key])
-                for key in ("start", "end")
-            ):
+            if set(payload) != {"start", "end"}:
                 raise ValueError("invalid energy span")
             return {"energy_kwh": service.charge_meter.log.energy_between(
-                float(payload["start"]), float(payload["end"]),
+                moment(payload["start"]), moment(payload["end"]),
             )}
         if path == "/v2/soc-goal/reserve":
             if payload != {}:

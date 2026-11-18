@@ -105,7 +105,6 @@ triggers:
   - trigger: state
     entity_id: event.mennekes_amtron_activity
     not_from:
-      - unknown
       - unavailable
     not_to:
       - unknown
