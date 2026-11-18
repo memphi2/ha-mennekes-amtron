@@ -22,7 +22,7 @@ from .device.control import pause_state
 from .device.decode import is_hex32
 from .device.departure_plan import DepartureInputs, DepartureState
 from .device.energy_goal import EnergyGoal
-from .device.enums import RequestedPhases
+from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
 from .device.operation import Operation
 from .device.registers import CHARGING_CURRENT_EMS
@@ -471,6 +471,10 @@ class ServiceControl:
     @ha_command
     async def async_set_lock_evse(self, locked: bool) -> None:
         await self._command("lock", value=locked)
+
+    @ha_command
+    async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
+        await self._command("solar", value=int(mode))
 
     @ha_command
     async def async_set_requested_phases(self, phases: RequestedPhases) -> None:

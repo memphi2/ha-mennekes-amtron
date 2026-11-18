@@ -255,6 +255,15 @@
           "single_phase": "Alleen één fase"
         }
       },
+      "solar_charging_mode": {
+        "name": "Weergavemodus zonnestroom",
+        "state": {
+          "fast": "Snel laden",
+          "not_active": "Niet actief",
+          "sunshine": "Zonnestroom",
+          "sunshine_plus": "Zonnestroom+"
+        }
+      },
       "active_vehicle": {
         "name": "Actief voertuig",
         "state": {
@@ -312,17 +321,7 @@
       },
       "wallbox_settings": {
         "name": "Wallbox-instellingen",
-        "state_attributes": {
-          "solar_mode": {
-            "name": "Weergavemodus zonnestroom",
-            "state": {
-              "fast": "Snel laden",
-              "not_active": "Niet actief",
-              "sunshine": "Zonnestroom",
-              "sunshine_plus": "Zonnestroom+"
-            }
-          }
-        }
+        "state_attributes": {}
       },
       "charging_status": {
         "name": "Laadstatus",

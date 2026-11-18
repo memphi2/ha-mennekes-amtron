@@ -50,7 +50,7 @@ from .const import (
 )
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
 from .energy_goal import EnergyGoal
-from .enums import CpState, EvseState, RequestedPhases
+from .enums import CpState, EvseState, RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError, device_error, validation_error
 from .plug_charge import PlugChargeController
 from .registers import (
@@ -63,6 +63,7 @@ from .registers import (
     HEARTBEAT,
     LOCK_EVSE,
     REQUESTED_PHASES,
+    SOLAR_CHARGING_MODE,
     SYSTEM_RESTART,
     RegisterSpec,
 )
@@ -757,6 +758,18 @@ class AmtronControl:
         self._require_write_access()
         async with self._current_lock:
             await self._async_submit_locked(_PendingCommand("lock" if locked else "unlock", int(locked)))
+
+    async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
+        """Set the solar charging mode shown on the wallbox (0x0D03).
+
+        It drives the wallbox display and its solar LEDs; the energy manager
+        stays responsible for the solar algorithm, and the wallbox needs DIP 7
+        on for the mode to have any effect. It switches no charge, so it
+        waits for no state-change interval.
+        """
+        self._require_write_access()
+        async with self._current_lock:
+            await self._async_write(SOLAR_CHARGING_MODE, int(mode))
 
     async def async_set_requested_phases(self, phases: RequestedPhases) -> None:
         """Request single-phase or all-phase charging through 0x0D04.

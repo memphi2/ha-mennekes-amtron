@@ -32,6 +32,14 @@
           "single_phase": "mdi:numeric-1-circle"
         }
       },
+      "solar_charging_mode": {
+        "default": "mdi:solar-power-variant-outline",
+        "state": {
+          "fast": "mdi:lightning-bolt",
+          "sunshine": "mdi:weather-sunny",
+          "sunshine_plus": "mdi:solar-power-variant"
+        }
+      },
       "active_vehicle": {
         "default": "mdi:car-multiple"
       }

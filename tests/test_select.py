@@ -30,7 +30,7 @@ async def _selects(**kwargs: object):
 def test_the_phase_select_exists_only_on_capable_hardware() -> None:
     async def run() -> None:
         selects, _entry, transport = await _selects()
-        assert set(selects) == {"requested_phases"}
+        assert set(selects) == {"requested_phases", "solar_charging_mode"}
         assert selects["requested_phases"].current_option == "all_available"
         transport.bank[R.CP_STATE.address] = int(R.CpState.A1)
         await selects["requested_phases"].async_select_option("single_phase")

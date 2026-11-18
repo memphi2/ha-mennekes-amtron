@@ -121,8 +121,8 @@ While a downgrade is active, read it back as the `downgraded_to` attribute of
 ### Solar mode — DIP 7
 
 **(Spec)** The solar charging mode has to be enabled with **DIP 7**. The
-integration shows the selected mode as the `solar_mode` attribute of
-`sensor.*_wallbox_settings`. The specification names the switch but not its
+integration shows and sets the selected mode with
+`select.*_solar_display_mode`. The specification names the switch but not its
 bank; check the installation manual.
 
 ## The §14a EnWG downgrade input

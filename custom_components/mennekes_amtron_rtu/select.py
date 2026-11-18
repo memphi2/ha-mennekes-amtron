@@ -1,4 +1,4 @@
-"""Selects: the phases to charge with, and the vehicle that is plugged in."""
+"""Selects: the phases to charge with, the solar mode shown, and the vehicle that is plugged in."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .device.decode import enum_option
-from .device.enums import RequestedPhases, enum_options
-from .device.registers import REQUESTED_PHASES, SWITCHED_PHASES
+from .device.enums import RequestedPhases, SolarChargingMode, enum_options
+from .device.registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE, SWITCHED_PHASES
 from .entity import AmtronEntity, Projection, Runtime, wanted
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
@@ -53,6 +53,20 @@ SELECTS: tuple[AmtronSelectDescription, ...] = (
                 SWITCHED_PHASES, runtime.coordinator.current_data().get(SWITCHED_PHASES.key)
             ),
         },
+    ),
+    # Drives the wallbox display and its solar LEDs; the energy manager runs
+    # the solar algorithm, and the wallbox needs DIP 7 on for any effect.
+    AmtronSelectDescription(
+        key="solar_charging_mode", register=SOLAR_CHARGING_MODE.key, writes=True,
+        entity_category=EntityCategory.CONFIG,
+        options=list(enum_options(SolarChargingMode)),
+        exists=lambda runtime: runtime.controls,
+        current=lambda runtime: enum_option(
+            SOLAR_CHARGING_MODE, runtime.coordinator.current_data().get(SOLAR_CHARGING_MODE.key)
+        ),
+        select=lambda runtime, option: runtime.control.async_set_solar_charging_mode(
+            SolarChargingMode[option.upper()]
+        ),
     ),
 )
 

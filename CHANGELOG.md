@@ -15,9 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   a direct connection had saved are not carried over; set them again.
 - The entity set is smaller. Removed: the sensors Operation controller, Next
   operation, Energy target status, Charge target status, Departure status,
-  Pending change, Virtual Plug & Charge status and Guest charging, the select
-  Solar charging mode, and the binary sensors Downgrade active, Heartbeat
-  lost and Master-lost fallback.
+  Pending change, Virtual Plug & Charge status and Guest charging, and the
+  binary sensors Downgrade active, Heartbeat lost and Master-lost fallback.
   - **Charging status** is the one sensor that says what the wallbox is
     doing. Its attributes carry the EVSE state, the CP state and
     `downgraded_to`, the limit of an active grid-operator downgrade.
@@ -25,8 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     its attributes carry the details.
   - **Error** carries the heartbeat and fallback state as attributes.
   - **Guest charging** is a binary sensor.
-  - The solar charging mode is the `solar_mode` attribute of the diagnostic
-    sensor Wallbox settings.
 - One event entity, **Activity**, replaces the command, wallbox and session
   event entities. Its event types are `command_done`, `command_failed`,
   `command_cancelled`, `session_started`, `session_ended` and
@@ -51,7 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The integration and the app must both be 0.10.0b1. Update them together;
   the service API is now version 3, and each side refuses the other's older
   version.
-- The wallbox's solar charging mode is shown and no longer changed.
 
 ### Changes
 

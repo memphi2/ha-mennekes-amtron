@@ -14,7 +14,7 @@
   `unplug_release_config`, also while Home Assistant is not running. Its
   state reports the setting as `control.release_off_on_unplug`. Control state
   saved by an older version is not taken over; acknowledge the reset.
-- The service no longer accepts the commands `solar`, `timed_current` and
+- The service no longer accepts the commands `timed_current` and
   `cancel_timed_current`; nothing sent them. Its state no longer carries the
   fields `supports_plug_charge`, `supports_cancel_pending`,
   `supports_departure_plan` and `soc_transactions_supported`.

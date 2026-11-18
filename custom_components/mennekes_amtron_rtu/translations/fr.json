@@ -255,6 +255,15 @@
           "single_phase": "Une seule phase"
         }
       },
+      "solar_charging_mode": {
+        "name": "Mode d’affichage solaire",
+        "state": {
+          "fast": "Charge rapide",
+          "not_active": "Inactif",
+          "sunshine": "Sunshine",
+          "sunshine_plus": "Sunshine+"
+        }
+      },
       "active_vehicle": {
         "name": "Véhicule actif",
         "state": {
@@ -312,17 +321,7 @@
       },
       "wallbox_settings": {
         "name": "Réglages de la wallbox",
-        "state_attributes": {
-          "solar_mode": {
-            "name": "Mode d’affichage solaire",
-            "state": {
-              "fast": "Charge rapide",
-              "not_active": "Inactif",
-              "sunshine": "Sunshine",
-              "sunshine_plus": "Sunshine+"
-            }
-          }
-        }
+        "state_attributes": {}
       },
       "charging_status": {
         "name": "État de la recharge",

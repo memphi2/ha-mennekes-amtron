@@ -12,8 +12,8 @@ blueprint:
     min_version: "2026.9.0"
   input:
     departure_time:
-      name: Next departure
-      description: The same Mennekes Amtron RTU Next departure used for the next trip.
+      name: Target time
+      description: The same Mennekes Amtron RTU Target time used for the next trip.
       selector:
         entity:
           filter:

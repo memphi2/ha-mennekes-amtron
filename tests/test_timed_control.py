@@ -235,12 +235,11 @@ def test_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkeypatch, 
 @pytest.mark.parametrize(
     "payload",
     [
-        {"command": "solar", "value": 1},
         {"command": "timed_current", "value": 6},
         {"command": "cancel_timed_current"},
     ],
 )
-def test_service_rejects_commands_that_only_run_inside_it(tmp_path, payload) -> None:
+def test_service_rejects_commands_it_no_longer_has(tmp_path, payload) -> None:
     async def run() -> None:
         service, transport, _clock = await service_fixture(tmp_path)
         try:

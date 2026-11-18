@@ -346,7 +346,6 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
             "grid_imbalance_monitoring": flag_attribute("grid_imbalance"),
             "grid_imbalance_threshold": number_attribute("grid_imbalance_threshold", 2),
             "solar_min_current": number_attribute("solar_min_current", 2),
-            "solar_mode": enum_attribute("solar_charging_mode"),
         }),
     ),
 )

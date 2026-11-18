@@ -26,7 +26,7 @@ from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
 from .energy_goal import EnergyGoal
 from .energy_goal_controller import EnergyGoalController
-from .enums import RequestedPhases
+from .enums import RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
@@ -872,6 +872,10 @@ class ModbusService:
                         await control.async_set_charging_release(value)
                     else:
                         await control.async_set_lock_evse(value)
+                elif command == "solar":
+                    await control.async_set_solar_charging_mode(
+                        SolarChargingMode(integer(value, 0, 3))
+                    )
                 elif command == "phases":
                     await control.async_set_requested_phases(
                         RequestedPhases(integer(value, 0, 1))

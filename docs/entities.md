@@ -175,6 +175,7 @@ does not send a charging command.
 | `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. With Virtual Plug & Charge enabled, switching it on releases the current or next connection by hand for any car until the next unplug; switching it off stops the current connection, also for a recognized car, until the next unplug. |
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | `all_available` or `single_phase`. A change while charging first pauses; resume separately after the waiting interval. The `switched` attribute is the wallbox's answer: the phases it will use when it next closes the relay. |
+| `select.*_solar_display_mode` | Solar display mode | always | The solar charging mode shown on the wallbox display and its solar LEDs. The energy manager runs the solar algorithm itself; the wallbox needs DIP 7 on for the mode to have any effect. Takes effect at once, without the state-change interval. |
 | `number.*_energy_target` | Energy target | lifetime energy counter | Additional kWh from the time you set it, in 0.1 kWh steps, up to 1000. Setting a positive value never starts or resumes charging. Zero disables the target without resuming. Its status is the `energy_target` attribute of **Charging wait reason**. |
 | `number.*_vehicle_charge_target` | Vehicle charge target | configured vehicle charge-level source | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. Its status is the `vehicle_target` attribute of **Charging wait reason**. |
 | `datetime.*_target_time` | Target time | always | One shared dated target: guest stop time or the selected car's next departure. A departure plan may resume a pause to meet this time; the ordinary percentage target alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
@@ -243,7 +244,7 @@ are disabled by default.
 | `sensor.*_authorization` | Authorization | | always | Whether RFID or the energy manager has released this session. The `enabled` attribute (layout v01.02) tells whether RFID authorization is switched on in the wallbox at all. |
 | `sensor.*_cable_lock` | Cable lock | | always | Cable locking. A 4You 310 has a fixed cable and reports `fixed_cable`. The `permanent` attribute (layout v01.02) tells whether permanent cable locking is switched on. |
 | `sensor.*_detected_vehicle_phases` | Detected vehicle phases | | layout v01.02 | How many phases the vehicle used in this session. The phases the wallbox itself will use are the `switched` attribute of **Requested phases**. |
-| `sensor.*_wallbox_settings` | Wallbox settings | | always | The installation, read from the wallbox: the state is the register layout the firmware implements (`v01.00` … `v01.03`), which decides which entities exist. The attributes are what the installer set with DIP switches and the service tool, so they change only when someone opens the wallbox: `max_current_house` (the installation limit, DIP switches 6-8 on bank S2, A), `max_evse_current` (the wallbox's own maximum and the upper bound of the charging-current limit, A), `phase_rotation`, `grid_phases_connected` (layout v01.02), `phase_options` (whether the hardware can switch between one and three phases, layout v01.01), `phase_switching_mode` (how the internal solar algorithm may use phases), `phase_switching_pause_seconds` (how long the wallbox pauses when it switches phases, layout v01.02), `grid_imbalance_monitoring` and `grid_imbalance_threshold` (A, layout v01.02), `solar_min_current` (the Sunshine+ minimum current, A, layout v01.02) and `solar_mode` (the solar mode shown on the wallbox display, which drives the display only). |
+| `sensor.*_wallbox_settings` | Wallbox settings | | always | The installation, read from the wallbox: the state is the register layout the firmware implements (`v01.00` … `v01.03`), which decides which entities exist. The attributes are what the installer set with DIP switches and the service tool, so they change only when someone opens the wallbox: `max_current_house` (the installation limit, DIP switches 6-8 on bank S2, A), `max_evse_current` (the wallbox's own maximum and the upper bound of the charging-current limit, A), `phase_rotation`, `grid_phases_connected` (layout v01.02), `phase_options` (whether the hardware can switch between one and three phases, layout v01.01), `phase_switching_mode` (how the internal solar algorithm may use phases), `phase_switching_pause_seconds` (how long the wallbox pauses when it switches phases, layout v01.02), `grid_imbalance_monitoring` and `grid_imbalance_threshold` (A, layout v01.02) and `solar_min_current` (the Sunshine+ minimum current, A, layout v01.02). The solar mode shown on the display is **Solar display mode**. |
 
 ## Binary sensors
 
@@ -337,6 +338,7 @@ and templates see.
 | `sensor.*_detected_vehicle_phases` | `not_initialized`, `one_phase`, `three_phases`, `two_phases` |
 | `sensor.*_cable_lock` | `fixed_cable`, `locked`, `undetermined`, `unlocked` |
 | `select.*_requested_phases` | `all_available`, `single_phase` |
+| `select.*_solar_display_mode` | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
 | `select.*_active_vehicle` | `none`, `automatic` (when automatic selection is available), and the names of your vehicle profiles |
 
 ### Attribute values
@@ -356,7 +358,6 @@ value leaves the attribute out.
 | `grid_phases_connected` on **Wallbox settings** | `l1`, `l1_l2_l3` |
 | `phase_options` on **Wallbox settings** | `one_phase_only`, `one_or_three_phases`, `three_phases_only` |
 | `phase_switching_mode` on **Wallbox settings** | `solar_dynamic`, `solar_one_phase`, `solar_three_phases` |
-| `solar_mode` on **Wallbox settings** | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
 
 ## Actions
 
