@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (`charge_meter` in its status) and answers `POST /v2/energy` for any time
   span; a restart of Home Assistant no longer interrupts a loss measurement.
   The service saves both in `charge-meter.json` and goes on measuring after
-  its own restart of less than two minutes. Home Assistant hands it the
+  its own ordinary restart of less than two minutes. Home Assistant hands it the
   recognized vehicle as a note on the plug cycle (command `charge_note`), so
   that name survives a restart as well.
   The charging cost takes the plug state and its gaps from there as well.

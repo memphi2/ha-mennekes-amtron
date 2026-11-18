@@ -262,7 +262,8 @@ still values all observed wallbox kWh. No PV/grid cost split is inferred.
 
 The service saves the meter readings, the plug cycle and the vehicle
 recognized for it. A restart of HA does not interrupt a loss measurement, and
-neither does a restart of the service that takes less than two minutes. Costs
+neither does an ordinary restart of the service that takes less than two
+minutes; after a crash or power loss that charge stays unmeasured. Costs
 are calculated in HA, which knows the prices: a cost across HA downtime stays
 incomplete, even with a fixed price.
 

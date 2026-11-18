@@ -38,11 +38,13 @@ class PresenceGap:
         self._unknown = known_at is not None
 
     def observe(self, now: float, *, known: bool) -> bool:
-        """Record one poll; return true when an unknown span became too long."""
+        """Record one poll; return true when the span since the last known one cannot be bridged."""
         if self._known_at is not None and now < self._known_at:
-            # The clock moved back: measure from this poll, known or not.
+            # The clock moved back: nobody knows how long this took, and
+            # older times no longer compare. Measure from this poll.
             self.reset()
             self._known_at = now
+            return True
         allowance = max(UNKNOWN_PRESENCE_GRACE_SECONDS, 2.5 * (self._interval or 0.0))
         if known and not self._unknown:
             # Between two known polls only a silent stall longer than any

@@ -33,7 +33,7 @@ from .errors import DeviceError, DeviceValidationError
 from .guest_limits import GuestLimits
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
-from .meter_log import ChargeMeter
+from .meter_log import ChargeMeter, moment
 from .notice import FailureNotice
 from .operation import summarize
 from .persistence import (
@@ -99,6 +99,7 @@ class ModbusService:
         self._meter_store: ChargeMeterStore | None = None
         # What of the plug cycle was last saved, and when.
         self._meter_saved: tuple[object, float] | None = None
+        self._meter_lock = asyncio.Lock()
         self._meter_notice = FailureNotice(_LOGGER, "Charging loss")
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
@@ -441,27 +442,37 @@ class ModbusService:
         now = time.monotonic()
         if not force and saved is not None and saved[0] == cycle and now - saved[1] < _METER_SAVE_SECONDS:
             return
-        self._meter_saved = (cycle, now)
-        try:
-            await asyncio.to_thread(store.save, meter.dump())
-        except (OSError, ValueError) as err:
-            self._meter_notice.failed("meter log not saved", type(err).__name__)
-        else:
-            self._meter_notice.recovered("meter log saved again")
+        # Shielded and one at a time: the write of a cancelled poll must not
+        # overtake the one at stop and leave the older state on disk.
+        await asyncio.shield(self._write_charge_meter(store, cycle, now, meter.dump()))
+
+    async def _write_charge_meter(
+        self, store: ChargeMeterStore, cycle: object, at: float, payload: dict[str, Any],
+    ) -> None:
+        async with self._meter_lock:
+            try:
+                await asyncio.to_thread(store.save, payload)
+            except (OSError, ValueError) as err:
+                # Not recorded as saved: the next poll tries again.
+                self._meter_notice.failed("meter log not saved", type(err).__name__)
+            else:
+                self._meter_saved = (cycle, at)
+                self._meter_notice.recovered("meter log saved again")
 
     async def _charge_note(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Home Assistant names the car of the running plug cycle; no bus access."""
         if payload.keys() != {"command", "plugged_at", "note", "expected_serial_number"}:
             raise ValueError("invalid charge note")
-        plugged_at = payload["plugged_at"]
-        if isinstance(plugged_at, bool) or not isinstance(plugged_at, (int, float)) or not math.isfinite(plugged_at):
-            raise ValueError("invalid charge note")
+        try:
+            plugged_at = moment(payload["plugged_at"])
+        except ValueError:
+            raise ValueError("invalid charge note") from None
         if self._stopping:
             raise DeviceError("service_unavailable")
         if payload["expected_serial_number"] != self.identity.serial_number:
             raise DeviceError("device_identity_changed")
         # A cycle that ended meanwhile keeps its note; the answer shows it.
-        if self.charge_meter.annotate(float(plugged_at), payload["note"]):
+        if self.charge_meter.annotate(plugged_at, payload["note"]):
             await self._save_charge_meter(force=True)
         if self._command_lock.locked():
             # Another command still runs; its outcome is not this one's.

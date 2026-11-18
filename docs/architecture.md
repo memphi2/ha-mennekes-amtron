@@ -340,8 +340,9 @@ the same cycle makes it nobody's. The note supplies only loss settings after
 automatic deselection; it cannot reactivate SoC or departure goals.
 
 Meter, cycle and note are saved in `charge-meter.json`, so they outlast a
-restart of Home Assistant and a restart of the service shorter than the gap
-rule allows. A controlled reload hands over a compatible cost observer with
+restart of Home Assistant and an ordinary restart of the service shorter than
+the gap rule allows; after a crash the saved state can be five minutes old,
+and the cycle then ends unmeasured. A controlled reload hands over a compatible cost observer with
 its meter baseline and price observations; a full unload or a failed setup
 closes it. Estimates add no Recorder writes beyond their own results.
 

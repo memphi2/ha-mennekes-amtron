@@ -59,8 +59,51 @@ def test_a_meter_that_goes_back_or_a_clock_step_starts_the_log_again() -> None:
 
 def test_the_log_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(meter_log, "_MAX_READINGS", 3)
-    log = filled((0, 1), (1, 2), (2, 3), (3, 4))
-    assert log._times == [1, 2, 3]
+    log = filled((0, 1), (100, 2), (200, 3), (300, 4))
+    assert log._times == [100, 200, 300]
+
+
+def test_a_long_charge_at_a_short_poll_interval_keeps_its_plug_in() -> None:
+    log = MeterLog()
+    log.observe(0, 100)
+    log.observe(1000, 100)
+    # Twelve hours of charging, read every two seconds.
+    for step in range(1, 21601):
+        log.observe(1000 + 2 * step, 100 + step * 0.001)
+    log.observe(50000, 121.6)
+    assert len(log._times) < 1000
+    # Where the rise begins and ends, the readings are exact.
+    assert log._times[:2] == [0, 1000]
+    assert log._times[-2:] == [44200, 50000]
+    assert log.energy_between(1000, 44200) == pytest.approx(21.6)
+    assert log.energy_between(500, 46000) == pytest.approx(21.6)
+    assert log.energy_between(1000, 1000 + 7200) == pytest.approx(3.6)
+
+
+def test_a_clock_that_moves_back_ends_the_cycle_unmeasured() -> None:
+    meter = ChargeMeter()
+    meter.observe(1000, present=False, reading=10)
+    meter.observe(1010, present=True, charging=True, reading=10)
+    assert meter.annotate(1010, "car")
+    meter.observe(900, present=True, charging=True, reading=11)
+    assert (meter.plugged_at, meter.note, meter.known_since) == (None, None, 900)
+    meter.observe(905, present=False, reading=11)
+    assert meter.last is None
+    parse_charge_meter(meter.snapshot())
+    # The same after a restart: a saved state from a later clock is not continued.
+    meter.observe(910, present=True, reading=11)
+    restarted = ChargeMeter()
+    restarted.restore(meter.dump())
+    restarted.observe(800, present=True, reading=11)
+    assert restarted.plugged_at is None
+
+
+def test_a_number_too_large_for_a_time_is_refused() -> None:
+    with pytest.raises(ValueError, match="invalid charge meter time"):
+        meter_log.moment(10**400)
+    saved = ChargeMeter().dump() | {"known_at": 10**400}
+    with pytest.raises(ValueError, match="invalid charge meter time"):
+        ChargeMeter().restore(saved)
 
 
 def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
@@ -94,10 +137,10 @@ def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
     assert meter.known_since == 900
     meter.observe(910, present=False)
     assert meter.last == (30, 70)
-    # A clock that stepped back measures the gap from there.
+    # A clock that stepped back knows the state only from there on.
     meter.observe(500, present=None)
     meter.observe(510, present=False)
-    assert meter.known_since == 900
+    assert meter.known_since == 510
     assert meter.present is False
 
 

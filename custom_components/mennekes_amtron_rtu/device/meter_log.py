@@ -15,6 +15,9 @@ from typing import Any
 from .presence_gap import PresenceGap
 
 _MAX_READINGS = 4096
+# While the meter rises, one reading per this span is kept: a long charge at
+# a short poll interval must not push its own plug-in out of the log.
+_RISING_SPACING_SECONDS = 60.0
 # Two readings further apart than this, with energy between them, cannot
 # place a boundary: nobody saw when that energy flowed.
 MAX_INTERPOLATION_SECONDS = 600.0
@@ -29,12 +32,21 @@ def _note(value: object) -> str | None:
     return value
 
 
-def _moment(value: object) -> float | None:
-    if value is None:
-        return None
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+def moment(value: object) -> float:
+    """A finite number as float; an integer too large for one is refused as well."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("invalid charge meter time")
-    return float(value)
+    try:
+        number = float(value)
+    except OverflowError as err:
+        raise ValueError("invalid charge meter time") from err
+    if not math.isfinite(number):
+        raise ValueError("invalid charge meter time")
+    return number
+
+
+def _moment(value: object) -> float | None:
+    return None if value is None else moment(value)
 
 
 class MeterLog:
@@ -58,6 +70,14 @@ class MeterLog:
             return
         if len(self._values) >= 2 and self._values[-1] == self._values[-2] == kwh:
             self._times[-1] = at
+            return
+        if (
+            len(self._values) >= 2 and self._values[-2] < self._values[-1] < kwh
+            and at - self._times[-2] < _RISING_SPACING_SECONDS
+        ):
+            # Inside an even rise the newer reading replaces the last one;
+            # where a rise begins or ends, both readings stay.
+            self._times[-1], self._values[-1] = at, kwh
             return
         self._times.append(at)
         self._values.append(kwh)

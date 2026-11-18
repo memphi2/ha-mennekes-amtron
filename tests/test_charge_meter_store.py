@@ -73,7 +73,7 @@ def test_a_note_needs_the_running_cycle_of_this_wallbox(tmp_path):
                 await observe(service, transport, clock, 1020, EvseState.CHARGING, 100)
                 for payload in (
                     note(service, 1020, "car", extra=1), note(service, True, "car"),
-                    note(service, "1020", "car"), note(service, float("nan"), "car"),
+                    note(service, "1020", "car"), note(service, float("nan"), "car"), note(service, 10**400, "car"),
                     note(service, 1020, ""), note(service, 1020, 5),
                 ):
                     with pytest.raises(ValueError, match="note"):
@@ -143,10 +143,12 @@ def test_the_meter_is_saved_at_a_change_and_else_every_five_minutes(tmp_path, mo
                 await observe(service, transport, clock, 1050, EvseState.CHARGING, 102)
                 assert saves == [1030, 1030]
                 # A disk that refuses is reported once and costs no measurement.
+                # It is tried again at the next poll, not five minutes later.
                 failing.extend([OSError("full"), OSError("full")])
-                for at in (1060, 1070, 1080):
-                    service._meter_saved = None
+                service._meter_saved = None
+                for at in (1060, 1070, 1080, 1090):
                     await observe(service, transport, clock, at, EvseState.CHARGING, 103)
+                assert len(saves) == 5
                 assert [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING] == [
                     "Charging loss: meter log not saved (OSError)",
                 ]
