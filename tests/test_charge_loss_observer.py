@@ -904,3 +904,68 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+def test_a_charge_that_could_not_be_saved_is_booked_before_what_came_after(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        observer._profiled, observer._profile_id = True, "a" * 32
+        mine, now = SimpleNamespace(id="a" * 32), time.time()
+        named = patch(
+            "custom_components.mennekes_amtron_rtu.charge_loss_observer.last_cycle",
+            side_effect=lambda _entry: getattr(coordinator, "last", None),
+        )
+        named.start()
+        try:
+            await observer.async_start()
+            coordinator.owner = mine
+            with patch.object(observer._store, "async_save", AsyncMock(side_effect=OSError("full"))):
+                charge = coordinator.complete(at=now - 2000)
+                await hass.async_block_till_done()
+                assert not observer.available
+                # Another car follows before the disk works again.
+                coordinator.owner = SimpleNamespace(id="b" * 32)
+                coordinator.complete(at=now - 1000)
+                await hass.async_block_till_done()
+            assert observer._cycle.unplugged_at == now - 2000
+            observer._last_storage_attempt = float("-inf")
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer.available
+            assert observer.statistics.last_charge == charge
+            # Only then the other car's cycle is taken; it changes nothing.
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer._cycle.unplugged_at == now - 1000
+            assert observer._assignable is None
+            assert observer.statistics.status == "waiting_for_vehicle"
+            # After a restart a plug-in without charging keeps that charge assignable.
+            coordinator.owner = mine
+            observer._cycle = None
+            coordinator.meter.observe(now - 500, coordinator.total)
+            coordinator.meter.observe(now - 100, coordinator.total)
+            coordinator.cycle(now - 400, now - 200)
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer._assignable == charge
+            coordinator.meter.observe(now - 50, coordinator.total)
+            coordinator.cycle(now - 90, now - 80)
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer._assignable == charge
+            # A save whose outcome stayed open is repeated, also with nothing new to book.
+            coordinator.owner = None
+            coordinator.complete(at=now - 10)
+            await hass.async_block_till_done()
+            assert observer._assignable is None
+            observer._storage_ok, observer._last_storage_attempt = False, float("-inf")
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer.available
+            assert observer.statistics.last_charge == charge
+        finally:
+            named.stop()
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

@@ -262,8 +262,11 @@ class ChargeLossObserver:
             # The reading after the unplug is still to come.
             return
         if energy == 0:
-            # Plugged in without charging: everything stays as it was.
+            # Plugged in without charging: everything stays as it was, also
+            # when this is the first cycle seen since a restart.
             self._cycle = cycle
+            if self._charge is None and not self._lost:
+                self._charge = self.statistics.last_charge
         elif energy is None:
             # The meter cannot measure it: the charge before is no longer the last one.
             self._cycle, self._charge, self._lost = cycle, None, True
@@ -287,14 +290,19 @@ class ChargeLossObserver:
             if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
                 await self._measure_record()
                 continue
-            await self._take_plug_cycle()
-            # Nothing is booked while a newer cycle is still open.
-            charge = self._assignable
-            if charge is None and not (self._lost and self._decided):
+            # What could not be saved is booked first, whatever came after;
+            # otherwise nothing is booked while a newer cycle is still open.
+            retry = not self._storage_ok
+            if not retry:
+                await self._take_plug_cycle()
+            settled = retry or self._decided
+            charge = self._charge if settled else None
+            lost = self._lost and settled
+            if charge is None and not lost and not retry:
                 continue
             energy: float | None = None
             change: tuple[float, float] | None = None
-            if charge is not None and self._auto and self._change is not None and self._unplugged():
+            if charge is not None and self._decided and self._auto and self._change is not None and self._unplugged():
                 at, value = self._change
                 if self._started_at <= charge.end <= at <= charge.end + LOSS_MATCH_WINDOW_SECONDS:
                     energy = value
@@ -303,7 +311,8 @@ class ChargeLossObserver:
                 if self._stopping:
                     continue
                 candidate = LossStatistics.restore(self.statistics.snapshot())
-                candidate.observe_charge(charge)
+                if charge is not None or lost:
+                    candidate.observe_charge(charge)
                 if charge is not None and energy is not None and self._change is change:
                     candidate.apply(charge, energy, association="changed_value")
                 if await self._save(candidate) and change is not None and self._change is change:
