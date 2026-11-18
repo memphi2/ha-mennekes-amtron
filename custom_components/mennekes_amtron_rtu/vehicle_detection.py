@@ -254,7 +254,7 @@ class VehicleDetectionObserver:
         selected = self.effective(active, wallbox_connected=self._wallbox_connected(), plugged_at=plugged_at)
         if selected == active:
             if selected is not None and selected == self.selected(plugged_at):
-                confirm_automatic_vehicle(self._hass, self._entry, selected)
+                confirm_automatic_vehicle(self._entry, selected)
             self._cancel_pending()
             return
         if selected is None:
@@ -297,7 +297,7 @@ class VehicleDetectionObserver:
 
     def _apply(self, selected: str | None) -> None:
         if selected is not None:
-            confirm_automatic_vehicle(self._hass, self._entry, selected)
+            confirm_automatic_vehicle(self._entry, selected)
         updated = activate_profile(self._entry.options, selected)
         if updated != dict(self._entry.options):
             self._hass.config_entries.async_update_entry(self._entry, options=updated)

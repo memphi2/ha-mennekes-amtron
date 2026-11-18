@@ -229,7 +229,7 @@ vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapt
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
 charge_loss_observer.py  bounded matching and durable loss aggregate
-charge_watch.py  the vehicle recognized for a plug cycle the service measured
+charge_watch.py  names the vehicle of a plug cycle to the service that measured it
 device/meter_log.py  the service's bounded total-energy readings and plug cycle
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
 number.py select.py switch.py button.py datetime.py  control tables
@@ -300,16 +300,17 @@ tracker coordinates without restore provenance cannot prove measurement
 freshness. A GPS accuracy circle crossing the Home-zone boundary is unknown. Detection remains a heuristic; manually selecting a
 profile is always possible. Manual loss matching requires the profile to have
 been selected before charging. Automatic selection can arrive later: the
-charge watch (`charge_watch.py`) records the uniquely confirmed vehicle within
-the plug cycle Home Assistant saw from plug-in to unplug. A conflicting profile
-or observation loss prevents attribution. This record supplies only loss
+charge watch (`charge_watch.py`) hands the uniquely confirmed vehicle to the
+service as a note on the running plug cycle, so the name stays with the cycle
+through a restart of either side. A conflicting profile or observation loss
+prevents attribution. This record supplies only loss
 settings after automatic deselection; it cannot reactivate SoC or departure goals.
 
 The charge watch follows every poll from setup on, before an active vehicle is
 selected. The service keeps the wallbox's total-energy readings in a bounded
 log and the last plug cycle it saw from plug-in to unplug
-(`device/meter_log.py`); every loss estimate is the meter difference over a
-time span.
+(`device/meter_log.py`), saved in `charge-meter.json`; every loss estimate is
+the meter difference over a time span.
 Controlled reloads on the same physical connection hand over the live session
 observer and compatible cost observer, including their meter baseline and price
 observations. Transport generation changes discard incomplete measurements;

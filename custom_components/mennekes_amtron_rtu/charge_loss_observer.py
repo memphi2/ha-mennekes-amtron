@@ -27,7 +27,7 @@ from .charge_loss_const import (
     LOSS_SOURCE_SENSOR,
     LOSS_SOURCE_VEHICLE_HISTORY,
 )
-from .charge_watch import PlugCycle, charge_watch, loss_vehicle_options
+from .charge_watch import PlugCycle, last_cycle, loss_vehicle_options
 from .device.charge_loss import Charge, LossStatistics
 from .device.client_errors import AmtronConnectionError
 from .device.enums import EvseState
@@ -73,7 +73,7 @@ class ChargeLossObserver:
         self._hass = hass
         self._entry = entry
         self._coordinator = entry.runtime_data.coordinator
-        options = loss_vehicle_options(hass, entry)
+        options = loss_vehicle_options(entry)
         self._profile_id: str | None = options.get(CONF_VEHICLE_PROFILE_ID)
         self._profiled = self._profile_id is not None
         self.mode = loss_source(options)
@@ -92,7 +92,6 @@ class ChargeLossObserver:
             hass, entry.entry_id, identity, profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
         )
         self.statistics = LossStatistics()
-        self._watch = charge_watch(hass, entry.entry_id)
         self._charging = False
         self._cycle: PlugCycle | None = None
         self._charge: Charge | None = None
@@ -199,7 +198,6 @@ class ChargeLossObserver:
             if not self._source_ready:
                 return
             initial = True
-        self._watch.observe(self._entry)
         if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
             # The vehicle's record follows the stop by a while: retry for it.
             charging = self._coordinator.current_data().get(EVSE_STATE.key) == EvseState.CHARGING
@@ -211,7 +209,7 @@ class ChargeLossObserver:
                     self._retry = None
                 self._queue()
                 return
-        elif self._watch.last is not None and self._watch.last != self._cycle:
+        elif (cycle := last_cycle(self._entry)) is not None and cycle != self._cycle:
             self._queue()
             return
         if not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
@@ -227,7 +225,7 @@ class ChargeLossObserver:
 
     async def _take_plug_cycle(self) -> None:
         """Take the last plug cycle of this car once the meter covers it."""
-        cycle = self._watch.last
+        cycle = last_cycle(self._entry)
         if cycle is None or cycle == self._cycle:
             return
         if self._profiled and (cycle.owner is None or cycle.owner.id != self._profile_id):

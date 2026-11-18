@@ -26,6 +26,17 @@ class PresenceGap:
         self._gap: float | None = None
         self._unknown = False
 
+    @property
+    def known_at(self) -> float | None:
+        """The last poll that knew the state."""
+        return self._known_at
+
+    def resume(self, known_at: float | None) -> None:
+        """Continue after a restart: the time since then counts as unknown."""
+        self.reset()
+        self._known_at = known_at
+        self._unknown = known_at is not None
+
     def observe(self, now: float, *, known: bool) -> bool:
         """Record one poll; return true when an unknown span became too long."""
         if self._known_at is not None and now < self._known_at:

@@ -270,9 +270,9 @@ long-term statistics are created. The current-cost entity is disabled by
 default; leaving it disabled keeps only the final cost in Recorder.
 
 Losses are measured against the wallbox's total energy meter. The service
-keeps the meter readings and the last plug cycle in memory, so a restart of
-HA does not interrupt them; a restart of the service does. After a restart of
-HA the plug cycle no longer has a recognized vehicle profile. Cost
+keeps and saves the meter readings, the plug cycle and the vehicle recognized
+for it, so a restart of HA does not interrupt them, and neither does a restart
+of the service that takes less than two minutes. Cost
 calculation runs in HA, so a cost across HA downtime stays incomplete, even
 with a fixed price. Previously completed results remain stored. Storage
 problems affect these optional estimates, not heartbeat or charging commands.

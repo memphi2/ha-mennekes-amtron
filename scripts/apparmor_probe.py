@@ -23,6 +23,7 @@ from typing import Any
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 from amtron_device import registers
 from amtron_device.app_settings import serial_adapters
+from amtron_device.charge_meter_store import ChargeMeterStore
 from amtron_device.decode import encode_register
 from amtron_device.departure_store import DepartureStore
 from pymodbus import FramerType
@@ -186,7 +187,7 @@ def check_temporary_files() -> None:
     require(
         not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*"))
 
-        and not list(DATA.glob(".departure-*")),
+        and not list(DATA.glob(".departure-*")) and not list(DATA.glob(".meter-*")),
         "atomic save left temporary files",
     )
 
@@ -207,6 +208,22 @@ def check_departure_storage() -> None:
         require(DepartureStore(path, SERIAL).load() is None, "cleared departure plan could not be saved")
     except OSError as error:
         raise ProbeError("departure plan storage was denied") from error
+
+
+def check_meter_storage() -> None:
+    """Save and read back a charge meter with the real store under the profile.
+
+    The service saves its own on the first poll; a refused save there is only
+    logged, so this process, confined by the same profile, proves it.
+    """
+    path = DATA / "charge-meter.json"
+    meter = {"readings": [[1.0, 2.0]]}
+    try:
+        ChargeMeterStore(path, SERIAL).save(meter)
+        require(ChargeMeterStore(path, SERIAL).load() == meter, "saved charge meter could not be read back")
+        require(stat.S_IMODE(path.stat().st_mode) == 0o600, "charge meter file is not private")
+    except OSError as error:
+        raise ProbeError("charge meter storage was denied") from error
 
 
 async def check_connection_page(session: ClientSession, mode: str, original: dict[str, Any]) -> None:
@@ -376,6 +393,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
             await denied_access()
             await child.stop()
             check_departure_storage()
+            check_meter_storage()
             check_temporary_files()
             for instance in children:
                 require(token.encode() not in instance.output and SUPERVISOR_TOKEN.encode() not in instance.output, "service logs exposed a credential")
@@ -384,7 +402,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
                 "discovery": True, "heartbeat": True, "pause_restart": True,
                 "token_preserved": True, "denials": 4, "shutdown": True,
                 "serial_settings": True, "connection_ui": True,
-                 "departure_storage": True}
+                 "departure_storage": True, "meter_storage": True}
     finally:
         for instance in children:
             await instance.stop(clean=False)

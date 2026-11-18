@@ -514,7 +514,7 @@ class ServiceClient:
                 # already queued command before it reaches the service.
                 cancelling = command == "cancel_pending"
                 soc_metadata = command in {"soc_source", "soc_observation"}
-                departure = command in {"departure_trip", "departure_inputs", "departure_choice"}
+                departure = command in {"departure_trip", "departure_inputs", "departure_choice", "charge_note"}
                 metadata = soc_metadata or departure or command == "unplug_release_config" or (
                     command == "plug_charge_config" and values.get("value") is False
                 )

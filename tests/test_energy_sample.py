@@ -295,7 +295,8 @@ def test_the_service_measures_a_plug_cycle_and_answers_for_any_span(tmp_path):
                 await observe(service, transport, clock, 1030, EvseState.IDLE, 106)
                 assert service.snapshot()["charge_meter"] == {
                     "first_reading_at": 1000, "known_since": 1000, "present": False,
-                    "plugged_at": None, "charging_at": None, "last": [1010, 1030],
+                    "plugged_at": None, "charging_at": None, "note": None,
+                    "last": [1010, 1030], "last_note": None,
                 }
                 data = client.apply_snapshot(service.snapshot())
                 assert data.charge_meter["last"] == (1010, 1030)

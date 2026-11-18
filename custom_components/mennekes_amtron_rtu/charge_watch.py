@@ -1,19 +1,24 @@
 """Name the vehicle of a plug cycle the service measured.
 
 The service keeps the meter log and sees each plug cycle from plug-in to
-unplug. One watch per wallbox, surviving a controlled entry reload, adds what
-only Home Assistant knows: the vehicle profile recognized for that whole
-cycle. This is evidence for an estimate, never a charging permission.
+unplug. Home Assistant adds what only it knows: the vehicle profile
+recognized for that whole cycle. It hands that to the service as a note on
+the running cycle, so the name stays with the cycle through a restart of
+either side. This is evidence for an estimate, never a charging permission.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 
-from .device.const import DOMAIN
+from .device.client_errors import AmtronConnectionError
+from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
@@ -25,7 +30,8 @@ from .vehicle_profiles import (
     vehicle_options,
 )
 
-_DATA_KEY = f"{DOMAIN}_charge_watch"
+# A second name for one cycle makes it nobody's.
+NOBODY = "x"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,139 +43,164 @@ class PlugCycle:
     owner: VehicleProfile | None
 
 
-@dataclass(frozen=True, slots=True)
-class _Claim:
-    profile: VehicleProfile
-    automatic: bool
+def note_for(profile: VehicleProfile, *, automatic: bool) -> str:
+    """The profile as it is now: an edited profile is no longer the same car."""
+    digest = hashlib.sha256(
+        json.dumps(profile.as_dict(), sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
+    return f"{'a' if automatic else 'm'}:{digest}:{profile.id}"
 
 
-class ChargeWatch:
-    """The claim on the running plug cycle and the last complete cycle."""
+def _named(options: Mapping[str, Any], note: str | None) -> tuple[VehicleProfile, bool] | None:
+    """The profile a note names and whether it was recognized automatically."""
+    if note is None or note == NOBODY:
+        return None
+    kind, _, rest = note.partition(":")
+    profile = profiles(options).get(rest.partition(":")[2])
+    if profile is None or kind not in ("a", "m") or note_for(profile, automatic=kind == "a") != note:
+        return None
+    return profile, kind == "a"
 
-    def __init__(self) -> None:
-        self._identity: str | None = None
-        self._bound = False
-        self._forget()
 
-    def _forget(self) -> None:
-        self.last: PlugCycle | None = None
-        self._start_cycle(None, None)
-
-    def _start_cycle(self, plugged_at: float | None, charging_at: float | None) -> None:
-        self._plugged_at = plugged_at
-        self._charging_at = charging_at
-        self._claim: _Claim | None = None
-        self._conflicted = False
-
-    def observe(self, entry: MennekesAmtronConfigEntry) -> None:
-        runtime = getattr(entry, "runtime_data", None)
-        if runtime is None:
-            return
-        identity = runtime.identity.serial_number
-        if self._bound and identity != self._identity:
-            self._forget()
-        self._identity, self._bound = identity, True
-        meter = runtime.coordinator.current_data().charge_meter
-        if meter is None:
-            # Not polled yet, or a poll failed: the service judges the gap.
-            return
-        last = meter["last"]
-        if last is not None and (
-            self.last is None or (self.last.plugged_at, self.last.unplugged_at) != last
+def _claim(options: Mapping[str, Any], meter: Mapping[str, Any], note: str | None,
+           profile: VehicleProfile, *, automatic: bool) -> str | None:
+    """The note after naming the car of the running cycle."""
+    if note == NOBODY:
+        return note
+    if note is not None:
+        return note if note.partition(":")[2] == note_for(profile, automatic=automatic).partition(":")[2] else NOBODY
+    charging_at = meter["charging_at"]
+    if not automatic and charging_at is not None:
+        # A car selected by hand owns only a charge that began afterwards.
+        selected_at = options.get(CONF_VEHICLE_PROFILE_SELECTED_AT)
+        if (
+            not isinstance(selected_at, (int, float)) or isinstance(selected_at, bool)
+            or selected_at > charging_at
         ):
-            claim = self._claim if self._plugged_at == last[0] and not self._conflicted else None
-            self.last = PlugCycle(last[0], last[1], claim.profile if claim is not None else None)
-        if meter["plugged_at"] != self._plugged_at:
-            self._start_cycle(meter["plugged_at"], None)
-        self._charging_at = meter["charging_at"]
-        if self._plugged_at is None:
-            return
-        selected = active_profile(entry.options)
-        automatic = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
-        claim = self._claim
-        if claim is not None and (
-            profiles(entry.options).get(claim.profile.id) != claim.profile
-            or (selected is not None and selected.id != claim.profile.id)
+            return None
+    return note_for(profile, automatic=automatic)
+
+
+def _settled(options: Mapping[str, Any], meter: Mapping[str, Any], note: str | None) -> str | None:
+    """The note the running cycle should carry under the current selection."""
+    selected = active_profile(options)
+    automatic = options.get(CONF_VEHICLE_AUTO_SELECTION) is True
+    if note is not None and note != NOBODY:
+        named = _named(options, note)
+        if (
+            named is None
+            or (selected is not None and selected.id != named[0].id)
             or (selected is None and not automatic)
         ):
-            self._claim = None
-            self._conflicted = True
-        if not automatic and selected is not None:
-            self.confirm(entry, selected.id, automatic=False)
-
-    def confirm(self, entry: MennekesAmtronConfigEntry, profile_id: str, *, automatic: bool) -> None:
-        """Name the car of the running cycle; a second name makes it nobody's."""
-        profile = profiles(entry.options).get(profile_id)
-        if self._plugged_at is None or profile is None or self._conflicted:
-            return
-        if self._claim is not None:
-            if self._claim.profile != profile:
-                self._claim = None
-                self._conflicted = True
-            return
-        charging_at = self._charging_at
-        if not automatic and charging_at is not None:
-            # A car selected by hand owns only a charge that began afterwards.
-            selected_at = entry.options.get(CONF_VEHICLE_PROFILE_SELECTED_AT)
-            if (
-                not isinstance(selected_at, (int, float)) or isinstance(selected_at, bool)
-                or selected_at > charging_at
-            ):
-                return
-        self._claim = _Claim(profile, automatic)
-
-    def owner(self, entry: MennekesAmtronConfigEntry) -> VehicleProfile | None:
-        """The recognized car of the running cycle, else of the last one."""
-        if self._plugged_at is not None:
-            profile = (
-                self._claim.profile
-                if self._claim is not None and self._claim.automatic and not self._conflicted
-                else None
-            )
-        else:
-            profile = self.last.owner if self.last is not None else None
-        if profile is None or profiles(entry.options).get(profile.id) != profile:
-            return None
-        return profile
+            note = NOBODY
+    if not automatic and selected is not None:
+        note = _claim(options, meter, note, selected, automatic=False)
+    return note
 
 
-def charge_watch(hass: HomeAssistant, entry_id: str) -> ChargeWatch:
-    watches: dict[str, ChargeWatch] = hass.data.setdefault(_DATA_KEY, {})
-    return watches.setdefault(entry_id, ChargeWatch())
+def _meter(entry: MennekesAmtronConfigEntry) -> dict[str, Any] | None:
+    runtime = getattr(entry, "runtime_data", None)
+    return runtime.coordinator.current_data().charge_meter if runtime is not None else None
 
 
-def track_charge_watch(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> CALLBACK_TYPE:
-    """Follow every poll of this entry; rebind after a reload."""
-    watch = charge_watch(hass, entry.entry_id)
-
-    @callback
-    def updated() -> None:
-        watch.observe(entry)
-
-    unsubscribe = entry.runtime_data.coordinator.async_add_listener(updated)
-    updated()
-    return unsubscribe
+def last_cycle(entry: MennekesAmtronConfigEntry) -> PlugCycle | None:
+    """The last plug cycle the service saw from end to end."""
+    meter = _meter(entry)
+    if meter is None or meter["last"] is None:
+        return None
+    named = _named(entry.options, meter["last_note"])
+    start, end = meter["last"]
+    return PlugCycle(start, end, named[0] if named is not None else None)
 
 
-def forget_charge_watch(hass: HomeAssistant, entry_id: str) -> None:
-    """Discard the evidence at a full unload, removal or failed setup."""
-    hass.data.get(_DATA_KEY, {}).pop(entry_id, None)
+def owner(entry: MennekesAmtronConfigEntry) -> VehicleProfile | None:
+    """The recognized car of the running cycle, else of the last one."""
+    meter = _meter(entry)
+    if meter is None:
+        return None
+    if meter["plugged_at"] is not None:
+        named = _named(entry.options, meter["note"])
+        return named[0] if named is not None and named[1] else None
+    named = _named(entry.options, meter["last_note"])
+    return named[0] if named is not None else None
 
 
-def confirm_automatic_vehicle(hass: HomeAssistant, entry: MennekesAmtronConfigEntry, profile_id: str) -> None:
-    watch = charge_watch(hass, entry.entry_id)
-    watch.observe(entry)
-    watch.confirm(entry, profile_id, automatic=True)
-
-
-def loss_vehicle_options(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> dict[str, Any]:
+def loss_vehicle_options(entry: MennekesAmtronConfigEntry) -> dict[str, Any]:
     """Retain only loss settings for the recognized owner after auto deselection."""
-    watch = charge_watch(hass, getattr(entry, "entry_id", ""))
-    watch.observe(entry)
     if (
         entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
         and active_profile(entry.options) is None
-        and (owner := watch.owner(entry)) is not None
+        and (profile := owner(entry)) is not None
     ):
-        return vehicle_options({**entry.options, CONF_ACTIVE_VEHICLE_PROFILE: owner.id})
+        return vehicle_options({**entry.options, CONF_ACTIVE_VEHICLE_PROFILE: profile.id})
     return vehicle_options(entry.options)
+
+
+class ChargeWatch:
+    """Keeps the service's note on the running cycle in step with the selection."""
+
+    def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
+        self._hass = hass
+        self._entry = entry
+        # The note the running cycle should carry until the service reports it.
+        self._wanted: tuple[float, str] | None = None
+        self._sending = False
+
+    def start(self) -> CALLBACK_TYPE:
+        """Follow every poll of this entry."""
+        unsubscribe = self._entry.runtime_data.coordinator.async_add_listener(self.observe)
+        self.observe()
+        return unsubscribe
+
+    def _note(self, meter: Mapping[str, Any]) -> str | None:
+        wanted = self._wanted
+        if wanted is not None and wanted[0] != meter["plugged_at"]:
+            wanted = self._wanted = None
+        return wanted[1] if wanted is not None else meter["note"]
+
+    @callback
+    def observe(self) -> None:
+        meter = _meter(self._entry)
+        if meter is None or meter["plugged_at"] is None:
+            # Not polled yet, a failed poll, or no car: nothing to name.
+            return
+        self._want(meter, _settled(self._entry.options, meter, self._note(meter)))
+
+    @callback
+    def confirm_automatic(self, profile_id: str) -> None:
+        """A car was recognized on the running cycle."""
+        meter = _meter(self._entry)
+        profile = profiles(self._entry.options).get(profile_id)
+        if meter is None or meter["plugged_at"] is None or profile is None:
+            return
+        note = _settled(self._entry.options, meter, self._note(meter))
+        self._want(meter, _claim(self._entry.options, meter, note, profile, automatic=True))
+
+    def _want(self, meter: Mapping[str, Any], note: str | None) -> None:
+        if note is None or note == meter["note"]:
+            self._wanted = None
+            return
+        self._wanted = wanted = (meter["plugged_at"], note)
+        if not self._sending:
+            self._sending = True
+            self._entry.async_create_background_task(
+                self._hass, self._send(*wanted), "amtron-charge-note",
+            )
+
+    async def _send(self, plugged_at: float, note: str) -> None:
+        try:
+            await self._entry.runtime_data.client.execute(
+                "charge_note", plugged_at=plugged_at, note=note,
+            )
+        except (AmtronConnectionError, DeviceError):
+            # The next poll tries again while the cycle still runs.
+            pass
+        finally:
+            self._sending = False
+
+
+def confirm_automatic_vehicle(entry: MennekesAmtronConfigEntry, profile_id: str) -> None:
+    runtime = getattr(entry, "runtime_data", None)
+    watch = runtime.charge_watch if runtime is not None else None
+    if watch is not None:
+        watch.confirm_automatic(profile_id)

@@ -229,7 +229,9 @@ Ordinary charging intent and shared energy/percentage limits are saved in
 `intent.json`, including bounded evidence for restoring guest permission.
 Format 2 rejects older beta intent files and requires a safe reset acknowledgement.
 The selected time, vehicle plan and its bounded learned model
-are saved in `departure-plan.json`. Both are bound to the wallbox identity.
+are saved in `departure-plan.json`. The meter log, the plug cycle and its note
+are saved in `charge-meter.json`, at every change of the plug cycle and else
+every five minutes. All three are bound to the wallbox identity.
 There is no guest-order file, separate guest energy baseline or charging-rate
 history. Guest permission is kept only in service memory for the current plug-in.
 
@@ -369,6 +371,7 @@ access no bus:
 |---|---|---|
 | `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
 | `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
+| `charge_note` | `plugged_at`: the `charge_meter.plugged_at` of the running plug cycle; `note`: string of 1 to 128 characters or `null` | Attach a note to the running plug cycle, such as the car Home Assistant recognized. The note means nothing to the service; it stays with the cycle as `charge_meter.note` and, after the unplug, as `charge_meter.last_note`. A cycle that is over keeps what it had. No bus access. |
 
 The plan writes through the same guarded path as other commands, with the
 owner `departure`. It is saved in `/data/departure-plan.json`, together with

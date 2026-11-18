@@ -1,13 +1,17 @@
-"""The watch names a car only for a plug cycle it followed from end to end."""
+"""The service keeps the car's name with the plug cycle Home Assistant named."""
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
 
 from custom_components.mennekes_amtron_rtu import charge_watch as m
 from custom_components.mennekes_amtron_rtu import vehicle_profiles
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
+)
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from custom_components.mennekes_amtron_rtu.device.meter_log import (
     ChargeMeter,
@@ -25,18 +29,41 @@ def scene(monkeypatch):
     """One wallbox with two cars, the service's charge meter and the watch."""
     clock = [START]
     monkeypatch.setattr(vehicle_profiles, "time", SimpleNamespace(time=lambda: clock[0]))
-    hass = SimpleNamespace(data={})
+    loop = asyncio.new_event_loop()
     coordinator = Coordinator()
     meter = ChargeMeter()
-    entry = SimpleNamespace(entry_id="entry", options={}, runtime_data=SimpleNamespace(
-        coordinator=coordinator, identity=SimpleNamespace(serial_number="123", layout_version=0x0103),
-    ))
+    sent, failing = [], []
+
+    async def execute(command, *, plugged_at, note):
+        assert command == "charge_note"
+        sent.append(note)
+        if failing:
+            raise failing.pop()
+        meter.annotate(plugged_at, note)
+
+    entry = SimpleNamespace(
+        entry_id="entry", options={},
+        async_create_background_task=lambda _hass, work, _name: loop.create_task(work),
+        runtime_data=SimpleNamespace(
+            coordinator=coordinator, client=SimpleNamespace(execute=execute), charge_watch=None,
+        ),
+    )
+
+    def publish():
+        """Let a sent note arrive, then show Home Assistant the service's state."""
+        loop.run_until_complete(asyncio.sleep(0))
+        loop.run_until_complete(asyncio.sleep(0))
+        coordinator.data.charge_meter = parse_charge_meter(meter.snapshot())
+        coordinator.async_update_listeners()
+        loop.run_until_complete(asyncio.sleep(0))
+        loop.run_until_complete(asyncio.sleep(0))
 
     def configure(*, automatic=True, selected=None):
         entry.options = detection_catalog() if automatic else catalog()
         entry.options["active_vehicle_profile"] = selected
         entry.options["vehicle_profile_selected_at"] = START - 200
-        return m.track_charge_watch(hass, entry)
+        entry.runtime_data.charge_watch = watch = m.ChargeWatch(None, entry)
+        return watch.start()
 
     def poll(after, state=EvseState.IDLE, *, present=...):
         clock[0] += after
@@ -44,13 +71,17 @@ def scene(monkeypatch):
             clock[0], present=state is not EvseState.IDLE if present is ... else present,
             charging=state is EvseState.CHARGING,
         )
-        coordinator.data.charge_meter = parse_charge_meter(meter.snapshot())
-        coordinator.async_update_listeners()
+        publish()
 
-    return SimpleNamespace(
-        hass=hass, entry=entry, clock=clock, coordinator=coordinator,
-        configure=configure, poll=poll, watch=m.charge_watch(hass, "entry"),
+    def confirm(profile_id):
+        m.confirm_automatic_vehicle(entry, profile_id)
+        publish()
+
+    yield SimpleNamespace(
+        entry=entry, clock=clock, coordinator=coordinator, meter=meter, sent=sent,
+        failing=failing, configure=configure, poll=poll, confirm=confirm, publish=publish,
     )
+    loop.close()
 
 
 def profile(entry, key):
@@ -59,59 +90,57 @@ def profile(entry, key):
 
 def test_a_cycle_the_service_saw_whole_is_kept_with_its_car(scene):
     unsubscribe = scene.configure(automatic=False, selected=A)
-    watch = scene.watch
+    entry = scene.entry
     scene.poll(10)
     scene.poll(10, EvseState.EV_CONNECTED)
     plugged = scene.clock[0]
     scene.poll(10, EvseState.CHARGING)
-    assert watch.last is None
-    assert watch.owner(scene.entry) is None  # A car chosen by hand owns nothing until the end.
+    assert m.last_cycle(entry) is None
+    assert m.owner(entry) is None  # A car chosen by hand owns nothing until the end.
     scene.poll(10)
     unplugged = scene.clock[0]
-    assert watch.last == m.PlugCycle(plugged, unplugged, profile(scene.entry, A))
-    assert watch.owner(scene.entry) == profile(scene.entry, A)
-    # Idle polls afterwards leave the cycle as it is.
+    assert m.last_cycle(entry) == m.PlugCycle(plugged, unplugged, profile(entry, A))
+    assert m.owner(entry) == profile(entry, A)
+    # The name was handed over once, and idle polls leave the cycle as it is.
     scene.poll(10)
-    assert watch.last.unplugged_at == unplugged
+    assert len(scene.sent) == 1
+    assert m.last_cycle(entry).unplugged_at == unplugged
     unsubscribe()
     assert not scene.coordinator.listeners
-    # The same watch serves the entry after its reload, until it is forgotten.
-    assert m.charge_watch(scene.hass, "entry") is watch
-    m.forget_charge_watch(scene.hass, "entry")
-    m.forget_charge_watch(scene.hass, "entry")
-    assert m.charge_watch(scene.hass, "entry") is not watch
 
 
 def test_a_cycle_that_began_unseen_is_neither_measured_nor_owned(scene):
     scene.configure()
     scene.poll(10, EvseState.CHARGING)
-    m.confirm_automatic_vehicle(scene.hass, scene.entry, A)
-    assert scene.watch.owner(scene.entry) is None
+    scene.confirm(A)
+    assert m.owner(scene.entry) is None
     scene.poll(10)
-    assert scene.watch.last is None
+    assert m.last_cycle(scene.entry) is None
+    assert not scene.sent
 
 
 def test_a_recognized_car_keeps_its_loss_settings_after_it_is_deselected(scene):
     scene.configure()
-    entry, watch = scene.entry, scene.watch
+    entry = scene.entry
     scene.poll(10)
     scene.poll(10, EvseState.CHARGING)
-    m.confirm_automatic_vehicle(scene.hass, entry, "0" * 32)  # no such car
-    assert watch.owner(entry) is None
-    m.confirm_automatic_vehicle(scene.hass, entry, A)
-    m.confirm_automatic_vehicle(scene.hass, entry, A)
+    scene.confirm("0" * 32)  # no such car
+    assert m.owner(entry) is None
+    scene.confirm(A)
+    scene.confirm(A)
     entry.options = vehicle_profiles.activate_profile(entry.options, A)
     scene.poll(10, EvseState.CHARGING)
-    assert watch.owner(entry) == profile(entry, A)
+    assert m.owner(entry) == profile(entry, A)
     entry.options = vehicle_profiles.activate_profile(entry.options, None)
-    assert m.loss_vehicle_options(scene.hass, entry)["vehicle_profile_id"] == A
+    assert m.loss_vehicle_options(entry)["vehicle_profile_id"] == A
     scene.poll(10)
-    assert watch.last.owner == profile(entry, A)
-    assert m.loss_vehicle_options(scene.hass, entry)["vehicle_profile_id"] == A
+    assert m.last_cycle(entry).owner == profile(entry, A)
+    assert m.loss_vehicle_options(entry)["vehicle_profile_id"] == A
+    assert len(scene.sent) == 1
     # Its profile is edited afterwards: the evidence names a car that is gone.
     entry.options["vehicle_profiles"][A]["name"] = "Renamed"
-    assert watch.owner(entry) is None
-    assert "vehicle_profile_id" not in m.loss_vehicle_options(scene.hass, entry)
+    assert m.owner(entry) is None
+    assert "vehicle_profile_id" not in m.loss_vehicle_options(entry)
 
 
 @pytest.mark.parametrize("second", ["other_car", "edited", "selected_other", "selection_off"])
@@ -120,9 +149,9 @@ def test_a_second_name_for_the_same_cycle_makes_it_nobodys(scene, second):
     entry = scene.entry
     scene.poll(10)
     scene.poll(10, EvseState.CHARGING)
-    m.confirm_automatic_vehicle(scene.hass, entry, A)
+    scene.confirm(A)
     if second == "other_car":
-        m.confirm_automatic_vehicle(scene.hass, entry, B)
+        scene.confirm(B)
     elif second == "edited":
         entry.options["vehicle_profiles"][A]["name"] = "Renamed"
     elif second == "selected_other":
@@ -130,10 +159,13 @@ def test_a_second_name_for_the_same_cycle_makes_it_nobodys(scene, second):
     else:
         entry.options["vehicle_auto_selection"] = False
     scene.poll(10, EvseState.CHARGING)
-    assert scene.watch.owner(entry) is None
-    m.confirm_automatic_vehicle(scene.hass, entry, A)
+    # The service shows the withdrawn name with its next state.
+    scene.publish()
+    assert m.owner(entry) is None
+    scene.confirm(A)
     scene.poll(10)
-    assert scene.watch.last.owner is None
+    assert scene.meter.last_note == m.NOBODY
+    assert m.last_cycle(entry).owner is None
 
 
 @pytest.mark.parametrize(("selected_at", "owned"), [
@@ -148,34 +180,71 @@ def test_a_car_selected_by_hand_owns_only_a_charge_that_began_afterwards(scene, 
     entry.options["vehicle_profile_selected_at"] = selected_at
     scene.poll(10, EvseState.CHARGING)
     scene.poll(10)
-    assert (scene.watch.last.owner is not None) is owned
+    assert (m.last_cycle(entry).owner is not None) is owned
 
 
-def test_a_cycle_that_ended_while_home_assistant_was_away_has_no_car(scene):
+def test_the_name_survives_a_restart_of_home_assistant(scene):
+    scene.configure()
+    entry = scene.entry
+    scene.poll(10)
+    scene.poll(10, EvseState.CHARGING)
+    scene.confirm(A)
+    # Home Assistant restarts: the service kept the cycle and its note.
+    scene.configure()
+    assert m.owner(entry) == profile(entry, A)
+    scene.poll(10)
+    assert m.last_cycle(entry).owner == profile(entry, A)
+    assert len(scene.sent) == 1
+
+
+def test_a_name_the_service_did_not_take_is_sent_again(scene):
+    scene.configure()
+    entry = scene.entry
+    scene.poll(10)
+    scene.poll(10, EvseState.CHARGING)
+    scene.failing.append(AmtronConnectionError("offline"))
+    # A second recognition while the first is on its way sends nothing twice.
+    m.confirm_automatic_vehicle(entry, A)
+    scene.confirm(A)
+    assert m.owner(entry) is None
+    scene.poll(10, EvseState.CHARGING)
+    scene.publish()
+    assert m.owner(entry) == profile(entry, A)
+    assert len(scene.sent) == 2
+    # A name still on its way when the car leaves belongs to no later cycle.
+    scene.poll(10)
+    scene.poll(10, EvseState.CHARGING)
+    scene.failing.extend([AmtronConnectionError("offline"), AmtronConnectionError("offline")])
+    scene.confirm(B)
+    assert len(scene.sent) == 4
+    scene.poll(10)
+    scene.poll(10, EvseState.CHARGING)
+    scene.poll(10, EvseState.CHARGING)
+    assert m.owner(entry) is None
+    assert len(scene.sent) == 4
+
+
+def test_an_unpolled_coordinator_or_an_entry_without_runtime_is_no_evidence(scene):
     scene.configure(automatic=False, selected=A)
     scene.poll(10)
     scene.poll(10, EvseState.CHARGING)
-    # Home Assistant restarts: the service kept the cycle, the claim is gone.
-    m.forget_charge_watch(scene.hass, "entry")
-    watch = m.charge_watch(scene.hass, "entry")
-    scene.poll(10)
-    watch.observe(scene.entry)
-    assert watch.last is not None
-    assert watch.last.owner is None
-
-
-def test_another_wallbox_or_an_unpolled_coordinator_is_no_evidence(scene):
-    scene.configure(automatic=False, selected=A)
-    scene.poll(10)
-    scene.poll(10, EvseState.CHARGING)
-    # A coordinator that has not polled yet, or an entry without runtime, says nothing.
     kept, scene.coordinator.data.charge_meter = scene.coordinator.data.charge_meter, None
     scene.coordinator.async_update_listeners()
-    scene.watch.observe(SimpleNamespace(options={}))
+    scene.confirm(B)
+    assert m.owner(scene.entry) is None
+    assert m.last_cycle(scene.entry) is None
+    assert m.owner(SimpleNamespace(options={})) is None
+    assert "vehicle_profile_id" not in m.loss_vehicle_options(SimpleNamespace(options={}))
     scene.coordinator.data.charge_meter = kept
     scene.poll(10)
-    assert scene.watch.last is not None
-    scene.entry.runtime_data.identity.serial_number = "456"
-    scene.coordinator.data.charge_meter = parse_charge_meter(ChargeMeter().snapshot())
-    scene.coordinator.async_update_listeners()
-    assert scene.watch.last is None
+    assert m.last_cycle(scene.entry).owner == profile(scene.entry, A)
+    # Nothing to tell a wallbox that has no watch, such as one being set up.
+    scene.entry.runtime_data.charge_watch = None
+    m.confirm_automatic_vehicle(scene.entry, A)
+    m.confirm_automatic_vehicle(SimpleNamespace(options={}), A)
+
+
+@pytest.mark.parametrize("note", ["", "q:0:" + A, "a:0000000000000000:" + A, "a:" + A])
+def test_a_note_that_names_no_current_profile_is_nobody(scene, note):
+    scene.configure()
+    assert m._named(scene.entry.options, note) is None

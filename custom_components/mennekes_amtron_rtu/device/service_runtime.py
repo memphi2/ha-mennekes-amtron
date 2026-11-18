@@ -18,6 +18,7 @@ from pathlib import Path
 from time import time as wall_clock
 from typing import Any
 
+from .charge_meter_store import ChargeMeterStore
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
 from .command_events import SOURCES, attributed, command_source
@@ -58,6 +59,7 @@ API_VERSION = 3
 # A state poll waits this long for a running command, then takes the last
 # published state unless that is older than the second value.
 _PATIENCE_SECONDS = 2.0
+_METER_SAVE_SECONDS = 300.0
 # A kWh goal pauses for a missing meter only after the bus failed this long.
 METER_GRACE_SECONDS = 60.0
 _PUBLISHED_SECONDS = 60.0
@@ -94,6 +96,10 @@ class ModbusService:
         self.register_monitor = RegisterMonitor()
         # What the meter delivered in any time span, for cost and loss estimates.
         self.charge_meter = ChargeMeter()
+        self._meter_store: ChargeMeterStore | None = None
+        # What of the plug cycle was last saved, and when.
+        self._meter_saved: tuple[object, float] | None = None
+        self._meter_notice = FailureNotice(_LOGGER, "Charging loss")
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
         # Guest permission and departure plan: parts of this one service.
@@ -198,6 +204,9 @@ class ModbusService:
             identity.serial_number
             or f"{self.config.connection.port}:{self.config.connection.device_id}",
         )
+        if self._meter_store is None:
+            self._phase = "loading saved charge meter"
+            await self._load_charge_meter(store.identity)
         self._phase = "loading saved control intent"
         self._intent_rejected = not await asyncio.to_thread(store.load, self.client.write_state)
         if self._intent_rejected:
@@ -408,6 +417,57 @@ class ModbusService:
             finally:
                 if self.departure is not None:
                     self.departure.observe()
+        await self._save_charge_meter()
+
+    async def _load_charge_meter(self, identity: str) -> None:
+        """Once per service life: go on measuring where the last run stopped."""
+        store = ChargeMeterStore(self.state_path.with_name("charge-meter.json"), identity)
+        try:
+            saved = await asyncio.to_thread(store.load)
+            if saved is not None:
+                self.charge_meter.restore(saved)
+        except (OSError, ValueError) as err:
+            # An estimate only: measuring starts again, charging is unaffected.
+            _LOGGER.warning("Charging loss: saved meter log unusable; starting without it (%s)", type(err).__name__)
+        self._meter_store = store
+
+    async def _save_charge_meter(self, *, force: bool = False) -> None:
+        """Save at every change of the plug cycle, else every five minutes."""
+        store, meter = self._meter_store, self.charge_meter
+        if store is None:
+            return
+        cycle = (meter.present, meter.plugged_at, meter.charging_at, meter.note, meter.last, meter.last_note)
+        saved = self._meter_saved
+        now = time.monotonic()
+        if not force and saved is not None and saved[0] == cycle and now - saved[1] < _METER_SAVE_SECONDS:
+            return
+        self._meter_saved = (cycle, now)
+        try:
+            await asyncio.to_thread(store.save, meter.dump())
+        except (OSError, ValueError) as err:
+            self._meter_notice.failed("meter log not saved", type(err).__name__)
+        else:
+            self._meter_notice.recovered("meter log saved again")
+
+    async def _charge_note(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Home Assistant names the car of the running plug cycle; no bus access."""
+        if payload.keys() != {"command", "plugged_at", "note", "expected_serial_number"}:
+            raise ValueError("invalid charge note")
+        plugged_at = payload["plugged_at"]
+        if isinstance(plugged_at, bool) or not isinstance(plugged_at, (int, float)) or not math.isfinite(plugged_at):
+            raise ValueError("invalid charge note")
+        if self._stopping:
+            raise DeviceError("service_unavailable")
+        if payload["expected_serial_number"] != self.identity.serial_number:
+            raise DeviceError("device_identity_changed")
+        # A cycle that ended meanwhile keeps its note; the answer shows it.
+        if self.charge_meter.annotate(float(plugged_at), payload["note"]):
+            await self._save_charge_meter(force=True)
+        if self._command_lock.locked():
+            # Another command still runs; its outcome is not this one's.
+            self._published = None
+            return self.snapshot()
+        return self._publish()
 
     async def _poll(self) -> None:
         async with self._poll_lock:
@@ -775,6 +835,8 @@ class ModbusService:
             return await self.planner.command(payload)
         if name == "guest_start":
             return await self.guest.start(payload)
+        if name == "charge_note":
+            return await self._charge_note(payload)
         if payload.keys() - {
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
             "source", "soc", "maximum", "deadline", "expected_soc_revision",
@@ -1016,6 +1078,7 @@ class ModbusService:
                     if self.soc_goal is not None:
                         await self.soc_goal.async_stop()
                     await self.control.async_shutdown()
+                await self._save_charge_meter(force=True)
                 await self._persist()
         finally:
             await self.client.async_close()

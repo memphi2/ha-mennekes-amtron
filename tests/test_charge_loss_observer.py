@@ -25,7 +25,7 @@ from custom_components.mennekes_amtron_rtu.charge_loss_observer import (
     ChargeLossObserver,
     vehicle_energy,
 )
-from custom_components.mennekes_amtron_rtu.charge_watch import PlugCycle, charge_watch
+from custom_components.mennekes_amtron_rtu.charge_watch import PlugCycle, note_for
 from custom_components.mennekes_amtron_rtu.device.charge_loss import Charge
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
@@ -37,6 +37,7 @@ from custom_components.mennekes_amtron_rtu.device.registers import (
     CP_STATE,
     EVSE_STATE,
 )
+from custom_components.mennekes_amtron_rtu.vehicle_profiles import VehicleProfile
 from custom_components.mennekes_amtron_rtu.vehicle_sources.types import ChargeRecord
 from tests.test_bavarian_history import VIN, vehicle_registry
 
@@ -57,7 +58,6 @@ class Coordinator:
         self.client = SimpleNamespace(async_energy_between=AsyncMock(
             side_effect=lambda start, end: self.meter.energy_between(start, end),
         ))
-        self.watch = None
         self.history = False
         self.owner = None
         self.total = 100.0
@@ -94,11 +94,14 @@ class Coordinator:
 
     def cycle(self, plugged_at, unplugged_at, owner=...):
         """What the service reports of its charge meter, and whose cycle it was."""
+        owner = self.owner if owner is ... else owner
+        self.last = PlugCycle(plugged_at, unplugged_at, owner)
         self.data.charge_meter = {
-            "first_reading_at": self.meter.first_at, "plugged_at": None, "charging_at": None,
+            "first_reading_at": self.meter.first_at, "known_since": None, "present": False,
+            "plugged_at": None, "charging_at": None, "note": None,
             "last": (plugged_at, unplugged_at),
+            "last_note": note_for(owner, automatic=True) if isinstance(owner, VehicleProfile) else None,
         }
-        self.watch.last = PlugCycle(plugged_at, unplugged_at, self.owner if owner is ... else owner)
 
     def record(self, vehicle_kwh=8):
         """What the vehicle recorded for the last charge."""
@@ -112,7 +115,6 @@ def build(hass, mode="sensor", *, auto=False):
     if mode == "vehicle_history":
         hass.data.setdefault(dr.DATA_REGISTRY, vehicle_registry())
     coordinator = Coordinator()
-    coordinator.watch = charge_watch(hass, "entry")
     coordinator.history = mode == "vehicle_history"
     entry = SimpleNamespace(
         entry_id="entry", options={
@@ -311,7 +313,8 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
             data.values[EVSE_STATE.key] = state
             data.energy_observed_at = at
             data.charge_meter = {
-                "first_reading_at": meter.first_at, "plugged_at": None, "charging_at": None, "last": None,
+                "first_reading_at": meter.first_at, "known_since": None, "present": False,
+                "plugged_at": None, "charging_at": None, "note": None, "last": None, "last_note": None,
             }
             coordinator.async_update_listeners()
 
@@ -814,8 +817,14 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
             coordinator.cycle(plugged_at, unplugged_at, mine)
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
-            return coordinator.watch.last
+            return coordinator.last
 
+        # The cars here are no configured profiles: name the owner directly.
+        named = patch(
+            "custom_components.mennekes_amtron_rtu.charge_loss_observer.last_cycle",
+            side_effect=lambda _entry: getattr(coordinator, "last", None),
+        )
+        named.start()
         try:
             await observer.async_start()
             # Another car's cycle, and one nobody was recognized for.
@@ -844,6 +853,7 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
             assert observer._charge == charge
             assert observer.statistics.status == "waiting_for_vehicle"
         finally:
+            named.stop()
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())

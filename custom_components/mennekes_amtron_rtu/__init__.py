@@ -33,11 +33,7 @@ from .charge_loss_const import (
     LOSS_SOURCE_DISABLED,
 )
 from .charge_loss_observer import ChargeLossObserver
-from .charge_watch import (
-    forget_charge_watch,
-    loss_vehicle_options,
-    track_charge_watch,
-)
+from .charge_watch import ChargeWatch, loss_vehicle_options
 from .charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
@@ -304,8 +300,8 @@ async def async_setup_entry(
         # A reconnect is only a gap; the session's presence rule judges it.
         if handoff is not None and handoff.identity != identity:
             await handoff.async_close()
-            forget_charge_watch(hass, entry.entry_id)
-        entry.runtime_data.charge_watch_unsubscribe = track_charge_watch(hass, entry)
+        entry.runtime_data.charge_watch = ChargeWatch(hass, entry)
+        entry.runtime_data.charge_watch_unsubscribe = entry.runtime_data.charge_watch.start()
         validate_vehicle_selection()
         # Configure the gate before starting heartbeat/recovery. The app owns
         # the previous grant; an unchanged policy survives this HA reload.
@@ -433,20 +429,15 @@ async def async_setup_entry(
         _keep_unplug_rule_handed_over(hass, entry, controls=entry.runtime_data.controls)
     except BaseException as err:
         try:
-            try:
-                await _async_stop_runtime(entry.runtime_data)
-            finally:
-                # Whatever else fails, no service is left that nothing stops.
-                if not remote:
-                    await _async_release_after_failure(
-                        hass, entry, err, healthy=wallbox_answers,
-                    )
+            await _async_stop_runtime(entry.runtime_data)
         finally:
-            forget_charge_watch(hass, entry.entry_id)
+            # Whatever else fails, no service is left that nothing stops.
+            if not remote:
+                await _async_release_after_failure(
+                    hass, entry, err, healthy=wallbox_answers,
+                )
         raise
     _remember_vehicle(entry)
-    if handoff is not None:
-        handoff.setup_complete = True
     return True
 
 
@@ -549,7 +540,7 @@ async def _async_start_vehicle(
     if _service_intent_rejected(runtime.client):
         return
     control, coordinator, client = runtime.control, runtime.coordinator, runtime.client
-    loss_enabled = loss_vehicle_options(hass, entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+    loss_enabled = loss_vehicle_options(entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
     if loss_enabled:
         runtime.charge_loss = ChargeLossObserver(hass, entry)
         await runtime.charge_loss.async_start()
@@ -806,10 +797,9 @@ async def async_unload_entry(
     if not unloaded:
         return False
     retain_cost = runtime_data.retain_cost_on_unload
-    if retain_cost or runtime_data.retain_watch_on_unload:
+    if retain_cost:
         handoff = hass.data[f"{DOMAIN}_reload_clients"][entry.entry_id]
-        handoff.unloaded = True
-        handoff.charging_cost = runtime_data.charging_cost if retain_cost else None
+        handoff.charging_cost = runtime_data.charging_cost
     # A reload that also selects another car must end the old car's plan
     # pause, like an in-place switch; a plain reload or shutdown keeps it.
     previous = runtime_data.vehicle_profile_id
@@ -822,14 +812,10 @@ async def async_unload_entry(
         and not (vehicle_soc_is_configured(options) and timed_goal_is_enabled(options))
     )
     try:
-        try:
-            await _async_stop_runtime(runtime_data, retain_cost=retain_cost, withdraw_plan=withdraw)
-        finally:
-            # Last: the car's observers above still withdraw through it.
-            await async_release(hass, entry.entry_id)
+        await _async_stop_runtime(runtime_data, retain_cost=retain_cost, withdraw_plan=withdraw)
     finally:
-        if not runtime_data.retain_watch_on_unload:
-            forget_charge_watch(hass, entry.entry_id)
+        # Last: the car's observers above still withdraw through it.
+        await async_release(hass, entry.entry_id)
     return unloaded
 
 
@@ -896,11 +882,9 @@ async def _async_reload_entry_locked(
         # A reload that also selects another car keeps the previous car's trip.
         await _async_park_trip(hass, entry)
     retain_cost = cost is not None and cost.retain_for_reload(entry)
-    retain_attribution = runtime is not None and runtime.entry_data == dict(entry.data)
     if runtime is not None:
         runtime.retain_cost_on_unload = retain_cost
-        runtime.retain_watch_on_unload = retain_attribution
-    if runtime is not None and (retain_cost or retain_attribution):
+    if runtime is not None and retain_cost:
         handoff = RuntimeHandoff(identity=runtime.identity)
         hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = handoff
     # The embedded service keeps its connection and heartbeat through this.
@@ -915,16 +899,11 @@ async def _async_reload_entry_locked(
             # A setup that is tried again has decided about the service itself,
             # and an entry that could not be unloaded still runs on it.
             await async_release(hass, entry.entry_id)
-        if runtime is not None and (retain_cost or retain_attribution):
+        if runtime is not None and retain_cost:
             runtime.retain_cost_on_unload = False
-            runtime.retain_watch_on_unload = False
             unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
             if unused is not None:
-                try:
-                    await unused.async_close()
-                finally:
-                    if unused.unloaded and not unused.setup_complete:
-                        forget_charge_watch(hass, entry.entry_id)
+                await unused.async_close()
 
 
 async def async_remove_entry(
@@ -933,7 +912,6 @@ async def async_remove_entry(
     """Remove repairs owned by a deleted entry, also on HA before 2026.11."""
 
     hass.data.get(f"{DOMAIN}_reload_locks", {}).pop(entry.entry_id, None)
-    forget_charge_watch(hass, entry.entry_id)
     await async_forget(hass, entry.entry_id)
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()

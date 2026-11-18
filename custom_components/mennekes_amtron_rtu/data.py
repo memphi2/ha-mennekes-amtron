@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from homeassistant.const import Platform
 
     from .charge_loss_observer import ChargeLossObserver
+    from .charge_watch import ChargeWatch
     from .coordinator import ServiceCoordinator
     from .cost_observer import ChargingCostObserver
     from .guest_charging import GuestCharging
@@ -39,8 +40,8 @@ class MennekesAmtronRuntimeData:
     # False for a direct connection set to read only: it shows no controls.
     controls: bool = True
     retain_cost_on_unload: bool = False
-    retain_watch_on_unload: bool = False
     entry_data: dict[str, Any] = field(default_factory=dict)
+    charge_watch: ChargeWatch | None = None
     charge_watch_unsubscribe: Callable[[], None] | None = None
     # Config data/options are already replaced when an update starts unloading.
     # Retain this runtime's platform set instead of recomputing from the new mode.
@@ -71,8 +72,6 @@ class RuntimeHandoff:
     """Owners retained only for the duration of a controlled entry reload."""
 
     identity: DeviceIdentity
-    unloaded: bool = False
-    setup_complete: bool = False
     charging_cost: ChargingCostObserver | None = None
 
     async def async_close(self) -> None:
