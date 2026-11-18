@@ -261,17 +261,17 @@ are disabled by default.
 |---|---|---|---|
 | `event.*_activity` | Activity | always | Commands the service carried out and changes the wallbox reported, as one event entity. |
 
-The event type answers what kind of thing happened; the attributes say which
-one. An automation triggers on the event type and narrows by attribute.
+The event type says what happened, so the entity's logbook row reads on its
+own; the attributes add who asked and why. After a reload or restart the
+entity is unknown until the next event.
 
 | Event type | When |
 |---|---|
-| `command_done` | A command was carried out (result `executed`), or error recovery was confirmed (`recovery_succeeded`). `executed` means the service completed the command, not that the vehicle has started charging; check **Charging** and actual power for that. |
-| `command_failed` | A command failed (`failed`, including a phase-pause timeout), its write could not be confirmed (`uncertain`, inspect readback before retrying) or error recovery failed (`recovery_failed`). |
-| `command_cancelled` | Queued work was cancelled (`cancelled`) or replaced by a newer request (`replaced`). |
-| `session_started` | A car was plugged in. |
-| `session_ended` | The car was unplugged. |
-| `wallbox_changed` | Another change the wallbox reported; the `change` attribute names it. |
+| `paused`, `resumed`, `current_set`, `single_phase_set`, `all_phases_set`, `release_enabled`, `release_disabled`, `unlocked`, `locked` | The service carried out that command (result `executed`). This means the service completed the command, not that the vehicle has started charging; check **Charging** and actual power for that. |
+| `recovered` | Error recovery was confirmed (`recovery_succeeded`). |
+| `command_failed` | A command failed (`failed`, including a phase-pause timeout), its write could not be confirmed (`uncertain`, inspect readback before retrying) or error recovery failed (`recovery_failed`). The `action` attribute names the command. |
+| `command_cancelled` | Queued work was cancelled (`cancelled`) or replaced by a newer request (`replaced`). The `action` attribute names the command. |
+| `vehicle_plugged_in`, `vehicle_unplugged`, `charging_started`, `charging_stopped`, `error_occurred`, `error_cleared`, `authorized`, `authorization_rejected`, `downgrade_started`, `downgrade_ended`, `cable_locked`, `cable_unlocked`, `phases_switched` | A change the wallbox reported. |
 
 Command events carry these attributes:
 
@@ -287,24 +287,23 @@ Command events carry these attributes:
 A queued request reports its result when it runs, is replaced or is
 cancelled; **Charging wait reason** shows the wait. While you drag the current
 slider, only the final value is reported, and a periodic automation that
-repeats the same setpoint reports it once. Each command event also writes a
-readable line to the logbook.
+repeats the same setpoint reports it once.
 
-Session and wallbox events carry `change` and the values of that moment:
+Changes the wallbox reported carry the values of that moment:
 
-| `change` | Event type | Attributes |
-|---|---|---|
-| `vehicle_plugged_in` | `session_started` | `cp_state` |
-| `vehicle_unplugged` | `session_ended` | `cp_state`, `session_energy` (kWh) and `session_duration` (s) last seen with the car |
-| `charging_started` | `wallbox_changed` | `evse_state` |
-| `charging_stopped` | `wallbox_changed` | `evse_state`, `session_energy`, `session_duration` |
-| `error_occurred` | `wallbox_changed` | `error_code`, `error_category` |
-| `error_cleared` | `wallbox_changed` | the code and category that were cleared |
-| `authorized` / `authorization_rejected` | `wallbox_changed` | `authorization` |
-| `downgrade_started` | `wallbox_changed` | `downgrade_current` (A) |
-| `downgrade_ended` | `wallbox_changed` | |
-| `cable_locked` / `cable_unlocked` | `wallbox_changed` | `cable_lock`; a fixed cable never reports this |
-| `phases_switched` | `wallbox_changed` | `phases`: `all_available` or `single_phase` |
+| Event type | Attributes |
+|---|---|
+| `vehicle_plugged_in` | `cp_state` |
+| `vehicle_unplugged` | `cp_state`, `session_energy` (kWh) and `session_duration` (s) last seen with the car |
+| `charging_started` | `evse_state` |
+| `charging_stopped` | `evse_state`, `session_energy`, `session_duration` |
+| `error_occurred` | `error_code`, `error_category` |
+| `error_cleared` | the code and category that were cleared |
+| `authorized` / `authorization_rejected` | `authorization` |
+| `downgrade_started` | `downgrade_current` (A) |
+| `downgrade_ended` | |
+| `cable_locked` / `cable_unlocked` | `cable_lock`; a fixed cable never reports this |
+| `phases_switched` | `phases`: `all_available` or `single_phase` |
 
 Attribute values are the same stable options as the matching sensors, so they
 work in every UI language. A charge that ends with the unplug reports

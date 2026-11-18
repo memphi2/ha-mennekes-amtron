@@ -95,8 +95,8 @@ Only one owner may use the adapter. Check readings before enabling writes.
 ## Understand the activity
 
 In Home Assistant **Activity**, filter by the **Activity** entity to follow
-control commands and physical charging changes together. The trigger explains
-why a command ran; the subsequent wallbox change tells you whether charging
+control commands and physical charging changes together. The entity's `trigger`
+attribute explains why a command ran; the subsequent wallbox change tells you whether charging
 started or stopped. See [activity details](troubleshooting.md#understand-the-activity-timeline).
 
 ## Understand the readings

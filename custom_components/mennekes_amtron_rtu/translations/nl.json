@@ -587,12 +587,31 @@
           "event_type": {
             "name": "Soort",
             "state": {
-              "command_done": "Opdracht uitgevoerd",
+              "paused": "Laden gepauzeerd",
+              "resumed": "Laden hervat",
+              "current_set": "Laadstroom ingesteld",
+              "single_phase_set": "Eén fase gekozen",
+              "all_phases_set": "Alle beschikbare fasen gekozen",
+              "release_enabled": "Laadtoestemming ingeschakeld",
+              "release_disabled": "Laadtoestemming uitgeschakeld",
+              "unlocked": "Wallbox ontgrendeld",
+              "locked": "Wallbox vergrendeld",
+              "recovered": "Foutherstel bevestigd",
               "command_failed": "Opdracht mislukt",
               "command_cancelled": "Opdracht geannuleerd",
-              "session_started": "Voertuig aangesloten",
-              "session_ended": "Voertuig losgekoppeld",
-              "wallbox_changed": "Wijziging aan de wallbox"
+              "vehicle_plugged_in": "Voertuig aangesloten",
+              "vehicle_unplugged": "Voertuig losgekoppeld",
+              "charging_started": "Laden gestart",
+              "charging_stopped": "Laden gestopt",
+              "error_occurred": "Fout opgetreden",
+              "error_cleared": "Fout verholpen",
+              "authorized": "Geautoriseerd",
+              "authorization_rejected": "Autorisatie geweigerd",
+              "downgrade_started": "Vermogensbeperking gestart",
+              "downgrade_ended": "Vermogensbeperking beëindigd",
+              "cable_locked": "Kabel vergrendeld",
+              "cable_unlocked": "Kabel ontgrendeld",
+              "phases_switched": "Fasen omgeschakeld"
             }
           },
           "action": {
@@ -668,24 +687,6 @@
           },
           "occurred_at": {
             "name": "Tijdstip"
-          },
-          "change": {
-            "name": "Wijziging",
-            "state": {
-              "vehicle_plugged_in": "Voertuig aangesloten",
-              "vehicle_unplugged": "Voertuig losgekoppeld",
-              "charging_started": "Laden gestart",
-              "charging_stopped": "Laden gestopt",
-              "error_occurred": "Fout opgetreden",
-              "error_cleared": "Fout verholpen",
-              "authorized": "Geautoriseerd",
-              "authorization_rejected": "Autorisatie geweigerd",
-              "downgrade_started": "Vermogensbeperking gestart",
-              "downgrade_ended": "Vermogensbeperking beëindigd",
-              "cable_locked": "Kabel vergrendeld",
-              "cable_unlocked": "Kabel ontgrendeld",
-              "phases_switched": "Fasen omgeschakeld"
-            }
           },
           "cp_state": {
             "name": "Control-pilot-status"

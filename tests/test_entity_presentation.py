@@ -118,8 +118,8 @@ def test_wallbox_changes_are_fully_translated_in_every_shipped_language() -> Non
         *sorted((INTEGRATION / "translations").glob("*.json")),
     ]:
         attributes = _activity_attributes(path)
+        assert set(WALLBOX_EVENT_TYPES) < set(ACTIVITY_TYPES)
         _assert_states(attributes, "event_type", ACTIVITY_TYPES, path.name)
-        _assert_states(attributes, "change", WALLBOX_EVENT_TYPES, path.name)
         assert set(WALLBOX_ATTRIBUTES) <= set(attributes), path.name
         assert all(attributes[key]["name"] for key in attributes), path.name
 

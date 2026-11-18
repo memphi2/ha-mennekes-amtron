@@ -1,4 +1,4 @@
-"""Only identical successful setpoints are quiet in the readable HA timeline."""
+"""Only identical successful setpoints are quiet in the HA timeline."""
 
 from __future__ import annotations
 
@@ -19,15 +19,16 @@ async def _setup(monkeypatch):
     activity = added["activity"]
     activity.hass = hass
     activity.entity_id = "event.activity"
+    # Each event is one row of the entity in the logbook; rows are the commands.
     rows, triggers = [], []
 
-    async def translations(*_args, **_kwargs):
-        return {}
+    def written() -> None:
+        attributes = activity.state_attributes.copy()
+        triggers.append(attributes)
+        if "action" in attributes:
+            rows.append(attributes)
 
-    monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_get_translations", translations)
-    monkeypatch.setattr(activity, "async_write_ha_state", lambda: triggers.append(activity.state_attributes.copy()))
-    monkeypatch.setattr("custom_components.mennekes_amtron_rtu.event.async_log_entry",
-                        lambda *args, **_kwargs: rows.append(args[2]))
+    monkeypatch.setattr(activity, "async_write_ha_state", written)
     await activity.async_added_to_hass()
     return entry, activity, entry.runtime_data.control.events, rows, triggers
 

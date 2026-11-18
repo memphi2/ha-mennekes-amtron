@@ -587,12 +587,31 @@
           "event_type": {
             "name": "Art",
             "state": {
-              "command_done": "Befehl ausgeführt",
+              "paused": "Laden pausiert",
+              "resumed": "Laden fortgesetzt",
+              "current_set": "Ladestrom eingestellt",
+              "single_phase_set": "Auf eine Phase umgestellt",
+              "all_phases_set": "Auf alle verfügbaren Phasen umgestellt",
+              "release_enabled": "Ladefreigabe eingeschaltet",
+              "release_disabled": "Ladefreigabe ausgeschaltet",
+              "unlocked": "Wallbox entsperrt",
+              "locked": "Wallbox gesperrt",
+              "recovered": "Fehlerbehebung bestätigt",
               "command_failed": "Befehl fehlgeschlagen",
               "command_cancelled": "Befehl verworfen",
-              "session_started": "Fahrzeug angesteckt",
-              "session_ended": "Fahrzeug abgesteckt",
-              "wallbox_changed": "Änderung an der Wallbox"
+              "vehicle_plugged_in": "Fahrzeug eingesteckt",
+              "vehicle_unplugged": "Fahrzeug abgesteckt",
+              "charging_started": "Laden gestartet",
+              "charging_stopped": "Laden beendet",
+              "error_occurred": "Fehler aufgetreten",
+              "error_cleared": "Fehler behoben",
+              "authorized": "Autorisiert",
+              "authorization_rejected": "Autorisierung abgelehnt",
+              "downgrade_started": "Downgrade begonnen",
+              "downgrade_ended": "Downgrade beendet",
+              "cable_locked": "Kabel verriegelt",
+              "cable_unlocked": "Kabel entriegelt",
+              "phases_switched": "Phasen umgeschaltet"
             }
           },
           "action": {
@@ -668,24 +687,6 @@
           },
           "occurred_at": {
             "name": "Ereigniszeit"
-          },
-          "change": {
-            "name": "Änderung",
-            "state": {
-              "vehicle_plugged_in": "Fahrzeug eingesteckt",
-              "vehicle_unplugged": "Fahrzeug abgesteckt",
-              "charging_started": "Laden gestartet",
-              "charging_stopped": "Laden beendet",
-              "error_occurred": "Fehler aufgetreten",
-              "error_cleared": "Fehler behoben",
-              "authorized": "Autorisiert",
-              "authorization_rejected": "Autorisierung abgelehnt",
-              "downgrade_started": "Downgrade begonnen",
-              "downgrade_ended": "Downgrade beendet",
-              "cable_locked": "Kabel verriegelt",
-              "cable_unlocked": "Kabel entriegelt",
-              "phases_switched": "Phasen umgeschaltet"
-            }
           },
           "cp_state": {
             "name": "Control-Pilot-Zustand"

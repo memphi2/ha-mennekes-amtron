@@ -587,12 +587,31 @@
           "event_type": {
             "name": "Type",
             "state": {
-              "command_done": "Commande exécutée",
+              "paused": "Charge mise en pause",
+              "resumed": "Charge reprise",
+              "current_set": "Courant de charge réglé",
+              "single_phase_set": "Une phase sélectionnée",
+              "all_phases_set": "Toutes les phases disponibles sélectionnées",
+              "release_enabled": "Autorisation de charge activée",
+              "release_disabled": "Autorisation de charge désactivée",
+              "unlocked": "Borne déverrouillée",
+              "locked": "Borne verrouillée",
+              "recovered": "Correction de l’erreur confirmée",
               "command_failed": "Échec de la commande",
               "command_cancelled": "Commande annulée",
-              "session_started": "Véhicule branché",
-              "session_ended": "Véhicule débranché",
-              "wallbox_changed": "Changement à la borne"
+              "vehicle_plugged_in": "Véhicule branché",
+              "vehicle_unplugged": "Véhicule débranché",
+              "charging_started": "Charge démarrée",
+              "charging_stopped": "Charge arrêtée",
+              "error_occurred": "Erreur survenue",
+              "error_cleared": "Erreur résolue",
+              "authorized": "Autorisé",
+              "authorization_rejected": "Autorisation refusée",
+              "downgrade_started": "Réduction de puissance commencée",
+              "downgrade_ended": "Réduction de puissance terminée",
+              "cable_locked": "Câble verrouillé",
+              "cable_unlocked": "Câble déverrouillé",
+              "phases_switched": "Phases commutées"
             }
           },
           "action": {
@@ -668,24 +687,6 @@
           },
           "occurred_at": {
             "name": "Survenu à"
-          },
-          "change": {
-            "name": "Changement",
-            "state": {
-              "vehicle_plugged_in": "Véhicule branché",
-              "vehicle_unplugged": "Véhicule débranché",
-              "charging_started": "Charge démarrée",
-              "charging_stopped": "Charge arrêtée",
-              "error_occurred": "Erreur survenue",
-              "error_cleared": "Erreur résolue",
-              "authorized": "Autorisé",
-              "authorization_rejected": "Autorisation refusée",
-              "downgrade_started": "Réduction de puissance commencée",
-              "downgrade_ended": "Réduction de puissance terminée",
-              "cable_locked": "Câble verrouillé",
-              "cable_unlocked": "Câble déverrouillé",
-              "phases_switched": "Phases commutées"
-            }
           },
           "cp_state": {
             "name": "État du control pilot"

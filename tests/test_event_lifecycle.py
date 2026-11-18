@@ -79,15 +79,12 @@ def test_activity_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                     key: recorded.attributes[key]
                     for key in ("event_type", "action", "result", "reason", "trigger", "value")
                 } == {
-                    "event_type": "command_done", "action": "set_current", "result": "executed",
+                    "event_type": "current_set", "action": "set_current", "result": "executed",
                     "reason": "completed", "trigger": "home_assistant", "value": 10,
                 }
 
-                assert len(activity) == 1
-                assert activity[0].data["entity_id"] == event_id
-                assert "Home Assistant" in activity[0].data["message"]
-                assert "10 A" in activity[0].data["message"]
-                activity.clear()
+                # The entity's own row is the only logbook entry.
+                assert activity == []
                 changes = []
                 remove = hass.bus.async_listen(
                     EVENT_STATE_CHANGED,

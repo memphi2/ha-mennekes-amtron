@@ -116,7 +116,7 @@ actions:
       - conditions:
           - condition: template
             value_template: >-
-              {{ trigger.to_state.attributes.event_type == 'session_ended' }}
+              {{ trigger.to_state.attributes.event_type == 'vehicle_unplugged' }}
         sequence:
           - action: notify.notify
             data:
@@ -125,7 +125,7 @@ actions:
       - conditions:
           - condition: template
             value_template: >-
-              {{ trigger.to_state.attributes.change == 'error_occurred' }}
+              {{ trigger.to_state.attributes.event_type == 'error_occurred' }}
         sequence:
           - action: persistent_notification.create
             data:

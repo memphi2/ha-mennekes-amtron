@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.10.0b2 — 2026-11-18
 
+### Breaking changes
+
+- **Activity** has one logbook row per event, and the row says what happened.
+  Its event types are now `paused`, `resumed`, `current_set`,
+  `single_phase_set`, `all_phases_set`, `release_enabled`, `release_disabled`,
+  `unlocked`, `locked` and `recovered` for completed commands,
+  `command_failed` and `command_cancelled`, and the wallbox changes by their
+  own name, such as `vehicle_plugged_in`, `vehicle_unplugged`,
+  `charging_started` or `error_occurred`. The types `command_done`,
+  `session_started`, `session_ended` and `wallbox_changed`, the `change`
+  attribute and the extra logbook sentence are gone. Automations need the new
+  types.
+
 ### Changes
 
 - The app and the integration must both be 0.10.0b2; update them together.
@@ -15,10 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   integration never read it.
 - The documentation and the connection form no longer carry upgrade hints for
   versions before 0.10.0.
-- The Activity logbook text names the event time only when the command ran a
-  minute or more before Home Assistant received it; the row has its own time.
 - A reload or restart no longer shows the last command again as new
-  activity: the Activity entity starts as unknown until the next event.
+  activity: the Activity entity is unknown until the next event.
 - Internal: the service's register monitor and live settings are part of the
   service itself, and members nothing used are gone.
 - Test: the Recorder row check waits until the charging display has settled.

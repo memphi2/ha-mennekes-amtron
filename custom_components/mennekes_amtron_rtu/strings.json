@@ -587,12 +587,31 @@
           "event_type": {
             "name": "Kind",
             "state": {
-              "command_done": "Command carried out",
+              "paused": "Charging paused",
+              "resumed": "Charging resumed",
+              "current_set": "Charging current set",
+              "single_phase_set": "One phase selected",
+              "all_phases_set": "All available phases selected",
+              "release_enabled": "Charging release enabled",
+              "release_disabled": "Charging release disabled",
+              "unlocked": "Wallbox unlocked",
+              "locked": "Wallbox locked",
+              "recovered": "Error recovery confirmed",
               "command_failed": "Command failed",
               "command_cancelled": "Command cancelled",
-              "session_started": "Vehicle plugged in",
-              "session_ended": "Vehicle unplugged",
-              "wallbox_changed": "Wallbox changed"
+              "vehicle_plugged_in": "Vehicle plugged in",
+              "vehicle_unplugged": "Vehicle unplugged",
+              "charging_started": "Charging started",
+              "charging_stopped": "Charging stopped",
+              "error_occurred": "Error occurred",
+              "error_cleared": "Error cleared",
+              "authorized": "Authorized",
+              "authorization_rejected": "Authorization rejected",
+              "downgrade_started": "Downgrade started",
+              "downgrade_ended": "Downgrade ended",
+              "cable_locked": "Cable locked",
+              "cable_unlocked": "Cable unlocked",
+              "phases_switched": "Phases switched"
             }
           },
           "action": {
@@ -668,24 +687,6 @@
           },
           "occurred_at": {
             "name": "Occurred at"
-          },
-          "change": {
-            "name": "Change",
-            "state": {
-              "vehicle_plugged_in": "Vehicle plugged in",
-              "vehicle_unplugged": "Vehicle unplugged",
-              "charging_started": "Charging started",
-              "charging_stopped": "Charging stopped",
-              "error_occurred": "Error occurred",
-              "error_cleared": "Error cleared",
-              "authorized": "Authorized",
-              "authorization_rejected": "Authorization rejected",
-              "downgrade_started": "Downgrade started",
-              "downgrade_ended": "Downgrade ended",
-              "cable_locked": "Cable locked",
-              "cable_unlocked": "Cable unlocked",
-              "phases_switched": "Phases switched"
-            }
           },
           "cp_state": {
             "name": "Control pilot state"
