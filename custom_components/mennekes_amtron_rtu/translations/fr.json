@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Se connecter au service Modbus",
-        "description": "Les applications Supervisor se connectent automatiquement, sans saisir d’URL ni de jeton. Ce formulaire est destiné à un service hébergé séparément. Pour migrer depuis une connexion Modbus directe, désactivez d’abord l’ancienne entrée de l’intégration afin de libérer la connexion Modbus.",
+        "description": "Les applications Supervisor se connectent automatiquement, sans saisir d’URL ni de jeton. Ce formulaire est destiné à un service hébergé séparément.",
         "data": {
           "server_url": "URL du service",
           "server_token": "Jeton d’accès"

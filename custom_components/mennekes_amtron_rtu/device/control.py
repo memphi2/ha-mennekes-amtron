@@ -462,11 +462,6 @@ class AmtronControl:
         """Return a stable deadline; a UI can derive remaining time locally."""
         return self._pending_until
 
-    @property
-    def can_cancel_pending(self) -> bool:
-        """Cancellation needs permission and pending work, not a healthy bus."""
-        return not self.read_only and self.pending_action is not None
-
     async def async_cancel_pending_change(self) -> None:
         """Discard future work, retaining any pause or setpoint already applied."""
         async with self._current_lock:
@@ -596,18 +591,6 @@ class AmtronControl:
             if isinstance(current, (int, float)) and math.isfinite(current) and current >= 0:
                 self._write_state.confirmed_current = float(current)
         return pause_state(self._write_state.confirmed_current)
-
-    @property
-    def observed_pause(self) -> bool | None:
-        """Fresh current evidence for automatic starts, never a held UI value."""
-        snapshot = self._state()
-        if (
-            snapshot.current_write_generation != self._write_state.current_write_generation
-            or "current_limits" in snapshot.failed_blocks
-        ):
-            return None
-        value = snapshot.fresh(CHARGING_CURRENT_EMS.key)
-        return pause_state(value)
 
     async def async_set_charging_current(
         self,

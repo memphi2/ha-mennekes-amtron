@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Connetti al servizio Modbus",
-        "description": "Le app Supervisor si connettono automaticamente senza inserire URL o token. Questo modulo è per un servizio su un host separato. Per passare da Modbus diretto al servizio, disabilita prima la voce dell'integrazione precedente per liberare la connessione Modbus.",
+        "description": "Le app Supervisor si connettono automaticamente senza inserire URL o token. Questo modulo è per un servizio su un host separato.",
         "data": {
           "server_url": "URL del servizio",
           "server_token": "Token di accesso"

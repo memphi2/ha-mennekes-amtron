@@ -2,7 +2,7 @@
 
 Home Assistant hands over the trip, the selected car with its capacity and
 each charge level it learns, with the time the car reported it. The service
-plans start and current with the same step as Home Assistant's direct mode.
+plans start and current with the same guarded step as every other command.
 While the car reports nothing, it projects the charge level from the metered
 energy and stops there at the target; such a stop is provisional until the
 car reports again.

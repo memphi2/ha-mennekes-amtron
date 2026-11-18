@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Modbus-Dienst verbinden",
-        "description": "Supervisor-Apps werden automatisch verbunden, ohne URL oder Token einzugeben. Dieses Formular ist für einen separat betriebenen Dienst. Beim Wechsel von direktem Modbus den bisherigen Integrationseintrag zuerst deaktivieren, damit die Modbus-Verbindung frei ist.",
+        "description": "Supervisor-Apps werden automatisch verbunden, ohne URL oder Token einzugeben. Dieses Formular ist für einen separat betriebenen Dienst.",
         "data": {
           "server_url": "Dienst-URL",
           "server_token": "Zugriffstoken"

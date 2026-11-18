@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Verbinden met de Modbus-service",
-        "description": "Supervisor-apps maken automatisch verbinding zonder dat je een URL of token hoeft in te voeren. Dit formulier is voor een afzonderlijk gehoste service. Schakel bij de overstap van direct Modbus eerst de bestaande integratievermelding uit om de Modbus-verbinding vrij te geven.",
+        "description": "Supervisor-apps maken automatisch verbinding zonder dat je een URL of token hoeft in te voeren. Dit formulier is voor een afzonderlijk gehoste service.",
         "data": {
           "server_url": "Service-URL",
           "server_token": "Toegangstoken"

@@ -310,8 +310,7 @@ are stored, so retaining these bounded in-memory models adds no Recorder writes.
 Manually selected entity sources work without a vehicle profile. Creating a
 profile starts with that vehicle's explicit settings; it does not invent a
 profile from earlier flat selections. Provider selection uses only the current
-provider/device keys. Before 1.0 we do not maintain migrations for obsolete
-beta configuration, storage or API formats. Hardware capability handling,
+provider/device keys. Hardware capability handling,
 identity checks and the supported Home Assistant range are separate concerns.
 
 Options edits are held in a section-local draft until the final form is

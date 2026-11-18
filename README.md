@@ -77,9 +77,7 @@ to be created. Intelligent vehicle planning is optional and configured in HA.
 
 **[Guide home](docs/README.md)** · **[Release notes](CHANGELOG.md)** · **[Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)**
 
-Before 1.0, releases can change configuration and stored data without
-migration. Read [the update steps](docs/installation.md#updates) and release
-notes first. Integration and app versions are independent; update the app first
+Integration and app versions are independent; update the app first
 when a newer minimum is required. Only a changed app needs an app update.
 
 Unofficial community project, not affiliated with MENNEKES.

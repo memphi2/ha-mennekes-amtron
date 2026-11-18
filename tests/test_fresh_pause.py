@@ -4,42 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 from aiohttp import ClientSession
 
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
-from tests.test_control import Harness
 from tests.test_modbus_service import TOKEN, service_fixture
 from tests.test_plug_charge_observer import observer_harness, plug_in_paused
-
-
-@pytest.mark.parametrize(("value", "expected"), [
-    (0, False), (1, True), (5.99, True), (6, False), (16, False),
-    (None, None), (True, None), (-1, None), (float("nan"), None), (float("inf"), None),
-])
-def test_fresh_pause_uses_valid_current_without_mutating_intent(value, expected):
-    h = Harness()
-    h.snapshot.values["charging_current_ems"] = value
-    h.control.pause_requested = True
-    assert h.control.observed_pause is expected
-    assert h.control.pause_requested is True
-
-
-@pytest.mark.parametrize("failure", ["held", "failed_block", "generation", "missing"])
-def test_cached_pause_is_not_fresh_evidence(failure):
-    h = Harness(values={"charging_current_ems": 1.0})
-    assert h.control.is_paused is True
-    if failure == "held":
-        h.snapshot.held = frozenset({"charging_current_ems"})
-    elif failure == "failed_block":
-        h.snapshot.failed_blocks = ("current_limits",)
-    elif failure == "generation":
-        h.snapshot.current_write_generation += 1
-    else:
-        h.snapshot.values.clear()
-    assert h.control.is_paused is True
-    assert h.control.observed_pause is None
 
 
 def test_remote_failed_block_keeps_a_cached_pause_out_of_automatic_decisions(tmp_path):

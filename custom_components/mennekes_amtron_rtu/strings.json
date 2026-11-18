@@ -99,7 +99,7 @@
       },
       "server": {
         "title": "Connect to the Modbus service",
-        "description": "Supervisor apps connect automatically without entering a URL or token. This form is for a separately hosted service. When migrating from direct Modbus, disable the previous integration entry first to release the Modbus connection.",
+        "description": "Supervisor apps connect automatically without entering a URL or token. This form is for a separately hosted service.",
         "data": {
           "server_url": "Service URL",
           "server_token": "Access token"

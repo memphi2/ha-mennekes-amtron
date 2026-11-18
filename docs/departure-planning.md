@@ -127,7 +127,7 @@ charges again; any other setting of the wallbox stays as it is.
 
 Disabling departure planning clears its selected trip and cancels commands queued
 by that plan. It keeps the ordinary percentage target and the current pause
-state. Before 1.0, incompatible beta settings are not migrated; see [Updates](installation.md#updates).
+state.
 
 ## What the plan changes while charging
 

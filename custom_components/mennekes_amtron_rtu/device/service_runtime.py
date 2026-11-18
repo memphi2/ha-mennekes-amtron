@@ -610,7 +610,6 @@ class ModbusService:
                 "supports_soc_goal": control.supports_soc_goal if control else False,
                 "soc_goal_revision": self._soc_goal_revision,
                 "soc_maximum_required": self._soc_maximum_required,
-                "choice_revision": self.choice_revision,
                 "soc_goal": control.soc_goal.snapshot() if control else None,
                 "energy_goal": control.energy_goal.snapshot() if control else None,
                 "read_only": self.config.read_only or self._intent_rejected,

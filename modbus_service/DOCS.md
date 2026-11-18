@@ -70,7 +70,7 @@ HA OS discovery supplies the service URL and token automatically.
 Web pages need **Supervisor 2026.10.4+** and an administrator account. The native
 Configuration tab remains available. Default polling is **5 / 30 seconds**;
 the state-change wait is **300 seconds**. A queued request is not a completed
-command: check **Pending change**. The app is the only software current cap in
+command: check **Charging wait reason**. The app is the only software current cap in
 service mode. Its cap does not apply to a deliberately selected unlimited **0 A**.
 
 An explicitly started guest charge runs independently of HA. It grants permission
@@ -93,8 +93,7 @@ to start, then update the integration. Keep the existing app data and HA entry.
 App updates interrupt the heartbeat briefly. Back up app data, including its
 private token and saved charging state.
 
-Before 1.0, incompatible beta formats are not migrated. A rejected saved state
-raises an HA Repair. Acknowledging it keeps pause on and charging release off;
+A rejected saved state raises an HA Repair. Acknowledging it keeps pause on and charging release off;
 check targets and permissions before resuming.
 [Update and reset instructions](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.10.0b1/docs/installation.md#updates).
 

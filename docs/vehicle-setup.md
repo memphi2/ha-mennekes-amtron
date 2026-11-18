@@ -119,9 +119,6 @@ stays off until you set it up:
 You can open and change any profile, not only the selected car. Changing a car
 that is not selected leaves the selected car's target and departure untouched.
 
-Before 1.0, incompatible beta profiles are not migrated. Reconfigure affected
-profiles after an update; see [Updates](installation.md#updates).
-
 ### Optional automatic vehicle selection
 
 Automatic selection is **off by default** and separately configurable for each

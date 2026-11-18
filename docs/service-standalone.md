@@ -155,7 +155,7 @@ This URL addresses our HTTP service, not the LAN gateway's Modbus port. The
 service's `host` and `tcp_port` options separately select the gateway.
 
 Standalone services use manual URL/token setup. Supervisor's automatic discovery
-is available only for the HA OS app. During migration, the service's wallbox serial
+is available only for the HA OS app. The service's wallbox serial
 number must match the existing entry. Re-enable that entry if it remains disabled.
 
 Compare readings while read-only. Then set the permitted `current_cap`, change

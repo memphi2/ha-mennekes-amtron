@@ -130,11 +130,7 @@ required just to use the wallbox.
 
 ## Updates
 
-Before version 1.0, releases may change configuration, stored state and the
-service API without migration. Read the release notes first.
-After an incompatible update, reconfigure the affected profiles or planning
-options and verify Plug & Charge, pause, release, charging target and departure
-before use. An incompatible saved app state is preserved and charging control is blocked.
+A saved app state that the service cannot use is preserved and charging control is blocked.
 Open **Settings → System → Repairs** in HA to acknowledge safe defaults: pause
 on, charging release off, resume current 6 A and no targets. This does not start
 charging. Reconfigure the desired policies before explicitly enabling release
@@ -185,8 +181,7 @@ remove and re-add the wallbox.
    entry uses it, then follow any restart request.
 
 Removal does not reset wallbox settings or delete Recorder history and
-blueprints. Update dashboards and automations that used the removed entities.
-Stop the app separately before giving the adapter to another bus owner.
+blueprints. Stop the app separately before giving the adapter to another bus owner.
 
 ---
 
