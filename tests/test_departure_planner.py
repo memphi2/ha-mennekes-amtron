@@ -7,10 +7,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.device import server
 from custom_components.mennekes_amtron_rtu.device import (
-    service_departure_runtime as departure_runtime,
+    departure_planner as departure_runtime,
 )
+from custom_components.mennekes_amtron_rtu.device import server
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureInputs,
 )

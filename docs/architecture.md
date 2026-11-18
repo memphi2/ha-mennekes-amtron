@@ -11,8 +11,8 @@ For maintainers and technical investigations; normal setup starts with
 
 There is one runtime for the wallbox: the service in `device/`
 (`service_runtime.py` with the one `ModbusService`, its parts `GuestLimits` in
-`service_guest_runtime.py` and `DeparturePlanner` in
-`service_departure_runtime.py`, and `service_api.py` with `ServiceApi.dispatch`).
+`guest_limits.py` and `DeparturePlanner` in
+`departure_planner.py`, and `service_api.py` with `ServiceApi.dispatch`).
 The `device/` package has no Home Assistant imports. It contains the shared
 register map, USB/LAN transport, poll cadence, heartbeat, recovery, control
 rules, goals, sessions and their stores. The same source is packaged as
@@ -311,9 +311,8 @@ selected. The service keeps the wallbox's total-energy readings in a bounded
 log and the last plug cycle it saw from plug-in to unplug
 (`device/meter_log.py`), saved in `charge-meter.json`; every loss estimate is
 the meter difference over a time span.
-Controlled reloads on the same physical connection hand over the live session
-observer and compatible cost observer, including their meter baseline and price
-observations. Transport generation changes discard incomplete measurements;
+Controlled reloads on the same physical connection hand over a compatible cost
+observer, including its meter baseline and price observations. Transport generation changes discard incomplete measurements;
 full unload and failed setup close all retained owners. Only completed summaries
 are stored, so retaining these bounded in-memory models adds no Recorder writes.
 

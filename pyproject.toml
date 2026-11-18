@@ -61,8 +61,8 @@ ignore = ["E501"]
 "tests/*" = ["S101", "SLF001", "INP001", "S603", "N812"]
 # The guest permission and the departure plan are parts of the one service and
 # share its state.
-"custom_components/mennekes_amtron_rtu/device/service_guest_runtime.py" = ["SLF001"]
-"custom_components/mennekes_amtron_rtu/device/service_departure_runtime.py" = ["SLF001"]
+"custom_components/mennekes_amtron_rtu/device/guest_limits.py" = ["SLF001"]
+"custom_components/mennekes_amtron_rtu/device/departure_planner.py" = ["SLF001"]
 # The write path and the command queue are parts of the one control; the
 # control holds the state they work on.
 "custom_components/mennekes_amtron_rtu/device/control_write.py" = ["SLF001"]

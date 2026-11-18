@@ -220,7 +220,7 @@ def test_remote_coordinator_observes_success_and_failed_poll(tmp_path):
                     scan_interval=5,
                 )
                 callback = AsyncMock()
-                coordinator.observe_session = callback
+                coordinator.observe_estimates = callback
                 assert await coordinator._async_update_data() is data
                 callback.assert_awaited_once_with(data)
                 callback.reset_mock()
@@ -228,7 +228,7 @@ def test_remote_coordinator_observes_success_and_failed_poll(tmp_path):
                 with pytest.raises(UpdateFailed):
                     await coordinator._async_update_data()
                 callback.assert_awaited_once_with(None)
-                coordinator.observe_session = None
+                coordinator.observe_estimates = None
                 with pytest.raises(UpdateFailed):
                     await coordinator._async_update_data()
         finally:

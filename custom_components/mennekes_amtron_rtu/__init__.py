@@ -297,7 +297,7 @@ async def async_setup_entry(
     # Whether a failure below is something other than a silent wallbox.
     wallbox_answers = True
     try:
-        # A reconnect is only a gap; the session's presence rule judges it.
+        # A reconnect is only a gap; the service's presence rule judges it.
         if handoff is not None and handoff.identity != identity:
             await handoff.async_close()
         entry.runtime_data.charge_watch = ChargeWatch(hass, entry)
@@ -340,12 +340,12 @@ async def async_setup_entry(
                     await entry.runtime_data.charging_cost.async_start()
 
             # Failed polls arrive as None. A reconnect re-checks the wallbox
-            # identity; the session judges continuity, costs follow it.
+            # identity; the service judges continuity, costs follow it.
             async def observe_estimates(data: WallboxData | None) -> None:
                 if entry.runtime_data.charging_cost is not None:
                     await entry.runtime_data.charging_cost.async_observe(data)
 
-            coordinator.observe_session = observe_estimates
+            coordinator.observe_estimates = observe_estimates
         client.on_auth_failed = lambda: entry.async_start_reauth(hass)
         heartbeat = ServiceHeartbeat(client)
         entry.runtime_data.heartbeat = heartbeat
@@ -837,7 +837,7 @@ async def _async_stop_runtime(
         runtime.charge_watch_unsubscribe = None
     if runtime.plug_charge is not None:
         await runtime.plug_charge.async_stop()
-    runtime.coordinator.observe_session = None
+    runtime.coordinator.observe_estimates = None
     if runtime.charge_loss is not None:
         await runtime.charge_loss.async_stop()
     if runtime.charging_cost is not None and not retain_cost:

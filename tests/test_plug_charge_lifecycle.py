@@ -35,7 +35,7 @@ def test_direct_gate_is_enforced_at_setup_and_stops_observer(tmp_path, monkeypat
         assert _service(hass, entry).control.plug_charge["enabled"]
         assert await integration.async_unload_entry(hass, entry)
         observer.async_stop.assert_awaited_once()
-        assert entry.runtime_data.coordinator.observe_session is None
+        assert entry.runtime_data.coordinator.observe_estimates is None
 
     asyncio.run(run())
 

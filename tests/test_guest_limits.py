@@ -8,11 +8,11 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.guest_limits import (
+    GuestLimits,
+)
 from custom_components.mennekes_amtron_rtu.device.power_window import (
     observed_phases,
-)
-from custom_components.mennekes_amtron_rtu.device.service_guest_runtime import (
-    GuestLimits,
 )
 from custom_components.mennekes_amtron_rtu.device.service_runtime import (
     ModbusService,
@@ -77,7 +77,7 @@ def test_long_unknown_connection_discards_guest_permission(tmp_path, monkeypatch
 
 @pytest.mark.parametrize("bus_error", [False, True])
 def test_guest_limit_loop_retries_transient_errors_and_propagates_cancellation(monkeypatch, bus_error):
-    from custom_components.mennekes_amtron_rtu.device import service_guest_runtime
+    from custom_components.mennekes_amtron_rtu.device import guest_limits
     from custom_components.mennekes_amtron_rtu.device.client_errors import (
         AmtronConnectionError,
         AmtronRateLimitedError,
@@ -88,7 +88,7 @@ def test_guest_limit_loop_retries_transient_errors_and_propagates_cancellation(m
         error = AmtronConnectionError("offline") if bus_error else AmtronRateLimitedError("current", 4)
         tick = AsyncMock(side_effect=[error, asyncio.CancelledError()])
         monkeypatch.setattr(guest, "tick", tick)
-        monkeypatch.setattr(service_guest_runtime.asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr(guest_limits.asyncio, "sleep", AsyncMock())
         with pytest.raises(asyncio.CancelledError):
             await guest.loop()
         assert tick.await_count == 2

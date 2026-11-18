@@ -108,7 +108,7 @@ def test_guest_uses_existing_energy_baseline_and_stops_before_time(tmp_path, mon
 
 
 def test_guest_uses_normal_current_and_pause_without_planner_takeover(tmp_path, monkeypatch):
-    from tests.test_service_departure_runtime import hand_over
+    from tests.test_departure_planner import hand_over
     async def body():
         async with runtime.guest_service(tmp_path) as (service, transport, clock):
             await hand_over(service)

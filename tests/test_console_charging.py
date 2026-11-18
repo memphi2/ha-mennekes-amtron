@@ -12,8 +12,8 @@ from custom_components.mennekes_amtron_rtu.device.console_http import (
     create_console_app,
 )
 from tests import service_guest_fixture as runtime
+from tests.test_departure_planner import CAR, hand_over
 from tests.test_service_charge_http import HEADERS, TOKEN, Console
-from tests.test_service_departure_runtime import CAR, hand_over
 
 
 def test_console_targets_auth_cas_and_vehicle_maximum(tmp_path, monkeypatch):

@@ -90,7 +90,7 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
         timed = SimpleNamespace(async_stop=AsyncMock())
         runtime = SimpleNamespace(
             loaded_platforms=[], retain_cost_on_unload=False,
-            retain_watch_on_unload=True, vehicle_profile_id="a" * 32,
+            vehicle_profile_id="a" * 32,
             vehicle_detection=None, vehicle_binding=None,
             charge_watch_unsubscribe=None,
             plug_charge=None, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
@@ -117,7 +117,7 @@ def test_a_forced_reload_rebuilds_the_runtime_although_no_option_changed(monkeyp
     async def run():
         runtime = SimpleNamespace(
             plug_charge=None, charging_cost=None, entry_data={"other": 1}, identity=None,
-            retain_cost_on_unload=False, retain_watch_on_unload=False,
+            retain_cost_on_unload=False,
         )
         entry = SimpleNamespace(entry_id="entry", data={}, options={}, runtime_data=runtime, state=None)
         switch = AsyncMock(return_value=True)

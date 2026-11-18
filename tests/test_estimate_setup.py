@@ -70,7 +70,7 @@ def owners(monkeypatch, entry, *, failure=None):
                 events.append(f"{name}.observe")
 
             async def stop():
-                assert entry.runtime_data.coordinator.observe_session is None
+                assert entry.runtime_data.coordinator.observe_estimates is None
                 events.append(f"{name}.stop")
 
             instance = SimpleNamespace(
@@ -108,7 +108,7 @@ def test_direct_estimates_are_wired_before_first_poll_and_closed_after_successfu
             assert events[-1] == "loss.start"
         # Assigning a charge is an action: a read-only entry adds no buttons.
         assert Platform.BUTTON not in runtime.loaded_platforms
-        callback = runtime.coordinator.observe_session
+        callback = runtime.coordinator.observe_estimates
         assert callback is not None
         # A failed poll reaches the costs as None; losses need no poll.
         await callback(None)
@@ -116,11 +116,11 @@ def test_direct_estimates_are_wired_before_first_poll_and_closed_after_successfu
             instances["cost"].async_observe.assert_awaited_with(None)
         hass.config_entries.unload_result = False
         assert not await integration.async_unload_entry(hass, entry)
-        assert runtime.coordinator.observe_session is callback
+        assert runtime.coordinator.observe_estimates is callback
         assert not any(event.endswith(".stop") for event in events)
         hass.config_entries.unload_result = True
         assert await integration.async_unload_entry(hass, entry)
-        assert runtime.coordinator.observe_session is None
+        assert runtime.coordinator.observe_estimates is None
         if loss:
             instances["loss"].async_stop.assert_awaited_once()
         if cost:
@@ -138,7 +138,7 @@ def test_disabled_optional_features_create_no_owners_or_poll_callback(tmp_path, 
         direct_wallbox(monkeypatch)
         events, instances = owners(monkeypatch, entry)
         assert await integration.async_setup_entry(hass, entry)
-        assert entry.runtime_data.coordinator.observe_session is None
+        assert entry.runtime_data.coordinator.observe_estimates is None
         assert not instances
         assert await integration.async_unload_entry(hass, entry)
         assert not events
@@ -166,7 +166,7 @@ def test_partial_setup_failure_closes_every_created_estimate_owner_and_transport
         with pytest.raises((RuntimeError, ConfigEntryNotReady)):
             await integration.async_setup_entry(hass, entry)
         runtime = entry.runtime_data
-        assert runtime.coordinator.observe_session is None
+        assert runtime.coordinator.observe_estimates is None
         instances["cost"].async_stop.assert_awaited_once()
         assert ("loss" in instances) is (failure in ("loss", "platform"))
         if "loss" in instances:
@@ -239,12 +239,12 @@ def test_app_entry_estimates_follow_the_apps_sessions_and_keep_saved_losses(tmp_
                 assert Platform.BUTTON in runtime.loaded_platforms
                 if enabled:
                     assert events[:3] == ["cost.start", "cost.observe", "loss.start"]
-                    await runtime.coordinator.observe_session(None)
+                    await runtime.coordinator.observe_estimates(None)
                     instances["cost"].async_observe.assert_awaited_with(None)
                 else:
                     assert not instances
                 assert await integration.async_unload_entry(hass, entry)
-                assert runtime.coordinator.observe_session is None
+                assert runtime.coordinator.observe_estimates is None
                 if enabled:
                     instances["loss"].async_stop.assert_awaited_once()
                     instances["cost"].async_stop.assert_awaited_once()
