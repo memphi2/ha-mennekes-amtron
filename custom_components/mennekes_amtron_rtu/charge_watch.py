@@ -133,6 +133,15 @@ def cycle_around(entry: MennekesAmtronConfigEntry, start: float, end: float) -> 
     return None
 
 
+def measurable_since(entry: MennekesAmtronConfigEntry) -> float | None:
+    """From when a charging record of the car can lie in a plug cycle seen here."""
+    meter = _meter(entry)
+    if meter is None:
+        return None
+    starts = [at for at in (meter["plugged_at"], meter["last"][0] if meter["last"] is not None else None) if at is not None]
+    return min(starts) - CLOCK_SLACK_SECONDS if starts else None
+
+
 def owner(entry: MennekesAmtronConfigEntry) -> VehicleProfile | None:
     """The recognized car of the running cycle, else of the last one."""
     meter = _meter(entry)

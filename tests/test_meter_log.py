@@ -91,6 +91,26 @@ def test_a_long_charge_at_a_short_poll_interval_keeps_its_plug_in() -> None:
     assert stepped.energy_between(500, 46000) == pytest.approx(54)
 
 
+def test_the_log_keeps_only_what_the_running_and_the_last_cycle_need() -> None:
+    meter = ChargeMeter()
+    for at in range(0, 5000, 100):
+        meter.observe(at, present=False, reading=10 + at / 1000)
+    # Nobody plugged in: nothing older than the reach of one boundary is kept.
+    assert meter.log._times[0] == 4300
+    meter.observe(5000, present=True, charging=True, reading=15)
+    for at in range(5100, 9000, 100):
+        meter.observe(at, present=True, charging=True, reading=10 + at / 1000)
+    meter.observe(9000, present=False, reading=19)
+    assert meter.log._times[0] == 4400
+    assert meter.log.energy_between(*meter.last) == pytest.approx(4)
+    # The next cycle is the running one, and the one before stays measurable.
+    meter.observe(9100, present=True, reading=19)
+    assert meter.log._times[0] == 4400
+    meter.observe(9200, present=False, reading=19)
+    assert meter.last == (9100, 9200)
+    assert meter.log._times[0] == 8500
+
+
 def test_a_clock_that_moves_back_ends_the_cycle_unmeasured() -> None:
     meter = ChargeMeter()
     meter.observe(1000, present=False, reading=10)
@@ -127,7 +147,7 @@ def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
     meter.observe(40, present=True, charging=True, reading=101)
     meter.observe(50, present=True, charging=True, reading=104)
     assert meter.snapshot() == {
-        "first_reading_at": 10, "known_since": 10, "present": True,
+        "known_since": 10, "present": True,
         "plugged_at": 30, "charging_at": 40, "note": None,
         "last": None, "last_note": None,
     }
@@ -135,7 +155,7 @@ def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
     meter.observe(60, present=None)
     meter.observe(70, present=False, reading=105)
     assert meter.snapshot() == {
-        "first_reading_at": 10, "known_since": 10, "present": False,
+        "known_since": 10, "present": False,
         "plugged_at": None, "charging_at": None, "note": None,
         "last": [30, 70], "last_note": None,
     }
@@ -157,7 +177,7 @@ def test_the_service_keeps_only_a_plug_cycle_it_saw_from_end_to_end() -> None:
 
 @pytest.mark.parametrize("changes", [
     {"extra": 1}, {"last": [1]}, {"last": (1, 2)}, {"last": [2, 1]}, {"last": [None, 2]},
-    {"plugged_at": "1"}, {"charging_at": True}, {"first_reading_at": float("nan")},
+    {"plugged_at": "1"}, {"charging_at": True}, {"known_since": float("nan")},
     {"present": 1}, {"known_since": []}, {"note": ""}, {"note": 5}, {"last_note": "x" * 129},
 ])
 def test_a_reported_charge_meter_is_checked(changes) -> None:

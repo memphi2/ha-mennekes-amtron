@@ -231,7 +231,7 @@ The service keeps three files, each bound to the wallbox identity:
 |---|---|---|
 | `intent.json` | Charging intent, shared energy and percentage limits, bounded evidence for restoring guest permission | When that intent changes |
 | `departure-plan.json` | The selected time, the vehicle plan and its bounded learned model | When the plan changes |
-| `charge-meter.json` | The meter log, the plug cycle and its note | At a change of the plug cycle, else every five minutes |
+| `charge-meter.json` | The meter log of the running and the last plug cycle, the plug cycle and its note | At a change of the plug cycle, and every five minutes while the meter rises |
 
 An intent file of another format is rejected and requires a safe reset
 acknowledgement. An unusable `charge-meter.json` only starts measuring again.
@@ -244,7 +244,7 @@ intent file never counts as charging permission; the acknowledgement is
 described in [Updates](installation.md#updates).
 
 Heartbeats and polls do not write `intent.json` or `departure-plan.json`; the
-charge meter is the only file saved on a timer. The heartbeat
+charge meter is the only file saved on a timer, and only while a car charges. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
@@ -283,7 +283,6 @@ cost and loss estimates; times are epoch seconds:
 
 | Field | Meaning |
 |---|---|
-| `first_reading_at` | The oldest reading in the meter log; `null` while it is empty |
 | `known_since` | Since when the plug state has been known without a long gap |
 | `present` | Whether a car is plugged in; `null` while unknown |
 | `plugged_at`, `charging_at` | Plug-in and first charging of the running cycle; `null` unless the service saw the plug-in |

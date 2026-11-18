@@ -138,19 +138,28 @@ def test_the_meter_is_saved_at_a_change_and_else_every_five_minutes(tmp_path, mo
                 await observe(service, transport, clock, 1030, EvseState.CHARGING, 100)
                 await observe(service, transport, clock, 1040, EvseState.CHARGING, 101)
                 assert saves == [1030]
-                cycle, at = service._meter_saved
-                service._meter_saved = (cycle, at - 301)
+                # Five minutes later nothing is written while the meter stands still ...
+                cycle, at, kwh = service._meter_saved
+                service._meter_saved = (cycle, at - 301, kwh)
+                await observe(service, transport, clock, 1045, EvseState.CHARGING, 101)
+                assert saves == [1030]
+                # ... and the log is saved once it has risen since.
+                service._meter_saved = (cycle, at - 301, kwh - 1)
                 await observe(service, transport, clock, 1050, EvseState.CHARGING, 102)
                 assert saves == [1030, 1030]
+                # The same note again is no change.
+                await service.command(note(service, 1030, "car"))
+                await service.command(note(service, 1030, "car"))
+                assert saves == [1030, 1030, 1030]
                 # A disk that refuses is reported once and costs no measurement.
                 # It is tried again after a minute, not five minutes later.
                 failing.extend([OSError("full"), OSError("full")])
                 service._meter_saved = None
                 for at in (1060, 1070, 1080, 1090):
                     await observe(service, transport, clock, at, EvseState.CHARGING, 103)
-                    assert service._meter_retry_at > 0 or len(saves) == 5
+                    assert service._meter_retry_at > 0 or len(saves) == 6
                     service._meter_retry_at -= 61
-                assert len(saves) == 5
+                assert len(saves) == 6
                 assert [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING] == [
                     "Charging loss: meter log not saved (OSError)",
                 ]

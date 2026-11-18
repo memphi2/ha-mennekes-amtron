@@ -76,7 +76,7 @@ changes have their own version and publication decision; see
 The service serializes commands independently of client lifetime and keeps
 heartbeat and polling active; the app does so without HA. Its intent file
 changes only with durable control intent, and its charge meter is saved at a
-change of the plug cycle and otherwise every five minutes. Named commands retain device guards; the API has no
+change of the plug cycle and every five minutes while a car charges. Named commands retain device guards; the API has no
 raw register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 

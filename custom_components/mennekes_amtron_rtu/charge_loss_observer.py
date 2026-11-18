@@ -27,7 +27,13 @@ from .charge_loss_const import (
     LOSS_SOURCE_SENSOR,
     LOSS_SOURCE_VEHICLE_HISTORY,
 )
-from .charge_watch import PlugCycle, cycle_around, last_cycle, loss_vehicle_options
+from .charge_watch import (
+    PlugCycle,
+    cycle_around,
+    last_cycle,
+    loss_vehicle_options,
+    measurable_since,
+)
 from .device.charge_loss import Charge, LossStatistics
 from .device.client_errors import AmtronConnectionError
 from .device.enums import EvseState
@@ -298,7 +304,8 @@ class ChargeLossObserver:
     async def _measure_record(self) -> None:
         """Compare the vehicle's newest record with the meter over the same span."""
         source = self._history_source
-        since = (self._coordinator.current_data().charge_meter or {}).get("first_reading_at")
+        # Without a plug cycle seen here, no record of the car can be measured.
+        since = measurable_since(self._entry)
         self._last_query = time.monotonic()
         record = None
         if source is not None and since is not None:

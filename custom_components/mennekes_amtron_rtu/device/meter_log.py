@@ -61,6 +61,16 @@ class MeterLog:
     def first_at(self) -> float | None:
         return self._times[0] if self._times else None
 
+    @property
+    def last_kwh(self) -> float | None:
+        return self._values[-1] if self._values else None
+
+    def forget_before(self, moment: float) -> None:
+        """Drop what lies before the last reading at or before that moment."""
+        index = bisect_right(self._times, moment) - 1
+        if index > 0:
+            del self._times[:index], self._values[:index]
+
     def observe(self, at: float, kwh: float) -> None:
         if not (math.isfinite(at) and math.isfinite(kwh)) or kwh < 0:
             return
@@ -128,8 +138,7 @@ class MeterLog:
 
 
 _KEYS = frozenset({
-    "first_reading_at", "known_since", "present", "plugged_at", "charging_at", "note",
-    "last", "last_note",
+    "known_since", "present", "plugged_at", "charging_at", "note", "last", "last_note",
 })
 
 
@@ -165,6 +174,14 @@ class ChargeMeter:
         """One poll: whether a car is plugged in, and the meter if it was read."""
         if reading is not None:
             self.log.observe(now, reading)
+        try:
+            self._observe_presence(now, present, charging)
+        finally:
+            # Only the running and the last cycle are ever measured.
+            starts = [at for at in (self.plugged_at, self.last[0] if self.last is not None else None) if at is not None]
+            self.log.forget_before(min(starts, default=now) - MAX_INTERPOLATION_SECONDS)
+
+    def _observe_presence(self, now: float, present: bool | None, charging: bool) -> None:
         if self._gap.observe(now, known=present is not None):
             # A long gap may hide an unplug, and another car.
             self._lose_cycle()
@@ -194,7 +211,6 @@ class ChargeMeter:
 
     def snapshot(self) -> dict[str, Any]:
         return {
-            "first_reading_at": self.log.first_at,
             "known_since": self.known_since,
             "present": self.present,
             "plugged_at": self.plugged_at,
@@ -237,7 +253,6 @@ def parse_charge_meter(raw: object) -> dict[str, Any]:
             raise ValueError("invalid plug cycle")
         last = (start, end)
     return {
-        "first_reading_at": _moment(raw["first_reading_at"]),
         "known_since": _moment(raw["known_since"]),
         "present": raw["present"],
         "plugged_at": _moment(raw["plugged_at"]),

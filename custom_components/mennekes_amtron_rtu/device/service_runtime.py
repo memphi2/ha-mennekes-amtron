@@ -98,8 +98,8 @@ class ModbusService:
         # What the meter delivered in any time span, for cost and loss estimates.
         self.charge_meter = ChargeMeter()
         self._meter_store: ChargeMeterStore | None = None
-        # What of the plug cycle was last saved, and when.
-        self._meter_saved: tuple[object, float] | None = None
+        # What of the plug cycle was last saved, when, and at which meter value.
+        self._meter_saved: tuple[object, float, float | None] | None = None
         self._meter_lock = asyncio.Lock()
         self._meter_retry_at = 0.0
         self._meter_notice = FailureNotice(_LOGGER, "Charging loss")
@@ -435,7 +435,7 @@ class ModbusService:
         self._meter_store = store
 
     async def _save_charge_meter(self, *, force: bool = False) -> None:
-        """Save at every change of the plug cycle, else every five minutes."""
+        """Save at every change of the plug cycle, and every five minutes while the meter rises."""
         store, meter = self._meter_store, self.charge_meter
         if store is None:
             return
@@ -444,25 +444,28 @@ class ModbusService:
         now = time.monotonic()
         if not force and (
             now < self._meter_retry_at
-            or (saved is not None and saved[0] == cycle and now - saved[1] < _METER_SAVE_SECONDS)
+            or (saved is not None and saved[0] == cycle and (
+                # Without a car charging nothing is worth a write.
+                now - saved[1] < _METER_SAVE_SECONDS or meter.log.last_kwh == saved[2]
+            ))
         ):
             return
         # Shielded and one at a time: the write of a cancelled poll must not
         # overtake the one at stop and leave the older state on disk.
-        await asyncio.shield(self._write_charge_meter(store, cycle, now, meter.dump()))
+        await asyncio.shield(self._write_charge_meter(store, (cycle, now, meter.log.last_kwh), meter.dump()))
 
     async def _write_charge_meter(
-        self, store: ChargeMeterStore, cycle: object, at: float, payload: dict[str, Any],
+        self, store: ChargeMeterStore, saved: tuple[object, float, float | None], payload: dict[str, Any],
     ) -> None:
         async with self._meter_lock:
             try:
                 await asyncio.to_thread(store.save, payload)
             except (OSError, ValueError) as err:
                 # Not recorded as saved: tried again in a minute.
-                self._meter_retry_at = at + _METER_RETRY_SECONDS
+                self._meter_retry_at = saved[1] + _METER_RETRY_SECONDS
                 self._meter_notice.failed("meter log not saved", type(err).__name__)
             else:
-                self._meter_saved = (cycle, at)
+                self._meter_saved = saved
                 self._meter_notice.recovered("meter log saved again")
 
     async def _charge_note(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -478,7 +481,8 @@ class ModbusService:
         if payload["expected_serial_number"] != self.identity.serial_number:
             raise DeviceError("device_identity_changed")
         # A cycle that ended meanwhile keeps its note; the answer shows it.
-        if self.charge_meter.annotate(plugged_at, payload["note"]):
+        note = self.charge_meter.note
+        if self.charge_meter.annotate(plugged_at, payload["note"]) and self.charge_meter.note != note:
             await self._save_charge_meter(force=True)
         if self._command_lock.locked():
             # Another command still runs; its outcome is not this one's.

@@ -97,7 +97,7 @@ class Coordinator:
         owner = self.owner if owner is ... else owner
         self.last = PlugCycle(plugged_at, unplugged_at, owner)
         self.data.charge_meter = {
-            "first_reading_at": self.meter.first_at, "known_since": None, "present": False,
+            "known_since": None, "present": False,
             "plugged_at": None, "charging_at": None, "note": None,
             "last": (plugged_at, unplugged_at),
             "last_note": note_for(owner, automatic=True) if isinstance(owner, VehicleProfile) else None,
@@ -313,7 +313,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
             data.values[EVSE_STATE.key] = state
             data.energy_observed_at = at
             data.charge_meter = {
-                "first_reading_at": meter.first_at, "known_since": 1000, "present": True,
+                "known_since": 1000, "present": True,
                 "plugged_at": plugged[0], "charging_at": None, "note": None, "last": None, "last_note": None,
             }
             coordinator.async_update_listeners()
@@ -332,7 +332,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                 poll(1120, 506, EvseState.IDLE)
                 await hass.async_block_till_done()
                 # The reading after the record's end is still to come.
-                assert read.await_args.kwargs["since"] == 1000
+                assert read.await_args.kwargs["since"] == 1030 - 120
                 assert observer.statistics.sample_count == 0
                 # The service does not answer: nothing is measured, nothing breaks.
                 observer._last_query = float("-inf")
