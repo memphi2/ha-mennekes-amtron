@@ -8,6 +8,7 @@ import math
 import time
 from contextlib import suppress
 from typing import TYPE_CHECKING
+from uuid import NAMESPACE_URL, uuid5
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -29,8 +30,13 @@ from .charge_loss_const import (
 )
 from .device.charge_loss import LossStatistics
 from .device.charging_session import CompletedSession
+from .device.const import DOMAIN
+from .device.data import WallboxData
+from .device.enums import EvseState
+from .device.meter_log import MeterLog
 from .device.notice import FailureNotice
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
+from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import _finish_atomic
@@ -47,6 +53,12 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _RETRY_DELAYS = (60, 300, 1800)
+
+
+def meter_log(hass: HomeAssistant, entry_id: str) -> MeterLog:
+    """The wallbox's meter readings; they outlive a reload of the entry."""
+    logs: dict[str, MeterLog] = hass.data.setdefault(f"{DOMAIN}_meter_log", {})
+    return logs.setdefault(entry_id, MeterLog())
 
 
 def vehicle_energy(state: State | None) -> float | None:
@@ -95,6 +107,8 @@ class ChargeLossObserver:
             hass, entry.entry_id, identity, profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
         )
         self.statistics = LossStatistics()
+        self._meter = meter_log(hass, entry.entry_id)
+        self._charging = False
         self._session: CompletedSession | None = None
         self._started_at = time.time()
         self._change: tuple[float, float] | None = None
@@ -103,7 +117,6 @@ class ChargeLossObserver:
         self._attempt = 0
         self._task: asyncio.Task[None] | None = None
         self._pending = False
-        self._query_history = False
         self._last_query = float("-inf")
         self._lock = asyncio.Lock()
         self._stopping = False
@@ -114,13 +127,14 @@ class ChargeLossObserver:
 
     @property
     def available(self) -> bool:
-        return (
-            self._storage_ok and self._source_ready
-            and self._coordinator.current_data().session_summary_supported
-            and (self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
-                self._history_source is not None and self._history_source.available
-            ))
-        )
+        data = self._coordinator.current_data()
+        if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
+            # The vehicle's record is measured against the wallbox meter.
+            return (
+                self._storage_ok and self._source_ready and data.energy_observed_at is not None
+                and self._history_source is not None and self._history_source.available
+            )
+        return self._storage_ok and self._source_ready and data.session_summary_supported
 
     @property
     def can_assign(self) -> bool:
@@ -187,7 +201,7 @@ class ChargeLossObserver:
         if changed:
             self._last_query = float("-inf")
         if time.monotonic() - self._last_query >= 30:
-            self._query_history = True
+            self._attempt = 0
             self._queue()
 
     @callback
@@ -198,6 +212,9 @@ class ChargeLossObserver:
                 return
             initial = True
         data = self._coordinator.current_data()
+        if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
+            self._meter_updated(data, initial=initial)
+            return
         session = CompletedSession.parse(data.charging_session) if data.charging_session else None
         ownership = (
             attributed_session(self._hass, self._entry, self._profile_id, session)
@@ -211,30 +228,40 @@ class ChargeLossObserver:
             # Retain this profile's saved last match and weighted average.
             self._session = None
             self._pending = False
-            if self._retry is not None:
-                self._retry()
-                self._retry = None
             return
         if session != self._session or initial:
             self._session = session
+            self._queue()
+        elif not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
+            self._queue()
+
+    def _meter_updated(self, data: WallboxData, *, initial: bool) -> None:
+        """Log the meter; ask the vehicle for its record once charging has stopped."""
+        energy = data.get(ENERGY_TOTAL.key)
+        if (
+            self._coordinator.last_update_success and data.energy_read
+            and data.energy_observed_at is not None
+            and isinstance(energy, (int, float)) and not isinstance(energy, bool)
+        ):
+            self._meter.observe(data.energy_observed_at, float(energy))
+        charging = data.get(EVSE_STATE.key) == EvseState.CHARGING
+        stopped, self._charging = self._charging and not charging, charging
+        if initial or stopped:
+            # The vehicle's record follows the stop by a while: retry for it.
             self._attempt = 0
             if self._retry is not None:
                 self._retry()
                 self._retry = None
-            self._query_history = self._history_source is not None
             self._queue()
         elif not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
-            # A failed save discarded the candidate, including its matched
-            # history energy. Re-read the local history for the current session
-            # before retrying storage; otherwise only the empty match is saved.
-            self._query_history = self._history_source is not None
+            # A failed save discarded the candidate; read the record again.
             self._queue()
 
     @callback
     def _queue(self) -> None:
         if (
             self._stopping or self._storage_corrupt or not self._source_ready
-            or (self._profiled and self._session is None)
+            or (self.mode != LOSS_SOURCE_VEHICLE_HISTORY and self._profiled and self._session is None)
         ):
             return
         self._pending = True
@@ -244,29 +271,13 @@ class ChargeLossObserver:
     async def _run(self) -> None:
         while self._pending and not self._stopping:
             self._pending = False
+            if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
+                await self._measure_record()
+                continue
             session = self._session
-            query, self._query_history = self._query_history, False
             energy: float | None = None
-            association = "changed_value"
             change: tuple[float, float] | None = None
-            if session is not None and query:
-                self._last_query = time.monotonic()
-                try:
-                    match = await self._history_source.async_match(session) if self._history_source is not None else None
-                except (HomeAssistantError, TimeoutError):
-                    match = None
-                except Exception as err:  # noqa: BLE001 - isolate third-party services
-                    # A third-party history service can fail with its own
-                    # exception types. Keep the wallbox and its setup usable;
-                    # the same bounded retry policy applies to this provider.
-                    # Do not log exception messages that may contain VINs.
-                    _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
-                    match = None
-                energy = match.vehicle_kwh if match is not None else None
-                association = "history"
-                if match is None and session == self._session:
-                    self._schedule_retry()
-            elif session is not None and self._auto and self._change is not None and self._unplugged():
+            if session is not None and self._auto and self._change is not None and self._unplugged():
                 at, value = self._change
                 if self._started_at <= session.disconnected_at <= at <= session.disconnected_at + LOSS_MATCH_WINDOW_SECONDS:
                     energy = value
@@ -279,9 +290,42 @@ class ChargeLossObserver:
                 if session is not None and energy is not None and (
                     change is None or self._change is change
                 ):
-                    candidate.apply(session, energy, association=association)
+                    candidate.apply(session, energy, association="changed_value")
                 if await self._save(candidate) and change is not None and self._change is change:
                     self._change = None
+
+    async def _measure_record(self) -> None:
+        """Compare the vehicle's newest record with the meter over the same span."""
+        source, since = self._history_source, self._meter.first_at
+        self._last_query = time.monotonic()
+        record = None
+        if source is not None and since is not None:
+            try:
+                record = await source.async_latest(since=since, until=time.time())
+            except (HomeAssistantError, TimeoutError):
+                record = None
+            except Exception as err:  # noqa: BLE001 - isolate third-party services
+                # A third-party history service can fail with its own
+                # exception types. Keep the wallbox and its setup usable;
+                # the same bounded retry policy applies to this provider.
+                # Do not log exception messages that may contain VINs.
+                _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
+        wallbox = self._meter.energy_between(record.start, record.end) if record is not None else None
+        if record is None or wallbox is None or wallbox <= 0:
+            # No record yet, or the meter reading after its end is still to come.
+            self._schedule_retry()
+            return
+        session = CompletedSession(
+            str(uuid5(NAMESPACE_URL, f"vehicle-record:{record.start!r}:{record.end!r}:{wallbox!r}")),
+            record.start, record.end, record.start, record.start, record.end, record.end, wallbox,
+        )
+        async with self._lock:
+            if self._stopping:
+                return
+            candidate = LossStatistics.restore(self.statistics.snapshot())
+            candidate.apply(session, record.vehicle_kwh, association="history")
+            if not self._storage_ok or candidate.snapshot() != self.statistics.snapshot():
+                await self._save(candidate)
 
     def _schedule_retry(self) -> None:
         if self._retry is not None or self._attempt >= len(_RETRY_DELAYS):
@@ -292,7 +336,6 @@ class ChargeLossObserver:
         @callback
         def retry(_: object) -> None:
             self._retry = None
-            self._query_history = True
             self._queue()
 
         self._retry = async_call_later(self._hass, delay, retry)

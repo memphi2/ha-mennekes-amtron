@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changes
 
+- The charging loss from the BavarianData history compares the car's newest
+  complete record with the wallbox's total energy meter over that record's
+  own time span. It no longer needs the record to fit the plug cycle and the
+  service's session energy, which left the loss unknown.
 - The charging cost follows the charge itself: the current charge starts at
   0.00 at the plug-in, runs while charging and is 0.00 again after the
   unplug; the last charge takes its value over whenever charging stops and at

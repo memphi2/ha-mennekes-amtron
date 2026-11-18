@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from custom_components.mennekes_amtron_rtu.vehicle_sources import (
-    HistoryMatch,
+    ChargeRecord,
     ProviderSelection,
     loss_source,
     provider_definitions,
@@ -20,7 +20,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources import (
     resolve_departure_source,
     resolve_history_source,
 )
-from tests.test_bavarian_history import VIN, session, vehicle_registry
+from tests.test_bavarian_history import VIN, vehicle_registry
 
 ADAPTER = "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata"
 
@@ -152,12 +152,13 @@ def test_history_adapter_preserves_statistics_identity_and_cleans_up_local_subsc
             hass.bus.async_fire("bavariandata_charging_stopped", {"unrelated": "car"})
             await hass.async_block_till_done()
             changed.assert_called_once_with()
-            with patch(f"{ADAPTER}.async_read_history", return_value=HistoryMatch(18, 1)) as read:
-                assert await source.async_match(session()) == HistoryMatch(18, 1)
-                read.assert_awaited_once_with(hass, "car", session(), expected_vin=VIN)
+            found = ChargeRecord(10, 20, 18)
+            with patch(f"{ADAPTER}.async_read_latest", return_value=found) as read:
+                assert await source.async_latest(since=5, until=30) == found
+                read.assert_awaited_once_with(hass, "car", since=5, until=30, expected_vin=VIN)
                 hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "WBA98765432109876")})
                 assert not source.available
-                assert await source.async_match(session()) is None
+                assert await source.async_latest(since=5, until=30) is None
                 assert read.await_count == 1
         finally:
             unsub()

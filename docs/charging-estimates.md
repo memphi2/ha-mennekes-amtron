@@ -73,11 +73,15 @@ BavarianData's existing local history through its public
 [`get_charging_sessions` action](https://justchr.github.io/BavarianData/docs/services/).
 It never requests a BMW history refresh or spends the BMW API quota.
 
-Only complete, non-overlapping records whose charging boundaries fit the
-observed wallbox cycle are accepted. Separate records caused by a pause may be
-combined. DC charges and open, interrupted, late-start, ambiguous or truncated
-histories remain unmatched. The last loss stays unknown until a suitable record appears; local
-reads are retried a limited number of times and on charging-stop events.
+The last loss compares the car's newest complete record with the wallbox's
+total energy meter over that record's own time span, from the car's start to
+the car's end of charging. A record that follows a pause is measured on its
+own. DC charges, open, interrupted or late-start records and records below
+1 kWh are passed over; a truncated history is not used. The last loss stays
+unknown until a suitable record appears; local reads are retried a limited
+number of times and on charging-stop events. The meter readings are kept
+while HA runs, so a record whose span began before HA started cannot be
+measured.
 
 BavarianData's `energy_kwh` is estimated battery energy integrated from vehicle
 telemetry. Its `grid_kwh` is grid energy and is deliberately not substituted.
@@ -257,13 +261,13 @@ with one correctable latest match are retained outside Recorder. There is no
 growing list of sessions, raw vehicle history or price history. The current
 pricing interval keeps at most 256 price changes; overflow makes the estimate incomplete.
 
-Loss values change only when an assignment or completed session changes. Costs
+Loss values change only when an assignment, a completed session or the car's newest record changes. Costs
 are rounded to cents and the last-cost energy attributes to 0.01 kWh. No extra
 long-term statistics are created. The current-cost entity is disabled by
 default; leaving it disabled keeps only the final cost in Recorder.
 
-The app can continue observing a wallbox cycle while HA restarts. A later
-BavarianData history match may still estimate that cycle's losses. Cost
+The app can continue observing a wallbox cycle while HA restarts. A
+BavarianData record needs HA's own meter readings over its whole span. Cost
 calculation runs in HA, so a running app cannot reconstruct a complete cost
 across HA downtime, even with a fixed price. A service restart also loses the
 uncompleted session anchor. Previously completed results remain stored. Storage

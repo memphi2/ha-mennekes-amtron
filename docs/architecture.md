@@ -225,6 +225,7 @@ vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapt
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
 charge_loss_observer.py  bounded matching and durable loss aggregate
+device/meter_log.py  bounded total-energy readings to measure a past time span
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
 number.py select.py switch.py button.py datetime.py  control tables
 event.py              the Activity event entity
