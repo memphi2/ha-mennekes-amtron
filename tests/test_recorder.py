@@ -10,6 +10,8 @@ from tests.recorder_replay import DETAILS, EXTRAS, measure
 
 def test_unchanged_values_do_not_create_recorder_rows(tmp_path: Path) -> None:
     result = asyncio.run(measure(tmp_path / "constant", "constant", duration=300))
+    # Names the entity that wrote, should one ever do.
+    assert result["rows_by_entity"] == {}
     assert result["state_rows"] == 0
 
 
