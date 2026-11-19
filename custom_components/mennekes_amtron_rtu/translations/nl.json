@@ -906,7 +906,7 @@
       "message": "De vertrektijd kon niet worden opgeslagen. Controleer de opslag van Home Assistant en probeer het opnieuw."
     },
     "intent_not_saved": {
-      "message": "De wallbox heeft de opdracht ontvangen, maar de service kon die niet opslaan. Na een herstart van de service geldt de eerdere instelling. Controleer de opslag van de service."
+      "message": "De wallbox heeft de opdracht ontvangen, maar de service kon die niet opslaan. Na een herstart van de service kan de eerdere instelling gelden. Controleer de opslag van de service."
     },
     "target_time_not_future": {
       "message": "Kies een tijdstip in de toekomst, met tijdzone."

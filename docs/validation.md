@@ -66,7 +66,7 @@ Use a controlled clock for delay and cancellation cases. Check that a worker
 does not hold the command lock while waiting, revalidates execution, and cannot
 send stale commands after shutdown or a newer request. Service-mode checks
 must distinguish an HA restart from a service restart: only the latter stops
-the service-owned queue. Configuration bounds and optional API 2 status fields
+the service-owned queue. Configuration bounds and optional status fields
 need their own invalid-input checks.
 
 The two status entities must publish a stable action and due timestamp during
@@ -184,6 +184,11 @@ RTU-over-TCP and Modbus TCP connections, heartbeat, permitted token/state writes
 restart and shutdown. Negative probes must reject writes outside the service's
 state files, modification of options, protected-file reads and shell execution.
 A successful startup alone cannot pass the enforcement check.
+
+The check runs the container as the runner's own user with every capability
+dropped, the stricter of the two ways the image is used. The Supervisor app
+runs as root; `scripts/service_image.py` checks that its wrapper image has
+that user and that the service gives up its capabilities there as well.
 
 The native image smoke also serves the installed package's HTML, JavaScript and
 CSS through its actual asset handlers. A separate loopback-only probe compares

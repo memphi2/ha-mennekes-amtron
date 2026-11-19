@@ -196,3 +196,25 @@ def test_a_newer_decision_of_the_same_owner_replaces_its_waiting_pause():
         await control.async_shutdown()
 
     asyncio.run(go())
+
+
+def test_a_lock_whose_reply_did_not_come_is_repeated_without_a_new_interval():
+    async def go():
+        h, control = await charging()
+        _rate_limited(h)
+        await control.async_set_lock_evse(True)
+        h.transport.write_exceptions[R.LOCK_EVSE.address] = raise_connection_error()
+        h.clock[0] += 301
+        control._pending_changed.set()
+        await asyncio.sleep(0.05)
+        assert control.pending_action == "lock"
+        del h.transport.write_exceptions[R.LOCK_EVSE.address]
+        for _ in range(200):
+            await asyncio.sleep(0.005)
+            if control._flush_task is None or control._flush_task.done():
+                break
+        assert control.pending_action is None
+        assert events(control)[-1] == ("executed", "lock")
+        await control.async_shutdown()
+
+    asyncio.run(go())

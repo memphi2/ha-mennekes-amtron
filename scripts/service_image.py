@@ -92,8 +92,14 @@ def check_installed_authentication(container: str) -> None:
     )
 
 
-def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
-    """Exercise the installed container API with no hardware or HA dependency."""
+def smoke(
+    image: str, *, apparmor_profile: str | None = None, as_root: bool = False,
+) -> None:
+    """Exercise the installed container API with no hardware or HA dependency.
+
+    ``as_root`` runs it the way Supervisor does: as the image's own root user
+    with Docker's default capabilities, which the service must then give up.
+    """
     if apparmor_profile is not None and (
         not isinstance(apparmor_profile, str)
         or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", apparmor_profile)
@@ -104,7 +110,12 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
         ("--init", f"--security-opt=apparmor={apparmor_profile}")
         if apparmor_profile is not None else ()
     )
-    with tempfile.TemporaryDirectory(prefix="amtron-container-") as temporary:
+    if as_root and run("docker", "run", "--rm", image, "id", "-u").decode().strip() != "0":
+        raise ValueError("the app image does not run as root")
+    # Root in the container leaves files the runner's user cannot remove.
+    with tempfile.TemporaryDirectory(
+        prefix="amtron-container-", ignore_cleanup_errors=as_root,
+    ) as temporary:
         directory = Path(temporary)
         token = secrets.token_urlsafe(32)
         options = directory / "options.json"
@@ -130,10 +141,10 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
                 *confinement,
                 # Match the owner of the private bind mount without granting
                 # DAC override to container root or weakening the token file.
-                "--user",
-                f"{os.getuid()}:{os.getgid()}",
+                *(() if as_root else (
+                    "--user", f"{os.getuid()}:{os.getgid()}", "--cap-drop=ALL",
+                )),
                 "--read-only",
-                "--cap-drop=ALL",
                 "--security-opt=no-new-privileges",
                 "--tmpfs",
                 "/tmp",  # noqa: S108 - isolated container tmpfs
@@ -451,6 +462,7 @@ def verify_app_install(info: dict[str, str], digest: str) -> None:
         (context / "Dockerfile").write_bytes(app_dockerfile(info, digest))
         run("docker", "build", "--pull", "--tag", "amtron-app:verify", temporary)
         smoke("amtron-app:verify")
+        smoke("amtron-app:verify", as_root=True)
 
 
 def verify_public(info: dict[str, str], digest: str) -> None:
@@ -482,10 +494,11 @@ def main() -> int:
     parser.add_argument("--path", type=Path)
     parser.add_argument("--digest")
     parser.add_argument("--image")
+    parser.add_argument("--as-root", action="store_true")
     args = parser.parse_args()
     try:
         if args.action == "smoke" and args.image:
-            smoke(args.image)
+            smoke(args.image, as_root=args.as_root)
             return 0
         info = release_info(args.repository, args.tag or "")
         if args.action == "build" and args.architecture and args.path:

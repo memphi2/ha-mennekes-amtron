@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+- A lock or withdrawn release whose reply did not come is repeated after
+  five seconds instead of a whole state-change interval.
+- Refusals of the app pages carry the security headers.
+
 ## 0.10.0b3
 
 - Integration and app must both be 0.10.0b3; update them together.

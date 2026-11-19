@@ -906,7 +906,7 @@
       "message": "Impossibile salvare l’orario di partenza. Controllare l’archiviazione di Home Assistant e riprovare."
     },
     "intent_not_saved": {
-      "message": "La wallbox ha ricevuto il comando, ma il servizio non ha potuto salvarlo. Dopo un riavvio del servizio vale l’impostazione precedente. Controllare l’archiviazione del servizio."
+      "message": "La wallbox ha ricevuto il comando, ma il servizio non ha potuto salvarlo. Dopo un riavvio del servizio può valere l’impostazione precedente. Controllare l’archiviazione del servizio."
     },
     "target_time_not_future": {
       "message": "Scegliere un orario futuro, con il fuso orario."

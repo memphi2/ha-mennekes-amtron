@@ -13,7 +13,12 @@ from collections.abc import Callable
 from copy import deepcopy
 from typing import Any, NoReturn
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import (
+    SIGNAL_CONFIG_ENTRY_CHANGED,
+    ConfigEntry,
+    ConfigEntryChange,
+    ConfigEntryState,
+)
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
@@ -24,6 +29,7 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -144,6 +150,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async_setup_services(hass)
     await async_install_blueprints(hass)
+
+    @callback
+    def entry_changed(change: ConfigEntryChange, entry: ConfigEntry) -> None:
+        # A disabled entry can fix nothing, also one that never finished its
+        # setup and is therefore never unloaded; a reload keeps its repairs.
+        if entry.domain == DOMAIN and entry.disabled_by is not None:
+            _delete_issues(hass, entry)
+
+    async_dispatcher_connect(hass, SIGNAL_CONFIG_ENTRY_CHANGED, entry_changed)
     return True
 
 
@@ -816,9 +831,6 @@ async def async_unload_entry(
     finally:
         # Last: the car's observers above still withdraw through it.
         await async_release(hass, entry.entry_id)
-    if entry.disabled_by is not None:
-        # A disabled entry can fix nothing; a reload keeps its repairs.
-        _delete_issues(hass, entry)
     return unloaded
 
 

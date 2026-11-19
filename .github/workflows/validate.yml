@@ -109,6 +109,9 @@ jobs:
           docker run --rm amtron-service:test id -Gn | grep -qw dialout
           python -m pip install -r requirements-dev.txt
           python scripts/service_image.py smoke --image amtron-service:test
+          # The way Supervisor runs it: root, default capabilities, then none.
+          printf 'FROM amtron-service:test\nUSER root\n' | docker build -t amtron-app:test -
+          python scripts/service_image.py smoke --image amtron-app:test --as-root
       - name: Install AppArmor validation tools
         run: |
           sudo apt-get update

@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixes
+
+- A lock or a withdrawn release whose reply did not come is written again
+  after five seconds. Before, the repeat waited for a whole state-change
+  interval that the unanswered write itself had started.
+- Repairs of an entry that is disabled while its setup never finished are
+  removed as well.
+- The app pages send their security headers also with a refusal (403, 404,
+  405, 413).
+- A write the service refuses before sending it no longer makes the next
+  request wait for a silent line.
+- The message for a command that could not be saved no longer claims the
+  earlier setting applies when the save may have succeeded.
+
+### Maintenance
+
+- CI runs the app image the way Supervisor does (root, default capabilities)
+  and requires the service to give them up; the release verifies the image's
+  attested list of contents.
+
 ## 0.10.0b3 — 2026-11-19
 
 ### Breaking changes

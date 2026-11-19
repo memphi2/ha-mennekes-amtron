@@ -562,3 +562,18 @@ def test_the_lost_reply_mark_ends_with_its_transaction(monkeypatch) -> None:
         await client.async_close()
 
     asyncio.run(run())
+
+
+def test_a_write_refused_before_it_is_sent_leaves_the_line_unsuspected() -> None:
+    transport = FakeModbusClient(device_bank())
+
+    async def run() -> None:
+        client = _client(transport)
+        await client.async_connect()
+        marked = []
+        client._quiet.unanswered = lambda: marked.append(1)
+        with pytest.raises(AmtronWriteRejectedError, match="finite"):
+            await client.async_write_register(R.CHARGING_CURRENT_EMS, float("nan"))
+        assert marked == [] and transport.writes == []
+
+    asyncio.run(run())
