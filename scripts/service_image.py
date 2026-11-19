@@ -133,8 +133,8 @@ def smoke(
         mount = f"{directory}:/data"
         if as_root:
             # Supervisor's data belongs to root. Without DAC override the
-            # service cannot read a file of the runner's user, so the options
-            # go into a root-owned volume first.
+            # service cannot read a file of the runner's user, nor the image's
+            # own /data that a new volume copies, so both become root's first.
             volume = f"amtron-smoke-{secrets.token_hex(6)}"
             run("docker", "volume", "create", volume)
             subprocess.run(
@@ -143,6 +143,7 @@ def smoke(
                     "--entrypoint", "python", "--volume", f"{volume}:/data", image, "-c",
                     (
                         "import os, sys; path = '/data/options.json'; "
+                        "os.chown('/data', 0, 0); os.chmod('/data', 0o700); "
                         "open(path, 'w').write(sys.stdin.read()); os.chmod(path, 0o600)"
                     ),
                 ],

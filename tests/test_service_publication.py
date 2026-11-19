@@ -283,6 +283,7 @@ def test_api_smoke_as_root_requires_the_root_user_and_keeps_docker_defaults(monk
     [(fill_command, options)] = filled
     assert fill_command[fill_command.index("--user") + 1] == "0:0"
     assert f"{volume}:/data" in fill_command
+    assert "os.chown('/data', 0, 0)" in fill_command[-1]
     assert options["read_only"] is True
     assert commands[-1] == ("docker", "volume", "rm", "--force", volume)
     command = commands[-2]
