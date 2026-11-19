@@ -201,7 +201,8 @@ def test_invalid_meter_value_is_retried_without_repolling_other_slow_blocks(inva
         put(h.transport.bank, R.ENERGY_TOTAL, invalid)
         data = await poller.async_poll(WallboxData(), last_success=True)
         assert data.energy_read
-        assert data.get("energy_total") is None or data.get("energy_total") < 0
+        # An invalid reading is read again soon and not published meanwhile.
+        assert data.get("energy_total") is None
         put(h.transport.bank, R.ENERGY_TOTAL, 1234.5)
         h.clock[0] += 5
         h.transport.reads.clear()

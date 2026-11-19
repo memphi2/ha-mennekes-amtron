@@ -444,6 +444,11 @@ class DepartureController:
         except (OSError, ValueError) as err:
             self._storage_notice.failed("not saved; it continues in memory", type(err).__name__)
             self.storage_error = True
+            task = asyncio.current_task()
+            if task is not None and task.cancelling():
+                # The save failed while this task was being cancelled: it
+                # must not carry on as if only the save had failed.
+                raise asyncio.CancelledError from err
             return
         self._durable = decision
         self.storage_error = False

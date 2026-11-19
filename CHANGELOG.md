@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - With a guest permission saved, the service starts also while the disk
   refuses writes; a stop of the service can no longer hang on a save that
   fails at that moment.
+- A serial adapter that was gone is used again within seconds of its return.
+  Before, the wait doubled up to five minutes, with the wallbox on its
+  fallback current meanwhile.
+- A write no longer follows a serial port that was reopened in the short
+  quiet wait before it, without a new check of the wallbox's identity.
+- A negative reading of the energy meter is no longer published while it is
+  read again.
+- A weak line logs late heartbeat acknowledgements once per episode instead
+  of with every acknowledgement.
 - Cost target: the app arms an amount at the price of the running amount,
   also after a restart of the service, and a price that changed nothing no
   longer delays the next one by a minute.

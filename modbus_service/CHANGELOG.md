@@ -14,6 +14,9 @@
 - A manual Plug & Charge release ends when the first answer after a restart
   shows no car; a foreign current above 32 A is not saved as the setpoint.
 - The departure plan leaves a guest's pause alone; the service starts with a refusing disk and a saved guest permission.
+- A returned serial adapter is reopened within seconds; a write does not
+  follow a port reopened just before it; a negative meter reading is not
+  published; late heartbeats are logged once per episode.
 - A price that arrived while a cost ceiling was stopped is applied once it
   runs again.
 - The Charging page names the reported price and its time, and the planned
