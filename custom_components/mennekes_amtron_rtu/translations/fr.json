@@ -905,6 +905,9 @@
     "departure_save_failed": {
       "message": "L’heure de départ n’a pas pu être enregistrée. Vérifiez le stockage de Home Assistant et réessayez."
     },
+    "intent_not_saved": {
+      "message": "La wallbox a reçu la commande, mais le service n’a pas pu l’enregistrer. Après un redémarrage du service, le réglage précédent s’applique. Vérifiez le stockage du service."
+    },
     "target_time_not_future": {
       "message": "Choisissez une heure dans le futur, avec son fuseau horaire."
     },

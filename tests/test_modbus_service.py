@@ -649,3 +649,30 @@ def test_a_queued_stop_survives_a_poll_that_failed_at_its_due_time(tmp_path):
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_command_the_disk_could_not_save_is_not_reported_as_an_unreachable_service(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
+
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        clock[0] += 400
+
+        async def refused():
+            raise OSError("no space left on device")
+
+        monkeypatch.setattr(service, "_persist", refused)
+        try:
+            status, reply = await ServiceApi(service).dispatch("POST", "/v2/command", {
+                "command": "set_current", "value": 10, "expected_serial_number": "ABC123456789",
+            })
+            # The wallbox has it; the caller learns what did not happen.
+            assert current_writes(transport)[-1] == 10
+            assert (status, reply["error"], reply["validation"]) == (409, "intent_not_saved", False)
+            # A requested stop ends cleanly all the same.
+            await service.stop()
+        finally:
+            monkeypatch.undo()
+            await service.stop()
+
+    asyncio.run(run())

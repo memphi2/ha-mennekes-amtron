@@ -38,7 +38,8 @@ def create_app(service: ModbusService) -> web.Application:
                 raise web.HTTPUnsupportedMediaType
             try:
                 payload = await request.json()
-            except (ValueError, RecursionError):
+            except (ValueError, RecursionError, LookupError):
+                # LookupError: a charset nobody knows.
                 return web.json_response({"error": "invalid_request"}, status=400)
         try:
             # A route for GET answers HEAD as well.

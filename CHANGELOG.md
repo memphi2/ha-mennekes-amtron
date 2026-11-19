@@ -57,6 +57,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   reaches the interface as an unknown error.
 - Diagnostics can be downloaded for an entry whose setup never finished, and
   a disabled entry takes its repairs along.
+- A command the wallbox received but the service could not save is
+  answered with its own message (`intent_not_saved`) instead of an
+  unreachable service, and a stop of the service ends cleanly while its
+  storage refuses.
+- A saved state the service cannot read is logged as that, not as a wallbox
+  that does not answer.
+- A vehicle note sent during a running command no longer makes status
+  readers wait for that command, and a request with an unknown character
+  set is answered with 400.
 - A failed save of the charging-loss averages is written again after a
   minute, also in the history mode when the car's record is gone.
 - The app answers an `Authorization` header that is no text with 401, and a

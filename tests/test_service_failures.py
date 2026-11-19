@@ -301,17 +301,18 @@ def test_service_cli_rejects_invalid_configuration_without_echoing_secrets(
 
 
 def test_service_shutdown_releases_the_port_even_if_state_cannot_be_saved(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, caplog
 ):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         monkeypatch.setattr(
             service, "_persist", AsyncMock(side_effect=OSError("disk full"))
         )
-        with pytest.raises(OSError, match="disk full"):
-            await service.stop()
+        # A requested stop is no crash: it ends cleanly and says what was lost.
+        await service.stop()
         assert not service.client.connected
         assert not service.heartbeat.running
+        assert any("intent not saved" in message for message in caplog.messages)
 
     asyncio.run(run())
 

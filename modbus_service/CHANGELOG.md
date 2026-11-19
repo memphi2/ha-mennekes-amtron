@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A waiting pause, lock or withdrawn release is not lost to a missing
+  reply, a current change or a goal stop.
+- A command that could not be saved answers `intent_not_saved` (409).
 - The app holds no capability any more, also with Protection mode off.
 - After a request without a usable answer the app lets the line fall silent
   for one reply timeout, so a late answer is never taken for the next one

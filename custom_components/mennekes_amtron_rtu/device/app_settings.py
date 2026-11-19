@@ -349,7 +349,7 @@ class AppSettings:
             raise SettingsError("invalid_request", 415)
         try:
             payload = await request.json()
-        except (ValueError, RecursionError) as err:
+        except (ValueError, RecursionError, LookupError) as err:
             raise SettingsError("invalid_request") from err
         if not isinstance(payload, dict):
             raise SettingsError("invalid_request")

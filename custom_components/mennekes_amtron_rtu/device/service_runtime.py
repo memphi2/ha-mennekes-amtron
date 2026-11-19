@@ -393,8 +393,11 @@ class ModbusService:
                     self._startup_error = err
                 if self.control is not None:
                     self.control.observe_plug_charge(None)
+                unreadable = self._phase == "loading saved control intent" and not isinstance(err, AmtronBusError)
                 self._wallbox_notice.failed(
-                    f"wallbox unavailable during {self._phase}; retrying every {self.config.scan_interval:.0f} seconds",
+                    ("saved intent unreadable, check the file's owner and mode" if unreadable
+                     else f"wallbox unavailable during {self._phase}")
+                    + f"; retrying every {self.config.scan_interval:.0f} seconds",
                     type(err).__name__,
                 )
             self._attempted.set()
@@ -496,8 +499,8 @@ class ModbusService:
         if self.charge_meter.annotate(plugged_at, payload["note"]) and self.charge_meter.note != note:
             await self._save_charge_meter(force=True)
         if self._command_lock.locked():
-            # Another command still runs; its outcome is not this one's.
-            self._published = None
+            # Another command still runs; its outcome is not this one's. What
+            # is published stays, so readers need not wait for that command.
             return self.snapshot()
         return self._publish()
 
@@ -1049,12 +1052,16 @@ class ModbusService:
                 else:
                     raise ValueError("unknown command")
             finally:
-                failure = sys.exception()
+                failure = command_failed = sys.exception()
                 try:
                     await self._persist()
                 except BaseException as err:
                     if not isinstance(failure, (StorageCommitUncertainError, StorageStateUnknownError)):
                         failure = err
+                    if isinstance(err, OSError) and command_failed is None:
+                        # The wallbox has the command; only the file has not.
+                        # That is not a service nobody could reach.
+                        raise DeviceError("intent_not_saved") from err
                     raise
                 finally:
                     if _soc_outcome is not None:
@@ -1121,7 +1128,8 @@ class ModbusService:
                         await self.soc_goal.async_stop()
                     await self.control.async_shutdown()
                 await self._save_charge_meter(force=True)
-                await self._persist()
+                # A disk that refuses must not turn a requested stop into a crash.
+                await self._save_intent()
         finally:
             await self.client.async_close()
             _LOGGER.info("Connection: %s connection closed", self._connection_name)
