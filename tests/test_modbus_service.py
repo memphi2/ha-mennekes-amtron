@@ -676,3 +676,30 @@ def test_a_command_the_disk_could_not_save_is_not_reported_as_an_unreachable_ser
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_an_energy_target_with_an_expected_one_is_set_only_while_that_holds(tmp_path):
+    from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            serial = service.identity.serial_number
+            await service.command({"command": "energy_goal", "value": 5.0, "expected_serial_number": serial})
+            await service.command({
+                "command": "energy_goal", "value": 7.0, "expected_energy_goal": 5.0,
+                "expected_serial_number": serial,
+            })
+            assert service.control.energy_goal.target_kwh == 7.0
+            for payload in (
+                {"command": "energy_goal", "value": 9.0, "expected_energy_goal": 5.0},
+                {"command": "pause", "expected_energy_goal": 7.0},
+            ):
+                with pytest.raises(DeviceError) as error:
+                    await service.command({**payload, "expected_serial_number": serial})
+                assert error.value.translation_key == "energy_goal_changed"
+            assert service.control.energy_goal.target_kwh == 7.0
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

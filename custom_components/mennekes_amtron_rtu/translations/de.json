@@ -933,6 +933,9 @@
     },
     "cost_goal_price_unknown": {
       "message": "Das Kostenziel braucht einen aktuellen Strompreis. Prüfe die Preisquelle der Ladekosten."
+    },
+    "energy_goal_changed": {
+      "message": "Das Ladeziel wurde inzwischen geändert und bleibt, wie es ist."
     }
   },
   "issues": {

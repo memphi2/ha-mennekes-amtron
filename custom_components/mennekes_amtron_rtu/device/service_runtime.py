@@ -882,6 +882,7 @@ class ModbusService:
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
             "source", "soc", "maximum", "deadline", "expected_soc_revision",
             "session", "policy", "maximum_required", "expected_choice_revision",
+            "expected_energy_goal",
         }:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
@@ -908,6 +909,12 @@ class ModbusService:
             # Explicit null matches only a device without a readable serial.
             if expected_serial != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
+            if "expected_energy_goal" in payload and (
+                command != "energy_goal"
+                or payload["expected_energy_goal"] != control.energy_goal.target_kwh
+            ):
+                # Whoever expected a target must not replace a newer one.
+                raise DeviceError("energy_goal_changed")
             if "expected_choice_revision" in payload and payload["expected_choice_revision"] != self.choice_revision:
                 raise DeviceError("soc_goal_source_changed")
             if "expected_soc_revision" in payload and (

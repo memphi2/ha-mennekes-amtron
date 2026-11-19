@@ -247,7 +247,8 @@ class ServiceControl:
         )
 
     @ha_command
-    async def async_set_energy_goal(self, value: float) -> None:
+    async def async_set_energy_goal(self, value: float, *, expected: float | None = None) -> None:
+        """Set the energy target; with ``expected``, only while it still is that."""
         if not self.supports_energy_goal:
             raise DeviceValidationError("energy_goal_not_supported")
         candidate = EnergyGoal()
@@ -255,7 +256,10 @@ class ServiceControl:
             candidate.set_target(value, 0)
         except ValueError as err:
             raise DeviceValidationError("energy_goal_invalid") from err
-        await self._command("energy_goal", value=value)
+        if expected is None:
+            await self._command("energy_goal", value=value)
+        else:
+            await self._command("energy_goal", value=value, expected_energy_goal=expected)
 
     @property
     def supports_soc_goal(self) -> bool:

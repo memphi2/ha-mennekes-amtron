@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   current price and again at every price change, so the service stops the
   charge itself. It needs configured charging costs and ends when the energy
   target is set by hand.
+- The service's `energy_goal` command takes `expected_energy_goal` and
+  refuses with `energy_goal_changed` when its target is another one by then.
+  Integration and app must be updated together.
 
 ### Fixes
 

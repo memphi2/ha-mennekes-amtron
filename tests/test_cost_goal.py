@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +12,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu import cost_goal
 from custom_components.mennekes_amtron_rtu.cost_goal import (
+    Attempt,
     CostGoal,
     CostGoalObserver,
     energy_for,
@@ -29,9 +31,11 @@ class Control:
         self.sets: list[float] = []
         self.fail: Exception | None = None
 
-    async def async_set_energy_goal(self, value: float) -> None:
+    async def async_set_energy_goal(self, value: float, *, expected: float | None = None) -> None:
         if self.fail is not None:
             raise self.fail
+        if expected is not None and expected != self.energy_goal.target_kwh:
+            raise HomeAssistantError(translation_domain="mennekes_amtron_rtu", translation_key="energy_goal_changed")
         self.sets.append(value)
         self.energy_goal.set_target(value, self.meter)
 
@@ -84,7 +88,7 @@ def test_an_amount_becomes_an_energy_target_and_follows_the_price(tmp_path, monk
     async def run():
         hass, _entry, control, cost, observer = setup(tmp_path)
         clock = [1000.0]
-        monkeypatch.setattr(cost_goal.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
         await observer.async_start()
         assert observer.status == "disabled"
         await observer.async_set_target(10)
@@ -184,7 +188,7 @@ def test_a_refused_update_and_a_refused_save_are_tried_again(tmp_path, monkeypat
     async def run():
         hass, _entry, control, cost, observer = setup(tmp_path)
         clock = [1000.0]
-        monkeypatch.setattr(cost_goal.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
         await observer.async_set_target(10)
         clock[0] += 120
         cost.price = 0.50
@@ -205,7 +209,8 @@ def test_a_refused_update_and_a_refused_save_are_tried_again(tmp_path, monkeypat
         await observe(observer, reading(control))
         assert control.sets == [33.3, 14.0]
         await observe(observer, reading(control))
-        assert saves == [1]
+        # The attempt before sending, the result after; then the retry waits.
+        assert saves == [1, 1]
         clock[0] += 61
         monkeypatch.undo()
         await observe(observer, reading(control))
@@ -231,10 +236,12 @@ def test_a_saved_amount_that_cannot_be_used_starts_without_one(tmp_path):
 
 
 @pytest.mark.parametrize("raw", [
-    None, {"target": 1}, {"target": 5, "spent": 0, "price": None, "energy_kwh": 1},
-    {"target": 5, "spent": float("nan"), "price": 0.3, "energy_kwh": 1},
-    {"target": 5, "spent": 0, "price": 0.3, "energy_kwh": 2000},
-    {"target": True, "spent": 0, "price": 0.3, "energy_kwh": 1},
+    None, {"target": 1}, {"target": 5, "spent": 0, "price": None, "energy_kwh": 1, "attempt": None},
+    {"target": 5, "spent": float("nan"), "price": 0.3, "energy_kwh": 1, "attempt": None},
+    {"target": 5, "spent": 0, "price": 0.3, "energy_kwh": 1, "attempt": [1, 0.3]},
+    {"target": 5, "spent": 0, "price": 0.3, "energy_kwh": 1, "attempt": [1, "x", 3]},
+    {"target": 5, "spent": 0, "price": 0.3, "energy_kwh": 2000, "attempt": None},
+    {"target": True, "spent": 0, "price": 0.3, "energy_kwh": 1, "attempt": None},
 ])
 def test_a_malformed_saved_amount_is_rejected(raw):
     with pytest.raises(ValueError, match=r"cost target|amount"):
@@ -242,7 +249,7 @@ def test_a_malformed_saved_amount_is_rejected(raw):
 
 
 def test_a_disabled_saved_amount_restores_empty():
-    restored = CostGoal.restore({"target": 0, "spent": 9, "price": None, "energy_kwh": None})
+    restored = CostGoal.restore({"target": 0, "spent": 9, "price": None, "energy_kwh": None, "attempt": None})
     assert restored.snapshot() == CostGoal().snapshot()
 
 
@@ -250,7 +257,7 @@ def test_without_a_baseline_or_with_nothing_left_nothing_is_handed_over(tmp_path
     async def run():
         hass, _entry, control, cost, observer = setup(tmp_path)
         clock = [1000.0]
-        monkeypatch.setattr(cost_goal.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
         await observer.async_set_target(3)
         clock[0] += 120
         cost.price = 0.50
@@ -269,21 +276,21 @@ def test_a_hand_over_whose_answer_was_lost_is_taken_when_the_service_shows_it(tm
     async def run():
         hass, _entry, control, cost, observer = setup(tmp_path)
         clock = [1000.0]
-        monkeypatch.setattr(cost_goal.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
         await observer.async_set_target(10)
         clock[0] += 120
         cost.price = 0.50
         applied = control.async_set_energy_goal
 
-        async def lost(value):
-            await applied(value)
+        async def lost(value, **how):
+            await applied(value, **how)
             raise HomeAssistantError("no answer")
 
         control.async_set_energy_goal = lost
         await observe(observer, reading(control, 110.0))
         assert observer.goal.energy_kwh == 33.3
         await observe(observer, reading(control))
-        assert observer.goal.snapshot() == {"target": 10, "spent": pytest.approx(3.0), "price": 0.5, "energy_kwh": 14.0}
+        assert observer.goal.snapshot() == {"target": 10, "spent": pytest.approx(3.0), "price": 0.5, "energy_kwh": 14.0, "attempt": None}
         await hass.async_stop(force=True)
 
     asyncio.run(run())
@@ -298,9 +305,9 @@ def test_a_poll_during_a_change_of_the_amount_leaves_it_alone(tmp_path):
             await observe(observer, reading(control))
         assert observer.target == 10
         # A hand-over that finds a newer amount, or a stop, does nothing.
-        await observer._hand_over(CostGoal(), 0.5, 1.0, 100.0)
+        await observer._hand_over(CostGoal(), Attempt(1.0, 0.5, 100.0))
         control.energy_goal.observe(200.0)
-        await observer._hand_over(observer.goal, 0.5, 1.0, 100.0)
+        await observer._hand_over(observer.goal, Attempt(1.0, 0.5, 100.0))
         assert control.sets == [33.3]
         await observer.async_stop()
         await hass.async_stop(force=True)
@@ -312,19 +319,19 @@ def test_stopping_cancels_a_running_hand_over_and_saves_what_is_left(tmp_path, m
     async def run():
         hass, _entry, control, cost, observer = setup(tmp_path)
         clock = [1000.0]
-        monkeypatch.setattr(cost_goal.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
         await observer.async_set_target(10)
         clock[0] += 120
         cost.price = 0.50
         blocked = asyncio.Event()
 
-        async def hang(_value):
+        async def hang(_value, **_how):
             blocked.set()
             await asyncio.Event().wait()
 
         control.async_set_energy_goal = hang
         await observer.async_observe(reading(control, 110.0))
-        await blocked.wait()
+        await asyncio.wait_for(blocked.wait(), 2)
         observer._dirty = True
         await observer.async_stop()
         assert observer._task is None
@@ -352,7 +359,7 @@ def test_the_number_refuses_an_amount_without_charging_costs():
 
 
 def test_a_negative_price_earns_back_part_of_the_amount():
-    restored = CostGoal.restore({"target": 5, "spent": -0.4, "price": -0.1, "energy_kwh": 1000})
+    restored = CostGoal.restore({"target": 5, "spent": -0.4, "price": -0.1, "energy_kwh": 1000, "attempt": None})
     assert restored.spent == -0.4
 
 
@@ -360,3 +367,96 @@ def test_a_lost_answer_seen_without_a_baseline_keeps_the_spent_part():
     observer = CostGoalObserver.__new__(CostGoalObserver)
     observer.goal = CostGoal(5, 1.5, 0.3, 10.0)
     assert observer._spent_until(None, since=100.0, price=0.3) == 1.5
+
+
+def test_a_hand_over_interrupted_by_a_stop_is_recognized_after_the_restart(tmp_path, monkeypatch):
+    async def run():
+        hass, entry, control, cost, observer = setup(tmp_path)
+        clock = [1000.0]
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
+        await observer.async_set_target(10)
+        clock[0] += 120
+        cost.price = 0.50
+        applied = control.async_set_energy_goal
+        arrived = asyncio.Event()
+
+        async def arrive_then_hang(value, **how):
+            await applied(value, **how)
+            arrived.set()
+            await asyncio.Event().wait()
+
+        control.async_set_energy_goal = arrive_then_hang
+        await observer.async_observe(reading(control, 110.0))
+        await asyncio.wait_for(arrived.wait(), 2)
+        await observer.async_stop()
+        restarted = CostGoalObserver(hass, entry)
+        await restarted.async_start()
+        await observe(restarted, reading(control))
+        assert restarted.goal.snapshot() == {
+            "target": 10, "spent": pytest.approx(3.0), "price": 0.5, "energy_kwh": 14.0, "attempt": None,
+        }
+        await hass.async_stop(force=True)
+
+    asyncio.run(run())
+
+
+def test_a_hand_over_never_replaces_a_target_set_meanwhile(tmp_path, monkeypatch):
+    async def run():
+        hass, _entry, control, cost, observer = setup(tmp_path)
+        clock = [1000.0]
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
+        await observer.async_set_target(10)
+        clock[0] += 120
+        cost.price = 0.50
+        await observer.async_observe(reading(control, 110.0))
+        # The user's own command reaches the service first.
+        control.energy_goal.set_target(5.0, 110.0)
+        await observer._task
+        assert control.energy_goal.target_kwh == 5.0
+        await observe(observer, reading(control))
+        assert observer.target == 0
+        # Ending the amount leaves the user's target alone, too.
+        await observer.async_set_target(3)
+        control.energy_goal.set_target(7.0, 110.0)
+        await observer.async_set_target(0)
+        assert control.energy_goal.target_kwh == 7.0
+        await hass.async_stop(force=True)
+
+    asyncio.run(run())
+
+
+def test_an_attempt_that_did_not_arrive_is_forgotten_at_the_next_poll(tmp_path, monkeypatch):
+    async def run():
+        hass, _entry, control, cost, observer = setup(tmp_path)
+        clock = [1000.0]
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
+        await observer.async_set_target(10)
+        clock[0] += 120
+        cost.price = 0.50
+        control.fail = HomeAssistantError("service down")
+        await observe(observer, reading(control, 110.0))
+        assert observer.goal.attempt is not None
+        control.fail = None
+        cost.price = 0.30
+        await observe(observer, reading(control))
+        assert observer.goal.attempt is None
+        # The same kWh set by hand later is the user's, not the amount's.
+        await control.async_set_energy_goal(14.0)
+        await observe(observer, reading(control))
+        assert observer.target == 0
+        await hass.async_stop(force=True)
+
+    asyncio.run(run())
+
+
+def test_ending_the_amount_reports_any_other_refusal(tmp_path):
+    async def run():
+        hass, _entry, control, _cost, observer = setup(tmp_path)
+        await observer.async_set_target(3)
+        control.fail = HomeAssistantError("service down")
+        with pytest.raises(HomeAssistantError):
+            await observer.async_set_target(0)
+        assert observer.target == 3
+        await hass.async_stop(force=True)
+
+    asyncio.run(run())

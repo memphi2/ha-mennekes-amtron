@@ -87,6 +87,8 @@ def test_remote_capabilities_and_quality_change_snapshots_but_old_formats_are_re
             assert wrapper.supports_energy_goal
             await wrapper.async_set_energy_goal(12)
             remote.execute.assert_awaited_once_with("energy_goal", value=12)
+            await wrapper.async_set_energy_goal(14, expected=12)
+            remote.execute.assert_awaited_with("energy_goal", value=14, expected_energy_goal=12)
             with pytest.raises(ServiceValidationError):
                 await wrapper.async_set_energy_goal(float("nan"))
             changed = deepcopy(service.snapshot())

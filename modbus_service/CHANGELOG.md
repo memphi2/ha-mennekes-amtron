@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `energy_goal` takes `expected_energy_goal` and refuses with
+  `energy_goal_changed` when the target is another one by then.
 - A lock or withdrawn release whose reply did not come is repeated after
   five seconds instead of a whole state-change interval.
 - Refusals of the app pages carry the security headers.

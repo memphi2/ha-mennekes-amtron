@@ -933,6 +933,9 @@
     },
     "cost_goal_price_unknown": {
       "message": "L’objectif de coût nécessite un prix de l’électricité actuel. Vérifiez la source de prix des coûts de recharge."
+    },
+    "energy_goal_changed": {
+      "message": "L’objectif d’énergie a été modifié entre-temps et reste tel quel."
     }
   },
   "issues": {
