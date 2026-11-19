@@ -79,10 +79,11 @@ class CostGoalObserver:
     async def async_observe(self, data: WallboxData | None) -> None:
         """Tell a running amount a new price, after the poll."""
         goal = self._entry.runtime_data.control.energy_goal
+        if data is None or goal.cost is None or goal.status != "active":
+            return
         price = self._price()
         if (
-            data is None or goal.cost is None or goal.status != "active" or price is None
-            or abs(price - goal.cost.price) < PRICE_TOLERANCE
+            price is None or abs(price - goal.cost.price) < PRICE_TOLERANCE
             or time.monotonic() - self._told_at < _RETRY_SECONDS
             or (self._task is not None and not self._task.done())
         ):

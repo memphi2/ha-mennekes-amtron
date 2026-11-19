@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from .decode import RegisterValue
+from .energy_goal import EnergyGoalSnapshot
 from .registers import LAYOUT_V01_00
 from .runtime_events import EventTimeline
 
@@ -45,7 +46,7 @@ class WallboxData:
     connection_failures: int | None = field(default=None, compare=False)
     connection_retries: int | None = field(default=None, compare=False)
     # Goal settings/latches change independently of register readback.
-    energy_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
+    energy_goal: EnergyGoalSnapshot | None = field(default=None, repr=False)
     soc_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
     # A goal may only act on a counter attempted in this poll, never a cached one.
     energy_read: bool = field(default=False, compare=False, repr=False)

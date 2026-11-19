@@ -26,8 +26,8 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 3 and service 0.10.0b3 or newer**,
-which carries command-origin metadata for activity reporting. Raise the minimum
+separately. The current requirement is **API 3 and service 0.10.0b4 or newer**,
+which carries the cost target commands. Raise the minimum
 when a newer service feature is required. The published or planned service
 release must satisfy the declared minimum.
 

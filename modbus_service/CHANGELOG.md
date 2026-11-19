@@ -1,6 +1,8 @@
 # Changes
 
-## Unreleased
+## 0.10.0b4
+
+- Integration and app must both be 0.10.0b4; update them together.
 
 - New commands `cost_goal` (amount and price) and `cost_price`: the energy
   target carries an amount of money and is re-armed at each new price.

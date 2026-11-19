@@ -177,3 +177,21 @@ def test_stopping_cancels_a_price_on_its_way(tmp_path, monkeypatch):
         await observer.async_stop()
         await hass.async_stop(force=True)
     asyncio.run(run())
+
+
+def test_the_number_passes_the_amount_on_and_refuses_without_costs():
+    from custom_components.mennekes_amtron_rtu import number
+
+    async def run():
+        calls = []
+
+        async def set_target(value):
+            calls.append(value)
+
+        runtime = SimpleNamespace(cost_goal=SimpleNamespace(async_set_target=set_target))
+        await number._set_cost_goal(runtime, 12.5)
+        assert calls == [12.5]
+        with pytest.raises(ServiceValidationError):
+            await number._set_cost_goal(SimpleNamespace(cost_goal=None), 1)
+
+    asyncio.run(run())

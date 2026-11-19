@@ -74,8 +74,10 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         await control.async_pause_charging()
         assert control.pending_action == "pause"
         assert await client.async_read_register(R.CHARGING_CURRENT_EMS) == initial
-        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
-        assert control.pending_action == "single_phase"
+        # A phase request does not take the waiting pause's place.
+        with pytest.raises(AmtronRateLimitedError):
+            await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        assert control.pending_action == "pause"
 
         clock[0] += 5
         # The short register guard has expired, but the cold-start transition

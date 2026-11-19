@@ -94,7 +94,7 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
             vehicle_detection=None, vehicle_binding=None,
             charge_watch_unsubscribe=None,
             plug_charge=None, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
-            timed_goal=timed, vehicle_soc=None,
+            cost_goal=None, timed_goal=timed, vehicle_soc=None,
             client=SimpleNamespace(async_close=AsyncMock()),
         )
         options = {**detection_catalog(), "active_vehicle_profile": selected}
