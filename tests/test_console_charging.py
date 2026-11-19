@@ -8,6 +8,9 @@ import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
 from custom_components.mennekes_amtron_rtu.device import app_settings
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
+)
 from custom_components.mennekes_amtron_rtu.device.console_http import (
     create_console_app,
 )
@@ -246,6 +249,17 @@ def test_console_reports_a_guest_failure_after_a_write_as_uncertain(tmp_path, mo
             guest = {"action": "guest", "value": True, "revision": state["guest_revision"], "confirm": True}
             response = await client.post("/api/charging", headers=headers, json=guest)
             assert (await response.json())["error"] == "charging_save_uncertain"
+
+            # A connection lost while reading the write back, or a disk that
+            # fails afterwards, is as uncertain: no bare server error.
+            for failure in (AmtronConnectionError("lost"), OSError("full")):
+                async def failed(_payload, failure=failure):
+                    raise failure
+
+                monkeypatch.setattr(service, "command", failed)
+                response = await client.post("/api/charging", headers=headers, json=guest)
+                assert (response.status, (await response.json())["error"]) == (503, "charging_save_uncertain")
+                assert response.headers["Cache-Control"] == "no-store"
     asyncio.run(body())
 
 

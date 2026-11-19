@@ -29,7 +29,7 @@ from .app_nav import PLACEHOLDER, render_nav
 from .connection import validate_network_host
 from .decode import is_hex32
 from .modbus_trace import ModbusTrace
-from .service_config import ServerConfig
+from .service_config import ServerConfig, bearer_matches
 from .waveshare_gateway import (
     GatewayError,
     GatewayRollbackError,
@@ -638,9 +638,7 @@ def create_setup_app(config: SetupConfig) -> web.Application:
     async def authenticate(
         request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
     ) -> web.StreamResponse:
-        if request.path != "/health" and not hmac.compare_digest(
-            request.headers.get("Authorization", "").encode(), f"Bearer {config.token}".encode(),
-        ):
+        if request.path != "/health" and not bearer_matches(request.headers.get("Authorization", ""), config.token):
             raise web.HTTPUnauthorized
         return await handler(request)
 

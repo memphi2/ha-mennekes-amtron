@@ -139,6 +139,11 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                 async with session.get(server.make_url("/v2/state")) as response:
                     assert response.status == 401
                 headers = {"Authorization": f"Bearer {TOKEN}"}
+                # A header that is no text is wrong, not a server error.
+                reader, writer = await asyncio.open_connection(server.host, server.port)
+                writer.write(b"GET /v2/state HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer \xff\xfe\r\n\r\n")
+                assert (await reader.readline()).split()[1] == b"401"
+                writer.close()
                 for payload in (
                     {"address": 0x302, "value": 16},
                     {"register": "charging_current_ems"},
