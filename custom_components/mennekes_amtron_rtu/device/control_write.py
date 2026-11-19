@@ -67,6 +67,8 @@ class WritePath:
         # The stop whose reply did not come: its repeat is the same switch,
         # not a new one, and does not wait for the interval it started.
         self._unanswered_stop: tuple[int, int, float | None] | None = None
+        # The current a planner wrote last, while it is the one on the line.
+        self._planned_current: float | None = None
 
     async def async_current_evse_state(
         self, error_key: str, *, read: LockedRegisterReader | None = None,
@@ -170,7 +172,7 @@ class WritePath:
                     self._control._clear_pending()
                 self._control._write_state.confirmed_current = None
                 if not paused:
-                    self._control.charging_setpoint = value
+                    self._remember(value)
                 if transition:
                     self._control._write_state.mode_change_at = self._control._monotonic()
                 if paused:
@@ -180,7 +182,7 @@ class WritePath:
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
         if not paused:
-            self._control.charging_setpoint = value
+            self._remember(value)
         else:
             self._remember_pause_setpoint(previous, preserve_setpoint)
         if transition:
@@ -201,11 +203,29 @@ class WritePath:
         if self._control._request_refresh is not None:
             await self._control._request_refresh()
 
+    def _remember(self, value: float) -> None:
+        """Keep a current as the one a later resume returns to.
+
+        Only a current somebody chose: a planner's is its own for the time of
+        its plan and must not outlive it.
+        """
+        active = self._control._active_command
+        if active is None or active.owner is None:
+            self._control.charging_setpoint = value
+            self._planned_current = None
+        else:
+            # Not saved: after a restart a pause takes the current it finds,
+            # as it does for one that another controller wrote.
+            self._planned_current = value
+
     def _remember_pause_setpoint(
         self, previous: float | None, preserve_setpoint: bool
     ) -> None:
         """Retain the confirmed current even when the pause acknowledgement is lost."""
 
+        if previous is not None and previous == self._planned_current and self._control.charging_setpoint is not None:
+            # The current on the line is a planner's; the chosen one stays.
+            return
         if (
             (not preserve_setpoint or self._control.charging_setpoint is None)
             and previous is not None

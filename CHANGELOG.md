@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A reached energy or cost target ends when the car is unplugged: the target
   is cleared and its pause ends, so the next car charges without the previous
   limit. Before, the stop stayed until it was resumed by hand.
+- The departure plan's charging current is the plan's only: a pause and
+  resume after the plan returns to the current chosen by hand. Before, the
+  plan's current replaced it. After a restart of the service during a plan,
+  a pause still takes the current it finds.
 - A percentage target that a lower charge limit of the car pressed down
   returns to the chosen value when the limit rises again. Before, it rose to
   the limit itself. A target chosen at the limit still follows it.

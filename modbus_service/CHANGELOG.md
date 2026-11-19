@@ -6,6 +6,8 @@
   update, confirm the reset in Home Assistant's Repairs and set the targets
   again.
 - An unplug ends a reached energy or cost target and its pause.
+- The departure plan's current no longer replaces the current chosen by
+  hand as the one a resume returns to.
 - A percentage target pressed down by the car's limit returns to the chosen
   value when the limit rises again.
 - A guest start behind a waiting stop is refused before its first write
