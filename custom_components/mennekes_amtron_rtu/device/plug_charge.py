@@ -114,7 +114,8 @@ class PlugChargeState:
             if self.session is None:
                 self.hold = True
                 return
-            if self.unknown_since is None:
+            if self.unknown_since is None or now < self.unknown_since:
+                # A clock set back starts the grace again instead of stretching it.
                 self.unknown_since = now
             elif self.authorized and now - self.unknown_since >= UNKNOWN_GRACE:
                 _LOGGER.warning(
