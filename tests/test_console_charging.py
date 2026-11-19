@@ -368,6 +368,13 @@ def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_sta
                         assert (response.status, await response.json()) == (503, {"error": "busy"})
                     # The overview waits shortly and shows the last published state.
                     assert (await client.get("/api/overview", headers=HEADERS)).status == 200
+                    # Its own limit must not end that wait first.
+                    from custom_components.mennekes_amtron_rtu.device import (
+                        service_runtime,
+                    )
+
+                    monkeypatch.undo()
+                    assert app_settings.OVERVIEW_SECONDS > service_runtime._PATIENCE_SECONDS
                 finally:
                     service._command_lock.release()
                 assert (await client.get("/api/charging", headers=HEADERS)).status == 200

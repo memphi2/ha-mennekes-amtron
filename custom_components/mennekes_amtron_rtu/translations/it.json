@@ -269,6 +269,11 @@
         "state": {
           "all_available": "Tutte le fasi disponibili",
           "single_phase": "Solo una fase"
+        },
+        "state_attributes": {
+          "switched": {
+            "name": "Fasi che la wallbox userà"
+          }
         }
       },
       "solar_charging_mode": {
@@ -317,7 +322,7 @@
         },
         "state_attributes": {
           "permanent": {
-            "name": "Bloccato in modo permanente"
+            "name": "Blocco permanente"
           }
         }
       },
@@ -372,7 +377,7 @@
             "name": "Durata (minuti)"
           },
           "maximum_current": {
-            "name": "Corrente massima"
+            "name": "Corrente massima della sessione"
           },
           "sessions": {
             "name": "Sessioni di ricarica totali"

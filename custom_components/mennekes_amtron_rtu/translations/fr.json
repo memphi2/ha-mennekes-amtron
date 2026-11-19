@@ -215,7 +215,7 @@
             "name": "Repli du gestionnaire d’énergie actif"
           },
           "code": {
-            "name": "Code d'erreur"
+            "name": "Code d’erreur"
           },
           "category": {
             "name": "Catégorie"
@@ -269,6 +269,11 @@
         "state": {
           "all_available": "Toutes les phases disponibles",
           "single_phase": "Une seule phase"
+        },
+        "state_attributes": {
+          "switched": {
+            "name": "Phases que la borne utilisera"
+          }
         }
       },
       "solar_charging_mode": {
@@ -317,7 +322,7 @@
         },
         "state_attributes": {
           "permanent": {
-            "name": "Verrouillé en permanence"
+            "name": "Verrouillage permanent"
           }
         }
       },
@@ -372,7 +377,7 @@
             "name": "Durée (minutes)"
           },
           "maximum_current": {
-            "name": "Courant maximal"
+            "name": "Courant maximal de la session"
           },
           "sessions": {
             "name": "Sessions de charge au total"
@@ -540,7 +545,7 @@
               "unavailable": "Borne injoignable",
               "departure_plan": "Planification du départ",
               "direct": "Commande directe",
-              "guest": "Charge invité"
+              "guest": "Recharge invité"
             }
           },
           "next_event": {

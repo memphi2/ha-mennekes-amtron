@@ -269,6 +269,11 @@
         "state": {
           "all_available": "Alle verfügbaren Phasen",
           "single_phase": "Nur eine Phase"
+        },
+        "state_attributes": {
+          "switched": {
+            "name": "Phasen, die die Wallbox nutzen wird"
+          }
         }
       },
       "solar_charging_mode": {
@@ -317,7 +322,7 @@
         },
         "state_attributes": {
           "permanent": {
-            "name": "Dauerhaft verriegelt"
+            "name": "Dauerhafte Verriegelung"
           }
         }
       },
@@ -372,7 +377,7 @@
             "name": "Dauer (Minuten)"
           },
           "maximum_current": {
-            "name": "Höchster Strom"
+            "name": "Maximalstrom der Sitzung"
           },
           "sessions": {
             "name": "Ladevorgänge insgesamt"

@@ -32,5 +32,13 @@ def test_the_reconfigure_form_shows_the_url_and_not_the_stored_token(monkeypatch
             for marker in result["data_schema"].schema
         }
         assert suggested == {CONF_SERVER_URL: "http://svc:8765", CONF_SERVER_TOKEN: None}
+        # A failed attempt shows the typed address again, never the typed token.
+        result = await flow.async_step_server({CONF_SERVER_URL: "http://other:8765", CONF_SERVER_TOKEN: "short"})
+        assert result["errors"]
+        suggested = {
+            str(marker): (marker.description or {}).get("suggested_value")
+            for marker in result["data_schema"].schema
+        }
+        assert suggested == {CONF_SERVER_URL: "http://other:8765", CONF_SERVER_TOKEN: None}
 
     asyncio.run(run())

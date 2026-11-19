@@ -221,10 +221,10 @@
             "name": "Categorie"
           },
           "fallback": {
-            "name": "Fallback-gedrag"
+            "name": "Terugvalgedrag"
           },
           "fallback_current": {
-            "name": "Fallback-stroom"
+            "name": "Terugvalstroom"
           }
         }
       },
@@ -269,6 +269,11 @@
         "state": {
           "all_available": "Alle beschikbare fasen",
           "single_phase": "Alleen één fase"
+        },
+        "state_attributes": {
+          "switched": {
+            "name": "Fasen die de wallbox gaat gebruiken"
+          }
         }
       },
       "solar_charging_mode": {
@@ -317,7 +322,7 @@
         },
         "state_attributes": {
           "permanent": {
-            "name": "Permanent vergrendeld"
+            "name": "Permanente vergrendeling"
           }
         }
       },
@@ -372,7 +377,7 @@
             "name": "Duur (minuten)"
           },
           "maximum_current": {
-            "name": "Hoogste stroom"
+            "name": "Maximale stroom van de sessie"
           },
           "sessions": {
             "name": "Laadsessies in totaal"
@@ -404,10 +409,10 @@
             "name": "Faseopties"
           },
           "phase_switching_mode": {
-            "name": "Fase-omschakeling"
+            "name": "Fasewisseling"
           },
           "phase_switching_pause_seconds": {
-            "name": "Pauze bij fase-omschakeling (seconden)"
+            "name": "Pauze bij fasewisseling (seconden)"
           },
           "grid_imbalance_monitoring": {
             "name": "Bewaking van scheefbelasting"

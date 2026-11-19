@@ -157,5 +157,16 @@ def test_every_attribute_a_sensor_shows_has_a_name_in_every_language() -> None:
             names = translated[key].get("state_attributes", {})
             assert attributes <= set(names), (path.name, key, attributes - set(names))
             assert all(names[attribute]["name"] for attribute in attributes), (path.name, key)
+        # Attributes the fixture leaves empty, and the other platforms.
+        entities = json.loads(path.read_text())["entity"]
+        for platform, key, attributes in (
+            ("sensor", "operation_waiting", {"planned_start", "estimated_finish", "estimated_level_at_departure"}),
+            ("sensor", "charging_status", {"evse_state", "cp_state", "downgraded_to"}),
+            ("binary_sensor", "error", {"code", "category", "heartbeat_lost", "fallback", "fallback_current"}),
+            ("select", "requested_phases", {"switched"}),
+        ):
+            names = entities[platform][key]["state_attributes"]
+            assert attributes <= set(names), (path.name, key)
+            assert all(names[attribute]["name"] for attribute in attributes), (path.name, key)
         # Counters that only the diagnostics download carries have no entity text.
         assert set(translated["connection_quality"]["state_attributes"]) == {"heartbeat"}
