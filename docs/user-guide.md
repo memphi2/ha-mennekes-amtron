@@ -159,7 +159,8 @@ a reached goal stays stopped. After an owner restart, resume explicitly.
 With charging costs configured, **Cost target** limits a charge by an amount
 of money instead of energy. Home Assistant converts the amount still open into
 an **Energy target** at the price that applies now, and again whenever the
-price or the network-charge window changes. The service therefore stops the
+price or the network-charge window changes, at most once a minute and only
+for a change of at least 0.1 ct/kWh. The service therefore stops the
 charge on its own; while Home Assistant is down it stops at the energy of the
 last known price. With a dynamic price the amount is kept to within one
 0.1 kWh step per price change, and it rests on the same estimate as the

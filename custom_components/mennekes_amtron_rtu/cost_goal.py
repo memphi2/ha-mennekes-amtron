@@ -41,14 +41,18 @@ MAX_COST_GOAL: Final = 1000.0
 MIN_COST_GOAL: Final = 0.1
 COST_GOAL_STEP: Final = 0.1
 _RETRY_SECONDS: Final = 60.0
+# Each hand-over saves the service's state and reads its meter. A price that
+# wobbles every few seconds must not turn into a write every few seconds.
+_HANDOVER_SECONDS: Final = 60.0
+_PRICE_TOLERANCE: Final = 0.001
 _KEYS = frozenset({"target", "spent", "price", "energy_kwh"})
 
 
-def _amount(value: object, *, maximum: float = math.inf) -> float:
+def _amount(value: object, *, minimum: float = 0.0, maximum: float = math.inf) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("amount must be a number")
     number = float(value)
-    if not math.isfinite(number) or not 0 <= number <= maximum:
+    if not math.isfinite(number) or not minimum <= number <= maximum:
         raise ValueError("amount out of range")
     return number
 
@@ -95,7 +99,8 @@ class CostGoal:
         if isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price):
             raise ValueError("invalid cost target price")
         return cls(
-            target, _amount(raw["spent"]), float(price),
+            # A negative price earns money, so the spent part may be negative.
+            target, _amount(raw["spent"], minimum=-math.inf), float(price),
             _amount(raw["energy_kwh"], maximum=MAX_ENERGY_GOAL_KWH),
         )
 
@@ -113,6 +118,7 @@ class CostGoalObserver:
         self._notice = FailureNotice(_LOGGER, "Cost target")
         self._storage_notice = FailureNotice(_LOGGER, "Cost target")
         self._retry_at = 0.0
+        self._handed_at = -math.inf
         self._dirty = False
 
     async def async_start(self) -> None:
@@ -169,6 +175,7 @@ class CostGoalObserver:
             raise service_validation_error("cost_goal_price_unknown")
         energy = energy_for(target, price)
         await control.async_set_energy_goal(energy)
+        self._handed_at = time.monotonic()
         self.goal = CostGoal(target, 0.0, price, energy)
         await self._save()
 
@@ -190,9 +197,11 @@ class CostGoalObserver:
             await self._save()
             return
         price = self._price()
+        now = time.monotonic()
         if (
-            energy_goal.status != "active" or price is None or price == goal.price
-            or time.monotonic() < self._retry_at
+            energy_goal.status != "active" or price is None or goal.price is None
+            or abs(price - goal.price) < _PRICE_TOLERANCE
+            or now < self._retry_at or now - self._handed_at < _HANDOVER_SECONDS
         ):
             return
         meter = data.get(ENERGY_TOTAL.key)
@@ -209,6 +218,7 @@ class CostGoalObserver:
             self._notice.failed("energy target not updated for the new price", "retrying")
             self._retry_at = time.monotonic() + _RETRY_SECONDS
             return
+        self._handed_at = now
         self._notice.recovered("energy target follows the price again")
         new_baseline = control.energy_goal.baseline_kwh
         if old_baseline is not None and new_baseline is not None and goal.price is not None:
