@@ -28,6 +28,10 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+# Commands that end a charge or close the wallbox.
+_STOPS = frozenset({"pause", "disable_charging", "lock"})
+
+
 class CommandQueue:
     """Submits commands to the write path and defers those that must wait."""
 
@@ -147,6 +151,16 @@ class CommandQueue:
                 task.cancel()
             await asyncio.gather(sleeping, changed, return_exceptions=True)
 
+    def _usable(self) -> bool:
+        """Whether a command that waited may reach the wallbox right now."""
+        if self._control._validate_deferred is None:
+            return True
+        try:
+            self._control._validate_deferred()
+        except DeviceError:
+            return False
+        return True
+
     async def async_flush_pending(self) -> None:
         try:
             while True:
@@ -166,6 +180,10 @@ class CommandQueue:
                     )
                     if delay > 0 and check_disconnect and await self._control.writes.async_vehicle_absent():
                         delay = 0
+                    if delay <= 0 and command.action in _STOPS and not self._usable():
+                        # A stop that came due during a lost poll waits for the
+                        # wallbox instead of being dropped; a start would not.
+                        delay = MIN_CURRENT_WRITE_INTERVAL_SECONDS
                     if delay <= 0:
                         try:
                             await self.async_observe_command(command, deferred=True)

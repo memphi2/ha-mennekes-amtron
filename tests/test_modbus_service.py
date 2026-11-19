@@ -600,3 +600,38 @@ def test_error_200_is_recovered_while_the_disk_refuses(tmp_path, monkeypatch):
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_queued_stop_survives_a_poll_that_failed_at_its_due_time(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path, current=1)
+        await service.heartbeat.async_stop()
+        transport.bank[R.EVSE_STATE.address] = 5
+        transport.bank[R.CP_STATE.address] = 28
+        await service.refresh()
+        control = service.control
+        try:
+            await control.async_resume_charging()
+            clock[0] += 60
+            await control.async_pause_charging()
+            assert control.pending_action == "pause"
+            failing = dict.fromkeys(
+                (0x100, 0x108, 0x300, 0xD02, 0xE00, 0xE01, 0x114, 0x500, 0xB00, 0xB06), raise_connection_error(),
+            )
+            transport.read_exceptions.update(failing)
+            with pytest.raises(AmtronBusError):
+                await service.refresh()
+            transport.read_exceptions.clear()
+            clock[0] += 241
+            control._pending_changed.set()
+            await asyncio.sleep(0.1)
+            # Due, but the wallbox is not known to answer: the stop waits.
+            assert (control.pending_action, current_writes(transport)) == ("pause", [6.0])
+            await service.refresh()
+            control._pending_changed.set()
+            await asyncio.sleep(0.1)
+            assert (control.pending_action, current_writes(transport)) == (None, [6.0, 1.0])
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
