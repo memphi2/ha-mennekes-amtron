@@ -244,6 +244,9 @@
       "energy_goal": {
         "name": "Energiedoel"
       },
+      "cost_goal": {
+        "name": "Kostendoel"
+      },
       "soc_goal": {
         "name": "Laaddoel van voertuig"
       }
@@ -501,6 +504,17 @@
               "reached": "Energiedoel bereikt",
               "meter_unavailable": "Energiemeting niet beschikbaar",
               "meter_reset": "Meterstand gedaald"
+            }
+          },
+          "cost_target": {
+            "name": "Status kostendoel",
+            "state": {
+              "disabled": "Uitgeschakeld",
+              "active": "Actief",
+              "reached": "Kostendoel bereikt",
+              "meter_unavailable": "Energiemeter niet beschikbaar",
+              "meter_reset": "Meterstand gedaald",
+              "price_unknown": "Prijs onbekend"
             }
           },
           "vehicle_target": {
@@ -913,6 +927,12 @@
     },
     "time_limit_reached": {
       "message": "Het gekozen tijdstip is voorbij. Wijzig of wis het vóór hervatten."
+    },
+    "cost_goal_invalid": {
+      "message": "Voer 0 in om het kostendoel uit te schakelen, of een bedrag van 0,10 tot 1000."
+    },
+    "cost_goal_price_unknown": {
+      "message": "Het kostendoel heeft een actuele stroomprijs nodig. Controleer de prijsbron van de laadkosten."
     }
   },
   "issues": {

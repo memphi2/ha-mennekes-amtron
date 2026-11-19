@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- **Cost target**: a charge target as an amount of money. Home Assistant
+  hands the amount still open to the service as an energy target at the
+  current price and again at every price change, so the service stops the
+  charge itself. It needs configured charging costs and ends when the energy
+  target is set by hand.
+
 ### Fixes
 
 - A lock or a withdrawn release whose reply did not come is written again

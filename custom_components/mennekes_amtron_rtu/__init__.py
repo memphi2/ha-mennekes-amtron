@@ -46,6 +46,7 @@ from .charging_cost_const import (
     COST_SOURCE_DISABLED,
 )
 from .coordinator import ServiceCoordinator
+from .cost_goal import CostGoal, CostGoalObserver
 from .cost_observer import ChargingCostObserver, LastChargingCost
 from .data import (
     MennekesAmtronRuntimeData,
@@ -353,12 +354,17 @@ async def async_setup_entry(
                         handoff.charging_cost = None
                     entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry)
                     await entry.runtime_data.charging_cost.async_start()
+                if entry.runtime_data.controls:
+                    entry.runtime_data.cost_goal = CostGoalObserver(hass, entry)
+                    await entry.runtime_data.cost_goal.async_start()
 
             # Failed polls arrive as None. A reconnect re-checks the wallbox
             # identity; the service judges continuity, costs follow it.
             async def observe_estimates(data: WallboxData | None) -> None:
                 if entry.runtime_data.charging_cost is not None:
                     await entry.runtime_data.charging_cost.async_observe(data)
+                if entry.runtime_data.cost_goal is not None:
+                    await entry.runtime_data.cost_goal.async_observe(data)
 
             coordinator.observe_estimates = observe_estimates
         client.on_auth_failed = lambda: entry.async_start_reauth(hass)
@@ -936,6 +942,7 @@ async def async_remove_entry(
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())
     await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()
+    await ModelStore(hass, entry.entry_id, "", kind="cost_goal", model=CostGoal).async_remove()
     _delete_issues(hass, entry)
 
 

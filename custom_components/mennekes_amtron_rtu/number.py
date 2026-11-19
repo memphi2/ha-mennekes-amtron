@@ -19,6 +19,7 @@ from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent, UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .cost_goal import COST_GOAL_STEP, MAX_COST_GOAL
 from .device.const import (
     CHARGING_CURRENT_DECIMALS,
     CHARGING_CURRENT_MINIMUM,
@@ -63,6 +64,12 @@ async def _set_vehicle_target(runtime: Runtime, value: float) -> None:
     await runtime.vehicle_soc.async_set_target(value)
 
 
+async def _set_cost_goal(runtime: Runtime, value: float) -> None:
+    if runtime.cost_goal is None:
+        raise service_validation_error("cost_goal_price_unknown")
+    await runtime.cost_goal.async_set_target(value)
+
+
 def _vehicle_maximum(runtime: Runtime) -> float:
     cap = runtime.control.soc_goal.maximum_percent
     return 100.0 if cap is None else cap
@@ -90,6 +97,20 @@ NUMBERS: tuple[AmtronNumberDescription, ...] = (
         ready=lambda runtime: runtime.control.supports_energy_goal,
         value=lambda runtime: runtime.control.energy_goal.target_kwh,
         set_value=lambda runtime, value: runtime.control.async_set_energy_goal(value),
+    ),
+    # An amount of money, carried by the energy target above.
+    AmtronNumberDescription(
+        key="cost_goal", capability=ENERGY_TOTAL.key, register="evse_state", writes=True,
+        device_class=NumberDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        native_min_value=0.0, native_max_value=MAX_COST_GOAL,
+        native_step=COST_GOAL_STEP, mode=NumberMode.BOX,
+        exists=lambda runtime: runtime.cost_goal is not None,
+        ready=lambda runtime: (
+            runtime.control.supports_energy_goal and runtime.cost_goal is not None
+            and runtime.charging_cost is not None and runtime.charging_cost.available
+        ),
+        value=lambda runtime: None if runtime.cost_goal is None else runtime.cost_goal.target,
+        set_value=_set_cost_goal,
     ),
     AmtronNumberDescription(
         key="soc_goal", writes=True, feature=lambda features: SOC in features,

@@ -244,6 +244,9 @@
       "energy_goal": {
         "name": "Ladeziel"
       },
+      "cost_goal": {
+        "name": "Kostenziel"
+      },
       "soc_goal": {
         "name": "Fahrzeug-Ladeziel"
       }
@@ -501,6 +504,17 @@
               "reached": "Ladeziel erreicht",
               "meter_unavailable": "Energiemessung fehlt",
               "meter_reset": "Zählerstand zurückgegangen"
+            }
+          },
+          "cost_target": {
+            "name": "Kostenzielstatus",
+            "state": {
+              "disabled": "Deaktiviert",
+              "active": "Aktiv",
+              "reached": "Kostenziel erreicht",
+              "meter_unavailable": "Energiemessung fehlt",
+              "meter_reset": "Zählerstand zurückgegangen",
+              "price_unknown": "Preis unbekannt"
             }
           },
           "vehicle_target": {
@@ -913,6 +927,12 @@
     },
     "time_limit_reached": {
       "message": "Der gewählte Zeitpunkt ist vorbei. Vor dem Fortsetzen ändern oder löschen."
+    },
+    "cost_goal_invalid": {
+      "message": "Gib 0 ein, um das Kostenziel zu deaktivieren, oder einen Betrag von 0,10 bis 1000."
+    },
+    "cost_goal_price_unknown": {
+      "message": "Das Kostenziel braucht einen aktuellen Strompreis. Prüfe die Preisquelle der Ladekosten."
     }
   },
   "issues": {

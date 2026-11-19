@@ -244,6 +244,9 @@
       "energy_goal": {
         "name": "Objectif énergétique"
       },
+      "cost_goal": {
+        "name": "Objectif de coût"
+      },
       "soc_goal": {
         "name": "Objectif de charge du véhicule"
       }
@@ -501,6 +504,17 @@
               "reached": "Objectif énergétique atteint",
               "meter_unavailable": "Mesure d’énergie indisponible",
               "meter_reset": "Valeur du compteur en baisse"
+            }
+          },
+          "cost_target": {
+            "name": "État de l’objectif de coût",
+            "state": {
+              "disabled": "Désactivé",
+              "active": "Actif",
+              "reached": "Objectif de coût atteint",
+              "meter_unavailable": "Compteur d’énergie indisponible",
+              "meter_reset": "Relevé du compteur en baisse",
+              "price_unknown": "Prix inconnu"
             }
           },
           "vehicle_target": {
@@ -913,6 +927,12 @@
     },
     "time_limit_reached": {
       "message": "L’heure choisie est passée. Modifiez-la ou effacez-la avant de reprendre."
+    },
+    "cost_goal_invalid": {
+      "message": "Saisissez 0 pour désactiver l’objectif de coût, ou un montant de 0,10 à 1000."
+    },
+    "cost_goal_price_unknown": {
+      "message": "L’objectif de coût nécessite un prix de l’électricité actuel. Vérifiez la source de prix des coûts de recharge."
     }
   },
   "issues": {

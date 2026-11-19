@@ -147,6 +147,7 @@ def _waiting_details(runtime: Runtime) -> dict[str, Any]:
         "pending": control.pending_action or "none",
         "pending_at": control.pending_until,
         "energy_target": control.energy_goal.status if control.supports_energy_goal else None,
+        "cost_target": None if runtime.cost_goal is None else runtime.cost_goal.status,
         "vehicle_target": (
             control.soc_goal.status
             if runtime.vehicle_soc is not None and runtime.vehicle_soc.source is not None else None

@@ -311,6 +311,7 @@ async def _every_entity():
     runtime = entry.runtime_data
     runtime.plug_charge = SimpleNamespace(status="disabled", blocked_reason=None)
     runtime.charging_cost = SimpleNamespace(available=False, current=None, last=SimpleNamespace(result=None))
+    runtime.cost_goal = SimpleNamespace(target=0.0, status="disabled")
     added: dict[str, dict[str, object]] = {}
     for platform, (setup, _rows) in _PLATFORMS.items():
         added[platform] = {}

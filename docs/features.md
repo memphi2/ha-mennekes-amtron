@@ -10,6 +10,7 @@ when you need it; you do not need to configure every option.
 | I want to… | I need… | Set it up |
 |---|---|---|
 | Add about 12 kWh, then stop | The wallbox's lifetime energy counter | [Energy target](user-guide.md#energy-target) |
+| Charge for about 5 €, then stop | Configured charging costs | [Cost target](user-guide.md#cost-target) |
 | Stop at 80% battery charge | A vehicle SoC source | [Percentage target](vehicle-setup.md#optional-vehicle-percentage-target) |
 | Respect the car's own maximum percentage | Its reported charge-limit source, separately enabled | [Vehicle setup](vehicle-setup.md) |
 | Reach a target for my next trip | SoC, usable battery capacity, positive percentage target and a dated departure | [Departure planning](departure-planning.md) |

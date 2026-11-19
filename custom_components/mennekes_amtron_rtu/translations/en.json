@@ -244,6 +244,9 @@
       "energy_goal": {
         "name": "Energy target"
       },
+      "cost_goal": {
+        "name": "Cost target"
+      },
       "soc_goal": {
         "name": "Vehicle charge target"
       }
@@ -501,6 +504,17 @@
               "reached": "Energy target reached",
               "meter_unavailable": "Energy meter unavailable",
               "meter_reset": "Energy meter reading decreased"
+            }
+          },
+          "cost_target": {
+            "name": "Cost target status",
+            "state": {
+              "disabled": "Disabled",
+              "active": "Active",
+              "reached": "Cost target reached",
+              "meter_unavailable": "Energy meter unavailable",
+              "meter_reset": "Energy meter reading decreased",
+              "price_unknown": "Price unknown"
             }
           },
           "vehicle_target": {
@@ -913,6 +927,12 @@
     },
     "time_limit_reached": {
       "message": "The selected time has passed. Change or clear it before resuming."
+    },
+    "cost_goal_invalid": {
+      "message": "Enter 0 to disable the cost target, or an amount from 0.10 to 1000."
+    },
+    "cost_goal_price_unknown": {
+      "message": "The cost target needs a current electricity price. Check the price source of the charging costs."
     }
   },
   "issues": {

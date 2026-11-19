@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .charge_loss_observer import ChargeLossObserver
     from .charge_watch import ChargeWatch
     from .coordinator import ServiceCoordinator
+    from .cost_goal import CostGoalObserver
     from .cost_observer import ChargingCostObserver
     from .guest_charging import GuestCharging
     from .plug_charge import PlugChargeObserver
@@ -62,6 +63,7 @@ class MennekesAmtronRuntimeData:
     timed_goal: TimedGoalObserver | None = None
     charge_loss: ChargeLossObserver | None = None
     charging_cost: ChargingCostObserver | None = None
+    cost_goal: CostGoalObserver | None = None
     # What the repair issues looked like last time, so an unchanged issue is
     # not written to the issue registry on every poll.
     repair_state: dict[str, dict[str, str] | None] = field(default_factory=dict)
