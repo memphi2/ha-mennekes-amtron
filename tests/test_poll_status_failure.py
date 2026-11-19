@@ -117,7 +117,8 @@ def test_a_silent_line_is_asked_two_blocks_per_poll_not_all_of_them():
         # One poll without any answer holds its values, as for a lost reply ...
         held = await poller.async_poll(data, last_success=True)
         assert len({address for address, _count in h.transport.reads}) == 2
-        assert held.get("evse_state") == EvseState.CHARGING and held.fresh("evse_state") is None
+        assert held.get("evse_state") == EvseState.CHARGING
+        assert held.fresh("evse_state") is None
         assert set(held.failed_blocks) >= {block.name for block in REGISTER_BLOCKS if block.cadence is BlockCadence.FAST}
         # ... the second one is a lost connection, again after two blocks.
         h.clock[0] += 5
