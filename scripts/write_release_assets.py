@@ -69,6 +69,10 @@ def _write_sha256sums(args: argparse.Namespace) -> None:
     args.sha256sums.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+# What docs/legal.md states for the manifest's runtime requirements.
+_REQUIREMENT_LICENSES = {"pymodbus": "BSD-3-Clause"}
+
+
 def _sbom(
     args: argparse.Namespace, version: str, zip_digest: str, commit: str, source_date: str
 ) -> dict[str, object]:
@@ -86,7 +90,7 @@ def _sbom(
             "filesAnalyzed": False,
             "licenseConcluded": "Apache-2.0",
             "licenseDeclared": "Apache-2.0",
-            "copyrightText": "NOASSERTION",
+            "copyrightText": (ROOT / "NOTICE").read_text(encoding="utf-8").splitlines()[1],
             "checksums": [{"algorithm": "SHA256", "checksumValue": zip_digest}],
         }
     ]
@@ -105,10 +109,10 @@ def _sbom(
                 "SPDXID": spdx_id,
                 "name": name,
                 "versionInfo": requirement_version or "NOASSERTION",
-                "downloadLocation": "NOASSERTION",
+                "downloadLocation": f"https://pypi.org/project/{name.partition('[')[0]}/",
                 "filesAnalyzed": False,
                 "licenseConcluded": "NOASSERTION",
-                "licenseDeclared": "NOASSERTION",
+                "licenseDeclared": _REQUIREMENT_LICENSES.get(name.partition("[")[0], "NOASSERTION"),
                 "copyrightText": "NOASSERTION",
             }
         )

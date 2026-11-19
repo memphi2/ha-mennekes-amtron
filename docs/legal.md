@@ -16,7 +16,8 @@ applications, protocols or trademarks, or to third-party projects.
 
 ## Trademark notice
 
-MENNEKES, AMTRON, Home Assistant, HACS, Nabu Casa, Modbus and other
+MENNEKES, AMTRON, Home Assistant, HACS, Nabu Casa, BMW, BavarianData,
+Waveshare, Tibber, VNBdigital, Modbus and other
 referenced names are trademarks or names of their respective owners. They are
 used only for compatibility, attribution, and descriptive reference. Modbus is
 a registered trademark of Schneider Electric USA, Inc., licensed to the Modbus
@@ -98,6 +99,23 @@ Home Assistant also provides for the integration client. Python packages and
 their license notices are installed from their upstream distributions. The
 container build uses `requirements-service.txt`; the shared project-owned driver
 is not a third-party vendored payload.
+
+## Service image contents
+
+The service image is built from the official `python:3.14-slim-bookworm` image,
+pinned by digest in the `Dockerfile`. It therefore contains Debian packages
+under their own licenses, among them GPL and LGPL components, and CPython under
+the PSF license. This project does not modify them. Each Debian package keeps
+its license text under `/usr/share/doc/<package>/copyright` in the image, and
+the corresponding sources are available from Debian, including past versions
+through [snapshot.debian.org](https://snapshot.debian.org/).
+
+`pip` adds the pinned packages of `requirements-service.txt` (aiohttp under
+Apache-2.0, pymodbus with pyserial under BSD-3-Clause, cryptography under
+Apache-2.0 OR BSD-3-Clause with the OpenSSL it bundles) and their
+dependencies. Every installed package keeps its license files in its
+`*.dist-info` directory under the image's `site-packages`. The project's own
+`LICENSE` and `NOTICE` are in `/app`.
 
 ## Optional Waveshare adapter support
 

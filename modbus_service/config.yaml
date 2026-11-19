@@ -2,7 +2,7 @@ name: Mennekes Amtron Modbus Service
 version: 0.10.0b2
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
-description: Independent Modbus connection and heartbeat for Mennekes Amtron
+description: Unofficial Modbus connection and heartbeat for Mennekes Amtron wallboxes
 arch:
   - aarch64
   - amd64

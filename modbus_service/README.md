@@ -55,3 +55,6 @@ with transparent RTU over TCP or translating Modbus TCP gateways. No local USB
 device is needed. Network and gateway outages can still interrupt the heartbeat.
 
 [Technical reference](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.10.0b2/docs/service-reference.md) · [Changes](CHANGELOG.md)
+
+Unofficial community project, not affiliated with MENNEKES. Provided as is,
+without warranty; use at your own risk.

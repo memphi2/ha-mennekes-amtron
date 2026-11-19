@@ -45,6 +45,9 @@ from vehicle planning until unplugging.
 | **Target time** | Stop at this time; start is immediate | With planning enabled: be ready for the next trip |
 | **Vehicle charge target** | Ignored; its saved value remains | Stop at the reported battery percentage |
 
+Energy and cost values are estimates from an uncalibrated meter reading (no
+MID or Eichrecht conformity) and must not be used to bill others.
+
 For guests, the **first reached kWh or time limit** stops charging. With neither
 set, no automatic limit is added. Set a kWh or percentage target to **0** to disable
 it. Clear the time separately; in the Mushroom example, hold the time chip.

@@ -80,5 +80,6 @@ to be created. Intelligent vehicle planning is optional and configured in HA.
 Integration and app versions are independent; update the app first
 when a newer minimum is required. Only a changed app needs an app update.
 
-Unofficial community project, not affiliated with MENNEKES.
+Unofficial community project, not affiliated with MENNEKES. Provided as is,
+without warranty (Apache-2.0 sections 7 and 8); use at your own risk.
 [Apache 2.0 license](LICENSE) · [Notices](NOTICE) · [Legal information](docs/legal.md)

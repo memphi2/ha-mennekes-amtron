@@ -125,3 +125,6 @@ or Recorder rows. It is bounded in RAM and redacts identifying register values;
 [details](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.10.0b2/docs/troubleshooting.md#watch-app-modbus-communication-live).
 
 [User guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.10.0b2/docs/README.md) · [App pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.10.0b2/docs/app-guide.md) · [Troubleshooting](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.10.0b2/docs/troubleshooting.md)
+
+Unofficial community project, not affiliated with MENNEKES. Provided as is,
+without warranty; use at your own risk.
