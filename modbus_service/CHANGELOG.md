@@ -1,6 +1,8 @@
 # Changes
 
-## Unreleased
+## 0.10.0b5
+
+- Integration and app must both be 0.10.0b5; update them together.
 
 - The Charging page sets and shows the cost ceiling; the service remembers
   the last price Home Assistant reported (`cost_price` in its state) and
