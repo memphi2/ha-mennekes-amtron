@@ -272,3 +272,65 @@ def test_app_names_a_hint_for_exactly_the_definite_refusals():
     source = Path(console_http.__file__).with_name("app_charging.js").read_text(encoding="utf-8")
     mapping = re.search(r"const refusals=\{(.*?)\};", source, re.DOTALL).group(1)
     assert set(re.findall(r"(\w+):\"\w+\"", mapping)) == console_http._REFUSALS
+
+
+def test_console_arms_a_cost_ceiling_at_the_last_reported_price(tmp_path, monkeypatch):
+    async def body():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        async with (
+            runtime.guest_service(tmp_path) as (service, _transport, _clock),
+            TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+        ):
+            state = await (await client.get("/api/charging", headers=HEADERS)).json()
+            assert (state["cost"], state["cost_price"], state["guest_confirmation_required"]) == (None, None, False)
+            headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
+            choice = {"action": "cost", "value": 10, "revision": state["revision"], "confirm": True}
+            refused = await client.post("/api/charging", headers=headers, json=choice)
+            assert (refused.status, (await refused.json())["error"]) == (409, "cost_goal_price_unknown")
+            # Home Assistant reports the price; the app needs no price of its own.
+            await service.command({
+                "command": "cost_price", "price": 0.25,
+                "expected_serial_number": service.identity.serial_number,
+            })
+            assert service.snapshot()["control"]["cost_price"] == 0.25
+            saved = await client.post("/api/charging", headers=headers, json=choice)
+            state = await saved.json()
+            assert saved.status == 200
+            assert state["cost"] == {"amount": 10, "spent": 0.0, "price": 0.25}
+            assert (state["energy"]["target"], state["cost_price"]) == (40.0, 0.25)
+            wrong = await client.post("/api/charging", headers=headers, json={**choice, "value": 0.05, "revision": state["revision"]})
+            assert (wrong.status, (await wrong.json())["error"]) == (409, "cost_goal_invalid")
+            ended = await client.post("/api/charging", headers=headers, json={**choice, "value": 0, "revision": state["revision"]})
+            state = await ended.json()
+            assert (state["cost"], state["energy"]["target"]) == (None, 0)
+
+    asyncio.run(body())
+
+
+def test_console_names_a_command_that_must_wait_and_a_past_time(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronRateLimitedError,
+    )
+    from custom_components.mennekes_amtron_rtu.device.errors import validation_error
+
+    async def body():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        async with (
+            runtime.guest_service(tmp_path) as (service, _transport, _clock),
+            TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
+        ):
+            state = await (await client.get("/api/charging", headers=HEADERS)).json()
+            headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
+            choice = {"action": "pause", "value": True, "revision": state["revision"], "confirm": True}
+            for error, key in (
+                (AmtronRateLimitedError("state_change", 5.0), "write_rate_limited"),
+                (validation_error("target_time_not_future"), "target_time_not_future"),
+            ):
+                async def refuse(_payload, error=error):
+                    raise error
+
+                monkeypatch.setattr(service, "command", refuse)
+                refused = await client.post("/api/charging", headers=headers, json=choice)
+                assert (refused.status, (await refused.json())["error"]) == (409, key)
+
+    asyncio.run(body())

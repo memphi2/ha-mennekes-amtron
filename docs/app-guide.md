@@ -10,7 +10,7 @@ by the service app; a direct integration connection has no app web interface.
 |---|---|
 | See whether the car is charging and why it waits | **Overview** |
 | Check what changed the current or stopped charging | **Overview → Recent command results** |
-| Change kWh/time/percentage limits or start a guest | **Charging** |
+| Change kWh/cost/time/percentage limits or start a guest | **Charging** |
 | Set up USB or LAN | **Settings → Connection** |
 | Change the current cap, polling or waiting interval | **Settings → Runtime** |
 | Investigate a problem | **Diagnostics → Registers** or **Log** |
@@ -26,7 +26,7 @@ The overview opens first. It refreshes every five seconds while the page is
 visible and shows:
 
 - **Current charging plan**: which of the app's controllers decides right now (a
-  guest charge, departure plan or manual control), why
+  guest charge, departure plan or direct control), why
   the car does not charge yet, the next step with its time, the target and
   whether Home Assistant confirmed the car. Home Assistant shows the same
   summary as [Charging wait reason](entities.md#charging-wait-reason) and its
@@ -70,8 +70,11 @@ French, Italian and Dutch.*
 
 ## Charge target
 
-Open **Charging**. Set an optional kWh limit, time or vehicle percentage target on
-the left and save each change. The right side shows the saved choices and the
+Open **Charging**. Set an optional kWh limit, cost ceiling, time or vehicle
+percentage target on the left and save each change. The **cost ceiling** is an
+amount in EUR; it needs charging costs configured in Home Assistant, which
+reports the price to the app. It is carried by the kWh limit: saving a kWh
+value by hand ends it, and 0 EUR clears both. The right side shows the saved choices and the
 **Start guest charging** button. Unsaved edits must be saved or reloaded first.
 The same saved values appear in Home Assistant. Setting a limit does not start charging.
 

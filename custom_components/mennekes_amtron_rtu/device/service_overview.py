@@ -143,7 +143,11 @@ def overview_snapshot(
         "targets": {
             "energy_kwh": _number(energy.get("target_kwh")),
             "soc_percent": _number(soc.get("target_percent")),
+            # The amount of money an energy target stands for, if any.
+            "cost_eur": _number(_mapping(energy.get("cost")).get("amount")),
         },
+        # A guest that ran before a restart needs a new explicit start.
+        "guest_confirmation_required": control.get("guest_confirmation_required") is True,
         "operation": _operation(control.get("operation")) if configured and ready else None,
         "commands": [asdict(event) for event in reversed(events[2])] if events else [],
     }

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from aiohttp import web
 
 from .app_settings import AppSettings, SettingsError, create_settings_app, serve_asset
-from .client_errors import AmtronBusError
+from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .errors import DeviceError
 from .runtime_settings import runtime_candidate, runtime_preview
 from .service_config import ServerConfig
@@ -32,7 +32,8 @@ _REFUSALS = frozenset({
     "guest_start_not_permitted", "guest_deadline_expired", "time_limit_reached",
     "energy_goal_stop_active", "guest_confirmation_required",
     "energy_goal_invalid", "soc_goal_invalid",
-    "energy_goal_unavailable",
+    "energy_goal_unavailable", "cost_goal_invalid", "cost_goal_price_unknown",
+    "energy_goal_not_supported", "target_time_not_future", "write_rate_limited",
 })
 
 
@@ -147,6 +148,13 @@ class ServiceConsole(AppSettings):
             "guest_revision": service.guest.revision,
             "guest_active": service.guest.active,
             "energy": {"target": control.energy_goal.target_kwh, "status": control.energy_goal.status},
+            # An amount of money carried by the energy target, and the last
+            # price Home Assistant reported (none without charging costs).
+            "cost": None if (cost := control.energy_goal.cost) is None else {
+                "amount": cost.amount, "spent": cost.spent, "price": cost.price,
+            },
+            "cost_price": None if control.goal_controller is None else control.goal_controller.price,
+            "guest_confirmation_required": service.guest.restore_pending,
             "soc": {
                 "configured": control.soc_goal.source is not None,
                 "target": control.soc_goal.target_percent,
@@ -185,6 +193,12 @@ class ServiceConsole(AppSettings):
                     "value": payload["value"], "expected_choice_revision": payload["revision"],
                     "expected_serial_number": service.identity.serial_number,
                 })
+            elif action == "cost":
+                await service.command({"origin": "app",
+                    "command": "cost_goal", "value": payload["value"],
+                    "expected_choice_revision": payload["revision"],
+                    "expected_serial_number": service.identity.serial_number,
+                })
             elif action == "guest":
                 if payload["value"] is not True:
                     raise ValueError("guest start must be explicit")
@@ -215,6 +229,9 @@ class ServiceConsole(AppSettings):
             raise SettingsError(safe, 409) from err
         except (ValueError, TypeError, OverflowError) as err:
             raise SettingsError("invalid_request") from err
+        except AmtronRateLimitedError as err:
+            # Refused before anything was written: it has to wait itself.
+            raise SettingsError("write_rate_limited", 409) from err
         except (AmtronBusError, OSError) as err:
             # The wallbox or the disk failed after the command went out.
             raise SettingsError("charging_save_uncertain", 503) from err

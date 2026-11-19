@@ -37,7 +37,16 @@
     targets_hint:["Limits only: setting a target does not start or resume charging. If both limits are active, the first one reached stops charging.","Nur begrenzen: Ein Ziel startet keine Ladung und hebt keine Pause auf. Sind beide Grenzen aktiv, stoppt die zuerst erreichte Grenze.","Limites uniquement : définir un objectif ne démarre ni ne reprend la charge. Si les deux limites sont actives, la première atteinte arrête la charge.","Alleen begrenzen: een doel start of hervat het laden niet. Bij twee actieve grenzen stopt de eerst bereikte grens het laden.","Solo limiti: impostare un obiettivo non avvia né riprende la ricarica. Con entrambi attivi, il primo raggiunto ferma la ricarica."],
     energy:["Additional energy","Zusätzliche Energie","Énergie supplémentaire","Extra energie","Energia aggiuntiva"],
     energy_label:["Energy ceiling","Energiegrenze","Limite d’énergie","Energiegrens","Limite energia"],
-    energy_hint:["Wallbox energy, not battery energy. Each save measures the chosen amount from now, even at the same value. 0 disables the limit without resuming a pause.", "Wallboxenergie, keine Akkuenergie. Jedes Speichern zählt die gewählte Menge ab jetzt, auch beim gleichen Wert. 0 deaktiviert die Grenze; eine Pause bleibt bestehen.", "Énergie à la borne, pas dans la batterie. Chaque enregistrement compte la quantité dès maintenant, même avec la même valeur. 0 désactive la limite sans reprendre une pause.", "Wallboxenergie, geen accu-energie. Elke opslag telt de gekozen hoeveelheid vanaf nu, ook bij dezelfde waarde. 0 schakelt de grens uit zonder een pauze te beëindigen.", "Energia alla wallbox, non nella batteria. Ogni salvataggio conta la quantità da ora, anche con lo stesso valore. 0 disattiva il limite senza riprendere una pausa."],
+    energy_hint:["Wallbox energy, not battery energy. Each save measures the chosen amount from now, even at the same value, and ends a cost ceiling. 0 disables the limit without resuming a pause.", "Wallboxenergie, keine Akkuenergie. Jedes Speichern zählt die gewählte Menge ab jetzt, auch beim gleichen Wert, und beendet eine Kostengrenze. 0 deaktiviert die Grenze; eine Pause bleibt bestehen.", "Énergie à la borne, pas dans la batterie. Chaque enregistrement compte la quantité dès maintenant, même avec la même valeur, et met fin à une limite de coût. 0 désactive la limite sans reprendre une pause.", "Wallboxenergie, geen accu-energie. Elke opslag telt de gekozen hoeveelheid vanaf nu, ook bij dezelfde waarde, en beëindigt een kostengrens. 0 schakelt de grens uit zonder een pauze te beëindigen.", "Energia alla wallbox, non nella batteria. Ogni salvataggio conta la quantità da ora, anche con lo stesso valore, e termina un limite di costo. 0 disattiva il limite senza riprendere una pausa."],
+    cost:["Cost ceiling","Kostengrenze","Limite de coût","Kostengrens","Limite di costo"],
+    cost_label:["Cost ceiling (EUR)","Kostengrenze (EUR)","Limite de coût (EUR)","Kostengrens (EUR)","Limite di costo (EUR)"],
+    cost_hint:["Charges for this amount from now at the price Home Assistant reports; a new price re-aims the energy target. An estimate, not for billing. 0 ends it together with its energy target.","Lädt ab jetzt für diesen Betrag zum Preis, den Home Assistant meldet; ein neuer Preis passt das Energieziel an. Eine Schätzung, nicht zur Abrechnung. 0 beendet sie mitsamt Energieziel.","Recharge dès maintenant pour ce montant au prix fourni par Home Assistant ; un nouveau prix ajuste l’objectif énergétique. Une estimation, pas pour facturer. 0 y met fin avec son objectif énergétique.","Laadt vanaf nu voor dit bedrag tegen de prijs die Home Assistant meldt; een nieuwe prijs past het energiedoel aan. Een schatting, niet voor facturatie. 0 beëindigt het samen met het energiedoel.","Ricarica da ora per questo importo al prezzo comunicato da Home Assistant; un nuovo prezzo adegua l’obiettivo energetico. Una stima, non per la fatturazione. 0 lo termina insieme all’obiettivo energetico."],
+    cost_used:["used","verbraucht","utilisé","verbruikt","usati"],
+    from_cost:["from the cost ceiling","aus der Kostengrenze","issu de la limite de coût","uit de kostengrens","dal limite di costo"],
+    price_unknown:["No price yet: configure charging costs in Home Assistant.","Noch kein Preis: Ladekosten in Home Assistant einrichten.","Pas encore de prix : configurez les coûts de recharge dans Home Assistant.","Nog geen prijs: stel laadkosten in Home Assistant in.","Nessun prezzo: configurare i costi di ricarica in Home Assistant."],
+    invalid_cost:["Enter 0 or 0.10–1000 EUR.","0 oder 0,10–1000 EUR eingeben.","Saisissez 0 ou 0,10–1000 EUR.","Voer 0 of 0,10–1000 EUR in.","Inserire 0 o 0,10–1000 EUR."],
+    must_wait:["Not accepted now: a waiting stop or the wallbox write interval comes first. Try again later.","Gerade nicht angenommen: Ein wartender Stopp oder der Schreibabstand der Wallbox geht vor. Später erneut versuchen.","Non accepté pour l’instant : un arrêt en attente ou l’intervalle d’écriture passe d’abord. Réessayez plus tard.","Nu niet geaccepteerd: een wachtende stop of het schrijfinterval gaat voor. Probeer het later opnieuw.","Non accettato ora: prima un arresto in attesa o l’intervallo di scrittura. Riprovare più tardi."],
+    unknown:["Unknown state","Unbekannter Zustand","État inconnu","Onbekende status","Stato sconosciuto"],
     soc:["Vehicle charge level","Fahrzeug-Ladestand","Niveau de batterie","Accuniveau","Livello batteria"],
     soc_label:["Target charge level","Ziel-Ladestand","Niveau cible","Doelniveau","Livello obiettivo"],
     soc_hint:["Uses the vehicle profile configured in Home Assistant and its optional maximum. 0 disables only this percentage target.","Nutzt das in Home Assistant eingerichtete Fahrzeugprofil und dessen optionale Obergrenze. 0 deaktiviert nur das Prozentziel.","Utilise le profil du véhicule dans Home Assistant et son maximum facultatif. 0 désactive uniquement cet objectif en pourcentage.","Gebruikt het voertuigprofiel in Home Assistant en het optionele maximum. 0 schakelt alleen dit procentdoel uit.","Usa il profilo veicolo in Home Assistant e il massimo opzionale. 0 disattiva solo questo obiettivo percentuale."],
@@ -64,27 +73,34 @@
     active:["Active","Aktiv","Actif","Actief","Attivo"],disabled:["Disabled","Deaktiviert","Désactivé","Uitgeschakeld","Disattivato"],reached:["Target reached","Ziel erreicht","Objectif atteint","Doel bereikt","Obiettivo raggiunto"],
     meter_unavailable:["Energy reading missing","Energiemessung fehlt","Mesure d’énergie absente","Energiemeting ontbreekt","Misura energia mancante"],meter_reset:["Energy meter reset","Energiezähler zurückgesetzt","Compteur réinitialisé","Energiemeter gereset","Contatore azzerato"],
   };
-  const t=k=>words[k]?.[lang]||words.configure[lang], el=id=>document.getElementById(id);
+  const t=k=>words[k]?.[lang]||words.unknown[lang], el=id=>document.getElementById(id);
   const refusals={soc_goal_source_changed:"changed",soc_goal_limit_unavailable:"limit_missing",read_only_mode:"read_only",
     guest_start_not_permitted:"not_permitted",guest_deadline_expired:"time_passed",time_limit_reached:"time_passed",
     energy_goal_stop_active:"limit_reached",guest_confirmation_required:"confirm_guest",
-    energy_goal_invalid:"invalid",soc_goal_invalid:"invalid_soc",energy_goal_unavailable:"meter_missing"};
+    energy_goal_invalid:"invalid",soc_goal_invalid:"invalid_soc",energy_goal_unavailable:"meter_missing",
+    cost_goal_invalid:"invalid_cost",cost_goal_price_unknown:"price_unknown",energy_goal_not_supported:"meter_missing",
+    target_time_not_future:"time_passed",write_rate_limited:"must_wait"};
   document.querySelectorAll("[data-text]").forEach(n=>{n.textContent=t(n.dataset.text);});
   document.documentElement.classList?.add("ready");
-  const keys=["energy","departure","soc"];
+  const keys=["energy","cost","departure","soc"];
   let state=null,busy=false,timer=null,abort=null,generation=0,hidden=false,error="";
   const dirty=new Set(),revisions={},originalDates={};
   const live=()=>!hidden&&!document.hidden;
   function localDate(v){if(!v)return "";const d=new Date(v);if(!Number.isFinite(d.getTime()))return "";const z=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;}
   function revision(key){return key==="departure"?state?.departure?.revision:state?.revision;}
-  function editable(key){return state&&!state.read_only&&(key==="energy"||(key==="soc"?state.soc?.configured&&state.soc.maximum_required!==null:state.departure?.configured));}
+  function editable(key){return state&&!state.read_only&&(key==="energy"||(key==="cost"?state.cost_price!==null||state.cost!==null:key==="soc"?state.soc?.configured&&state.soc.maximum_required!==null:state.departure?.configured));}
+  const euro=v=>v.toLocaleString(langs[lang],{style:"currency",currency:"EUR"});
+  function costText(){
+    const c=state?.cost;if(c)return `${euro(c.amount)} · ${euro(c.spent)} ${t("cost_used")} · ${euro(c.price)}/kWh`;
+    return state?.cost_price===null?t("price_unknown"):t("disabled");
+  }
   function render(){
-    el("notice").textContent=error||(!state?t("offline"):state.read_only?t("read_only"):t("ready"));
+    el("notice").textContent=error||(!state?t("offline"):state.read_only?t("read_only"):state.guest_confirmation_required?t("confirm_guest"):t("ready"));
     for(const key of keys){
       const info=state?.[key], input=el(key+"_value");
       input.disabled=busy||!editable(key);el(key+"_save").disabled=input.disabled;
-      el(key+"_status").textContent=!info?"—":key==="departure"?(info.deadline?new Date(info.deadline).toLocaleString(langs[lang]):t("disabled")):!editable(key)?t(state?.read_only?"plan_read_only":"configure"):`${info.target} ${key==="energy"?"kWh":"%"} · ${t(info.status)}`;
-      el(key+"_status").className="charging-state "+(!editable(key)?"state-muted":["reached","estimated_reached"].includes(info?.status)?"state-good":["active","charging","minimum_level","finishing"].includes(info?.status)?"state-active":["error","meter_reset"].includes(info?.status)?"state-error":info?.status==="disabled"?"state-muted":"state-wait");
+      el(key+"_status").textContent=key==="cost"?(state?costText():"—"):!info?"—":key==="departure"?(info.deadline?`${new Date(info.deadline).toLocaleString(langs[lang])} · ${t("plan_"+info.status)}`:t("disabled")):!editable(key)?t(state?.read_only?"plan_read_only":"configure"):`${info.target} ${key==="energy"?"kWh":"%"} · ${t(info.status)}${key==="energy"&&state.cost?` · ${t("from_cost")}`:""}`;
+      el(key+"_status").className="charging-state "+(key==="cost"?(state?.cost?"state-active":"state-muted"):!editable(key)?"state-muted":["reached","estimated_reached"].includes(info?.status)?"state-good":["active","charging","minimum_level","finishing"].includes(info?.status)?"state-active":["error","meter_reset"].includes(info?.status)?"state-error":info?.status==="disabled"?"state-muted":"state-wait");
       if(key==="soc"&&info){input.max=String(info.maximum??100);if(info.maximum_required&&info.maximum===null)el(key+"_status").textContent=t("limit_missing");}
       if(key==="departure"){
         el("departure_clear").disabled=busy||!editable(key);
@@ -101,6 +117,9 @@
         ||typeof data.guest_active!=="boolean"
         ||!(data.guest_revision===null||typeof data.guest_revision==="string")
         ||!data.energy||!num(data.energy.target,1000)||typeof data.energy.status!=="string"
+        ||typeof data.guest_confirmation_required!=="boolean"
+        ||!(data.cost_price===null||typeof data.cost_price==="number"&&Number.isFinite(data.cost_price))
+        ||(data.cost!==null&&(!data.cost||!num(data.cost.amount,1000)||![data.cost.spent,data.cost.price].every(Number.isFinite)))
         ||!data.soc||typeof data.soc.configured!=="boolean"||!num(data.soc.target,100)
         ||!(data.soc.maximum===null||num(data.soc.maximum,100))
         ||!(data.soc.maximum_required===null||typeof data.soc.maximum_required==="boolean")
@@ -116,7 +135,7 @@
       if(dirty.has(key)){if(revisions[key]!==revision(key))error=t("changed");continue;}
       revisions[key]=revision(key);
       if(key==="departure"){originalDates[key]=state.departure?.deadline??null;el(key+"_value").value=localDate(originalDates[key]);}
-      else el(key+"_value").value=String(state[key]?.target??0);
+      else el(key+"_value").value=String(key==="cost"?state.cost?.amount??0:state[key]?.target??0);
     }
     render();
   }

@@ -71,6 +71,8 @@ class EnergyGoalController:
         self._dirty = False
         self._monotonic = monotonic
         self._priced_at = -math.inf
+        # The last price Home Assistant reported, per kWh.
+        self.price: float | None = None
         control.goal_controller = self
         self.model.resume_on_recovery = False
 
@@ -107,8 +109,12 @@ class EnergyGoalController:
         self._storage_unknown = False
         self._dirty = False
 
-    async def async_set_cost_target(self, amount: object, price: object) -> None:
-        """Arm an amount of money at ``price``; zero ends it with its target."""
+    async def async_set_cost_target(self, amount: object, price: object = None) -> None:
+        """Arm an amount of money at ``price``; zero ends it with its target.
+
+        Without a price the last one Home Assistant reported applies, so the
+        app can arm an amount, too.
+        """
         value = finite_number(amount)
         if value is None:
             raise validation_error("cost_goal_invalid")
@@ -116,7 +122,7 @@ class EnergyGoalController:
             if self.model.cost is not None:
                 await self.async_set_target(0)
             return
-        unit = finite_number(price)
+        unit = self.price if price is None else finite_number(price)
         if unit is None or abs(unit) > MAX_PRICE:
             raise validation_error("cost_goal_price_unknown")
         try:
@@ -128,7 +134,7 @@ class EnergyGoalController:
         self._priced_at = self._monotonic()
 
     async def async_set_price(self, price: object) -> None:
-        """Follow a new price: book the energy so far, aim the rest anew.
+        """Remember a new price; a running amount books the energy so far.
 
         The running goal keeps its baseline, status, generation and latches;
         only its target and amount change, in the model and in the copy that
@@ -138,6 +144,10 @@ class EnergyGoalController:
         unit = finite_number(price)
         if unit is None or abs(unit) > MAX_PRICE:
             raise validation_error("cost_goal_price_unknown")
+        # Remembered for an amount armed later, also from the app; it is not
+        # saved: after a restart Home Assistant tells it again.
+        self.price = unit
+        self._notify_changed()
         async with self._control.energy_goal_guard:
             if self._stopping:
                 raise validation_error("energy_goal_unavailable")

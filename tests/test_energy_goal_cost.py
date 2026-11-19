@@ -239,3 +239,17 @@ def test_only_a_running_amount_takes_a_price():
     goal = EnergyGoal()
     goal.set_target(5, 100.0)
     assert not goal.reprice(0.5)
+
+
+def test_the_last_reported_price_arms_an_amount_without_one():
+    async def run():
+        _harness, control, runner, _saved, _clock = await _cost_runner()
+        with pytest.raises(DeviceValidationError, match="cost_goal_price_unknown"):
+            await runner.async_set_cost_target(10)
+        await runner.async_set_price(0.25)
+        assert runner.price == 0.25
+        await runner.async_set_cost_target(10)
+        assert control.energy_goal.target_kwh == 40.0
+        assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.25)
+        await runner.async_stop()
+    asyncio.run(run())

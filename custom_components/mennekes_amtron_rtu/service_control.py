@@ -268,6 +268,14 @@ class ServiceControl:
             raise DeviceValidationError("cost_goal_price_unknown")
         await self._command("cost_goal", value=amount, price=price)
 
+    @property
+    def cost_price(self) -> float | None:
+        """The last price the service was told, per kWh."""
+        price = self._control.get("cost_price")
+        if isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price):
+            return None
+        return float(price)
+
     @ha_command
     async def async_set_cost_price(self, price: float) -> None:
         """Tell the service the price that applies now."""

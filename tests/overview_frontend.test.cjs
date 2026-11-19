@@ -142,3 +142,11 @@ test("successful target stops do not claim that their command was prevented", as
     assert.ok(row.children[1].textContent.includes(label));
   }
 });
+
+test("an energy target names its cost ceiling, and a restarted guest gets its own advice", async () => {
+  const data = overview(operation({waiting:"vehicle_unconfirmed"}));
+  data.targets = {energy_kwh:33.3, soc_percent:0, cost_eur:10}; data.guest_confirmation_required = true;
+  const h = setup("en", data); await flush();
+  assert.equal(put(h, "energy_target"), "33.3 kWh · €10.00");
+  assert.match(put(h, "op_advice"), /Start it again under Charging/);
+});

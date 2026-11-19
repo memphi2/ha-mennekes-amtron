@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- The app's **Charging** page sets and shows the cost ceiling, and the
+  overview names the amount beside its energy target. Home Assistant now
+  reports every price change to the service, also without a running amount,
+  so the app arms an amount at the last reported price.
+
+### Fixes
+
+- App: a command refused because it has to wait behind a waiting stop or the
+  write interval, and a target time in the past, are named as such. Before,
+  both read "Save not confirmed".
+- App: a guest charge interrupted by a restart asks for a new guest start
+  instead of a check of the selected vehicle.
+- App: the Charging page shows the status of the departure plan beside its
+  time, an unknown status no longer reads as a missing vehicle setup, and
+  the command results hint names their times.
+
 ## 0.10.0b4 — 2026-11-19
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/oliver7557)

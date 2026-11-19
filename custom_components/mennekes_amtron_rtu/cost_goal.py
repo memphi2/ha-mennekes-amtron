@@ -34,7 +34,7 @@ _RETRY_SECONDS: Final = 60.0
 
 
 class CostGoalObserver:
-    """Forward the price to a running amount; nothing is stored here."""
+    """Forward the price to the service; nothing is stored here."""
 
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
@@ -77,13 +77,19 @@ class CostGoalObserver:
         self._told_at = time.monotonic()
 
     async def async_observe(self, data: WallboxData | None) -> None:
-        """Tell a running amount a new price, after the poll."""
-        goal = self._entry.runtime_data.control.energy_goal
-        if data is None or goal.cost is None or goal.status != "active":
+        """Tell the service a new price after the poll.
+
+        Always, not only while an amount runs: the app can arm an amount at
+        the last price the service knows.
+        """
+        if data is None:
             return
+        control = self._entry.runtime_data.control
         price = self._price()
+        known = control.cost_price
         if (
-            price is None or abs(price - goal.cost.price) < PRICE_TOLERANCE
+            price is None
+            or (known is not None and abs(price - known) < PRICE_TOLERANCE)
             or time.monotonic() - self._told_at < _RETRY_SECONDS
             or (self._task is not None and not self._task.done())
         ):
