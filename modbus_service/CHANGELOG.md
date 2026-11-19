@@ -1,5 +1,21 @@
 # Changes
 
+## 0.10.0b3
+
+- Integration and app must both be 0.10.0b3; update them together.
+- The image runs as UID 10001 and the service drops every capability; the app stays root for Supervisor's data.
+- A waiting pause, lock or withdrawn release is not lost to a missing
+  reply, a current change or a goal stop.
+- A command that could not be saved answers `intent_not_saved` (409).
+- The app holds no capability any more, also with Protection mode off.
+- After a request without a usable answer the app lets the line fall silent
+  for one reply timeout, so a late answer is never taken for the next one
+  (serial and Modbus RTU over TCP).
+- A queued pause, release-off or lock survives a poll that failed at its due
+  time.
+- Error 200 is recovered while the state cannot be saved.
+- The app does not start without a serial number when that read merely failed.
+
 ## 0.10.0b2
 
 - Integration and app must both be 0.10.0b2; update them together.

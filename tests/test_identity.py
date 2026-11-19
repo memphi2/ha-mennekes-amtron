@@ -21,7 +21,7 @@ from custom_components.mennekes_amtron_rtu.device.identity import (
 )
 from custom_components.mennekes_amtron_rtu.device.models import ARTICLE_MODELS
 from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
-from tests.fakes import FakeModbusClient, device_bank, put
+from tests.fakes import FakeModbusClient, device_bank, put, raise_modbus_error
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
 
@@ -97,6 +97,26 @@ def test_a_register_that_fails_is_simply_absent() -> None:
     identity = asyncio.run(_identity(transport))
     assert identity.serial_number is None
     assert identity.article_number == "1313201205"
+
+
+def test_a_serial_number_that_merely_failed_to_read_fails_the_start() -> None:
+    """Running on without it would leave every write of the session unguarded."""
+    transport = FakeModbusClient(device_bank())
+    transport.read_exceptions[R.SERIAL_NUMBER.address] = raise_modbus_error()
+    with pytest.raises(AmtronBusError):
+        asyncio.run(_identity(transport))
+    # A device fault answers nothing about whether the register exists.
+    transport.read_exceptions[R.SERIAL_NUMBER.address] = 4
+    with pytest.raises(AmtronBusError):
+        asyncio.run(_identity(transport))
+    # A wallbox that refuses the register has no serial number.
+    for refusal in (1, 2, 3):
+        transport.read_exceptions[R.SERIAL_NUMBER.address] = refusal
+        assert asyncio.run(_identity(transport)).serial_number is None
+    # Any other detail that fails stays simply absent.
+    transport.read_exceptions = {R.FIRMWARE_VERSION.address: raise_modbus_error()}
+    identity = asyncio.run(_identity(transport))
+    assert (identity.firmware_version, identity.serial_number) == (None, "ABC123456789")
 
 
 @pytest.mark.parametrize("spec", [R.FIRMWARE_VERSION, R.SERIAL_NUMBER, R.ARTICLE_NUMBER])

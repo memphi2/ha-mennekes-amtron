@@ -226,3 +226,45 @@ def test_stale_write_response_cannot_become_a_read_value(payload):
             finally:
                 await client.async_close()
     asyncio.run(asyncio.wait_for(run(), 10))
+
+
+@pytest.mark.parametrize(("retries", "slow"), [(0, 0.03), (1, 0.03), (2, 0.05)])
+def test_a_late_answer_is_not_taken_for_the_next_read(retries, slow):
+    """RTU has no transaction number: after a timeout the line must fall silent first."""
+    from custom_components.mennekes_amtron_rtu.device import registers as R
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronBusError,
+    )
+
+    bank = {
+        R.CHARGING_RELEASE.address: 1, R.EVSE_STATE.address: 5, R.CP_STATE.address: 28,
+        R.LOCK_EVSE.address: 0, R.REQUESTED_PHASES.address: 1, R.ERROR_CODE.address: 0,
+    }
+    specs = (R.CHARGING_RELEASE, R.EVSE_STATE, R.CP_STATE, R.LOCK_EVSE, R.REQUESTED_PHASES, R.ERROR_CODE, R.EVSE_STATE)
+
+    async def run():
+        loop = asyncio.get_running_loop()
+        free_at = [0.0]
+
+        def reply(request, number):
+            # The wallbox answers strictly in order; its first answer is late.
+            address = int.from_bytes(request[2:4], "big")
+            now = loop.time()
+            done = max(now, free_at[0]) + (slow if number == 1 else 0.001)
+            free_at[0] = done
+            return [(done - now, frame(bytes([request[0], 3, 2]) + bank[address].to_bytes(2, "big")))]
+
+        async with serial_peer(reply) as (port, _requests):
+            client = MennekesModbusClient(SerialConfig(port=port, timeout=0.02, retries=retries))
+            await client.async_connect()
+            try:
+                for spec in specs:
+                    try:
+                        value = await client.async_read_register(spec)
+                    except AmtronBusError:
+                        continue
+                    assert value == bank[spec.address], spec.key
+            finally:
+                await client.async_close()
+
+    asyncio.run(asyncio.wait_for(run(), 10))

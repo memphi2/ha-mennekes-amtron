@@ -367,7 +367,7 @@ def test_catalogs_are_separate_and_allowlist_only_distributable_files(version, c
     assert "image" not in config  # Supervisor must select the build path.
     assert config["apparmor"] is True
     assert files["mennekes_amtron_modbus/Dockerfile"] == (
-        f"FROM {INFO['image']}@{DIGEST}\n".encode()
+        f"FROM {INFO['image']}@{DIGEST}\nUSER root\n".encode()
     )
     assert f"{INFO['image']}@{DIGEST}".encode() in files["README.md"]
     assert f"/releases/tag/{INFO['source_tag']}".encode() in files["README.md"]
@@ -728,7 +728,9 @@ def test_local_export_builds_the_checkout_instead_of_pulling_a_published_image(
     output = tmp_path / "app"
     export(output)
     assert "image" not in yaml.safe_load((output / "config.yaml").read_text())
-    assert (output / "Dockerfile").is_file()
+    # The image runs as its own user; only the Supervisor app is root again.
+    assert "\nUSER 10001\n" in (images.ROOT / "Dockerfile").read_text()
+    assert (output / "Dockerfile").read_text() == (images.ROOT / "Dockerfile").read_text() + "USER root\n"
     assert (output / "apparmor.txt").read_bytes() == (
         images.ROOT / "modbus_service/apparmor.txt"
     ).read_bytes()

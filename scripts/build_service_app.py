@@ -8,13 +8,17 @@ import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Supervisor owns /data and writes options.json for root alone, so the app
+# cannot use the image's own user. Its root holds no capability: the AppArmor
+# profile grants none, and the service gives up what is left at its start.
+SUPERVISOR_USER = "USER root\n"
 
 
 def export(destination: Path) -> None:
     """Create a new build context, refusing to overwrite an existing directory."""
     destination.mkdir(parents=True, exist_ok=False)
+    (destination / "Dockerfile").write_text((ROOT / "Dockerfile").read_text() + SUPERVISOR_USER)
     for filename in (
-        "Dockerfile",
         "pyproject.toml",
         "requirements-service.txt",
         "LICENSE",

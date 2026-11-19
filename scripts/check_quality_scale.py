@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 QUALITY_SCALE = COMPONENT / "quality_scale.yaml"
 QUALITY_DOC = ROOT / "docs" / "quality-scale.md"
+TARGET_TIER = "platinum"
 
 # Audited against https://contributors.home-assistant.io/core/quality-scale/rules/
 # on 2026-11-05. Review this versioned inventory when HA adds or changes rules.
@@ -205,7 +206,8 @@ def validate_quality_scale() -> list[str]:
     statuses = {name: rule.status for name, rule in rules.items()}
     return (
         validate_rules(statuses)
-        + validate_tier(statuses, manifest.get("quality_scale", ""))
+        + (["manifest.json must not declare a quality scale"] if "quality_scale" in manifest else [])
+        + validate_tier(statuses, TARGET_TIER)
         + validate_evidence(rules)
         + validate_documentation(docs, statuses)
     )

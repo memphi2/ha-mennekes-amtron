@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from build_service_app import SUPERVISOR_USER
 from manifest_version import read_integration_version
 from release_check import remote_commit, run
 from release_version import catalog_branch, validate_version
@@ -213,6 +214,8 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
                 )
             ):
                 raise ValueError("container lifecycle logs are missing or expose credentials")
+            if "Service: privileges kept" in lifecycle_log:
+                raise ValueError("container could not give up its capabilities")
         finally:
             run("docker", "rm", "--force", container)
 
@@ -438,7 +441,7 @@ def app_dockerfile(info: dict[str, str], digest: str) -> bytes:
         raise ValueError("invalid app image or digest")
     # Supervisor appends :version to config.image, so digest references must
     # use its supported local-build path. No source is compiled on the host.
-    return f"FROM {image}@{digest}\n".encode()
+    return f"FROM {image}@{digest}\n{SUPERVISOR_USER}".encode()
 
 
 def verify_app_install(info: dict[str, str], digest: str) -> None:

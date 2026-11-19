@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 
 import pytest
 from aiohttp import ClientSession
@@ -139,6 +140,11 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                 async with session.get(server.make_url("/v2/state")) as response:
                     assert response.status == 401
                 headers = {"Authorization": f"Bearer {TOKEN}"}
+                # A header that is no text is wrong, not a server error.
+                reader, writer = await asyncio.open_connection(server.host, server.port)
+                writer.write(b"GET /v2/state HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer \xff\xfe\r\n\r\n")
+                assert (await reader.readline()).split()[1] == b"401"
+                writer.close()
                 for payload in (
                     {"address": 0x302, "value": 16},
                     {"register": "charging_current_ems"},
@@ -454,4 +460,219 @@ def test_a_failing_intent_save_keeps_the_wallbox_available(tmp_path, monkeypatch
             monkeypatch.undo()
         finally:
             await service.stop()
+    asyncio.run(run())
+
+
+def test_a_command_polls_the_wallbox_once_after_its_write(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        try:
+            clock[0] += 100
+            first = len(transport.reads)
+            await service.command({"command": "set_current", "value": 10, "expected_serial_number": "ABC123456789"})
+            # The serial check and one poll that reads the write back.
+            after = transport.reads[first:]
+            assert after.count(after[-1]) == 1
+            assert current_writes(transport)[-1] == 10
+            # A command without a write still polls for its answer.
+            first = len(transport.reads)
+            await service.command({"command": "set_current", "value": 10, "expected_serial_number": "ABC123456789"})
+            assert len(transport.reads) > first
+            # A poll that only carried a block forward has read nothing back.
+            clock[0] += 100
+            poll = service._poll
+
+            async def carried():
+                await poll()
+                service.data = replace(service.data, held=frozenset({"evse_state"}))
+
+            service._poll = carried
+            polls = []
+            service.guest.after_poll = lambda *, polled: polls.append(polled)
+            await service.command({"command": "set_current", "value": 12, "expected_serial_number": "ABC123456789"})
+            assert polls == [True, True]
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_command_reads_its_own_write_back_beside_a_queued_command(tmp_path):
+    """The poll after a queued command's write is not this command's read-back."""
+    from custom_components.mennekes_amtron_rtu.device.enums import EvseState
+    from tests.test_plug_charge_core import POLICY, deadline
+
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        serial = service.identity.serial_number
+        try:
+            transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+            await service.command({
+                "command": "plug_charge_config", "value": True, "policy": POLICY, "expected_serial_number": serial,
+            })
+            session = service.control.plug_charge["session"]
+            clock[0] += 301
+            wake, entered, gate = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+            async def sleep(_delay):
+                await wake.wait()
+
+            service.control._sleep = sleep
+            for value in (10, 12):
+                await service.command({"command": "set_current", "value": value, "expected_serial_number": serial})
+            refresh = service.refresh
+
+            async def slow_refresh():
+                if not entered.is_set():
+                    entered.set()
+                    await gate.wait()
+                await refresh()
+
+            service.refresh = slow_refresh
+            clock[0] += 30
+            wake.set()
+            await asyncio.wait_for(entered.wait(), 5)
+            # The queued current is written and its poll is under way.
+            authorize = asyncio.create_task(service.command({
+                "command": "plug_charge_authorize", "session": session,
+                "deadline": deadline().isoformat(), "expected_serial_number": serial,
+            }))
+            await asyncio.sleep(0.05)
+            gate.set()
+            result = await authorize
+            assert result["control"]["plug_charge"]["authorized"] is True
+            assert result["values"]["charging_release"] == 1
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_switch_counts_from_its_acknowledgement_even_when_cancelled(tmp_path):
+    """A cancellation during the reads after the write keeps the state-change interval."""
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path, current=1)
+        await service.heartbeat.async_stop()
+        transport.bank[R.EVSE_STATE.address] = 2
+        await service.refresh()
+        clock[0] += 400
+        control = service.control
+        wrote = asyncio.Event()
+        write = transport.write_registers
+
+        async def acknowledged(address, values, **kwargs):
+            result = await write(address, values, **kwargs)
+            transport.read_delay = 0.2
+            wrote.set()
+            return result
+
+        transport.write_registers = acknowledged
+        try:
+            resume = asyncio.create_task(control.async_resume_charging())
+            await wrote.wait()
+            await asyncio.sleep(0.05)
+            resume.cancel()
+            await asyncio.gather(resume, return_exceptions=True)
+            transport.read_delay = 0
+            clock[0] += 6
+            await control.async_pause_charging()
+            # The pause waits for the interval instead of following at once.
+            assert control.pending_action == "pause"
+            assert current_writes(transport) == [6.0]
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_error_200_is_recovered_while_the_disk_refuses(tmp_path, monkeypatch):
+    """A disk that fails is not a lost wallbox: the recovery runs to its end."""
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        service.heartbeat._set_healthy(True)
+        clock[0] += 400
+
+        async def refused():
+            raise OSError("read-only file system")
+
+        monkeypatch.setattr(service, "_persist", refused)
+        put(transport.bank, R.ERROR_CODE, 200)
+        transport.writes.clear()
+        try:
+            polling = asyncio.create_task(service._polling_loop())
+            service._attempted.clear()
+            await asyncio.wait_for(service._attempted.wait(), 5)
+            polling.cancel()
+            await asyncio.gather(polling, return_exceptions=True)
+            # Heartbeat, the wallbox's own recovery register and the current again.
+            assert [address for address, _words in transport.writes] == [0x0D00, 0x0D05, 0x0302]
+            assert service._attempts == 1
+            assert service._is_available()
+        finally:
+            monkeypatch.undo()
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_queued_stop_survives_a_poll_that_failed_at_its_due_time(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path, current=1)
+        await service.heartbeat.async_stop()
+        transport.bank[R.EVSE_STATE.address] = 5
+        transport.bank[R.CP_STATE.address] = 28
+        await service.refresh()
+        control = service.control
+        try:
+            await control.async_resume_charging()
+            clock[0] += 60
+            await control.async_pause_charging()
+            assert control.pending_action == "pause"
+            failing = dict.fromkeys(
+                (0x100, 0x108, 0x300, 0xD02, 0xE00, 0xE01, 0x114, 0x500, 0xB00, 0xB06), raise_connection_error(),
+            )
+            transport.read_exceptions.update(failing)
+            with pytest.raises(AmtronBusError):
+                await service.refresh()
+            transport.read_exceptions.clear()
+            clock[0] += 241
+            control._pending_changed.set()
+            await asyncio.sleep(0.1)
+            # Due, but the wallbox is not known to answer: the stop waits.
+            assert (control.pending_action, current_writes(transport)) == ("pause", [6.0])
+            await service.refresh()
+            control._pending_changed.set()
+            await asyncio.sleep(0.1)
+            assert (control.pending_action, current_writes(transport)) == (None, [6.0, 1.0])
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_command_the_disk_could_not_save_is_not_reported_as_an_unreachable_service(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
+
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        clock[0] += 400
+
+        async def refused():
+            raise OSError("no space left on device")
+
+        monkeypatch.setattr(service, "_persist", refused)
+        try:
+            status, reply = await ServiceApi(service).dispatch("POST", "/v2/command", {
+                "command": "set_current", "value": 10, "expected_serial_number": "ABC123456789",
+            })
+            # The wallbox has it; the caller learns what did not happen.
+            assert current_writes(transport)[-1] == 10
+            assert (status, reply["error"], reply["validation"]) == (409, "intent_not_saved", False)
+            # A requested stop ends cleanly all the same.
+            await service.stop()
+        finally:
+            monkeypatch.undo()
+            await service.stop()
+
     asyncio.run(run())

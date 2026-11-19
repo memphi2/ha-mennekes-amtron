@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
@@ -25,6 +26,14 @@ _CONNECTION_TYPES = {
     "rtu_over_tcp": "rtu_over_tcp",
     "modbus_tcp": "modbus_tcp",
 }
+
+
+def bearer_matches(header: str, token: str) -> bool:
+    """Compare an Authorization header with the token in constant time.
+
+    A header may carry any bytes; one that is no text is simply wrong.
+    """
+    return hmac.compare_digest(header.encode("utf-8", "surrogateescape"), f"Bearer {token}".encode())
 
 
 def validate_token(value: Any) -> str:

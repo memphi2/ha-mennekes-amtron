@@ -12,6 +12,7 @@ from homeassistant.helpers import issue_registry as ir
 
 from .device.client_errors import AmtronBusError
 from .device.const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
+from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
 from .repair_health import HeartbeatRepairMonitor
 from .repair_issues import (
@@ -215,7 +216,8 @@ class IntentResetRepairFlow(HeartbeatRecoveryRepairFlow):
             return self._show_error("entry_unavailable")
         try:
             await entry.runtime_data.client.execute("acknowledge_intent_reset")
-        except (AmtronBusError, HomeAssistantError):
+        except (AmtronBusError, DeviceError, HomeAssistantError):
+            # The service is down, not connected, or refused.
             return self._show_error("recovery_failed")
         # The reset response schedules a reload of deferred vehicle owners.
         # The entry may already be unloaded; clear only this acknowledged issue.

@@ -3,6 +3,7 @@
     "abort": {
       "already_configured": "Cette borne de recharge est déjà configurée.",
       "reconfigure_successful": "La connexion a été mise à jour.",
+      "reauth_successful": "La connexion a été mise à jour.",
       "unique_id_mismatch": "Cette connexion correspond à une autre borne.",
       "service_migration_requires_serial": "Le numéro de série de la borne doit pouvoir être lu pour retrouver l’appareil existant lors de la migration.",
       "invalid_service_discovery": "L’application a fourni des informations de connexion non valides.",
@@ -892,6 +893,24 @@
     "guest_deadline_expired": {
       "message": "L’heure limite est dépassée. Choisissez une heure future ou effacez-la."
     },
+    "calendar_not_configured": {
+      "message": "Définissez d’abord un calendrier et le titre exact de l’événement dans les options du véhicule."
+    },
+    "calendar_reply_invalid": {
+      "message": "Le calendrier n’a renvoyé aucune liste d’événements utilisable."
+    },
+    "calendar_no_event": {
+      "message": "Aucun événement horodaté portant ce titre dans les 14 prochains jours."
+    },
+    "departure_save_failed": {
+      "message": "L’heure de départ n’a pas pu être enregistrée. Vérifiez le stockage de Home Assistant et réessayez."
+    },
+    "intent_not_saved": {
+      "message": "La wallbox a reçu la commande, mais le service n’a pas pu l’enregistrer. Après un redémarrage du service, le réglage précédent s’applique. Vérifiez le stockage du service."
+    },
+    "target_time_not_future": {
+      "message": "Choisissez une heure dans le futur, avec son fuseau horaire."
+    },
     "time_limit_reached": {
       "message": "L’heure choisie est passée. Modifiez-la ou effacez-la avant de reprendre."
     }
@@ -1148,7 +1167,7 @@
       },
       "costs": {
         "title": "Source du prix de l’électricité",
-        "description": "Choisissez un prix fixe ou un capteur de prix existant. Désactivé coupe l’estimation des coûts. Les étapes de tarif réseau apparaissent si le pays de Home Assistant est l’Allemagne.",
+        "description": "Choisissez un prix fixe ou un capteur de prix existant. Désactivé coupe l’estimation des coûts. Les étapes de tarif réseau apparaissent si le pays de Home Assistant est l’Allemagne. Les coûts sont des estimations issues d’un compteur non étalonné et ne conviennent pas à une facturation à des tiers.",
         "data": {
           "charging_cost_source": "Source du prix de l’électricité"
         },

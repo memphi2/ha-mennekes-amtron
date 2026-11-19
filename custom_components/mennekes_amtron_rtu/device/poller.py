@@ -26,6 +26,8 @@ _BLOCK_RETRY_INITIAL_SECONDS = 5.0
 # energy meter never does, as energy goals rely on its failure being visible.
 _BLOCK_HOLD_SECONDS = 30.0
 _NEVER_HELD = frozenset({"statistics"})
+# After this many blocks in a row without any answer the line counts as dead.
+_SILENT_BLOCKS = 2
 # Vehicle presence depends on these values; losing them must be visible.
 _PRESENCE_KEYS = frozenset({"evse_state", "cp_state"})
 
@@ -105,6 +107,7 @@ class DevicePoller:
         stale: list[str] = []
         held: set[str] = set()
         answered = False
+        silent = 0
         # Read status first: a plug/start/stop transition must refresh the
         # measurements and final energy counters in this same poll.
         order = {BlockCadence.FAST: 0, BlockCadence.ACTIVE: 1, BlockCadence.SLOW: 2}
@@ -141,6 +144,11 @@ class DevicePoller:
                     continue
             failed.discard(block.name)
             try:
+                if silent >= _SILENT_BLOCKS and not read and not answered:
+                    # The line is dead: the remaining blocks count as unread
+                    # without each of them waiting out its retries, which
+                    # would hold the bus from the heartbeat for half a minute.
+                    raise AmtronProtocolError("line silent; block not asked")
                 result = await self._client.async_read_block(block)
             except AmtronConnectionError:
                 self._record_lost()
@@ -150,6 +158,7 @@ class DevicePoller:
                 # A valid Modbus exception proves the device answered even
                 # though it did not supply this block's data.
                 answered |= isinstance(err, AmtronProtocolError) and err.exception_code is not None
+                silent += 1
                 # Carrying a block forward is otherwise only right while it was
                 # not due. A block that keeps failing has no current value, and
                 # a frozen measurement an automation still believes is worse

@@ -807,3 +807,18 @@ def test_a_reconnect_only_suspects_and_a_closed_client_forgets():
     state.observe(True)
     assert state.unknown_since is None
     assert state.authorized
+
+
+def test_a_clock_set_back_does_not_stretch_the_unknown_grace():
+    state = PlugChargeState()
+    state.configure(True, POLICY)
+    start = datetime(2026, 11, 19, 12, tzinfo=UTC)
+    state.observe(True, observed_at=start)
+    state.authorized = True
+    state.observe(None, observed_at=start + timedelta(seconds=5))
+    # The clock is set back an hour while the vehicle state stays unknown.
+    back = start - timedelta(hours=1)
+    state.observe(None, observed_at=back)
+    assert state.authorized
+    state.observe(None, observed_at=back + timedelta(seconds=61))
+    assert not state.authorized

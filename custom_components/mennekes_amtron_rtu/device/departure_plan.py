@@ -428,8 +428,12 @@ class DepartureController:
         return start.isoformat()
 
     def _decision(self) -> dict[str, Any]:
-        """The saved part that matters; the session record refreshes in RAM."""
-        return {**self._state(), "session": self._session is not None}
+        """The saved part that matters; the session record refreshes in RAM.
+
+        A car's learned power moves a few watts with every two-minute window
+        of a charge: only a visible step is saved.
+        """
+        return {**self._state(), "session": self._session is not None, "learned": self.model.visible()}
 
     async def _save(self) -> None:
         decision = self._decision()

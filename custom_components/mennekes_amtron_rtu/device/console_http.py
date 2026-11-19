@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from aiohttp import web
 
 from .app_settings import AppSettings, SettingsError, create_settings_app, serve_asset
+from .client_errors import AmtronBusError
 from .errors import DeviceError
 from .runtime_settings import runtime_candidate, runtime_preview
 from .service_config import ServerConfig
@@ -214,6 +215,9 @@ class ServiceConsole(AppSettings):
             raise SettingsError(safe, 409) from err
         except (ValueError, TypeError, OverflowError) as err:
             raise SettingsError("invalid_request") from err
+        except (AmtronBusError, OSError) as err:
+            # The wallbox or the disk failed after the command went out.
+            raise SettingsError("charging_save_uncertain", 503) from err
         return web.json_response({**self._choices(), "csrf": self._digest("csrf", user)})
 
 

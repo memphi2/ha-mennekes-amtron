@@ -102,6 +102,9 @@ class ModbusService:
         self._meter_saved: tuple[object, float, float | None] | None = None
         self._meter_lock = asyncio.Lock()
         self._meter_retry_at = 0.0
+        # The count of writes the last poll after a write has read back: a
+        # command whose last write is among them needs no second poll.
+        self._read_back: int | None = None
         self._meter_notice = FailureNotice(_LOGGER, "Charging loss")
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
@@ -390,8 +393,11 @@ class ModbusService:
                     self._startup_error = err
                 if self.control is not None:
                     self.control.observe_plug_charge(None)
+                unreadable = self._phase == "loading saved control intent" and not isinstance(err, AmtronBusError)
                 self._wallbox_notice.failed(
-                    f"wallbox unavailable during {self._phase}; retrying every {self.config.scan_interval:.0f} seconds",
+                    ("saved intent unreadable, check the file's owner and mode" if unreadable
+                     else f"wallbox unavailable during {self._phase}")
+                    + f"; retrying every {self.config.scan_interval:.0f} seconds",
                     type(err).__name__,
                 )
             self._attempted.set()
@@ -493,8 +499,8 @@ class ModbusService:
         if self.charge_meter.annotate(plugged_at, payload["note"]) and self.charge_meter.note != note:
             await self._save_charge_meter(force=True)
         if self._command_lock.locked():
-            # Another command still runs; its outcome is not this one's.
-            self._published = None
+            # Another command still runs; its outcome is not this one's. What
+            # is published stays, so readers need not wait for that command.
             return self.snapshot()
         return self._publish()
 
@@ -592,7 +598,7 @@ class ModbusService:
             self._attempts += 1
             self._retry_at = time.monotonic() + 30
         finally:
-            await self._persist()
+            await self._save_intent()
 
     @attributed("unplug")
     async def _close_release_after_unplug(self) -> None:
@@ -661,8 +667,14 @@ class ModbusService:
         """Publish queue changes and persist commands executed by the worker."""
         # A command may already have reached the wallbox. Save its intent
         # before a poll can fail or be cancelled during a connection outage.
-        await self._persist()
+        # A disk that refuses must not break off what the wallbox is in the
+        # middle of, such as its recovery; a command reports it at its end.
+        await self._save_intent()
+        written = self.diagnostics.writes_sent
         await self.refresh()
+        # A poll that carried a block forward has not read the write back.
+        fresh = not self.data.held and not self.data.failed_blocks
+        self._read_back = written if fresh else None
 
     def _validate_deferred(self) -> None:
         """A queued command needs the same fresh connection as an API request."""
@@ -881,6 +893,7 @@ class ModbusService:
             raise ValueError("expected_serial_number must be a non-empty string or null")
         async with self._command_lock:
             control = self.control
+            written = self.diagnostics.writes_sent
             # A request can age while another command owns the lock. Only admit
             # it against the same current state that the API reports as usable.
             command = payload.get("command")
@@ -1039,17 +1052,24 @@ class ModbusService:
                 else:
                     raise ValueError("unknown command")
             finally:
-                failure = sys.exception()
+                failure = command_failed = sys.exception()
                 try:
                     await self._persist()
                 except BaseException as err:
                     if not isinstance(failure, (StorageCommitUncertainError, StorageStateUnknownError)):
                         failure = err
+                    if isinstance(err, OSError) and command_failed is None:
+                        # The wallbox has the command; only the file has not.
+                        # That is not a service nobody could reach.
+                        raise DeviceError("intent_not_saved") from err
                     raise
                 finally:
                     if _soc_outcome is not None:
                         _soc_outcome(initial_revision, self._soc_goal_revision, failure)
-            if not cancelling and not metadata:
+            # Something was written during this command and a poll followed
+            # the last write: the state to answer with is already read.
+            read_back = written < self.diagnostics.writes_sent == self._read_back
+            if not cancelling and not metadata and not read_back:
                 await self.refresh()
             return self._publish()
 
@@ -1108,7 +1128,8 @@ class ModbusService:
                         await self.soc_goal.async_stop()
                     await self.control.async_shutdown()
                 await self._save_charge_meter(force=True)
-                await self._persist()
+                # A disk that refuses must not turn a requested stop into a crash.
+                await self._save_intent()
         finally:
             await self.client.async_close()
             _LOGGER.info("Connection: %s connection closed", self._connection_name)

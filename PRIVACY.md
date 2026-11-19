@@ -64,10 +64,17 @@ The Supervisor app exclusively manages its own token in an owner-only
 address and token and transfers them locally to Home Assistant; no network
 broadcast or cloud discovery is involved. Protect Supervisor backups as well. Its
 small `intent.json` file stores the wallbox identity, pause/release intent,
-resume current, charging targets and the latest completed charging cycle. It is
-replaced when that durable state changes, with no growing history. Heartbeats,
-ordinary polls and progress within a running cycle are not persisted. Protect
-service data and backups.
+resume current, charging targets, the source of a vehicle target and the
+Plug & Charge and guest permission state. It is replaced when that durable state
+changes. `departure-plan.json` stores the planned trip, the selected vehicle's
+planning values and what the plan learned about that car's charging power and
+efficiency. `charge-meter.json` stores the wallbox's total-energy readings with
+their times for the running and the last plug cycle, when the car was plugged
+in and unplugged, and the name of the vehicle profile recognized for it. This
+log is bounded: at most 8192 readings, older ones are dropped, and it is
+written only while a car charges. Heartbeats and ordinary polls are not
+persisted. Deleting the three files in the service's data folder while the
+service is stopped removes this state. Protect service data and backups.
 
 The app's **connection page**, displays locally mapped adapter
 names and paths to an authenticated administrator through Supervisor Ingress.
@@ -135,7 +142,7 @@ you decide to share their contents.
 
 ## Optional German tariff import
 
-Selecting **Import for HA Home** in the Module 3 setup sends HA Home latitude and longitude to VNBdigital
+Selecting **Import for HA Home** in the Module 3 setup sends HA Home latitude and longitude, rounded to four decimals, to VNBdigital
 to identify the local low-voltage network operator. Public tariff CSV data is
 downloaded from Par14a-Database through GitHub. Both services see the requesting
 IP address; GitHub receives no Home coordinates. No vehicle history, wallbox
@@ -153,7 +160,8 @@ initial import. It can replace saved manual prices and time windows. Disable
 yearly refresh to stop background imports; manually choosing Import for HA Home
 still performs that one requested lookup.
 
-The optional service stores one shared charging-job draft in `job-draft.json`
-(current, energy, reserve and optional start/finish times), bound to its wallbox
-identity. Only explicit edits write this file. Resetting the draft replaces
-those values; it does not remove or change an accepted charging order.
+With a BavarianData vehicle selected, its profile, the saved loss average and
+the service's vehicle-target state (`intent.json`) are bound to that vehicle
+by an unsalted SHA-256 hash of its VIN. The VIN itself is not stored by this
+integration. The hash is a pseudonym, not anonymization: anyone who knows the
+VIN can compute it.

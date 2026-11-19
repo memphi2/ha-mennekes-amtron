@@ -52,7 +52,6 @@ REQUIRED_PATHS = (
     "docs/architecture.md",
     "docs/quality-scale.md",
     "docs/legal.md",
-    "docs/audits/current-legal-provenance.md",
     ".github/workflows/validate.yml",
     ".github/workflows/release.yml",
     ".github/workflows/codeql.yml",
@@ -199,8 +198,9 @@ def check_release_metadata() -> list[str]:
             f"manifest.json version {manifest.get('version')!r} does not match "
             f"project-versions.json {expected!r}"
         )
-    if manifest.get("quality_scale") != "platinum":
-        failures.append("manifest.json must declare the platinum quality scale")
+    if "quality_scale" in manifest:
+        # A tier in the manifest reads as awarded; the self-assessment is in docs/quality-scale.md.
+        failures.append("manifest.json must not declare a quality scale")
     if manifest.get("codeowners") != ["@memphi2"]:
         failures.append("manifest.json must name the public integration maintainer")
     if manifest.get("iot_class") != "local_polling":

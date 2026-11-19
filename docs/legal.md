@@ -16,7 +16,8 @@ applications, protocols or trademarks, or to third-party projects.
 
 ## Trademark notice
 
-MENNEKES, AMTRON, Home Assistant, HACS, Nabu Casa, Modbus and other
+MENNEKES, AMTRON, Home Assistant, HACS, Nabu Casa, BMW, BavarianData,
+Waveshare, Tibber, VNBdigital, Modbus and other
 referenced names are trademarks or names of their respective owners. They are
 used only for compatibility, attribution, and descriptive reference. Modbus is
 a registered trademark of Schneider Electric USA, Inc., licensed to the Modbus
@@ -99,6 +100,29 @@ their license notices are installed from their upstream distributions. The
 container build uses `requirements-service.txt`; the shared project-owned driver
 is not a third-party vendored payload.
 
+## Service image contents
+
+The service image is built from the official `python:3.14-slim-bookworm` image,
+pinned by digest in the `Dockerfile`. It therefore contains Debian packages
+under their own licenses, among them GPL and LGPL components, and CPython under
+the PSF license. This project does not modify them. Each Debian package keeps
+its license text under `/usr/share/doc/<package>/copyright` in the image, and
+the corresponding sources are available from Debian, including past versions
+through [snapshot.debian.org](https://snapshot.debian.org/).
+
+`pip` adds the pinned packages of `requirements-service.txt` (aiohttp under
+Apache-2.0, pymodbus with pyserial under BSD-3-Clause, cryptography under
+Apache-2.0 OR BSD-3-Clause with the OpenSSL it bundles) and their
+dependencies. Every installed package keeps its license files in its
+`*.dist-info` directory under the image's `site-packages`. The project's own
+`LICENSE` and `NOTICE` are in `/app`.
+
+Each release attests an SPDX list of the image's contents to the published
+image, next to its build provenance. `gh attestation verify
+oci://ghcr.io/memphi2/ha-mennekes-amtron-service:<version> --repo
+memphi2/ha-mennekes-amtron --predicate-type https://spdx.dev/Document/v2.3`
+shows it; the list describes the amd64 variant.
+
 ## Optional Waveshare adapter support
 
 The adapter implementation is project-written interoperability code. It uses
@@ -118,8 +142,9 @@ materials or Waveshare trademarks.
 
 Support is constrained to the documented family and verified firmware/layout;
 see [supported LAN adapters and verification limits](lan-adapters.md).
-The TCP handshake has a confirmed firmware weakness and does not encrypt
-Modbus traffic. Compatibility support is not a security certification.
+In this project's own test on firmware 1.523 the TCP handshake accepted a
+login without the password; the vendor has not been notified and has not
+confirmed this. The handshake does not encrypt Modbus traffic. Compatibility support is not a security certification.
 
 ## Repository gate
 
@@ -128,13 +153,11 @@ Modbus traffic. Compatibility support is not a security certification.
 payload suffixes, foreign runtime directories, private keys, identifying
 device paths, unexpected runtime requirements and brand-asset changes.
 
-The current local provenance evidence is retained under
-[docs/audits/current-legal-provenance.md](audits/current-legal-provenance.md).
-That file is a technical audit snapshot, not a live legal opinion.
-
 ## Optional tariff data
 
 Imported data comes from [Par14a-Database (the78mole)](https://github.com/the78mole/Par14a-Database)
 under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Operator matching
-uses VNBdigital, operated by BDEW. Original operator price sheets remain
+uses VNBdigital, operated by BDEW, through the interface of its website; it
+is not an official API and may stop working. The lookup sends the Home
+coordinates rounded to four decimals. Original operator price sheets remain
 authoritative. The repository does not distribute their PDFs.

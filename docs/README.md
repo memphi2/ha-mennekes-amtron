@@ -46,6 +46,6 @@ Look up a detail when you need it: [models](compatibility.md), [wiring](hardware
 [Validation](validation.md) · [Control conflicts](charging-conflict-matrix.md) ·
 [Recorder validation](recorder-validation.md) · [Release process](service-releasing.md) ·
 [Repository settings](repository-settings.md) · [HA compatibility](ha-2026-11-validation.md) ·
-[Quality scale](quality-scale.md) · [Legal](legal.md) · [Provenance](audits/current-legal-provenance.md)
+[Quality scale](quality-scale.md) · [Legal](legal.md)
 
 </details>

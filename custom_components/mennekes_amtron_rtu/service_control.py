@@ -10,7 +10,7 @@ import logging
 import math
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import copy
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
@@ -184,7 +184,11 @@ class ServiceControl:
             or not isinstance(snapshot, dict)
         ):
             raise DeviceError("service_unavailable")
-        self._client.apply_snapshot(snapshot, require_available=False, consume_energy=False)
+        try:
+            self._client.apply_snapshot(snapshot, require_available=False, consume_energy=False)
+        except AmtronConnectionError as err:
+            # A reply that is no valid state: reported like a lost service.
+            raise DeviceError("service_unavailable") from err
         if outcome == "unknown":
             return outcome
         current = self.soc_goal_revision
@@ -344,6 +348,10 @@ class ServiceControl:
 
     @ha_command
     async def async_set_target_time(self, deadline: datetime | None) -> None:
+        # The service would answer a past time as a malformed request, which
+        # would read as an unreachable service instead of a wrong value.
+        if deadline is not None and (deadline.utcoffset() is None or deadline <= datetime.now(UTC)):
+            raise DeviceValidationError("target_time_not_future")
         revision = self._control.get("target_time_revision")
         await self._departure_command(
             "departure_choice", deadline=None if deadline is None else deadline.isoformat(),

@@ -29,6 +29,11 @@ def test_sensitive_categories_do_not_return_the_value(value, category):
 
 
 def test_documentation_placeholders_and_reserved_addresses_are_safe():
+    # Interface text and Home Assistant's fixed Supervisor address are public.
+    assert not audit.categories('password: "Existing adapter web password" peer = "172.30.32.2"')
+    assert audit.categories("172.30.34.2") == {"private_ip"}
+    for leak in ('api_key = "sk_live_abcdef123456 "', 'password: "hunter2 secret9"', "client_secret: 'abcd1234efgh5678\t'"):
+        assert audit.categories(leak) == {"literal_credential"}
     assert not audit.categories("""password: "<REDACTED>" access_token="${SECRET}"
         api_key="EXAMPLE_VALUE" 127.0.0.1 192.0.2.1 198.51.100.1 203.0.113.2
         /dev/serial/by-id/<adapter> /home/<user>/project 999.999.999.999

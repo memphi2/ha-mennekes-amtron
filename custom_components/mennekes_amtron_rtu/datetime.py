@@ -9,8 +9,10 @@ from homeassistant.components.datetime import DateTimeEntity, DateTimeEntityDesc
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .entity import AmtronEntity, Projection
 from .entry_types import MennekesAmtronConfigEntry
+from .exceptions import home_assistant_error
 
 PARALLEL_UPDATES = 1
 
@@ -54,7 +56,11 @@ class AmtronTargetTime(AmtronEntity, DateTimeEntity):
 
     async def _async_set(self, value: datetime | None) -> None:
         if self._owns_trip and (observer := self.runtime.timed_goal) is not None:
-            await observer.async_set_deadline(value)
+            try:
+                await observer.async_set_deadline(value)
+            except (StorageCommitUncertainError, StorageStateUnknownError, OSError) as err:
+                # Home Assistant's own storage refused, not the wallbox.
+                raise home_assistant_error("departure_save_failed") from err
         else:
             await self.runtime.control.async_set_target_time(value)
 

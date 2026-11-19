@@ -69,7 +69,9 @@ Counts are additional **state rows**, after initial entity setup. They are
 scenario results, not upper bounds. Voltage varies by ±0.8 V around 230 V;
 charging current varies around 15 A per phase. Different meters, errors,
 status transitions, user automations and interval settings change the result.
-Unchanged attributes used the same 44 attribute records in every scenario.
+Unchanged attributes used the same 44 attribute records in every scenario of
+that measurement. The live phase details and the session duration are not
+recorded, so charging adds no attribute records either.
 There are no per-poll timestamps or growing register dumps on the entities.
 
 For continuous charging, SQLite allocated about 29.2 MiB before and 5.6 MiB

@@ -67,7 +67,7 @@ projection of that state: each platform is a table of descriptions
 entity shows, when it exists and when it is available. HA restore values cannot
 overwrite service intent, and HA decides nothing about the wallbox.
 
-The HTTP client checks API 2 and a minimum service version reported in every
+The HTTP client checks API 3 and a minimum service version reported in every
 snapshot. A release that changes no service input reuses the published app, so
 updating HA does not restart the app or interrupt its heartbeat. Service
 changes have their own version and publication decision; see
@@ -79,6 +79,14 @@ changes only with durable control intent, and its charge meter is saved at a
 change of the plug cycle and every five minutes while a car charges. Named commands retain device guards; the API has no
 raw register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
+
+An RTU frame carries no transaction number, on a serial line and through a
+transparent gateway alike. After a request that got no usable answer, the
+client therefore lets the line fall silent for one reply timeout, at most a
+second, before it
+asks anything else (`bus_quiet.py`): an answer that arrives late is dropped
+instead of being taken for the answer to the next request. Modbus TCP numbers
+its transactions and needs no such wait.
 
 Percentage-target updates reserve a bounded, short-lived service token before
 submission. After a lost reply, resolution either confirms completion or prevents
@@ -235,6 +243,7 @@ device/service_store.py      intent.json
 device/bound_file.py         BoundFile for departure-plan.json and charge-meter.json
 device/service_config.py     service options
 device/server.py             standalone process entrypoint
+device/privileges.py         gives up every capability at the start of that process
 embedded.py           the service inside HA for a direct entry
 service_transport.py  HttpTransport and EmbeddedTransport
 service_client.py     HA service client: snapshot, commands, event cursor
@@ -251,7 +260,10 @@ vehicle_sources/     optional provider capabilities and explicit selection
 vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapters
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
-charge_loss_observer.py  bounded matching and durable loss aggregate
+charge_loss_observer.py  follows the polls and runs one loss measurement at a time
+loss_plug_cycle.py  decides each plug cycle once and matches the car's energy value to it
+loss_record.py  compares the car's own charging record with the meter over its span
+loss_ledger.py  the saved loss aggregate; a change counts once it is on disk
 charge_watch.py  names the vehicle of a plug cycle to the service that measured it
 cost_observer.py  prices the energy of the running plug cycle
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables

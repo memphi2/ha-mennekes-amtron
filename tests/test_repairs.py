@@ -321,7 +321,7 @@ def test_a_different_fault_during_confirmation_is_not_treated_as_recovered():
 def test_intent_reset_repair_handles_unavailable_entries(monkeypatch, state):
     from unittest.mock import AsyncMock, Mock
 
-    from homeassistant.exceptions import HomeAssistantError
+    from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 
     async def run():
         registry = _patch(monkeypatch)
@@ -333,7 +333,8 @@ def test_intent_reset_repair_handles_unavailable_entries(monkeypatch, state):
             hass.config_entries.entries[entry_id] = SimpleNamespace()
         elif state == "offline":
             client = Mock(spec=repairs.ServiceClient)
-            client.execute = AsyncMock(side_effect=HomeAssistantError("offline"))
+            # What the client really raises while the service is down.
+            client.execute = AsyncMock(side_effect=DeviceError("service_unavailable"))
             entry.runtime_data.client = client
         flow = await repairs.async_create_fix_flow(
             hass, "reset", {"entry_id": entry_id, "issue": repairs.ISSUE_SERVICE_INTENT_REJECTED},

@@ -11,6 +11,7 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device import departure_plan as dp
 from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
+from custom_components.mennekes_amtron_rtu.device.departure_model import CarModel
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureController,
     DepartureInputs,
@@ -294,6 +295,26 @@ def test_charging_to_the_minimum_level_does_not_save_every_reading(tmp_path):
         assert plan.status == "minimum_level"
         assert len(starts) == 5
         assert len(saves) <= 1  # One learned power update, not one write per reading.
+    run(go())
+
+
+def test_a_learned_power_is_saved_only_when_it_moves_visibly(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=12)
+        saves = []
+        original = plan.store.save
+        plan.store.save = lambda raw: (saves.append(raw["learned"]), original(raw))
+        vehicle = plan.inputs.vehicle
+        for kw in (10.512, 10.517, 10.509):
+            plan.model.learn(vehicle, CarModel(None, (None, None, kw)))
+            await plan._save()
+        # A few watts between two windows of a charge are not worth a write ...
+        assert len(saves) == 1
+        plan.model.learn(vehicle, CarModel(None, (None, None, 10.2)))
+        await plan._save()
+        # ... a step the plan can see is, with its exact value.
+        assert saves[-1][0][1]["power_kw"][2] == 10.2
     run(go())
 
 

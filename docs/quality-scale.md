@@ -8,8 +8,8 @@ For maintainers and technical investigations; normal setup starts with
 Target: Platinum.
 
 Current status: Platinum **(local self-assessment)**. This community integration
-has not been awarded a tier by Home Assistant. The README badge links here so
-its scope, evidence and exceptions remain visible.
+has not been awarded a tier by Home Assistant, and its manifest declares none.
+The README badge links here so its scope, evidence and exceptions remain visible.
 
 The assessment follows the [official quality-scale rules](https://contributors.home-assistant.io/core/quality-scale/)
 reviewed on **2026-11-05**: 20 Bronze, 10 Silver, 21 Gold and 3 Platinum rules.

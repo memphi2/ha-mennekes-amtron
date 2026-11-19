@@ -816,6 +816,9 @@ async def async_unload_entry(
     finally:
         # Last: the car's observers above still withdraw through it.
         await async_release(hass, entry.entry_id)
+    if entry.disabled_by is not None:
+        # A disabled entry can fix nothing; a reload keeps its repairs.
+        _delete_issues(hass, entry)
     return unloaded
 
 
@@ -921,6 +924,10 @@ async def async_remove_entry(
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())
     await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()
+    _delete_issues(hass, entry)
+
+
+def _delete_issues(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     prefix = f"{entry.entry_id}_"
     for domain, issue_id in tuple(ir.async_get(hass).issues):
         if domain == DOMAIN and issue_id.startswith(prefix):

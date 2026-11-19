@@ -237,8 +237,7 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT, device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT, suggested_display_precision=0,
         # The phase details under load, in whole volts and watts and tenths
-        # of an ampere: while charging, the power changes with every poll
-        # anyway, so they add no history rows.
+        # of an ampere. They are shown live and not recorded.
         attributes=_registers({
             **{f"current_l{n}": under_load(number_attribute(f"current_l{n}", 1)) for n in (1, 2, 3)},
             **{f"voltage_l{n}": under_load(number_attribute(f"voltage_l{n}", 0)) for n in (1, 2, 3)},
@@ -364,6 +363,12 @@ class AmtronSensor(AmtronEntity, SensorEntity):
     """A sensor described by one row of the table."""
 
     entity_description: AmtronSensorDescription
+    # Live details that change with nearly every reading: recorded, each
+    # reading would store its own copy of all attributes.
+    _unrecorded_attributes = frozenset({
+        *(f"{kind}_l{n}" for kind in ("current", "voltage", "power") for n in (1, 2, 3)),
+        "duration_minutes",
+    })
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

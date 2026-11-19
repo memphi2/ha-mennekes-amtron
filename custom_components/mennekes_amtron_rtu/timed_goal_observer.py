@@ -32,7 +32,7 @@ from .device.enums import (
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.registers import EVSE_STATE
 from .device.timed_goal import TimedGoal, matches_departure_source
-from .exceptions import service_validation_error
+from .exceptions import home_assistant_error, service_validation_error
 from .goal_store import DepartureIntent, TimedGoalStore
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
@@ -242,11 +242,8 @@ class TimedGoalObserver:
         self, value: datetime | None, *, source: str | None,
         expected: TimedGoal | None = None,
     ) -> None:
-        if value is not None:
-            if value.tzinfo is None or value.utcoffset() is None:
-                raise HomeAssistantError("Departure time needs a timezone")
-            if value <= dt_util.utcnow():
-                raise HomeAssistantError("Departure time must be in the future")
+        if value is not None and (value.utcoffset() is None or value <= dt_util.utcnow()):
+            raise service_validation_error("target_time_not_future")
         async with self._goal_lock:
             if self._stopping or (expected is not None and self.goal is not expected):
                 return
@@ -327,7 +324,7 @@ class TimedGoalObserver:
         entity_id = self._options.get(CONF_TIMED_CALENDAR_ENTITY)
         title = self._options.get(CONF_TIMED_CALENDAR_TITLE)
         if not isinstance(entity_id, str) or not isinstance(title, str) or not title:
-            raise HomeAssistantError("A calendar and exact event title are required")
+            raise service_validation_error("calendar_not_configured")
         now = dt_util.utcnow()
         end = now + timedelta(days=14)
         original = self.goal
@@ -340,7 +337,7 @@ class TimedGoalObserver:
         payload = response.get(entity_id) if isinstance(response, dict) else None
         events = payload.get("events") if isinstance(payload, dict) else None
         if not isinstance(events, list):
-            raise HomeAssistantError("Calendar did not return a valid event list")
+            raise home_assistant_error("calendar_reply_invalid")
         starts: list[datetime] = []
         for event in events:
             if not isinstance(event, dict) or event.get("summary") != title:
@@ -355,7 +352,7 @@ class TimedGoalObserver:
             if start.tzinfo is not None and start.utcoffset() is not None and now < start <= end:
                 starts.append(start)
         if not starts:
-            raise HomeAssistantError("No matching timed calendar event in the next 14 days")
+            raise service_validation_error("calendar_no_event")
         await self._set_user_deadline(
             min(starts), source=None, expected=original,
         )

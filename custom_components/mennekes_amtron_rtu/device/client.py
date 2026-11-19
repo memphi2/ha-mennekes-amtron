@@ -28,6 +28,7 @@ from pymodbus import FramerType
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
 
 from . import _client_read, _client_write
+from .bus_quiet import BusQuiet
 from .client_errors import (
     AmtronBusError,
     AmtronConnectionError,
@@ -221,9 +222,19 @@ class MennekesModbusClient:
                 callback(connected)
 
         self._trace_connect = trace_connect
+        # Only RTU frames lack a transaction number, on a serial line and
+        # through a transparent gateway alike.
+        self._quiet = BusQuiet(quiet=config.timeout, enabled=client_factory is create_modbus_client and (
+            isinstance(config, SerialConfig) or config.connection_type == "rtu_over_tcp"
+        ))
+        write_trace, quiet = self.write_trace, self._quiet
+
+        def trace_packet(sending: bool, data: bytes) -> bytes:
+            return write_trace.packet(sending, quiet.packet(sending, data))
+
         self._client_factory: ClientFactory = (
             partial(
-                create_modbus_client, trace_packet=self.write_trace.packet,
+                create_modbus_client, trace_packet=trace_packet,
                 trace_connect=self._trace_connect,
             )
             if client_factory is create_modbus_client else client_factory
@@ -464,12 +475,17 @@ class MennekesModbusClient:
         Connection generation checks and heartbeat priority belong to the
         caller; this helper must never select or reconnect another transport.
         """
-        return await _client_read.read_words(
+        def retried() -> None:
+            # The first answer may still come, after the one to the retry.
+            self._quiet.unanswered()
+            self.link_quality.observe_retry()
+
+        return await self._quiet.ask(lambda: _client_read.read_words(
             client, address=address, count=count,
             device_id=self._config.device_id, retries=self._config.retries,
-            observe=self.link_quality.observe, retry=self.link_quality.observe_retry,
+            observe=self.link_quality.observe, retry=retried,
             trace=self.modbus_trace,
-        )
+        ))
 
     async def async_read_register(
         self, spec: RegisterSpec, *, verify_identity: bool = False,
@@ -611,13 +627,13 @@ class MennekesModbusClient:
                     client = await self._async_transaction_client(
                         verify_identity=verify_identity
                     )
-                await _client_write.write_register(
+                await self._quiet.ask(lambda: _client_write.write_register(
                     client,
                     spec=spec,
                     value=value,
                     device_id=self._config.device_id,
                     trace=self.modbus_trace,
-                )
+                ))
             except (Exception, asyncio.CancelledError) as err:
                 error = err
                 # A definite rejection did not change the register. A missing

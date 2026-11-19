@@ -87,7 +87,8 @@ def test_a_note_needs_the_running_cycle_of_this_wallbox(tmp_path):
                 async with service._command_lock:
                     result = await service.command(note(service, 1020, "car"))
                 assert result["charge_meter"]["note"] == "car"
-                assert service._published is None
+                # What is published stays: readers need not wait for that command.
+                assert service._published is not None
                 service._stopping = True
                 with pytest.raises(DeviceError, match="service_unavailable"):
                     await service.command(note(service, 1020, "other"))

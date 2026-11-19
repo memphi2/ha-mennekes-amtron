@@ -184,6 +184,10 @@ communication and its own token, charging-intent, vehicle-planning and charge-me
 read-only to the service. Normal heartbeat and charging operation are intended
 to continue within these limits.
 
+Supervisor gives an app its data as root, so the app runs as root. That root
+holds no capability: the profile grants none, and the service gives up every
+capability at its start, also with Protection mode off.
+
 With the default app settings, an installed app can show **8/8** once Supervisor
 has loaded its custom profile. A store rating of **7/8 before installation** is
 normal. The [rating describes configuration](https://contributors.home-assistant.io/apps/reference/security-rating/),

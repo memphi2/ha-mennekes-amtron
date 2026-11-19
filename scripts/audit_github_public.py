@@ -35,6 +35,8 @@ PATTERNS = {
 PRIVATE_NETWORKS = tuple(ipaddress.ip_network(value) for value in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7",
 ))
+# Home Assistant's fixed Supervisor network is the same on every installation.
+SUPERVISOR_NETWORK = ipaddress.ip_network("172.30.32.0/23")
 PLACEHOLDER = re.compile(r"^(?:<[^>]+>|\$\{[^}]+\}|!?secret\s+\w+|REDACTED|EXAMPLE[_\w-]*|CHANGEME)$", re.IGNORECASE)
 
 
@@ -44,7 +46,10 @@ def categories(text: str) -> set[str]:
     for category, pattern in PATTERNS.items():
         matches = pattern.finditer(text)
         if category == "literal_credential":
-            matches = (match for match in matches if not PLACEHOLDER.fullmatch(match[1]))
+            # Three words or more are a label or a sentence, not a secret.
+            matches = (match for match in matches if not PLACEHOLDER.fullmatch(match[1]) and not (
+                match[1] == match[1].strip() and len(match[1].split()) >= 3
+            ))
         elif category == "serial_device_path":
             matches = (match for match in matches if match[1] not in {
                 "...", "usb-...", "REPLACE_WITH_YOUR_ADAPTER",
@@ -56,7 +61,7 @@ def categories(text: str) -> set[str]:
             address = ipaddress.ip_address(candidate)
         except ValueError:
             continue
-        if any(address in network for network in PRIVATE_NETWORKS):
+        if address not in SUPERVISOR_NETWORK and any(address in network for network in PRIVATE_NETWORKS):
             found.add("private_ip")
     return found
 

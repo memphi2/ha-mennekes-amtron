@@ -53,6 +53,12 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return the diagnostics dump of one wallbox."""
 
+    if not hasattr(entry, "runtime_data"):
+        # Setup never finished, e.g. the service is down: say that much.
+        return {
+            "setup": entry.state.value,
+            "bus": {"transport": "service" if CONF_SERVER_URL in entry.data else "direct"},
+        }
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
     client = runtime_data.client

@@ -5,6 +5,90 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0b3 — 2026-11-19
+
+### Breaking changes
+
+- The service image runs as its own user, UID 10001, instead of root, and
+  the service gives up every capability at its start. A standalone container
+  needs a data directory that user can write, and for USB the group of the
+  adapter; see the standalone guide. The Home Assistant app needs nothing: it
+  stays root for Supervisor's data, without any capability.
+
+### Fixes
+
+- On a serial line and through a transparent gateway (Modbus RTU over TCP),
+  an answer that arrived after its request had timed out was taken for the
+  answer to the next read of the same length, and every answer after it was
+  one late. A charging wallbox could read as idle. After a request without a
+  usable answer the service now waits until nothing arrived for one reply
+  timeout before it asks anything else.
+- A pause, a withdrawn release or a lock that waited for the state-change
+  interval was dropped when the latest poll had failed at its due time. It
+  now waits for the wallbox and is then written.
+- A waiting pause, lock or withdrawn release is also written again after a
+  reply that did not come. It is replaced only by what overrides it: the
+  planner's own newer decision, a start after a pause, or the opposite
+  switch. A current change that switches nothing (such as a surplus
+  adjustment), a different stop and a goal or time stop leave it waiting; a
+  command that would have to wait itself is refused instead of taking its
+  place. Before, each of these dropped the stop and the car went on charging.
+- The recovery from error 200 leaves the charging release closed when
+  nobody has decided it yet and the wallbox has it closed.
+- A manual Plug & Charge release ends when the vehicle state was unknown
+  for a minute, as an automatic grant already did.
+- With a line that does not answer at all, a poll gives up after two
+  register blocks instead of waiting out every block, so the heartbeat gets
+  the bus back within seconds.
+- The recovery from wallbox error 200 runs to its end while the service
+  cannot save its state; before, it broke off after its first write on
+  every poll.
+- The state-change interval counts from the acknowledged write even when the
+  command is cancelled right after it.
+- The service no longer starts without a serial number when that read merely
+  failed; only a wallbox that does not know the register starts without one.
+- A system clock set back no longer stretches the time a Plug & Charge
+  connection may stay unknown.
+- A target time in the past or without time zone is refused as a wrong value
+  with a translated message. Before, the entities became unavailable until
+  the next poll.
+- The repair for a rejected saved state reports a service that is down
+  instead of failing with an unknown error.
+- A successful new sign-in ends with a translated message, the calendar
+  action and a refused save of the departure time report in the user's
+  language, and a reply of the service that is no valid state no longer
+  reaches the interface as an unknown error.
+- Diagnostics can be downloaded for an entry whose setup never finished, and
+  a disabled entry takes its repairs along.
+- A command the wallbox received but the service could not save is
+  answered with its own message (`intent_not_saved`) instead of an
+  unreachable service, and a stop of the service ends cleanly while its
+  storage refuses.
+- A saved state the service cannot read is logged as that, not as a wallbox
+  that does not answer.
+- A vehicle note sent during a running command no longer makes status
+  readers wait for that command, and a request with an unknown character
+  set is answered with 400.
+- A failed save of the charging-loss averages is written again after a
+  minute, also in the history mode when the car's record is gone.
+- The app answers an `Authorization` header that is no text with 401, and a
+  charging change whose readback was lost with `charging_save_uncertain`.
+
+### Changes
+
+- A command polls the wallbox once after its write instead of twice.
+- The phase details on **Total power** and `duration_minutes` stay visible
+  but are no longer recorded.
+- A learned car power is saved only when it moves visibly, so a charging car
+  no longer writes the plan file at every step.
+- The release attests the contents of the service image (SBOM) besides its
+  provenance.
+- The network-operator lookup sends the Home coordinates rounded to four
+  decimals, and the price source step says that costs are estimates and not
+  suitable for billing others.
+- Privacy and legal texts name what is stored and shipped; the manifest no
+  longer claims a quality tier.
+
 ## 0.10.0b2 — 2026-11-18
 
 ### Breaking changes

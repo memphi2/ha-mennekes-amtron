@@ -104,6 +104,9 @@ jobs:
           docker build -t amtron-service:test .
           docker run --rm amtron-service:test amtron-modbus-service --help
           docker run --rm amtron-service:test python -m pip check
+          # The image's own user, with the group of serial adapters.
+          test "$(docker run --rm amtron-service:test id -u)" = 10001
+          docker run --rm amtron-service:test id -Gn | grep -qw dialout
           python -m pip install -r requirements-dev.txt
           python scripts/service_image.py smoke --image amtron-service:test
       - name: Install AppArmor validation tools

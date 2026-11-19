@@ -9,7 +9,12 @@ test, so this module stays free of Home Assistant imports.
 from __future__ import annotations
 
 from .client import MennekesModbusClient
-from .client_errors import AmtronBusError
+from .client_errors import (
+    ILLEGAL_DATA_ADDRESS,
+    ILLEGAL_DATA_VALUE,
+    ILLEGAL_FUNCTION,
+    AmtronBusError,
+)
 from .const import CHARGING_CURRENT_MINIMUM, DEFAULT_MODEL
 from .data import DeviceIdentity
 from .models import ARTICLE_MODELS
@@ -56,11 +61,12 @@ def usable_max_evse_current(value: float | None) -> float | None:
 
 
 async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:
-    """Read the device identity, raising only when the layout is unreadable.
+    """Read the device identity.
 
     The layout version is mandatory: without it the integration cannot know
-    which registers exist. Everything else is optional, because older layouts
-    simply do not have those registers.
+    which registers exist. The serial number must be read or be refused by the
+    wallbox. Everything else is optional, because older layouts simply do not
+    have those registers.
     """
 
     layout = await client.async_read_register(MODBUS_LAYOUT_VERSION)
@@ -69,7 +75,10 @@ async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:
 
     identity = DeviceIdentity(layout_version=layout)
     identity.firmware_version = await _optional_text(client, FIRMWARE_VERSION, layout)
-    identity.serial_number = await _optional_text(client, SERIAL_NUMBER, layout)
+    # The serial number guards every write: only a wallbox that says it has
+    # none goes without. A read that merely failed fails the start, which is
+    # tried again, instead of leaving the whole session unguarded.
+    identity.serial_number = await _optional_text(client, SERIAL_NUMBER, layout, required=True)
     identity.article_number = await _optional_text(client, ARTICLE_NUMBER, layout)
     identity.phase_options_hw = await _optional_int(client, PHASE_OPTIONS_HW, layout)
     identity.max_evse_current = usable_max_evse_current(
@@ -83,12 +92,21 @@ async def _optional_value(
     client: MennekesModbusClient,
     spec: RegisterSpec,
     layout: int,
+    *,
+    required: bool = False,
 ) -> object:
     if layout < spec.min_layout:
         return None
     try:
         return await client.async_read_register(spec)
-    except AmtronBusError:
+    except AmtronBusError as err:
+        # The wallbox says it has no such register: unknown address, function
+        # or value. Silence or a device fault says nothing about it.
+        refused = getattr(err, "exception_code", None) in (
+            ILLEGAL_FUNCTION, ILLEGAL_DATA_ADDRESS, ILLEGAL_DATA_VALUE,
+        )
+        if required and not refused:
+            raise
         return None
 
 
@@ -96,8 +114,10 @@ async def _optional_text(
     client: MennekesModbusClient,
     spec: RegisterSpec,
     layout: int,
+    *,
+    required: bool = False,
 ) -> str | None:
-    value = await _optional_value(client, spec, layout)
+    value = await _optional_value(client, spec, layout, required=required)
     return value if isinstance(value, str) else None
 
 

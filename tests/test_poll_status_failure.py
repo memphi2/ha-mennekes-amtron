@@ -93,3 +93,45 @@ def test_recovery_with_a_real_transition_refreshes_measurements_and_energy(befor
         assert data.energy_read
 
     asyncio.run(run())
+
+
+def test_a_silent_line_is_asked_two_blocks_per_poll_not_all_of_them():
+    """Each further block would wait out its retries while the heartbeat waits for the bus."""
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronConnectionError,
+    )
+
+    async def run():
+        h = Harness(values={"evse_state": EvseState.CHARGING, "charging_current_ems": 16.0})
+        await h.connect()
+        poller = DevicePoller(
+            h.client, h.identity, connection_state=ConnectionState(),
+            measurement_interval=30, monotonic=lambda: h.clock[0],
+        )
+        data = await poller.async_poll(WallboxData(), last_success=True)
+        every = {block.address for block in REGISTER_BLOCKS}
+        for address in every:
+            h.transport.read_exceptions[address] = ModbusIOException("No response received")
+        h.clock[0] += 5
+        h.transport.reads.clear()
+        # One poll without any answer holds its values, as for a lost reply ...
+        held = await poller.async_poll(data, last_success=True)
+        assert len({address for address, _count in h.transport.reads}) == 2
+        assert held.get("evse_state") == EvseState.CHARGING
+        assert held.fresh("evse_state") is None
+        assert set(held.failed_blocks) >= {block.name for block in REGISTER_BLOCKS if block.cadence is BlockCadence.FAST}
+        # ... the second one is a lost connection, again after two blocks.
+        h.clock[0] += 5
+        h.transport.reads.clear()
+        with pytest.raises(AmtronConnectionError):
+            await poller.async_poll(held, last_success=True)
+        assert len({address for address, _count in h.transport.reads}) == 2
+        # A wallbox that answers, if only with a refusal, is asked everything.
+        h.transport.read_exceptions[R.EVSE_STATE.address] = 4
+        h.clock[0] += 5
+        h.transport.reads.clear()
+        with pytest.raises(AmtronConnectionError):
+            await poller.async_poll(held, last_success=False)
+        assert len({address for address, _count in h.transport.reads}) > 2
+
+    asyncio.run(run())

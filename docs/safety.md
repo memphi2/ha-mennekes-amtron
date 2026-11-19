@@ -30,7 +30,8 @@ existing master. Disabling a service-connected HA entry does not stop the app.
 A LAN-to-RS-485 gateway does not make the bus multi-master. Give only the selected
 HA instance or independent service access to it. Both supported LAN protocols
 are unencrypted and have no authentication by default. Optional Waveshare login
-has a confirmed weakness in firmware 1.523 and is not a security boundary:
+could be passed without the password in this project's own test on firmware
+1.523 and is not a security boundary:
 restrict the gateway to a trusted private network and never expose its Modbus
 port to the Internet. The service API's token does not protect that separate
 port. See [LAN setup](network-gateway.md) and [Security](../SECURITY.md#threat-model).

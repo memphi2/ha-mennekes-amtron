@@ -133,9 +133,10 @@ password through Home Assistant's access-renewal prompt for a direct connection,
 or correct it in the app and restart the app. Temporary timeouts and malformed
 responses still retry automatically.
 
-**TCP login does not encrypt Modbus traffic and does not provide TLS.** Firmware
-1.523 has a confirmed handshake weakness that can accept a login without the
-password. Acceptance was reproduced on the detached PoE B adapter; serial
+**TCP login does not encrypt Modbus traffic and does not provide TLS.** In this
+project's own test, firmware 1.523 accepted a login without the password; the
+vendor has not been notified and has not confirmed this. Acceptance was
+reproduced on the detached PoE B adapter; serial
 command access through that bypass was not tested. Keep the adapter on a
 trusted, isolated network and restrict access to the chosen HA/service host.
 Do not rely on this login as a security boundary or expose the adapter to the

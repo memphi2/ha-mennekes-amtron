@@ -99,7 +99,7 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
         )
         options = {**detection_catalog(), "active_vehicle_profile": selected}
         options["vehicle_profiles"]["a" * 32]["options"]["timed_goal_enabled"] = planning
-        entry = SimpleNamespace(entry_id="entry", options=options, runtime_data=runtime)
+        entry = SimpleNamespace(entry_id="entry", options=options, runtime_data=runtime, disabled_by=None)
         handoff = SimpleNamespace()
         hass = SimpleNamespace(
             data={f"{integration.DOMAIN}_reload_clients": {"entry": handoff}},

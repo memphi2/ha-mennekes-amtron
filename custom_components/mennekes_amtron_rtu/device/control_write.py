@@ -172,13 +172,17 @@ class WritePath:
             self._control.charging_setpoint = value
         else:
             self._remember_pause_setpoint(previous, preserve_setpoint)
-        # Without a vehicle or with the release off no charge was switched, so
-        # e.g. Plug & Charge can end a pause before its grant without delay.
-        if transition and (
-            phase_preparation
-            or not (await self.async_vehicle_absent() or await self._async_release_off())
-        ):
-            self._control._write_state.mode_change_at = self._control._monotonic()
+        if transition:
+            # The switch counts from its acknowledgement: a cancellation during
+            # the reads below must not let the next switch follow at once.
+            state = self._control._write_state
+            before, state.mode_change_at = state.mode_change_at, self._control._monotonic()
+            # Without a vehicle or with the release off no charge was switched, so
+            # e.g. Plug & Charge can end a pause before its grant without delay.
+            if not phase_preparation and (
+                await self.async_vehicle_absent() or await self._async_release_off()
+            ):
+                state.mode_change_at = before
         if not recovery and not phase_preparation:
             # The command reached the device. A failed visibility/persistence
             # callback must never allow an older queued command to run later.

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import hmac
 from collections.abc import Awaitable, Callable
 
 from aiohttp import web
 
 from .service_api import GETS, POSTS, ServiceApi, ServiceBusyError
+from .service_config import bearer_matches
 from .service_runtime import ModbusService
 
 
@@ -19,9 +19,8 @@ def create_app(service: ModbusService) -> web.Application:
         request: web.Request,
         handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
     ) -> web.StreamResponse:
-        if request.path != "/health" and not hmac.compare_digest(
-            request.headers.get("Authorization", "").encode(),
-            f"Bearer {service.config.token}".encode(),
+        if request.path != "/health" and not bearer_matches(
+            request.headers.get("Authorization", ""), service.config.token,
         ):
             raise web.HTTPUnauthorized
         return await handler(request)
@@ -39,7 +38,8 @@ def create_app(service: ModbusService) -> web.Application:
                 raise web.HTTPUnsupportedMediaType
             try:
                 payload = await request.json()
-            except (ValueError, RecursionError):
+            except (ValueError, RecursionError, LookupError):
+                # LookupError: a charset nobody knows.
                 return web.json_response({"error": "invalid_request"}, status=400)
         try:
             # A route for GET answers HEAD as well.

@@ -35,8 +35,8 @@ What matters for security here is different from a cloud integration:
 - **LAN adapter access.** Modbus through a LAN gateway is unencrypted and has no
   authentication by default. The optional Waveshare login supports the vendor's
   existing connection protocol; it is not a secure transport. On firmware 1.523,
-  a test obtained the successful-login indicator by reflecting challenge
-  responses without knowing the password. Serial forwarding after that result
+  this project's own test obtained the successful-login indicator without
+  knowing the password; the vendor has not been notified. Serial forwarding after that result
   was not tested. Do not rely on this login to keep an untrusted peer out. Use a
   trusted private network, restrict gateway access to the selected HA/service
   host, and never expose it to the Internet. A service token protects the
@@ -46,9 +46,8 @@ What matters for security here is different from a cloud integration:
   only when TCP authentication is enabled. Every new TCP connection completes
   the full handshake before Modbus starts; failed authentication closes the
   socket without an unauthenticated fallback. Authentication frames do not
-  enter the Modbus packet logger. The vendor protocol uses a password-derived
-  AES key without a password-hardening function; recorded challenge/response
-  pairs permit offline password checks. This feature neither adds TLS nor
+  enter the Modbus packet logger. The vendor protocol does not protect a weak password against
+  someone who records the login. This feature neither adds TLS nor
   changes the adapter password.
 - **Explicit adapter setup.** Reading and applying supported adapter settings
   happens only after the user chooses that setup path and confirms the
@@ -101,6 +100,10 @@ Python runtime, USB/LAN communication and the service's private token and intent
 files. Options are read-only; there is no general filesystem-write or shell
 execution permission. This does not add authentication or encryption to Modbus
 or restrict TCP destinations to a particular gateway.
+
+The image runs as its own user, UID 10001. The app runs as root because
+Supervisor provides its data for root alone; the profile grants no capability,
+and the service gives up every capability at its start in either case.
 
 The profile is separate from the OCI image. Standalone Docker deployments must
 load and select a suitable profile explicitly. Direct HA connections use the
