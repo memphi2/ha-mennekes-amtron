@@ -11,6 +11,9 @@ from aiohttp import ClientSession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronRateLimitedError,
+)
 from custom_components.mennekes_amtron_rtu.device.command_events import (
     MAX_EVENTS,
     CommandEvents,
@@ -293,17 +296,19 @@ def test_event_entity_subscribes_without_replaying_and_stays_available(monkeypat
     asyncio.run(run())
 
 
-def test_idempotent_phase_command_reports_replaced_pending_pause():
+def test_a_phase_request_does_not_replace_a_waiting_pause():
     async def run():
         harness = Harness()
         control = await harness.connect()
         from custom_components.mennekes_amtron_rtu.device.enums import RequestedPhases
         await control.async_set_charging_current(12)
         await control.async_pause_charging()
-        await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
-        assert outcomes(control.events)[-2:] == [
-            ("replaced", "pause", "replaced"), ("executed", "all_phases", "completed"),
-        ]
+        # The pause waits for the current write; a phase request must not
+        # take its place and is refused instead.
+        with pytest.raises(AmtronRateLimitedError):
+            await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
+        assert control.pending_action == "pause"
+        assert ("replaced", "pause", "replaced") not in outcomes(control.events)
         await control.async_shutdown()
     asyncio.run(run())
 

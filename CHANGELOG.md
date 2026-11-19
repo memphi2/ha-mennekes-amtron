@@ -5,6 +5,45 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0b4 — 2026-11-19
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/oliver7557)
+
+### Added
+
+- **Cost target**: a charge target as an amount of money. The service keeps
+  the amount with the energy target that carries it, books the energy at
+  each price and stops the charge itself; Home Assistant only tells it the
+  current price. It needs configured charging costs and ends when the energy
+  target is set by hand.
+- The service takes `cost_goal` (amount and price) and `cost_price`, and its
+  energy target state carries the amount. Integration and app must be
+  updated together.
+
+### Fixes
+
+- A lock or a withdrawn release whose reply did not come is written again
+  after five seconds. Before, the repeat waited for a whole state-change
+  interval that the unanswered write itself had started.
+- A waiting pause, lock or withdrawn release is now kept against every
+  command except the one that overrides it. In 0.10.0b3 the other switch, a
+  different stop that had to wait and a phase request could still take its
+  place, and a start refused behind a waiting lock was accepted silently.
+- Repairs of an entry that is disabled while its setup never finished are
+  removed as well.
+- The app pages send their security headers also with a refusal (403, 404,
+  405, 413).
+- A write the service refuses before sending it no longer makes the next
+  request wait for a silent line.
+- The message for a command that could not be saved no longer claims the
+  earlier setting applies when the save may have succeeded.
+
+### Maintenance
+
+- CI runs the app image the way Supervisor does (root, default capabilities)
+  and requires the service to give them up; the release verifies the image's
+  attested list of contents.
+
 ## 0.10.0b3 — 2026-11-19
 
 ### Breaking changes

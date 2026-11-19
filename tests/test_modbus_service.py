@@ -676,3 +676,36 @@ def test_a_command_the_disk_could_not_save_is_not_reported_as_an_unreachable_ser
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_the_service_carries_an_amount_and_follows_its_price(tmp_path):
+    from custom_components.mennekes_amtron_rtu.device.errors import (
+        DeviceValidationError,
+    )
+
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            serial = service.identity.serial_number
+            await service.command({
+                "command": "cost_goal", "value": 10.0, "price": 0.25, "expected_serial_number": serial,
+            })
+            goal = service.control.energy_goal
+            assert goal.target_kwh == 40.0
+            assert goal.cost.snapshot() == {"amount": 10.0, "spent": 0.0, "price": 0.25, "booked_kwh": 0.0}
+            assert service.snapshot()["control"]["energy_goal"]["cost"]["amount"] == 10.0
+            # Within the minute the same price changes nothing.
+            await service.command({"command": "cost_price", "price": 0.5, "expected_serial_number": serial})
+            assert service.control.energy_goal.target_kwh == 40.0
+            await service.command({"command": "cost_goal", "value": 0, "expected_serial_number": serial})
+            assert service.control.energy_goal.target_kwh == 0
+            controller, service.control.goal_controller = service.control.goal_controller, None
+            try:
+                with pytest.raises(DeviceValidationError, match="energy_goal_not_supported"):
+                    await service.command({"command": "cost_price", "price": 0.5, "expected_serial_number": serial})
+            finally:
+                service.control.goal_controller = controller
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

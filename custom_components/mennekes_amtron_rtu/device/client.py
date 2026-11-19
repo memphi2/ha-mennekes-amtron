@@ -627,6 +627,8 @@ class MennekesModbusClient:
                     client = await self._async_transaction_client(
                         verify_identity=verify_identity
                     )
+                # Refused here, nothing reaches the line and nothing is owed.
+                _client_write.validate_write(spec, value)
                 await self._quiet.ask(lambda: _client_write.write_register(
                     client,
                     spec=spec,

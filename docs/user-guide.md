@@ -154,6 +154,24 @@ same goal and no intervening manual command. A reset counter needs a new goal;
 a reached goal stays stopped. After an owner restart, resume explicitly.
 [Target troubleshooting](troubleshooting.md#targets-and-departure-planning).
 
+## Cost target
+
+With charging costs configured, **Cost target** limits a charge by an amount
+of money instead of energy. The service keeps the amount together with the
+**Energy target** that carries it: at the price that applies now it arms the
+energy the amount buys. Home Assistant tells it each new price, at most once
+a minute and only for a change of at least 0.1 ct/kWh; the service then books
+the energy so far at the old price and re-arms the rest at the new one. It
+therefore stops the charge on its own; while Home Assistant is down it keeps
+the last price. With a dynamic price the amount is kept to within one 0.1 kWh
+step per price change, and it rests on the same estimate as the charging
+costs — it is not for billing.
+
+Setting **Energy target** by hand ends the cost target, and setting the cost
+target to zero clears both. Like the energy target it never starts or resumes
+a charge. Without a current price a new amount is refused, and an armed one
+keeps its last price.
+
 ## Phase switching
 
 If the wallbox supports it, select single phase or all available phases. During

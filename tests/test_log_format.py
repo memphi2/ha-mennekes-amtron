@@ -13,7 +13,7 @@ from custom_components.mennekes_amtron_rtu.device.notice import FailureNotice
 PACKAGE = Path(__file__).parents[1] / "custom_components" / "mennekes_amtron_rtu"
 AREAS = (
     "Blueprints", "Charging cost", "Charging loss", "Connection",
-    "Control", "Departure plan", "Energy target", "Heartbeat", "LAN adapter",
+    "Control", "Cost target", "Departure plan", "Energy target", "Heartbeat", "LAN adapter",
     "Network tariff", "Plug & Charge", "Service", "Setup", "Vehicle",
     "Vehicle charge target",
 )

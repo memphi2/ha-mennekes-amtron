@@ -16,6 +16,7 @@ updates. Restored goals retain their original meter baseline and stop latch.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Final
 
 MIN_ENERGY_GOAL_KWH: Final = 0.1
@@ -26,8 +27,71 @@ ENERGY_GOAL_STATES: Final = (
 )
 _STOP_STATES = frozenset({"reached", "meter_unavailable", "meter_reset"})
 _SNAPSHOT_KEYS = frozenset({"target_kwh", "baseline_kwh", "status"})
+MAX_COST_GOAL: Final = 1000.0
+MIN_COST_GOAL: Final = 0.1
+COST_GOAL_STEP: Final = 0.1
+_COST_KEYS = frozenset({"amount", "spent", "price", "booked_kwh"})
+# A smaller price change does not re-arm the amount (0.1 ct/kWh).
+PRICE_TOLERANCE: Final = 0.001
+# No real tariff comes near; it keeps every booking finite.
+MAX_PRICE: Final = 100.0
 
-type EnergyGoalSnapshot = dict[str, float | str | None]
+type EnergyGoalSnapshot = dict[str, float | str | dict[str, float] | None]
+
+
+def finite_number(value: object) -> float | None:
+    """A real finite number as float, else None (never bool or huge ints)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except OverflowError:
+        return None
+    return number if math.isfinite(number) else None
+
+
+@dataclass(frozen=True, slots=True)
+class CostPart:
+    """The amount of money an energy target stands for.
+
+    ``spent`` is what the first ``booked_kwh`` above the target's baseline
+    cost; beyond them ``price`` applies. A negative price earns money back.
+    """
+
+    amount: float
+    spent: float
+    price: float
+    booked_kwh: float = 0.0
+
+    def __post_init__(self) -> None:
+        if any(finite_number(value) is None for value in (self.amount, self.spent, self.price, self.booked_kwh)):
+            raise ValueError("cost values must be finite numbers")
+        if not MIN_COST_GOAL <= self.amount <= MAX_COST_GOAL:
+            raise ValueError("cost target must be between 0.1 and 1000")
+        if self.booked_kwh < 0:
+            raise ValueError("cost booked energy must not be negative")
+
+    def snapshot(self) -> dict[str, float]:
+        return {"amount": self.amount, "spent": self.spent, "price": self.price, "booked_kwh": self.booked_kwh}
+
+    @classmethod
+    def restore(cls, raw: object) -> CostPart:
+        if not isinstance(raw, dict) or raw.keys() != _COST_KEYS:
+            raise ValueError("invalid cost target fields")
+        return cls(raw["amount"], raw["spent"], raw["price"], raw["booked_kwh"])
+
+
+def energy_for(amount: float, price: float) -> float:
+    """The energy that keeps within ``amount`` at ``price``.
+
+    Rounded down to the target's step, so the amount is not exceeded; at
+    least one step. A price of zero or below never uses the amount up.
+    """
+    ratio = amount / price / ENERGY_GOAL_STEP_KWH if price > 0 else math.inf
+    if not math.isfinite(ratio):
+        return MAX_ENERGY_GOAL_KWH
+    steps = math.floor(ratio + 1e-9)
+    return min(MAX_ENERGY_GOAL_KWH, max(MIN_ENERGY_GOAL_KWH, steps / 10))
 
 
 def _nonnegative_number(value: object) -> float:
@@ -73,6 +137,8 @@ class EnergyGoal:
         self._baseline_kwh: float | None = None
         self._status = "disabled"
         self._last_total_kwh: float | None = None
+        # Set when the target stands for an amount of money.
+        self.cost: CostPart | None = None
         # Only this running owner may undo a pause it caused. A disk failure
         # must never resurrect an old resume permission after a manual pause.
         self.resume_on_recovery = False
@@ -112,6 +178,7 @@ class EnergyGoal:
         self._baseline_kwh = self._last_total_kwh = baseline
         self._status = "active" if target else "disabled"
         self.resume_on_recovery = False
+        self.cost = None
         return previous != self.snapshot()
 
     def observe(self, total_kwh: object, *, fresh: bool = True) -> bool:
@@ -141,25 +208,58 @@ class EnergyGoal:
             self.resume_on_recovery = False
         return self.snapshot() != previous
 
+    def take_cost(self, other: EnergyGoal) -> None:
+        """Adopt the repriced target and amount of the same goal's copy."""
+        self._target_kwh = other._target_kwh
+        self.cost = other.cost
+
+    def reprice(self, price: float) -> bool:
+        """Book the energy so far at the old price and aim the rest at ``price``.
+
+        Only a running amount changes, and only its target and amount: the
+        baseline, the status and every latch stay, so this is no new goal.
+        With less than one step of money left the target in force ends it.
+        """
+        cost = self.cost
+        if cost is None or self._status != "active":
+            return False
+        # An active goal always has both; the fallback only satisfies typing.
+        polled = 0.0 if self._baseline_kwh is None or self._last_total_kwh is None else (
+            self._last_total_kwh - self._baseline_kwh
+        )
+        delivered = max(cost.booked_kwh, polled)
+        spent = cost.spent + (delivered - cost.booked_kwh) * cost.price
+        left = cost.amount - spent
+        if left < price * ENERGY_GOAL_STEP_KWH:
+            return False
+        steps = math.floor((delivered + energy_for(left, price)) / ENERGY_GOAL_STEP_KWH + 1e-9)
+        self._target_kwh = min(MAX_ENERGY_GOAL_KWH, max(MIN_ENERGY_GOAL_KWH, steps / 10))
+        self.cost = CostPart(cost.amount, spent, price, delivered)
+        return True
+
     def snapshot(self) -> EnergyGoalSnapshot:
         """Return bounded durable state, excluding ordinary meter progress."""
-        return {
+        snapshot: EnergyGoalSnapshot = {
             "target_kwh": self._target_kwh,
             "baseline_kwh": self._baseline_kwh,
             "status": self._status,
         }
+        if self.cost is not None:
+            snapshot["cost"] = self.cost.snapshot()
+        return snapshot
 
     @classmethod
     def restore(cls, raw: object) -> EnergyGoal:
         """Restore exact stored state; malformed state must not silently disable it."""
-        if not isinstance(raw, dict) or raw.keys() != _SNAPSHOT_KEYS:
+        if not isinstance(raw, dict) or raw.keys() - {"cost"} != _SNAPSHOT_KEYS:
             raise ValueError("invalid energy goal state fields")
+        cost = CostPart.restore(raw["cost"]) if "cost" in raw else None
         target = _target(raw["target_kwh"])
         status = raw["status"]
         if not isinstance(status, str) or status not in ENERGY_GOAL_STATES:
             raise ValueError("invalid energy goal status")
         if target == 0:
-            if status != "disabled" or raw["baseline_kwh"] is not None:
+            if status != "disabled" or raw["baseline_kwh"] is not None or cost is not None:
                 raise ValueError("disabled energy goal has an active baseline or status")
             return cls()
         if status == "disabled":
@@ -169,4 +269,5 @@ class EnergyGoal:
         goal._target_kwh = target
         goal._baseline_kwh = goal._last_total_kwh = baseline
         goal._status = status
+        goal.cost = cost
         return goal

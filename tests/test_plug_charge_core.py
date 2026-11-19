@@ -10,6 +10,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronRateLimitedError,
+)
 from custom_components.mennekes_amtron_rtu.device.control import (
     AmtronControl,
     ControlOptions,
@@ -728,7 +731,7 @@ def test_manual_release_request_does_not_clear_independent_goal_stop():
     asyncio.run(run())
 
 
-def test_manual_gate_release_replaces_old_pending_command_and_goal_recovery():
+def test_manual_gate_release_keeps_a_waiting_lock_but_ends_goal_recovery():
     async def run():
         h = Harness(state_change_interval_seconds=300)
         c = await armed(h)
@@ -737,15 +740,15 @@ def test_manual_gate_release_replaces_old_pending_command_and_goal_recovery():
         persist = AsyncMock()
         goal = EnergyGoalController(c, h.client, persist)
         goal.model.resume_on_recovery = True
-        await c.async_set_charging_release(True)
-        # The manual release queues like any other release command.
-        assert c.pending_action == "enable_charging"
-        assert c.plug_charge["manual"]
+        # A release does not undo a waiting lock: it is refused, while the
+        # deliberate command still ends the goal's automatic recovery.
+        with pytest.raises(AmtronRateLimitedError):
+            await c.async_set_charging_release(True)
+        assert c.pending_action == "lock"
         assert not goal.model.resume_on_recovery
         persist.assert_awaited_once()
         assert h.written(R.LOCK_EVSE) == []
         assert h.written(R.CHARGING_RELEASE) == [[0]]
-        assert c.events.snapshot()["events"][-1]["outcome"] == "replaced"
         await goal.async_stop()
         await c.async_shutdown()
     asyncio.run(run())

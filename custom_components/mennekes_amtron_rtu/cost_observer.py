@@ -210,6 +210,10 @@ class ChargingCostObserver:
             return float(self._entry.options[CONF_CHARGING_PRICE])
         return self._live_price
 
+    def unit_price(self, at: float) -> float | None:
+        """What a kilowatt hour costs at ``at``, network charges included."""
+        return self._tariff.price_at(at, self._price())
+
     async def async_start(self) -> None:
         try:
             self.last = await self._store.async_load()

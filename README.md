@@ -73,6 +73,15 @@ to be created. Intelligent vehicle planning is optional and configured in HA.
 | Keep the database manageable | [Recorder settings](docs/recorder.md) |
 | Resolve a connection or charging problem | [Troubleshooting](docs/troubleshooting.md) |
 
+## Support the project
+
+Every contribution is voluntary and very welcome. Support and new features
+stay open to everyone either way.
+
+<p align="center">
+  <a href="https://ko-fi.com/oliver7557"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi"></a>
+</p>
+
 ## Guides and updates
 
 **[Guide home](docs/README.md)** · **[Release notes](CHANGELOG.md)** · **[Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)**

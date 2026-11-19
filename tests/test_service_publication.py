@@ -254,6 +254,46 @@ def test_api_smoke_uses_init_and_exact_profile_only_when_requested(monkeypatch, 
     assert "--security-opt=no-new-privileges" in command
 
 
+def test_api_smoke_as_root_requires_the_root_user_and_keeps_docker_defaults(monkeypatch):
+    commands = []
+
+    filled = []
+
+    def run(*command):
+        commands.append(command)
+        if command[:3] == ("docker", "run", "--rm"):
+            return b"10001\n" if command[3] == "plain" else b"0\n"
+        if command[:2] == ("docker", "volume"):
+            return b""
+        raise RuntimeError("startup intercepted")
+
+    def fill(command, **how):
+        filled.append((command, json.loads(how["input"])))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(images, "run", run)
+    monkeypatch.setattr(images.subprocess, "run", fill)
+    with pytest.raises(ValueError, match="does not run as root"):
+        images.smoke("plain", as_root=True)
+    with pytest.raises(RuntimeError, match="startup intercepted"):
+        images.smoke("amtron-app:test", as_root=True)
+    [create] = [command for command in commands if command[:3] == ("docker", "volume", "create")]
+    volume = create[3]
+    # The options go into the root-owned volume as root, then the volume goes.
+    [(fill_command, options)] = filled
+    assert fill_command[fill_command.index("--user") + 1] == "0:0"
+    assert f"{volume}:/data" in fill_command
+    assert "os.chown('/data', 0, 0)" in fill_command[-1]
+    assert options["read_only"] is True
+    assert commands[-1] == ("docker", "volume", "rm", "--force", volume)
+    command = commands[-2]
+    assert f"{volume}:/data" in command
+    assert "--user" not in command
+    assert "--cap-drop=ALL" not in command
+    assert "--read-only" in command
+    assert "--security-opt=no-new-privileges" in command
+
+
 @pytest.mark.parametrize("profile", ["", "unconfined", "name/other", "name\n", "name space", "-name", "a" * 129, True])
 def test_api_smoke_rejects_invalid_or_unconfined_profile_before_docker(monkeypatch, profile):
     monkeypatch.setattr(images, "run", lambda *_args: pytest.fail("Docker must not run"))
@@ -396,9 +436,9 @@ def test_release_smokes_the_digest_bound_supervisor_build(monkeypatch):
 
     exercised = []
     monkeypatch.setattr(images, "run", run)
-    monkeypatch.setattr(images, "smoke", exercised.append)
+    monkeypatch.setattr(images, "smoke", lambda image, **how: exercised.append((image, how)))
     images.verify_app_install(INFO, DIGEST)
-    assert exercised == ["amtron-app:verify"]
+    assert exercised == [("amtron-app:verify", {}), ("amtron-app:verify", {"as_root": True})]
 
 
 @pytest.mark.parametrize("change", ["downgrade", "digest", "source", "channel"])

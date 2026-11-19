@@ -439,8 +439,16 @@ def test_actual_socket_cannot_spoof_ingress_and_assets_use_selected_language(mon
             assert response.headers["X-Content-Type-Options"] == "nosniff"
             for path in ("/app_settings.js", "/app_settings.css"):
                 assert (await client.get(path)).status == 200
-            assert (await client.get("/server.py")).status == 404
-            assert (await client.get("/app_settings.js", headers={"Sec-Fetch-Site": "cross-site"})).status == 403
+            for response in (
+                await client.get("/server.py"),
+                await client.get("/app_settings.js", headers={"Sec-Fetch-Site": "cross-site"}),
+                await client.post("/"),
+            ):
+                # A refusal carries the same headers as a page.
+                assert response.status in (403, 404, 405)
+                assert response.headers["X-Content-Type-Options"] == "nosniff"
+                assert response.headers["Cache-Control"] == "no-store"
+                assert "Content-Security-Policy" in response.headers
         assert settings._session is None
     asyncio.run(check())
 

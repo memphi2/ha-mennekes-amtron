@@ -64,6 +64,9 @@ class WritePath:
 
     def __init__(self, control: AmtronControl) -> None:
         self._control = control
+        # The stop whose reply did not come: its repeat is the same switch,
+        # not a new one, and does not wait for the interval it started.
+        self._unanswered_stop: tuple[int, int, float | None] | None = None
 
     async def async_current_evse_state(
         self, error_key: str, *, read: LockedRegisterReader | None = None,
@@ -122,6 +125,12 @@ class WritePath:
         return not (
             not isinstance(current, bool) and isinstance(current, (int, float))
             and CHARGING_CURRENT_UNLIMITED < current < CHARGING_CURRENT_MINIMUM
+        )
+
+    def _repeats_stop(self, spec: RegisterSpec, value: int) -> bool:
+        """Whether this stop is the one whose reply did not come, with nothing since."""
+        return self._unanswered_stop == (
+            spec.address, value, self._control._write_state.mode_change_at,
         )
 
     async def async_check_transition_interval(self, *, current_change: bool = False) -> None:
@@ -238,7 +247,9 @@ class WritePath:
         except (DeviceError, asyncio.CancelledError) as err:
             if switched() and self._control._uncertain(err):
                 self._control._write_state.mode_change_at = self._control._monotonic()
+                self._unanswered_stop = (spec.address, int(value), self._control._write_state.mode_change_at)
             raise
+        self._unanswered_stop = None
         if spec == CHARGING_RELEASE:
             self._control._release_writes += 1
             if value == 1:
@@ -268,7 +279,7 @@ class WritePath:
             # A stop keeps the plain write path: a link that drops during
             # guarded reads must not hold it back.
             switches = await self.async_release_switches_charge()
-            if switches:
+            if switches and not self._repeats_stop(CHARGING_RELEASE, 0):
                 await self.async_check_transition_interval()
         previous = self._control.charging_release_requested
         self._control.charging_release_requested = released
@@ -291,7 +302,7 @@ class WritePath:
     async def _async_apply_lock(self, locked: bool) -> None:
         current = await self.async_read_switch(LOCK_EVSE, stopping=locked)
         changed = current != int(locked)
-        if changed:
+        if changed and not (locked and self._repeats_stop(LOCK_EVSE, 1)):
             await self.async_check_transition_interval()
         await self._async_transition_write(LOCK_EVSE, int(locked), changed=changed)
 

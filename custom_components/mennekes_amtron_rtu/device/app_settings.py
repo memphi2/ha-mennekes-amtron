@@ -581,11 +581,11 @@ class AppSettings:
         self, request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
     ) -> web.StreamResponse:
         peer = request.transport.get_extra_info("peername") if request.transport is not None else None
-        if not isinstance(peer, tuple) or not peer or peer[0] != SUPERVISOR_PEER:
-            raise web.HTTPForbidden
-        if request.headers.get("Sec-Fetch-Site") == "cross-site":
-            raise web.HTTPForbidden
         try:
+            if not isinstance(peer, tuple) or not peer or peer[0] != SUPERVISOR_PEER:
+                raise web.HTTPForbidden
+            if request.headers.get("Sec-Fetch-Site") == "cross-site":
+                raise web.HTTPForbidden
             if not request.path.startswith("/api/"):
                 # Packaged page assets load in parallel and never call the Supervisor.
                 response = await handler(request)
@@ -596,8 +596,17 @@ class AppSettings:
                     response = await handler(request)
         except SettingsError as err:
             response = web.json_response({"error": err.key}, status=err.status)
+        except web.HTTPException as err:
+            # A refusal is a response as well and gets the same headers.
+            self._harden(request, err)
+            raise
         except (ClientError, TimeoutError, OSError, ValueError, TypeError):
             response = web.json_response({"error": "supervisor_unavailable"}, status=503)
+        self._harden(request, response)
+        return response
+
+    @staticmethod
+    def _harden(request: web.Request, response: web.StreamResponse) -> None:
         # Only packaged scripts and styles may be kept, and only to revalidate.
         asset = "ETag" in response.headers and not request.path.startswith("/api/")
         response.headers.update({
@@ -606,7 +615,6 @@ class AppSettings:
             "Referrer-Policy": "no-referrer",
         })
         response.headers.setdefault("Content-Security-Policy", _CSP.format(style="'self'"))
-        return response
 
 
 def add_settings_asset_routes(app: web.Application) -> None:

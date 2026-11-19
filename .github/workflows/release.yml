@@ -352,8 +352,13 @@ jobs:
           RELEASE_IMAGE: ${{ steps.image.outputs.image }}
           RELEASE_DIGEST: ${{ steps.image.outputs.digest }}
           RELEASE_COMMIT: ${{ needs.main-validation.outputs.commit }}
+          BUILD_REQUIRED: ${{ needs.service-plan.outputs.build_required }}
         run: |
           gh attestation verify "oci://$RELEASE_IMAGE@$RELEASE_DIGEST" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$RELEASE_TAG" --source-digest "$RELEASE_COMMIT"
+          if [ "$BUILD_REQUIRED" = true ]; then
+            # The list of contents attested just above, by the same workflow.
+            gh attestation verify "oci://$RELEASE_IMAGE@$RELEASE_DIGEST" --repo "$GITHUB_REPOSITORY" --predicate-type "https://spdx.dev/Document/v2.3" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$RELEASE_TAG" --source-digest "$RELEASE_COMMIT"
+          fi
           python scripts/service_image.py public --tag "$RELEASE_TAG" --digest "$RELEASE_DIGEST"
           python scripts/service_image.py app --tag "$RELEASE_TAG" --digest "$RELEASE_DIGEST"
 
@@ -407,10 +412,12 @@ jobs:
       - name: Build HACS release zip
         run: python scripts/build_hacs_release.py
       - name: Generate release metadata
+        env:
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag }}
         run: |
           python scripts/write_release_assets.py \
             --zip "$RELEASE_ZIP" \
-            --tag "${{ steps.release-tag.outputs.tag }}" \
+            --tag "$RELEASE_TAG" \
             --repository "$GITHUB_REPOSITORY" \
             --sha256sums "$RELEASE_SHA256SUMS" \
             --metadata "$RELEASE_METADATA" \
@@ -458,16 +465,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_REF: ${{ steps.release-tag.outputs.ref }}
           RELEASE_COMMIT: ${{ steps.release-tag.outputs.commit }}
+          PROVENANCE_BUNDLE: ${{ steps.provenance_attestation.outputs.bundle-path }}
+          SBOM_BUNDLE: ${{ steps.sbom_attestation.outputs.bundle-path }}
         run: |
           gh attestation verify "$RELEASE_ZIP" \
             --repo "$GITHUB_REPOSITORY" \
-            --bundle "${{ steps.provenance_attestation.outputs.bundle-path }}" \
+            --bundle "$PROVENANCE_BUNDLE" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
             --source-ref "$RELEASE_REF" \
             --source-digest "$RELEASE_COMMIT"
           gh attestation verify "$RELEASE_ZIP" \
             --repo "$GITHUB_REPOSITORY" \
-            --bundle "${{ steps.sbom_attestation.outputs.bundle-path }}" \
+            --bundle "$SBOM_BUNDLE" \
             --predicate-type "https://spdx.dev/Document/v2.3" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
             --source-ref "$RELEASE_REF" \

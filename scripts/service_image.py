@@ -92,8 +92,14 @@ def check_installed_authentication(container: str) -> None:
     )
 
 
-def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
-    """Exercise the installed container API with no hardware or HA dependency."""
+def smoke(
+    image: str, *, apparmor_profile: str | None = None, as_root: bool = False,
+) -> None:
+    """Exercise the installed container API with no hardware or HA dependency.
+
+    ``as_root`` runs it the way Supervisor does: as the image's own root user
+    with Docker's default capabilities, which the service must then give up.
+    """
     if apparmor_profile is not None and (
         not isinstance(apparmor_profile, str)
         or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", apparmor_profile)
@@ -104,6 +110,8 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
         ("--init", f"--security-opt=apparmor={apparmor_profile}")
         if apparmor_profile is not None else ()
     )
+    if as_root and run("docker", "run", "--rm", image, "id", "-u").decode().strip() != "0":
+        raise ValueError("the app image does not run as root")
     with tempfile.TemporaryDirectory(prefix="amtron-container-") as temporary:
         directory = Path(temporary)
         token = secrets.token_urlsafe(32)
@@ -122,102 +130,132 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
             )
         )
         options.chmod(0o600)
-        container = (
-            run(
-                "docker",
-                "run",
-                "--detach",
-                *confinement,
-                # Match the owner of the private bind mount without granting
-                # DAC override to container root or weakening the token file.
-                "--user",
-                f"{os.getuid()}:{os.getgid()}",
-                "--read-only",
-                "--cap-drop=ALL",
-                "--security-opt=no-new-privileges",
-                "--tmpfs",
-                "/tmp",  # noqa: S108 - isolated container tmpfs
-                "--publish",
-                "127.0.0.1::8765",
-                "--volume",
-                f"{directory}:/data",
-                image,
+        mount = f"{directory}:/data"
+        if as_root:
+            # Supervisor's data belongs to root. Without DAC override the
+            # service cannot read a file of the runner's user, nor the image's
+            # own /data that a new volume copies, so both become root's first.
+            volume = f"amtron-smoke-{secrets.token_hex(6)}"
+            run("docker", "volume", "create", volume)
+            subprocess.run(
+                [
+                    "docker", "run", "--rm", "--interactive", "--user", "0:0",
+                    "--entrypoint", "python", "--volume", f"{volume}:/data", image, "-c",
+                    (
+                        "import os, sys; path = '/data/options.json'; "
+                        "os.chown('/data', 0, 0); os.chmod('/data', 0o700); "
+                        "open(path, 'w').write(sys.stdin.read()); os.chmod(path, 0o600)"
+                    ),
+                ],
+                input=options.read_bytes(), capture_output=True, check=True,
             )
-            .decode()
-            .strip()
-        )
+            mount = f"{volume}:/data"
         try:
-            port = json.loads(run("docker", "inspect", container))[0][
-                "NetworkSettings"
-            ]["Ports"]["8765/tcp"][0]["HostPort"]
-            base = f"http://127.0.0.1:{int(port)}"
-            deadline = time.monotonic() + 30
-            while True:
-                try:
-                    with urllib.request.urlopen(  # noqa: S310 - fixed loopback HTTP
-                        base + "/health", timeout=2
-                    ) as response:
-                        if response.status == 200:
-                            break
-                except OSError, urllib.error.URLError:
-                    if time.monotonic() >= deadline:
-                        logs = subprocess.run(
-                            ["docker", "logs", "--tail", "40", container],
-                            capture_output=True,
-                            check=False,
-                        )
-                        detail = (logs.stdout + logs.stderr).decode(errors="replace")
-                        raise ValueError(
-                            "container API did not become ready: "
-                            + detail.replace(token, "<redacted>")
-                        ) from None
-                time.sleep(0.25)
-            try:
-                urllib.request.urlopen(base + "/v2/state", timeout=2)  # noqa: S310 - fixed loopback HTTP
-            except urllib.error.HTTPError as error:
-                if error.code != 401:
-                    raise ValueError("unexpected unauthenticated response") from error
-            else:
-                raise ValueError("container API allowed unauthenticated access")
-            request = urllib.request.Request(  # noqa: S310 - fixed loopback HTTP
-                base + "/v2/state", headers={"Authorization": f"Bearer {token}"}
-            )
-            with urllib.request.urlopen(request, timeout=2) as response:  # noqa: S310 - fixed loopback HTTP
-                data = json.load(response)
-            if (
-                data.get("api_version") != service_api_version()
-                or data.get("available") is not False
-                or data["control"]["read_only"] is not True
-                or data["heartbeat"]["running"] is not False
-            ):
-                raise ValueError("container did not report the missing device safely")
-            # Read through the installed package's HTTP handlers, not through
-            # the source checkout. This runs for both native architecture builds
-            # under their actual AppArmor profile before any candidate is pushed.
-            check_installed_assets(container)
-            check_installed_authentication(container)
-            run("docker", "stop", "--time", "15", container)
-            if (
-                json.loads(run("docker", "inspect", container))[0]["State"]["ExitCode"]
-                != 0
-            ):
-                raise ValueError("container did not shut down cleanly")
-            lifecycle_log = run("docker", "logs", container).decode(errors="replace")
-            if token in lifecycle_log or any(
-                message not in lifecycle_log
-                for message in (
-                    "Service: starting Mennekes Amtron Modbus service",
-                    "Service: API ready",
-                    "Connection: opening serial connection",
-                    "SIGTERM received",
-                    "Service: shutdown complete",
-                )
-            ):
-                raise ValueError("container lifecycle logs are missing or expose credentials")
-            if "Service: privileges kept" in lifecycle_log:
-                raise ValueError("container could not give up its capabilities")
+            _smoke_container(image, token, mount, confinement, as_root=as_root)
         finally:
-            run("docker", "rm", "--force", container)
+            if as_root:
+                run("docker", "volume", "rm", "--force", volume)
+
+
+def _smoke_container(
+    image: str, token: str, mount: str, confinement: tuple[str, ...], *, as_root: bool,
+) -> None:
+    container = (
+        run(
+            "docker",
+            "run",
+            "--detach",
+            *confinement,
+            # Match the owner of the private bind mount without granting
+            # DAC override to container root or weakening the token file.
+            *(() if as_root else (
+                "--user", f"{os.getuid()}:{os.getgid()}", "--cap-drop=ALL",
+            )),
+            "--read-only",
+            "--security-opt=no-new-privileges",
+            "--tmpfs",
+            "/tmp",  # noqa: S108 - isolated container tmpfs
+            "--publish",
+            "127.0.0.1::8765",
+            "--volume",
+            mount,
+            image,
+        )
+        .decode()
+        .strip()
+    )
+    try:
+        port = json.loads(run("docker", "inspect", container))[0][
+            "NetworkSettings"
+        ]["Ports"]["8765/tcp"][0]["HostPort"]
+        base = f"http://127.0.0.1:{int(port)}"
+        deadline = time.monotonic() + 30
+        while True:
+            try:
+                with urllib.request.urlopen(  # noqa: S310 - fixed loopback HTTP
+                    base + "/health", timeout=2
+                ) as response:
+                    if response.status == 200:
+                        break
+            except OSError, urllib.error.URLError:
+                if time.monotonic() >= deadline:
+                    logs = subprocess.run(
+                        ["docker", "logs", "--tail", "40", container],
+                        capture_output=True,
+                        check=False,
+                    )
+                    detail = (logs.stdout + logs.stderr).decode(errors="replace")
+                    raise ValueError(
+                        "container API did not become ready: "
+                        + detail.replace(token, "<redacted>")
+                    ) from None
+            time.sleep(0.25)
+        try:
+            urllib.request.urlopen(base + "/v2/state", timeout=2)  # noqa: S310 - fixed loopback HTTP
+        except urllib.error.HTTPError as error:
+            if error.code != 401:
+                raise ValueError("unexpected unauthenticated response") from error
+        else:
+            raise ValueError("container API allowed unauthenticated access")
+        request = urllib.request.Request(  # noqa: S310 - fixed loopback HTTP
+            base + "/v2/state", headers={"Authorization": f"Bearer {token}"}
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:  # noqa: S310 - fixed loopback HTTP
+            data = json.load(response)
+        if (
+            data.get("api_version") != service_api_version()
+            or data.get("available") is not False
+            or data["control"]["read_only"] is not True
+            or data["heartbeat"]["running"] is not False
+        ):
+            raise ValueError("container did not report the missing device safely")
+        # Read through the installed package's HTTP handlers, not through
+        # the source checkout. This runs for both native architecture builds
+        # under their actual AppArmor profile before any candidate is pushed.
+        check_installed_assets(container)
+        check_installed_authentication(container)
+        run("docker", "stop", "--time", "15", container)
+        if (
+            json.loads(run("docker", "inspect", container))[0]["State"]["ExitCode"]
+            != 0
+        ):
+            raise ValueError("container did not shut down cleanly")
+        lifecycle_log = run("docker", "logs", container).decode(errors="replace")
+        if token in lifecycle_log or any(
+            message not in lifecycle_log
+            for message in (
+                "Service: starting Mennekes Amtron Modbus service",
+                "Service: API ready",
+                "Connection: opening serial connection",
+                "SIGTERM received",
+                "Service: shutdown complete",
+            )
+        ):
+            raise ValueError("container lifecycle logs are missing or expose credentials")
+        if "Service: privileges kept" in lifecycle_log:
+            raise ValueError("container could not give up its capabilities")
+    finally:
+        run("docker", "rm", "--force", container)
 
 
 def build(info: dict[str, str], architecture: str, output: Path) -> None:
@@ -451,6 +489,7 @@ def verify_app_install(info: dict[str, str], digest: str) -> None:
         (context / "Dockerfile").write_bytes(app_dockerfile(info, digest))
         run("docker", "build", "--pull", "--tag", "amtron-app:verify", temporary)
         smoke("amtron-app:verify")
+        smoke("amtron-app:verify", as_root=True)
 
 
 def verify_public(info: dict[str, str], digest: str) -> None:
@@ -482,10 +521,11 @@ def main() -> int:
     parser.add_argument("--path", type=Path)
     parser.add_argument("--digest")
     parser.add_argument("--image")
+    parser.add_argument("--as-root", action="store_true")
     args = parser.parse_args()
     try:
         if args.action == "smoke" and args.image:
-            smoke(args.image)
+            smoke(args.image, as_root=args.as_root)
             return 0
         info = release_info(args.repository, args.tag or "")
         if args.action == "build" and args.architecture and args.path:

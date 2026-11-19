@@ -13,7 +13,12 @@ from collections.abc import Callable
 from copy import deepcopy
 from typing import Any, NoReturn
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import (
+    SIGNAL_CONFIG_ENTRY_CHANGED,
+    ConfigEntry,
+    ConfigEntryChange,
+    ConfigEntryState,
+)
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
@@ -24,6 +29,7 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -40,6 +46,7 @@ from .charging_cost_const import (
     COST_SOURCE_DISABLED,
 )
 from .coordinator import ServiceCoordinator
+from .cost_goal import CostGoalObserver
 from .cost_observer import ChargingCostObserver, LastChargingCost
 from .data import (
     MennekesAmtronRuntimeData,
@@ -144,6 +151,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async_setup_services(hass)
     await async_install_blueprints(hass)
+
+    @callback
+    def entry_changed(change: ConfigEntryChange, entry: ConfigEntry) -> None:
+        # A disabled entry can fix nothing, also one that never finished its
+        # setup and is therefore never unloaded; a reload keeps its repairs.
+        if entry.domain == DOMAIN and entry.disabled_by is not None:
+            _delete_issues(hass, entry)
+
+    async_dispatcher_connect(hass, SIGNAL_CONFIG_ENTRY_CHANGED, entry_changed)
     return True
 
 
@@ -338,12 +354,16 @@ async def async_setup_entry(
                         handoff.charging_cost = None
                     entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry)
                     await entry.runtime_data.charging_cost.async_start()
+                if entry.runtime_data.controls:
+                    entry.runtime_data.cost_goal = CostGoalObserver(hass, entry)
 
             # Failed polls arrive as None. A reconnect re-checks the wallbox
             # identity; the service judges continuity, costs follow it.
             async def observe_estimates(data: WallboxData | None) -> None:
                 if entry.runtime_data.charging_cost is not None:
                     await entry.runtime_data.charging_cost.async_observe(data)
+                if entry.runtime_data.cost_goal is not None:
+                    await entry.runtime_data.cost_goal.async_observe(data)
 
             coordinator.observe_estimates = observe_estimates
         client.on_auth_failed = lambda: entry.async_start_reauth(hass)
@@ -816,9 +836,6 @@ async def async_unload_entry(
     finally:
         # Last: the car's observers above still withdraw through it.
         await async_release(hass, entry.entry_id)
-    if entry.disabled_by is not None:
-        # A disabled entry can fix nothing; a reload keeps its repairs.
-        _delete_issues(hass, entry)
     return unloaded
 
 
@@ -845,6 +862,8 @@ async def _async_stop_runtime(
         await runtime.charge_loss.async_stop()
     if runtime.charging_cost is not None and not retain_cost:
         await runtime.charging_cost.async_stop()
+    if runtime.cost_goal is not None:
+        await runtime.cost_goal.async_stop()
     if runtime.timed_goal is not None:
         await runtime.timed_goal.async_stop(withdraw=withdraw_plan)
     if runtime.vehicle_soc is not None:
