@@ -1,5 +1,14 @@
 # Changes
 
+## Unreleased
+
+- A guest start behind a waiting stop is refused before its first write
+  instead of leaving the release open without a guest.
+- A price that arrived while a cost ceiling was stopped is applied once it
+  runs again.
+- The Charging page names the reported price and its time, and the planned
+  start of the departure plan.
+
 ## 0.10.0b5
 
 - Integration and app must both be 0.10.0b5; update them together.

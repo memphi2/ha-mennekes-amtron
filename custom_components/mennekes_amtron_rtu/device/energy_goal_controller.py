@@ -9,6 +9,7 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from copy import copy
+from datetime import UTC, datetime
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError, AmtronRateLimitedError
@@ -73,6 +74,7 @@ class EnergyGoalController:
         self._priced_at = -math.inf
         # The last price Home Assistant reported, per kWh.
         self.price: float | None = None
+        self.price_at: datetime | None = None
         control.goal_controller = self
         self.model.resume_on_recovery = False
 
@@ -147,6 +149,7 @@ class EnergyGoalController:
         # Remembered for an amount armed later, also from the app; it is not
         # saved: after a restart Home Assistant tells it again.
         self.price = unit
+        self.price_at = datetime.now(UTC)
         self._notify_changed()
         async with self._control.energy_goal_guard:
             if self._stopping:

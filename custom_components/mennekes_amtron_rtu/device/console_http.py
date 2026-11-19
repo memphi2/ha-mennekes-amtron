@@ -142,6 +142,7 @@ class ServiceConsole(AppSettings):
             raise SettingsError("service_not_configured", 503)
         departure = getattr(service, "departure", None)
         plan = departure.snapshot() if departure is not None and departure.ready else None
+        runner = control.goal_controller
         return {
             "schema": 1, "read_only": control.read_only,
             "revision": service.choice_revision,
@@ -153,7 +154,10 @@ class ServiceConsole(AppSettings):
             "cost": None if (cost := control.energy_goal.cost) is None else {
                 "amount": cost.amount, "spent": control.energy_goal.cost_spent, "price": cost.price,
             },
-            "cost_price": None if control.goal_controller is None else control.goal_controller.price,
+            "cost_price": None if runner is None else runner.price,
+            # Home Assistant reports a price only when it changes; the page
+            # shows since when this one holds.
+            "cost_price_at": None if runner is None or runner.price_at is None else runner.price_at.isoformat(),
             "guest_confirmation_required": service.guest.restore_pending,
             "soc": {
                 "configured": control.soc_goal.source is not None,
@@ -166,7 +170,7 @@ class ServiceConsole(AppSettings):
                 "revision": departure.choice_revision,
                 "configured": True,
                 "deadline": plan["trip"]["deadline"], "status": plan["status"],
-                "planned_start": plan["planned_start"], "forecast": plan["forecast"],
+                "planned_start": plan["planned_start"],
                 "storage_error": departure.storage_error,
             },
         }

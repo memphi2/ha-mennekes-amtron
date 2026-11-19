@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- App: without a running amount the **Charging** page names the price and
+  since when Home Assistant reported it; the departure plan shows its
+  planned start, or that it could not be saved.
+
+### Fixes
+
+- A guest start behind a waiting stop is refused before its first write.
+  Before, it opened the charging release and then failed at its current: the
+  release stayed open without a guest.
+- Cost target: a price that arrived while the target was stopped or its meter
+  was missing is applied once the target runs again. With less than one
+  0.1 kWh step of money left, a new price now leaves one step at that price
+  instead of being ignored.
+
+### Changed
+
+- The app's overview state no longer carries `configured`; `state` already
+  says `setup_required`. The Charging page state no longer carries the
+  unused `forecast` of the departure plan.
+
 ## 0.10.0b5 — 2026-11-19
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/oliver7557)

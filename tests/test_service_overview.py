@@ -106,8 +106,8 @@ def test_real_service_overview_does_not_poll_write_or_save(tmp_path):
         try:
             await service.heartbeat.async_stop()
             before = (list(transport.reads), list(transport.writes))
-            assert (await service_overview(service))["configured"]
-            assert (await service_overview(service))["configured"]
+            assert (await service_overview(service))["state"] != "setup_required"
+            assert (await service_overview(service))["state"] != "setup_required"
             assert (transport.reads, transport.writes) == before
             assert (await service_overview(None))["reason"] == "setup_required"
         finally:

@@ -282,7 +282,8 @@ def test_console_arms_a_cost_ceiling_at_the_last_reported_price(tmp_path, monkey
             TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
         ):
             state = await (await client.get("/api/charging", headers=HEADERS)).json()
-            assert (state["cost"], state["cost_price"], state["guest_confirmation_required"]) == (None, None, False)
+            assert (state["cost"], state["cost_price"], state["cost_price_at"]) == (None, None, None)
+            assert state["guest_confirmation_required"] is False
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
             choice = {"action": "cost", "value": 10, "revision": state["revision"], "confirm": True}
             refused = await client.post("/api/charging", headers=headers, json=choice)
@@ -293,6 +294,8 @@ def test_console_arms_a_cost_ceiling_at_the_last_reported_price(tmp_path, monkey
                 "expected_serial_number": service.identity.serial_number,
             })
             assert service.snapshot()["control"]["cost_price"] == 0.25
+            told = (await (await client.get("/api/charging", headers=HEADERS)).json())["cost_price_at"]
+            assert str(told).endswith("+00:00")
             saved = await client.post("/api/charging", headers=headers, json=choice)
             state = await saved.json()
             assert saved.status == 200
