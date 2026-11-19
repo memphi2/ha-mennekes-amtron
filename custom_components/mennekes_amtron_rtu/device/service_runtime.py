@@ -102,9 +102,9 @@ class ModbusService:
         self._meter_saved: tuple[object, float, float | None] | None = None
         self._meter_lock = asyncio.Lock()
         self._meter_retry_at = 0.0
-        # Polls that followed a write: a command whose write was read back
-        # needs no second poll of its own.
-        self._write_polls = 0
+        # The count of writes the last poll after a write has read back: a
+        # command whose last write is among them needs no second poll.
+        self._read_back: int | None = None
         self._meter_notice = FailureNotice(_LOGGER, "Charging loss")
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
@@ -665,8 +665,9 @@ class ModbusService:
         # A command may already have reached the wallbox. Save its intent
         # before a poll can fail or be cancelled during a connection outage.
         await self._persist()
+        written = self.diagnostics.writes_sent
         await self.refresh()
-        self._write_polls += 1
+        self._read_back = written
 
     def _validate_deferred(self) -> None:
         """A queued command needs the same fresh connection as an API request."""
@@ -885,7 +886,7 @@ class ModbusService:
             raise ValueError("expected_serial_number must be a non-empty string or null")
         async with self._command_lock:
             control = self.control
-            write_polls = self._write_polls
+            written = self.diagnostics.writes_sent
             # A request can age while another command owns the lock. Only admit
             # it against the same current state that the API reports as usable.
             command = payload.get("command")
@@ -1054,7 +1055,10 @@ class ModbusService:
                 finally:
                     if _soc_outcome is not None:
                         _soc_outcome(initial_revision, self._soc_goal_revision, failure)
-            if not cancelling and not metadata and self._write_polls == write_polls:
+            # Something was written during this command and a poll followed
+            # the last write: the state to answer with is already read.
+            read_back = written < self.diagnostics.writes_sent == self._read_back
+            if not cancelling and not metadata and not read_back:
                 await self.refresh()
             return self._publish()
 

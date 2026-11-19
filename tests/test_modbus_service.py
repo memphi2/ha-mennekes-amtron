@@ -476,3 +476,54 @@ def test_a_command_polls_the_wallbox_once_after_its_write(tmp_path):
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_command_reads_its_own_write_back_beside_a_queued_command(tmp_path):
+    """The poll after a queued command's write is not this command's read-back."""
+    from custom_components.mennekes_amtron_rtu.device.enums import EvseState
+    from tests.test_plug_charge_core import POLICY, deadline
+
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        serial = service.identity.serial_number
+        try:
+            transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+            await service.command({
+                "command": "plug_charge_config", "value": True, "policy": POLICY, "expected_serial_number": serial,
+            })
+            session = service.control.plug_charge["session"]
+            clock[0] += 301
+            wake, entered, gate = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+            async def sleep(_delay):
+                await wake.wait()
+
+            service.control._sleep = sleep
+            for value in (10, 12):
+                await service.command({"command": "set_current", "value": value, "expected_serial_number": serial})
+            refresh = service.refresh
+
+            async def slow_refresh():
+                if not entered.is_set():
+                    entered.set()
+                    await gate.wait()
+                await refresh()
+
+            service.refresh = slow_refresh
+            clock[0] += 30
+            wake.set()
+            await asyncio.wait_for(entered.wait(), 5)
+            # The queued current is written and its poll is under way.
+            authorize = asyncio.create_task(service.command({
+                "command": "plug_charge_authorize", "session": session,
+                "deadline": deadline().isoformat(), "expected_serial_number": serial,
+            }))
+            await asyncio.sleep(0.05)
+            gate.set()
+            result = await authorize
+            assert result["control"]["plug_charge"]["authorized"] is True
+            assert result["values"]["charging_release"] == 1
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

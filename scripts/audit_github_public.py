@@ -46,9 +46,10 @@ def categories(text: str) -> set[str]:
     for category, pattern in PATTERNS.items():
         matches = pattern.finditer(text)
         if category == "literal_credential":
-            # A value with whitespace is a label or a sentence, not a secret.
-            matches = (match for match in matches
-                       if not PLACEHOLDER.fullmatch(match[1]) and not any(c.isspace() for c in match[1]))
+            # Three words or more are a label or a sentence, not a secret.
+            matches = (match for match in matches if not PLACEHOLDER.fullmatch(match[1]) and not (
+                match[1] == match[1].strip() and len(match[1].split()) >= 3
+            ))
         elif category == "serial_device_path":
             matches = (match for match in matches if match[1] not in {
                 "...", "usb-...", "REPLACE_WITH_YOUR_ADAPTER",
