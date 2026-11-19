@@ -595,7 +595,7 @@ class ModbusService:
             self._attempts += 1
             self._retry_at = time.monotonic() + 30
         finally:
-            await self._persist()
+            await self._save_intent()
 
     @attributed("unplug")
     async def _close_release_after_unplug(self) -> None:
@@ -664,7 +664,9 @@ class ModbusService:
         """Publish queue changes and persist commands executed by the worker."""
         # A command may already have reached the wallbox. Save its intent
         # before a poll can fail or be cancelled during a connection outage.
-        await self._persist()
+        # A disk that refuses must not break off what the wallbox is in the
+        # middle of, such as its recovery; a command reports it at its end.
+        await self._save_intent()
         written = self.diagnostics.writes_sent
         await self.refresh()
         self._read_back = written

@@ -569,3 +569,34 @@ def test_a_switch_counts_from_its_acknowledgement_even_when_cancelled(tmp_path):
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_error_200_is_recovered_while_the_disk_refuses(tmp_path, monkeypatch):
+    """A disk that fails is not a lost wallbox: the recovery runs to its end."""
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        service.heartbeat._set_healthy(True)
+        clock[0] += 400
+
+        async def refused():
+            raise OSError("read-only file system")
+
+        monkeypatch.setattr(service, "_persist", refused)
+        put(transport.bank, R.ERROR_CODE, 200)
+        transport.writes.clear()
+        try:
+            polling = asyncio.create_task(service._polling_loop())
+            service._attempted.clear()
+            await asyncio.wait_for(service._attempted.wait(), 5)
+            polling.cancel()
+            await asyncio.gather(polling, return_exceptions=True)
+            # Heartbeat, the wallbox's own recovery register and the current again.
+            assert [address for address, _words in transport.writes] == [0x0D00, 0x0D05, 0x0302]
+            assert service._attempts == 1
+            assert service._is_available()
+        finally:
+            monkeypatch.undo()
+            await service.stop()
+
+    asyncio.run(run())
