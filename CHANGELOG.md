@@ -10,8 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - **Breaking:** the saved control state has two new fields and the state of
-  0.10.0b5 is not read. After the update, set percentage, energy and cost
-  targets again and check the pause and release switches.
+  0.10.0b5 is not read. After the update the service switches the charging
+  release off and blocks charging commands until the reset is confirmed
+  under **Settings → System → Repairs**; then set the targets again. See
+  [Saved charging settings could not be loaded](docs/troubleshooting.md#saved-charging-settings-could-not-be-loaded).
 - A reached energy or cost target ends when the car is unplugged: the target
   is cleared and its pause ends, so the next car charges without the previous
   limit. Before, the stop stayed until it was resumed by hand.
