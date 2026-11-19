@@ -213,6 +213,18 @@
         "state_attributes": {
           "heartbeat_lost": {
             "name": "Repli du gestionnaire d’énergie actif"
+          },
+          "code": {
+            "name": "Code d'erreur"
+          },
+          "category": {
+            "name": "Catégorie"
+          },
+          "fallback": {
+            "name": "Comportement de repli"
+          },
+          "fallback_current": {
+            "name": "Courant de repli"
           }
         }
       },
@@ -288,6 +300,11 @@
           "authorized": "Autorisée",
           "not_authorized": "Non autorisée",
           "not_used": "Non utilisée"
+        },
+        "state_attributes": {
+          "enabled": {
+            "name": "Autorisation requise"
+          }
         }
       },
       "cable_lock_status": {
@@ -297,6 +314,11 @@
           "locked": "Verrouillé",
           "undetermined": "Indéterminé",
           "unlocked": "Déverrouillé"
+        },
+        "state_attributes": {
+          "permanent": {
+            "name": "Verrouillé en permanence"
+          }
         }
       },
       "detected_ev_phases": {
@@ -312,10 +334,50 @@
         "name": "Énergie totale"
       },
       "power_total": {
-        "name": "Puissance totale"
+        "name": "Puissance totale",
+        "state_attributes": {
+          "current_l1": {
+            "name": "Courant L1"
+          },
+          "current_l2": {
+            "name": "Courant L2"
+          },
+          "current_l3": {
+            "name": "Courant L3"
+          },
+          "voltage_l1": {
+            "name": "Tension L1"
+          },
+          "voltage_l2": {
+            "name": "Tension L2"
+          },
+          "voltage_l3": {
+            "name": "Tension L3"
+          },
+          "power_l1": {
+            "name": "Puissance L1"
+          },
+          "power_l2": {
+            "name": "Puissance L2"
+          },
+          "power_l3": {
+            "name": "Puissance L3"
+          }
+        }
       },
       "session_energy": {
-        "name": "Énergie de la session"
+        "name": "Énergie de la session",
+        "state_attributes": {
+          "duration_minutes": {
+            "name": "Durée (minutes)"
+          },
+          "maximum_current": {
+            "name": "Courant maximal"
+          },
+          "sessions": {
+            "name": "Sessions de charge au total"
+          }
+        }
       },
       "signaled_current": {
         "name": "Courant proposé au véhicule"
@@ -325,7 +387,38 @@
       },
       "wallbox_settings": {
         "name": "Réglages de la wallbox",
-        "state_attributes": {}
+        "state_attributes": {
+          "max_current_house": {
+            "name": "Courant maximal du raccordement"
+          },
+          "max_evse_current": {
+            "name": "Courant maximal de la borne"
+          },
+          "phase_rotation": {
+            "name": "Rotation des phases"
+          },
+          "grid_phases_connected": {
+            "name": "Phases réseau raccordées"
+          },
+          "phase_options": {
+            "name": "Options de phases"
+          },
+          "phase_switching_mode": {
+            "name": "Commutation de phases"
+          },
+          "phase_switching_pause_seconds": {
+            "name": "Pause de commutation de phases (secondes)"
+          },
+          "grid_imbalance_monitoring": {
+            "name": "Surveillance du déséquilibre"
+          },
+          "grid_imbalance_threshold": {
+            "name": "Limite de déséquilibre"
+          },
+          "solar_min_current": {
+            "name": "Courant minimal pour la charge solaire"
+          }
+        }
       },
       "charging_status": {
         "name": "État de la recharge",
@@ -348,6 +441,12 @@
         "state_attributes": {
           "downgraded_to": {
             "name": "Limitation externe active"
+          },
+          "evse_state": {
+            "name": "État de la borne"
+          },
+          "cp_state": {
+            "name": "Signal du véhicule (CP)"
           }
         }
       },
@@ -358,11 +457,12 @@
           "degraded": "Erreurs de communication détectées"
         },
         "state_attributes": {
-          "failed_transactions": {
-            "name": "Transactions échouées"
-          },
-          "retried_transactions": {
-            "name": "Transactions répétées"
+          "heartbeat": {
+            "name": "Heartbeat",
+            "state": {
+              "ok": "OK",
+              "problem": "Problème"
+            }
           }
         }
       },
@@ -440,7 +540,7 @@
               "unavailable": "Borne injoignable",
               "departure_plan": "Planification du départ",
               "direct": "Commande directe",
-              "guest": "Ordre invité"
+              "guest": "Charge invité"
             }
           },
           "next_event": {
@@ -577,6 +677,15 @@
               "authorization_required": "Authentification activée sur la borne",
               "register_unavailable": "Valeur de registre indisponible"
             }
+          },
+          "planned_start": {
+            "name": "Démarrage prévu"
+          },
+          "estimated_finish": {
+            "name": "Fin estimée"
+          },
+          "estimated_level_at_departure": {
+            "name": "Niveau de charge estimé au départ"
           }
         }
       }

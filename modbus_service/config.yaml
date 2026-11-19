@@ -10,7 +10,6 @@ startup: services
 boot: auto
 init: true
 uart: true
-udev: true
 apparmor: true
 ingress: true
 ingress_port: 8099

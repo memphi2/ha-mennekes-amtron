@@ -54,6 +54,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   read again.
 - A weak line logs late heartbeat acknowledgements once per episode instead
   of with every acknowledgement.
+- Reconfiguring the connection to a separately hosted service no longer
+  fills the form with the stored access token. Enter the token again there.
+- A tariff change after a vehicle switch or after switching Plug & Charge is
+  applied without a reload again, so the running cost estimate is kept.
+- Attributes of Total power, Session energy, Charging status, Wallbox
+  settings, Error, Authorization, Cable lock and the departure plan have
+  names in all five languages. Connection quality names its `heartbeat`
+  attribute instead of two counters it never carried.
+- App: a page read behind a long command ends after five seconds with
+  "Another request is running" instead of blocking the app's other pages,
+  and the overview shows the last state meanwhile.
+- App: the unused access to the host's udev database is gone.
+- Documentation: a guest charge follows the blueprints' current and pause
+  like any other charge; the fields of `set_charging_current` are listed in
+  the user guide.
 - Cost target: the app arms an amount at the price of the running amount,
   also after a restart of the service, and a price that changed nothing no
   longer delays the next one by a minute.

@@ -213,6 +213,18 @@
         "state_attributes": {
           "heartbeat_lost": {
             "name": "Fallback del gestore energetico attivo"
+          },
+          "code": {
+            "name": "Codice di errore"
+          },
+          "category": {
+            "name": "Categoria"
+          },
+          "fallback": {
+            "name": "Comportamento di fallback"
+          },
+          "fallback_current": {
+            "name": "Corrente di fallback"
           }
         }
       },
@@ -288,6 +300,11 @@
           "authorized": "Autorizzato",
           "not_authorized": "Non autorizzato",
           "not_used": "Non utilizzata"
+        },
+        "state_attributes": {
+          "enabled": {
+            "name": "Autorizzazione richiesta"
+          }
         }
       },
       "cable_lock_status": {
@@ -297,6 +314,11 @@
           "locked": "Bloccato",
           "undetermined": "Non determinato",
           "unlocked": "Sbloccato"
+        },
+        "state_attributes": {
+          "permanent": {
+            "name": "Bloccato in modo permanente"
+          }
         }
       },
       "detected_ev_phases": {
@@ -312,10 +334,50 @@
         "name": "Energia totale"
       },
       "power_total": {
-        "name": "Potenza totale"
+        "name": "Potenza totale",
+        "state_attributes": {
+          "current_l1": {
+            "name": "Corrente L1"
+          },
+          "current_l2": {
+            "name": "Corrente L2"
+          },
+          "current_l3": {
+            "name": "Corrente L3"
+          },
+          "voltage_l1": {
+            "name": "Tensione L1"
+          },
+          "voltage_l2": {
+            "name": "Tensione L2"
+          },
+          "voltage_l3": {
+            "name": "Tensione L3"
+          },
+          "power_l1": {
+            "name": "Potenza L1"
+          },
+          "power_l2": {
+            "name": "Potenza L2"
+          },
+          "power_l3": {
+            "name": "Potenza L3"
+          }
+        }
       },
       "session_energy": {
-        "name": "Energia della sessione"
+        "name": "Energia della sessione",
+        "state_attributes": {
+          "duration_minutes": {
+            "name": "Durata (minuti)"
+          },
+          "maximum_current": {
+            "name": "Corrente massima"
+          },
+          "sessions": {
+            "name": "Sessioni di ricarica totali"
+          }
+        }
       },
       "signaled_current": {
         "name": "Corrente comunicata al veicolo"
@@ -325,7 +387,38 @@
       },
       "wallbox_settings": {
         "name": "Impostazioni della wallbox",
-        "state_attributes": {}
+        "state_attributes": {
+          "max_current_house": {
+            "name": "Corrente massima dell'allacciamento"
+          },
+          "max_evse_current": {
+            "name": "Corrente massima della wallbox"
+          },
+          "phase_rotation": {
+            "name": "Rotazione delle fasi"
+          },
+          "grid_phases_connected": {
+            "name": "Fasi di rete collegate"
+          },
+          "phase_options": {
+            "name": "Opzioni di fase"
+          },
+          "phase_switching_mode": {
+            "name": "Commutazione di fase"
+          },
+          "phase_switching_pause_seconds": {
+            "name": "Pausa di commutazione di fase (secondi)"
+          },
+          "grid_imbalance_monitoring": {
+            "name": "Monitoraggio dello squilibrio"
+          },
+          "grid_imbalance_threshold": {
+            "name": "Limite di squilibrio"
+          },
+          "solar_min_current": {
+            "name": "Corrente minima per la ricarica solare"
+          }
+        }
       },
       "charging_status": {
         "name": "Stato di ricarica",
@@ -348,6 +441,12 @@
         "state_attributes": {
           "downgraded_to": {
             "name": "Limitazione di rete attiva"
+          },
+          "evse_state": {
+            "name": "Stato della wallbox"
+          },
+          "cp_state": {
+            "name": "Segnale del veicolo (CP)"
           }
         }
       },
@@ -358,11 +457,12 @@
           "degraded": "Errori di comunicazione rilevati"
         },
         "state_attributes": {
-          "failed_transactions": {
-            "name": "Transazioni non riuscite"
-          },
-          "retried_transactions": {
-            "name": "Transazioni ripetute"
+          "heartbeat": {
+            "name": "Heartbeat",
+            "state": {
+              "ok": "OK",
+              "problem": "Problema"
+            }
           }
         }
       },
@@ -440,7 +540,7 @@
               "unavailable": "Wallbox non raggiungibile",
               "departure_plan": "Pianificazione della partenza",
               "direct": "Controllo diretto",
-              "guest": "Ordine ospite"
+              "guest": "Ricarica ospite"
             }
           },
           "next_event": {
@@ -577,6 +677,15 @@
               "authorization_required": "Autorizzazione attiva sulla wallbox",
               "register_unavailable": "Valore del registro non disponibile"
             }
+          },
+          "planned_start": {
+            "name": "Avvio pianificato"
+          },
+          "estimated_finish": {
+            "name": "Fine stimata"
+          },
+          "estimated_level_at_departure": {
+            "name": "Livello di carica stimato alla partenza"
           }
         }
       }

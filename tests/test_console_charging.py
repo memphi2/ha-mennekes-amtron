@@ -341,3 +341,35 @@ def test_console_names_a_command_that_must_wait_and_a_past_time(tmp_path, monkey
                 assert (refused.status, (await refused.json())["error"]) == expected
 
     asyncio.run(body())
+
+
+def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_state(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device import console_http
+    from custom_components.mennekes_amtron_rtu.device.service_overview import (
+        service_overview,
+    )
+
+    async def body():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        monkeypatch.setattr(console_http, "_READ_SECONDS", 0.05)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            monkeypatch.setattr("custom_components.mennekes_amtron_rtu.device.service_runtime._PATIENCE_SECONDS", 0.05)
+            console = Console(
+                "supervisor-fixture", TOKEN, service=service, overview=lambda: service_overview(service),
+            )
+            async with TestClient(TestServer(create_console_app(console))) as client:
+                assert (await client.get("/api/overview", headers=HEADERS)).status == 200
+                await service._command_lock.acquire()
+                try:
+                    # A read that waited for the command would keep its request
+                    # slot after the page gave up; two of them blocked the app.
+                    for path in ("/api/charging", "/api/registers"):
+                        response = await client.get(path, headers=HEADERS)
+                        assert (response.status, await response.json()) == (503, {"error": "busy"})
+                    # The overview waits shortly and shows the last published state.
+                    assert (await client.get("/api/overview", headers=HEADERS)).status == 200
+                finally:
+                    service._command_lock.release()
+                assert (await client.get("/api/charging", headers=HEADERS)).status == 200
+
+    asyncio.run(body())

@@ -154,6 +154,14 @@ class ChargingCostObserver:
         self._entry = entry
         self._configured_options = deepcopy(dict(entry.options))
 
+    def options_applied(self) -> None:
+        """Another owner applied the entry's current options in place.
+
+        Without this the next tariff change is compared with options from
+        before that change and takes the full reload instead.
+        """
+        self._configured_options = deepcopy(dict(self._entry.options))
+
     def apply_tariff_only_update(self) -> bool:
         """Change only the cost model without restarting the Modbus connection."""
         current = deepcopy(dict(self._entry.options))

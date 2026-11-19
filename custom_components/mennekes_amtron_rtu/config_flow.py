@@ -560,7 +560,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect_service"
         if entry is not None and dict(entry.data) != expected_data:
             return self.async_abort(reason="connection_settings_changed")
-        defaults = user_input or (dict(entry.data) if entry is not None else {})
+        # The stored token stays where it is: a form would hand it to the
+        # browser. Only what the user typed in this flow is shown again.
+        defaults = user_input or ({CONF_SERVER_URL: entry.data.get(CONF_SERVER_URL)} if entry is not None else {})
         return self.async_show_form(
             step_id="server",
             data_schema=self.add_suggested_values_to_schema(service_schema(), defaults),

@@ -17,6 +17,9 @@
 - A returned serial adapter is reopened within seconds; a write does not
   follow a port reopened just before it; a negative meter reading is not
   published; late heartbeats are logged once per episode.
+- A page read behind a long command ends after five seconds instead of
+  holding one of the two request slots; the overview shows the last state.
+- The app no longer asks for the host's udev database (`udev: true`).
 - A price that arrived while a cost ceiling was stopped is applied once it
   runs again.
 - The Charging page names the reported price and its time, and the planned

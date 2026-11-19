@@ -14,9 +14,13 @@ from custom_components import mennekes_amtron_rtu as integration
 @pytest.mark.parametrize("applied_by", ["plug_charge", "charging_cost"])
 def test_in_place_option_update_still_switches_the_vehicle(monkeypatch, applied_by):
     async def run():
+        adopted = []
         runtime = SimpleNamespace(
             plug_charge=SimpleNamespace(options_applied=lambda: applied_by == "plug_charge"),
-            charging_cost=SimpleNamespace(apply_tariff_only_update=lambda: applied_by == "charging_cost"),
+            charging_cost=SimpleNamespace(
+                apply_tariff_only_update=lambda: applied_by == "charging_cost",
+                options_applied=lambda: adopted.append(True),
+            ),
             vehicle_base_options={},
         )
         entry = SimpleNamespace(
@@ -33,6 +37,8 @@ def test_in_place_option_update_still_switches_the_vehicle(monkeypatch, applied_
         assert runtime.vehicle_base_options == {"virtual_plug_charge": True}
         switch.assert_awaited_once_with(hass, entry)
         hass.config_entries.async_reload.assert_not_awaited()
+        # The costs learn that these options are now the applied ones.
+        assert adopted == [True]
 
     asyncio.run(run())
 

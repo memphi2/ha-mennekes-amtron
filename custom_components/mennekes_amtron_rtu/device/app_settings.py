@@ -311,7 +311,9 @@ class AppSettings:
         if self._overview is None:
             raise SettingsError("overview_unavailable", 503)
         try:
-            async with asyncio.timeout(2):
+            # Longer than the two seconds a patient reader waits for a running
+            # command before it takes the last published state.
+            async with asyncio.timeout(5):
                 snapshot = await self._overview()
         except TimeoutError as err:
             raise SettingsError("overview_unavailable", 503) from err

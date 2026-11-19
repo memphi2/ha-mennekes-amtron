@@ -139,3 +139,23 @@ def test_command_results_are_fully_translated_in_every_shipped_language() -> Non
             _assert_states(attributes, attribute, values, path.name)
         assert attributes["occurred_at"]["name"], path.name
         assert attributes["value"]["state"]["0"], path.name
+
+
+def test_every_attribute_a_sensor_shows_has_a_name_in_every_language() -> None:
+    async def run() -> dict[str, set[str]]:
+        hass, entry, _transport = await build_runtime()
+        sensors = {}
+        await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
+        sensors["power_total"].coordinator.data.values["power_total"] = 1000.0
+        return {key: set(entity.extra_state_attributes or {}) for key, entity in sensors.items()}
+
+    shown = asyncio.run(run())
+    assert all(shown[key] for key in ("power_total", "wallbox_settings", "session_energy"))
+    for path in [INTEGRATION / "strings.json", *sorted((INTEGRATION / "translations").glob("*.json"))]:
+        translated = json.loads(path.read_text())["entity"]["sensor"]
+        for key, attributes in shown.items():
+            names = translated[key].get("state_attributes", {})
+            assert attributes <= set(names), (path.name, key, attributes - set(names))
+            assert all(names[attribute]["name"] for attribute in attributes), (path.name, key)
+        # Counters that only the diagnostics download carries have no entity text.
+        assert set(translated["connection_quality"]["state_attributes"]) == {"heartbeat"}

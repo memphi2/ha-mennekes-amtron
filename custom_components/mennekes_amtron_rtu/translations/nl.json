@@ -213,6 +213,18 @@
         "state_attributes": {
           "heartbeat_lost": {
             "name": "Terugvalmodus energiemanager actief"
+          },
+          "code": {
+            "name": "Foutcode"
+          },
+          "category": {
+            "name": "Categorie"
+          },
+          "fallback": {
+            "name": "Fallback-gedrag"
+          },
+          "fallback_current": {
+            "name": "Fallback-stroom"
           }
         }
       },
@@ -288,6 +300,11 @@
           "authorized": "Geautoriseerd",
           "not_authorized": "Niet geautoriseerd",
           "not_used": "Niet gebruikt"
+        },
+        "state_attributes": {
+          "enabled": {
+            "name": "Autorisatie vereist"
+          }
         }
       },
       "cable_lock_status": {
@@ -297,6 +314,11 @@
           "locked": "Vergrendeld",
           "undetermined": "Niet vastgesteld",
           "unlocked": "Ontgrendeld"
+        },
+        "state_attributes": {
+          "permanent": {
+            "name": "Permanent vergrendeld"
+          }
         }
       },
       "detected_ev_phases": {
@@ -312,10 +334,50 @@
         "name": "Totale energie"
       },
       "power_total": {
-        "name": "Totaal vermogen"
+        "name": "Totaal vermogen",
+        "state_attributes": {
+          "current_l1": {
+            "name": "Stroom L1"
+          },
+          "current_l2": {
+            "name": "Stroom L2"
+          },
+          "current_l3": {
+            "name": "Stroom L3"
+          },
+          "voltage_l1": {
+            "name": "Spanning L1"
+          },
+          "voltage_l2": {
+            "name": "Spanning L2"
+          },
+          "voltage_l3": {
+            "name": "Spanning L3"
+          },
+          "power_l1": {
+            "name": "Vermogen L1"
+          },
+          "power_l2": {
+            "name": "Vermogen L2"
+          },
+          "power_l3": {
+            "name": "Vermogen L3"
+          }
+        }
       },
       "session_energy": {
-        "name": "Energie laadsessie"
+        "name": "Energie laadsessie",
+        "state_attributes": {
+          "duration_minutes": {
+            "name": "Duur (minuten)"
+          },
+          "maximum_current": {
+            "name": "Hoogste stroom"
+          },
+          "sessions": {
+            "name": "Laadsessies in totaal"
+          }
+        }
       },
       "signaled_current": {
         "name": "Aangeboden stroom"
@@ -325,7 +387,38 @@
       },
       "wallbox_settings": {
         "name": "Wallbox-instellingen",
-        "state_attributes": {}
+        "state_attributes": {
+          "max_current_house": {
+            "name": "Maximale stroom van de huisaansluiting"
+          },
+          "max_evse_current": {
+            "name": "Maximale stroom van de wallbox"
+          },
+          "phase_rotation": {
+            "name": "Faserotatie"
+          },
+          "grid_phases_connected": {
+            "name": "Aangesloten netfasen"
+          },
+          "phase_options": {
+            "name": "Faseopties"
+          },
+          "phase_switching_mode": {
+            "name": "Fase-omschakeling"
+          },
+          "phase_switching_pause_seconds": {
+            "name": "Pauze bij fase-omschakeling (seconden)"
+          },
+          "grid_imbalance_monitoring": {
+            "name": "Bewaking van scheefbelasting"
+          },
+          "grid_imbalance_threshold": {
+            "name": "Grens voor scheefbelasting"
+          },
+          "solar_min_current": {
+            "name": "Minimale stroom voor zonneladen"
+          }
+        }
       },
       "charging_status": {
         "name": "Laadstatus",
@@ -348,6 +441,12 @@
         "state_attributes": {
           "downgraded_to": {
             "name": "Vermogensbeperking actief"
+          },
+          "evse_state": {
+            "name": "Status van de wallbox"
+          },
+          "cp_state": {
+            "name": "Voertuigsignaal (CP)"
           }
         }
       },
@@ -358,11 +457,12 @@
           "degraded": "Communicatiefouten gedetecteerd"
         },
         "state_attributes": {
-          "failed_transactions": {
-            "name": "Mislukte transacties"
-          },
-          "retried_transactions": {
-            "name": "Herhaalde transacties"
+          "heartbeat": {
+            "name": "Heartbeat",
+            "state": {
+              "ok": "In orde",
+              "problem": "Probleem"
+            }
           }
         }
       },
@@ -440,7 +540,7 @@
               "unavailable": "Wallbox niet bereikbaar",
               "departure_plan": "Vertrekplanning",
               "direct": "Directe bediening",
-              "guest": "Gastopdracht"
+              "guest": "Gastladen"
             }
           },
           "next_event": {
@@ -577,6 +677,15 @@
               "authorization_required": "Autorisatie op de wallbox ingeschakeld",
               "register_unavailable": "Registerwaarde niet beschikbaar"
             }
+          },
+          "planned_start": {
+            "name": "Geplande start"
+          },
+          "estimated_finish": {
+            "name": "Verwacht einde"
+          },
+          "estimated_level_at_departure": {
+            "name": "Verwacht laadniveau bij vertrek"
           }
         }
       }

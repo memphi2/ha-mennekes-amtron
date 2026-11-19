@@ -213,6 +213,18 @@
         "state_attributes": {
           "heartbeat_lost": {
             "name": "Energiemanager-Fallback aktiv"
+          },
+          "code": {
+            "name": "Fehlercode"
+          },
+          "category": {
+            "name": "Kategorie"
+          },
+          "fallback": {
+            "name": "Fallback-Verhalten"
+          },
+          "fallback_current": {
+            "name": "Fallback-Strom"
           }
         }
       },
@@ -288,6 +300,11 @@
           "authorized": "Autorisiert",
           "not_authorized": "Nicht autorisiert",
           "not_used": "Nicht verwendet"
+        },
+        "state_attributes": {
+          "enabled": {
+            "name": "Autorisierung erforderlich"
+          }
         }
       },
       "cable_lock_status": {
@@ -297,6 +314,11 @@
           "locked": "Verriegelt",
           "undetermined": "Unbestimmt",
           "unlocked": "Entriegelt"
+        },
+        "state_attributes": {
+          "permanent": {
+            "name": "Dauerhaft verriegelt"
+          }
         }
       },
       "detected_ev_phases": {
@@ -312,10 +334,50 @@
         "name": "Energie insgesamt"
       },
       "power_total": {
-        "name": "Gesamtleistung"
+        "name": "Gesamtleistung",
+        "state_attributes": {
+          "current_l1": {
+            "name": "Strom L1"
+          },
+          "current_l2": {
+            "name": "Strom L2"
+          },
+          "current_l3": {
+            "name": "Strom L3"
+          },
+          "voltage_l1": {
+            "name": "Spannung L1"
+          },
+          "voltage_l2": {
+            "name": "Spannung L2"
+          },
+          "voltage_l3": {
+            "name": "Spannung L3"
+          },
+          "power_l1": {
+            "name": "Leistung L1"
+          },
+          "power_l2": {
+            "name": "Leistung L2"
+          },
+          "power_l3": {
+            "name": "Leistung L3"
+          }
+        }
       },
       "session_energy": {
-        "name": "Energie der Sitzung"
+        "name": "Energie der Sitzung",
+        "state_attributes": {
+          "duration_minutes": {
+            "name": "Dauer (Minuten)"
+          },
+          "maximum_current": {
+            "name": "Höchster Strom"
+          },
+          "sessions": {
+            "name": "Ladevorgänge insgesamt"
+          }
+        }
       },
       "signaled_current": {
         "name": "Signalisierter Strom"
@@ -325,7 +387,38 @@
       },
       "wallbox_settings": {
         "name": "Wallbox-Einstellungen",
-        "state_attributes": {}
+        "state_attributes": {
+          "max_current_house": {
+            "name": "Maximalstrom des Hausanschlusses"
+          },
+          "max_evse_current": {
+            "name": "Maximalstrom der Wallbox"
+          },
+          "phase_rotation": {
+            "name": "Phasendrehung"
+          },
+          "grid_phases_connected": {
+            "name": "Angeschlossene Netzphasen"
+          },
+          "phase_options": {
+            "name": "Phasenoptionen"
+          },
+          "phase_switching_mode": {
+            "name": "Phasenumschaltung"
+          },
+          "phase_switching_pause_seconds": {
+            "name": "Pause bei Phasenumschaltung (Sekunden)"
+          },
+          "grid_imbalance_monitoring": {
+            "name": "Schieflastüberwachung"
+          },
+          "grid_imbalance_threshold": {
+            "name": "Schieflastgrenze"
+          },
+          "solar_min_current": {
+            "name": "Mindeststrom für Solarladen"
+          }
+        }
       },
       "charging_status": {
         "name": "Ladestatus",
@@ -348,6 +441,12 @@
         "state_attributes": {
           "downgraded_to": {
             "name": "Downgrade aktiv"
+          },
+          "evse_state": {
+            "name": "Zustand der Wallbox"
+          },
+          "cp_state": {
+            "name": "Fahrzeugsignal (CP)"
           }
         }
       },
@@ -358,11 +457,12 @@
           "degraded": "Kommunikationsfehler erkannt"
         },
         "state_attributes": {
-          "failed_transactions": {
-            "name": "Fehlerhafte Übertragungen"
-          },
-          "retried_transactions": {
-            "name": "Wiederholte Übertragungen"
+          "heartbeat": {
+            "name": "Heartbeat",
+            "state": {
+              "ok": "In Ordnung",
+              "problem": "Problem"
+            }
           }
         }
       },
@@ -440,7 +540,7 @@
               "unavailable": "Wallbox nicht erreichbar",
               "departure_plan": "Abfahrtsplanung",
               "direct": "Direkte Steuerung",
-              "guest": "Gastauftrag"
+              "guest": "Gastladen"
             }
           },
           "next_event": {
@@ -577,6 +677,15 @@
               "authorization_required": "Autorisierung an der Wallbox aktiv",
               "register_unavailable": "Registerwert nicht verfügbar"
             }
+          },
+          "planned_start": {
+            "name": "Geplanter Start"
+          },
+          "estimated_finish": {
+            "name": "Voraussichtliches Ende"
+          },
+          "estimated_level_at_departure": {
+            "name": "Voraussichtlicher Ladestand bei Abfahrt"
           }
         }
       }

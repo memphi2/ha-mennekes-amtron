@@ -734,3 +734,26 @@ def test_a_plug_in_no_poll_showed_ends_the_charge_before_it(tmp_path):
         assert observer.current.energy_kwh == pytest.approx(3)
         assert not observer.current.complete
     observed(tmp_path, body)
+
+
+@pytest.mark.parametrize("earlier", [
+    {"active_vehicle_profile": "a" * 32, "vehicle_profile_selected_at": 1.0}, {"virtual_plug_charge": True},
+])
+def test_a_tariff_change_is_applied_in_place_after_another_in_place_change(tmp_path, earlier):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        configured = entry()
+        observer = ChargingCostObserver(hass, configured)
+        # A vehicle switch or the Plug & Charge switch changes the options
+        # without a reload; the listener reports that to the costs.
+        configured.options = {**configured.options, **earlier}
+        assert not observer.apply_tariff_only_update()
+        observer.options_applied()
+        configured.options = {
+            **configured.options,
+            "charging_network_tariff": {"module": "module_2", "regular_network": 0.1, "price_includes_network": True},
+        }
+        assert observer.apply_tariff_only_update()
+        await hass.async_stop()
+
+    asyncio.run(run())

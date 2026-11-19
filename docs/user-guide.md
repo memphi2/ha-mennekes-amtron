@@ -240,3 +240,18 @@ owns the charging current.
 
 Use native entities for daily operation. For automations, see [actions and events](automations.md)
 and [app actions](app-from-home-assistant.md#automation-actions).
+
+`mennekes_amtron_rtu.set_charging_current` takes these fields:
+
+| Field | Meaning |
+|---|---|
+| `device_id` | The wallbox device, or a list of them. Required. |
+| `current` | The limit in ampere, 6 to 32 in steps of 0.1. Required. |
+| `allow_unlimited` | Must be `true` to send `current: 0`, which removes the limit. It is not a pause. |
+
+```yaml
+action: mennekes_amtron_rtu.set_charging_current
+data:
+  device_id: 0123456789abcdef0123456789abcdef
+  current: 10
+```

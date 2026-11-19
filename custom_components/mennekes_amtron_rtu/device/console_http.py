@@ -27,6 +27,8 @@ CONSOLE_ASSETS = {
 
 # Refusals decided before the requested change, each with its own app hint.
 # Everything else, e.g. a lost write or storage error, stays uncertain.
+# Below the eight seconds after which the pages give up on a read.
+_READ_SECONDS = 5.0
 _REFUSALS = frozenset({
     "soc_goal_source_changed", "soc_goal_limit_unavailable", "read_only_mode",
     "guest_start_not_permitted", "guest_deadline_expired", "time_limit_reached",
@@ -125,8 +127,11 @@ class ServiceConsole(AppSettings):
         service = self.service
         if service is None:
             raise SettingsError("service_not_configured", 503)
-        async with asyncio.timeout(2):
-            state = await service.stable_snapshot()
+        try:
+            async with asyncio.timeout(_READ_SECONDS):
+                state = await service.stable_snapshot()
+        except TimeoutError as err:
+            raise SettingsError("busy", 503) from err
         data = service.register_monitor.snapshot(
             layout=service.identity.layout_version if service.control is not None else None,
             available=state["available"], scan_interval=service.config.scan_interval,
@@ -179,7 +184,14 @@ class ServiceConsole(AppSettings):
         user = await self._authorize(request)
         if request.query:
             raise SettingsError("invalid_request")
-        await self._configured_service().stable_snapshot()
+        service = self._configured_service()
+        try:
+            # A read that waits for a long command holds one of the two
+            # request slots, also after the page gave up on it.
+            async with asyncio.timeout(_READ_SECONDS):
+                await service.stable_snapshot()
+        except TimeoutError as err:
+            raise SettingsError("busy", 503) from err
         return web.json_response({**self._choices(), "csrf": self._digest("csrf", user)})
 
     async def save_charging(self, request: web.Request) -> web.Response:

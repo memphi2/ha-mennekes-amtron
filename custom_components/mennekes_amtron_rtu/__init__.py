@@ -900,6 +900,10 @@ async def _async_reload_entry_locked(
             # vehicle, which must still be switched, not silently skipped.
             runtime.vehicle_base_options = without_selection(entry.options)
         if await _async_switch_vehicle(hass, entry):
+            # Everything was applied in place. The costs go on and must
+            # compare the next tariff change with these options.
+            if cost is not None:
+                cost.options_applied()
             return
         # A reload that also selects another car keeps the previous car's trip.
         await _async_park_trip(hass, entry)
