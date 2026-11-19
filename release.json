@@ -1,10 +1,10 @@
 {
   "catalog_channel": "apps-beta",
   "channel": "apps-beta",
-  "commit": "ba824fb112f0ba6d1d2e71c2c3d9e6c9fbb90aee",
-  "digest": "sha256:e754aa965ba0e32ca1aea4bebe702918bfa6ce615393b399bde9405c03689f8a",
+  "commit": "0c31156000cae449689d5f12e7800e9b69c2b80b",
+  "digest": "sha256:f7a8071c2dbb621f67bf7b9dab59317f5436f980fdf3e82ab091178245c3c588",
   "image": "ghcr.io/memphi2/ha-mennekes-amtron-service",
   "repository": "memphi2/ha-mennekes-amtron",
-  "source_tag": "v0.10.0b1",
-  "version": "0.10.0b1"
+  "source_tag": "v0.10.0b2",
+  "version": "0.10.0b2"
 }

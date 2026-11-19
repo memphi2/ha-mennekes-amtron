@@ -1,5 +1,17 @@
 # Changes
 
+## 0.10.0b2
+
+- Integration and app must both be 0.10.0b2; update them together.
+- The state no longer carries the field `choice_revision`.
+- The service no longer summarizes charging sessions; an intent file saved by
+  an earlier version is rejected once and needs the acknowledgement in Home
+  Assistant Repairs.
+- The service keeps the meter readings of the running and the last plug
+  cycle (`charge_meter` in its state, `POST /v2/energy` for a time span) and
+  saves them in `charge-meter.json`, together with the vehicle Home Assistant
+  names with the new command `charge_note`.
+
 ## 0.10.0b1
 
 - Log lines start with their area, such as `Service:`, `Connection:` or
