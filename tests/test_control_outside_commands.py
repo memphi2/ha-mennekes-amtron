@@ -9,6 +9,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
 from tests.fakes import raise_connection_error
 from tests.test_control import Harness
 from tests.test_modbus_service import service_fixture
@@ -53,9 +54,7 @@ def test_closing_the_release_after_an_unplug_keeps_a_waiting_lock(tmp_path):
         assert control.pending_action == "lock"
         _plug(transport, False)
         await _poll(service)
-        assert (
-            control.pending_action == "lock" or transport.bank[R.LOCK_EVSE.address] == 1
-        )
+        assert control.pending_action == "lock"
         await service.stop()
 
     asyncio.run(run())
@@ -98,7 +97,7 @@ def test_an_uncertain_recovery_write_keeps_a_waiting_pause():
     asyncio.run(run())
 
 
-def test_a_lowered_cap_is_written_behind_a_waiting_stop():
+def test_a_lowered_cap_waits_behind_a_waiting_stop():
     async def run():
         h, control = await charging()
         h.client.write_state.mode_change_at = h.clock[0]
@@ -111,8 +110,11 @@ def test_a_lowered_cap_is_written_behind_a_waiting_stop():
         )
         h.clock[0] += 60
         h.snapshot.values["charging_current_ems"] = 16.0
-        lowered = await control.async_enforce_current_cap()
-        assert lowered or currents(h)
+        before = currents(h)
+        # The stop keeps its place and nothing is reported as lowered; the
+        # stop ends the charge, and the cap bounds whatever starts after it.
+        assert await control.async_enforce_current_cap() is False
+        assert (control.pending_action, currents(h)) == ("lock", before)
         await control.async_shutdown()
 
     asyncio.run(run())
@@ -165,5 +167,38 @@ def test_a_manual_release_does_not_pass_to_the_next_car_over_a_restart(tmp_path)
         rel = wallbox.bank[R.CHARGING_RELEASE.address]
         await restarted.stop()
         assert rel == 0
+
+    asyncio.run(run())
+
+
+def test_a_release_by_hand_for_the_next_plug_in_survives_a_restart():
+    state = PlugChargeState()
+    state.configure(True, "a" * 64)
+    state.manual = True
+    saved = state.durable()
+    assert saved["manual_connected"] is False
+    restored = PlugChargeState.restore(saved)
+    restored.observe(False)
+    # Given without a car: it still waits for the next one.
+    assert restored.manual
+    state.observe(True)
+    assert state.durable()["manual_connected"] is True
+    restored = PlugChargeState.restore(state.durable())
+    restored.observe(False)
+    assert not restored.manual
+    with pytest.raises(ValueError, match="Plug & Charge"):
+        PlugChargeState.restore({**saved, "manual": False, "manual_connected": True})
+
+
+def test_a_release_given_after_a_restart_is_not_the_one_read_from_disk(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        gate = service.control._plug_charge
+        await service.control.async_configure_plug_charge(True, policy="a" * 64)
+        gate.state.restored_manual = True
+        gate.set_manual(True)
+        assert (gate.state.manual, gate.state.restored_manual) == (True, False)
+        await service.stop()
 
     asyncio.run(run())

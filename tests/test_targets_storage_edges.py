@@ -2,11 +2,14 @@
 
 import asyncio
 import threading
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
+from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests import service_guest_fixture as runtime
 from tests.test_departure_plan import NOW, Box, inputs
 from tests.test_departure_planner import hand_over
@@ -202,17 +205,78 @@ def test_the_plans_current_does_not_replace_the_current_chosen_by_hand(tmp_path)
             assert planned >= 6
             assert planned != chosen
             assert service.control.charging_setpoint == chosen
-            await service.command({
-                "command": "departure_trip", "deadline": None, "source": None, "withdraw": True,
-                "expected_serial_number": serial,
-            })
+            await service.command(
+                {
+                    "command": "departure_trip",
+                    "deadline": None,
+                    "source": None,
+                    "withdraw": True,
+                    "expected_serial_number": serial,
+                }
+            )
             clock[0] += 1000
             await service.departure.tick()
             await service.refresh()
-            await service.command({"command": "pause", "expected_serial_number": serial})
+            await service.command(
+                {"command": "pause", "expected_serial_number": serial}
+            )
             clock[0] += 1000
-            await service.command({"command": "resume", "expected_serial_number": serial})
+            await service.command(
+                {"command": "resume", "expected_serial_number": serial}
+            )
             # Back to the chosen current, not the plan's.
             assert runtime.current_writes(transport)[-1] == chosen
 
     asyncio.run(run())
+
+
+def test_the_plan_ends_its_pause_when_a_queued_guest_start_never_ran(tmp_path):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (s, transport, clock):
+            serial = s.identity.serial_number
+            await hand_over(s, hours=10)
+            await s.departure.tick()
+            assert s.departure.status == "paused_until_start"
+            assert s.departure.plan_paused
+            assert s.control.pause_requested is True
+            # guest start inside the state-change interval of the plan's pause
+            clock[0] += 5
+            with suppress(DeviceError):
+                await s.command(
+                    {
+                        "command": "guest_start",
+                        "expected_serial_number": serial,
+                        "expected_guest_revision": s.guest.revision,
+                    }
+                )
+            assert s.guest.mode
+            assert s.control.pending_action == "resume"
+            assert (
+                s.control.pause_requested is True
+            )  # the plan's pause is still what the wallbox has
+            await s.departure.tick()
+            # the guest leaves before the queued start ran
+            runtime.put(transport.bank, runtime.R.EVSE_STATE, 1)
+            runtime.put(transport.bank, runtime.R.CP_STATE, 10)
+            clock[0] += 1
+            await s.refresh()
+            for _ in range(20):
+                s.control._pending_changed.set()
+                await asyncio.sleep(0.01)
+            assert s.control.pending_action is None
+            assert not s.guest.mode
+            clock[0] += 1000
+            await s.departure.tick()
+            await s.refresh()
+            await s.departure.tick()
+            assert s.control.pause_requested is not True, (
+                "the plan's own pause was left on the wallbox"
+            )
+
+    asyncio.run(run())
+
+
+def test_an_intent_file_far_too_large_counts_as_damaged(tmp_path):
+    store = IntentStore(tmp_path / "intent.json", "serial")
+    store.path.write_bytes(b" " * 70000)
+    assert store.load(WriteState()) is False

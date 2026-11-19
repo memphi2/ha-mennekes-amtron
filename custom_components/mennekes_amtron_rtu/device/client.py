@@ -348,6 +348,14 @@ class MennekesModbusClient:
         if client.connected:
             return
         self._connection_changed(False)
+        # The library may still try to reopen a port it lost. Left alone it
+        # would go on beside this connection and fail on the port's lock
+        # every few seconds for good.
+        context = getattr(client, "ctx", None)
+        reopening = getattr(context, "reconnect_task", None)
+        if context is not None and isinstance(reopening, asyncio.Task):
+            reopening.cancel()
+            context.reconnect_task = None
         try:
             connected = await client.connect()
         except WaveshareAuthenticationRejectedError as err:

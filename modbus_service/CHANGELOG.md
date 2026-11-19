@@ -18,9 +18,10 @@
 - A missing-meter pause no longer resumes by itself after a guest time limit
   was lifted; a guest start for a car that just left is refused.
 - Writes outside a command (release closed after an unplug, error recovery)
-  keep a waiting lock or pause; a lowered current cap is written behind one.
-- A manual Plug & Charge release ends when the first answer after a restart
-  shows no car; a foreign current above 32 A is not saved as the setpoint.
+  keep a waiting lock or pause.
+- A manual Plug & Charge release given to a connected car ends when the
+  first answer after a restart shows no car; a foreign current above 32 A is
+  not saved as the setpoint.
 - The departure plan leaves a guest's pause alone; the service starts with a refusing disk and a saved guest permission.
 - A returned serial adapter is reopened within seconds; a write does not
   follow a port reopened just before it; a negative meter reading is not

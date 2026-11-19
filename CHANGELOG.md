@@ -50,10 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   switched off by hand into a requested one.
 - Closing the release after an unplug, and an error recovery whose write
   stayed unanswered, no longer drop a lock or pause that still waits.
-- A lowered current cap is written at once, also while a pause or lock waits
-  for the state-change interval.
-- Plug & Charge: a release given by hand no longer passes to the next car
-  when the released car was unplugged while the service was down.
+- Plug & Charge: a release given by hand to a connected car no longer passes
+  to the next car when that car was unplugged while the service was down. A
+  release given without a car still waits for the next plug-in.
 - A current above 32 A found in the wallbox, e.g. from another controller, is
   no longer saved as the current to return to. Before, the next start
   rejected the saved state and blocked charging until acknowledged.
@@ -63,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - With a guest permission saved, the service starts also while the disk
   refuses writes; a stop of the service can no longer hang on a save that
   fails at that moment.
+- After a serial port was lost while the service started, the library's own
+  attempts to reopen it no longer go on beside the new connection.
 - A serial adapter that was gone is used again within seconds of its return.
   Before, the wait doubled up to five minutes, with the wallbox on its
   fallback current meanwhile.
@@ -70,8 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   quiet wait before it, without a new check of the wallbox's identity.
 - A negative reading of the energy meter is no longer published while it is
   read again.
-- A weak line logs late heartbeat acknowledgements once per episode instead
-  of with every acknowledgement.
+- A weak line logs late heartbeat acknowledgements once per weak phase,
+  until five minutes passed without one, instead of each time.
 - Reconfiguring the connection to a separately hosted service no longer
   fills the form with the stored access token, nor with one typed before a
   failed attempt. Enter the token again there.

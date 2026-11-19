@@ -72,11 +72,28 @@ def test_a_late_heartbeat_is_reported_once_per_episode(caplog):
     manager._diagnostics = WriteDiagnostics()
     manager._client = SimpleNamespace(config=SimpleNamespace(port="/dev/ttyUSB0"))
     manager._late_notice = FailureNotice(logging.getLogger(HeartbeatTask.__module__), "Heartbeat")
+    manager._late_at = None
     with caplog.at_level(logging.DEBUG):
-        for at in (0.0, 15.0, 30.0, 45.0, 50.0, 70.0):
-            manager._note_delivery(at)
+        # Late and on time in turns is one weak phase; five quiet minutes end it.
+        for at in (0.0, 15.0, 20.0, 35.0, 40.0, 60.0, *range(65, 380, 5), 400.0):
+            manager._note_delivery(float(at))
     warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
-    # Three late gaps, one recovery, one more late gap: two warnings, not four.
     assert len(warnings) == 2
     assert manager._diagnostics.heartbeats_late == 4
     assert any("within the deadline again" in record.getMessage() for record in caplog.records)
+
+
+def test_the_owners_connect_ends_the_librarys_own_reopening():
+    async def run():
+        fake = FakeModbusClient(device_bank())
+        reopening = asyncio.create_task(asyncio.sleep(3600))
+        fake.ctx = SimpleNamespace(reconnect_task=reopening)
+        client = MennekesModbusClient(SerialConfig(port="/dev/null-not-opened"))
+        client._client = fake
+        await client.async_connect()
+        await asyncio.sleep(0)
+        # Two openers of one port: the second fails on its lock for good.
+        assert reopening.cancelled()
+        assert fake.ctx.reconnect_task is None
+
+    asyncio.run(run())

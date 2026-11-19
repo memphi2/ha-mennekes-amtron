@@ -59,6 +59,9 @@ class PlugChargeState:
     # A manual release read from disk: its connection may have ended while
     # the service was down, so it needs a car at the first answer.
     restored_manual: bool = False
+    # The manual release was given to, or met, a connected car. The session
+    # itself is not saved, so this says after a restart whose release it was.
+    manual_connected: bool = False
 
     @property
     def blocked(self) -> bool:
@@ -135,25 +138,30 @@ class PlugChargeState:
         if self.session is None:
             self.session = secrets.token_hex(16)
             self.since = self.last_absent_at or now
+        self.manual_connected = self.manual
 
     def snapshot(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
 
     def durable(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold,
-                "manual": self.manual}
+                "manual": self.manual,
+                # Given for a connected car, not for the next plug-in.
+                "manual_connected": self.manual and self.manual_connected}
 
     @classmethod
     def restore(cls, raw: object) -> PlugChargeState:
         if (
             not isinstance(raw, dict)
-            or raw.keys() != {"enabled", "policy", "hold", "manual"}
+            or raw.keys() != {"enabled", "policy", "hold", "manual", "manual_connected"}
             or type(raw["hold"]) is not bool or type(raw["manual"]) is not bool
+            or type(raw["manual_connected"]) is not bool or (raw["manual_connected"] and not raw["manual"])
         ):
             raise ValueError("invalid saved Plug & Charge configuration")
         result = cls(hold=raw["hold"])
         result.configure(raw["enabled"], raw["policy"])
-        result.manual = result.restored_manual = raw["manual"] and result.enabled
+        result.manual = raw["manual"] and result.enabled
+        result.restored_manual = result.manual_connected = result.manual and raw["manual_connected"]
         return result
 
 
@@ -264,6 +272,9 @@ class PlugChargeController:
                 "the next plug-in" if self.state.session is None else "this connection",
             )
         self.state.manual = released and self.state.enabled
+        self.state.manual_connected = self.state.manual and self.state.session is not None
+        # Given now, it is not the one read from disk any more.
+        self.state.restored_manual = False
 
     def _check_request(self, session: str, deadline: datetime) -> None:
         if self._stopping or not self.state.enabled:

@@ -592,10 +592,11 @@ class DepartureController:
             if sample.guest_mode:
                 self._power_window.reset()
                 await self._cancel_command()
-                if self.plan_paused:
-                    # The guest start ended the plan's pause. A pause from now
-                    # on is the guest's, by hand or by its limits, and the
-                    # plan must not end it after the unplug.
+                if self.plan_paused and sample.pause_requested is False:
+                    # The guest start has ended the plan's pause. A pause from
+                    # now on is the guest's, by hand or by its limits, and the
+                    # plan must not end it after the unplug. While the start
+                    # still waits, the pause stays the plan's to end.
                     self.plan_paused = self._pause_seen = False
                     await self._save()
                 self.status = "guest_mode"

@@ -428,7 +428,9 @@ def test_service_persists_policy_but_new_process_requires_new_authorization(tmp_
             snap = service.snapshot()["control"]
             assert snap["plug_charge"]["session"]
             saved = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert saved == {"enabled": True, "policy": POLICY, "hold": True, "manual": False}
+            assert saved == {
+                "enabled": True, "policy": POLICY, "hold": True, "manual": False, "manual_connected": False,
+            }
             restored = WriteState()
             IntentStore(tmp_path / "intent.json", service.identity.serial_number).load(restored)
             assert restored.plug_charge.enabled
@@ -553,7 +555,7 @@ def test_service_accepts_only_current_session_authorization(tmp_path):
             result = await service.command({"command": "plug_charge_authorize", "session": session, "deadline": deadline().isoformat(), "expected_serial_number": serial})
             assert result["control"]["plug_charge"]["authorized"]
             stored = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert set(stored) == {"enabled", "policy", "hold", "manual"}
+            assert set(stored) == {"enabled", "policy", "hold", "manual", "manual_connected"}
             assert stored["hold"] is False
             for payload in (
                 {"command": "plug_charge_config", "value": 1},

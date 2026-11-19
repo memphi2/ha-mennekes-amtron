@@ -38,6 +38,9 @@ from .registers import HEARTBEAT
 from .runtime_events import EventType
 
 _LOGGER = logging.getLogger(__name__)
+# Late acknowledgements closer together than this are one report.
+_LATE_EPISODE_SECONDS = 300.0
+
 
 class HeartbeatTask:
     """Periodic heartbeat writer for one wallbox."""
@@ -62,6 +65,7 @@ class HeartbeatTask:
         self._stopping = False
         self._delivered_at: float | None = None
         self._late_notice = FailureNotice(_LOGGER, "Heartbeat")
+        self._late_at: float | None = None
         self._failed = False
         self._healthy: bool | None = None
         self._deadline_handle: asyncio.TimerHandle | None = None
@@ -200,8 +204,12 @@ class HeartbeatTask:
             return
         gap = now - previous
         if gap <= self._deadline:
-            self._late_notice.recovered("acknowledgements arrive within the deadline again")
+            # A line that is late now and then is one weak phase, not many.
+            if self._late_at is not None and now - self._late_at >= _LATE_EPISODE_SECONDS:
+                self._late_at = None
+                self._late_notice.recovered("acknowledgements arrive within the deadline again")
             return
+        self._late_at = now
         self._diagnostics.heartbeats_late += 1
         self._diagnostics.timeline.record(EventType.HEARTBEAT_LATE)
         # A weak line repeats this with every acknowledgement that gets through.
