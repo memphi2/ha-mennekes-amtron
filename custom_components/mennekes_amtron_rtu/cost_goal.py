@@ -225,9 +225,12 @@ class CostGoalObserver:
         async with self._lock:
             if not target:
                 goal = self.goal
-                if goal.target and goal.energy_kwh is not None:
+                # Ours is what we set, or an attempt the service already holds.
+                ours = {goal.energy_kwh, None if goal.attempt is None else goal.attempt.energy_kwh}
+                current = control.energy_goal.target_kwh
+                if goal.target and current in ours - {None}:
                     try:
-                        await control.async_set_energy_goal(0, expected=goal.energy_kwh)
+                        await control.async_set_energy_goal(0, expected=current)
                     except HomeAssistantError as err:
                         # Somebody else's target stays; only the amount ends.
                         if err.translation_key != "energy_goal_changed":

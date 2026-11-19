@@ -699,6 +699,12 @@ def test_an_energy_target_with_an_expected_one_is_set_only_while_that_holds(tmp_
                     await service.command({**payload, "expected_serial_number": serial})
                 assert error.value.translation_key == "energy_goal_changed"
             assert service.control.energy_goal.target_kwh == 7.0
+            for wrong in (None, True, "7"):
+                with pytest.raises(ValueError, match="expected_energy_goal"):
+                    await service.command({
+                        "command": "energy_goal", "value": 0, "expected_energy_goal": wrong,
+                        "expected_serial_number": serial,
+                    })
         finally:
             await service.stop()
 

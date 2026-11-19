@@ -460,3 +460,47 @@ def test_ending_the_amount_reports_any_other_refusal(tmp_path):
         await hass.async_stop(force=True)
 
     asyncio.run(run())
+
+
+def test_ending_the_amount_clears_an_attempt_the_service_already_holds(tmp_path, monkeypatch):
+    async def run():
+        hass, _entry, control, cost, observer = setup(tmp_path)
+        clock = [1000.0]
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
+        await observer.async_set_target(10)
+        clock[0] += 120
+        cost.price = 0.50
+        applied = control.async_set_energy_goal
+
+        async def lost(value, **how):
+            await applied(value, **how)
+            raise HomeAssistantError("no answer")
+
+        control.async_set_energy_goal = lost
+        await observe(observer, reading(control, 110.0))
+        control.async_set_energy_goal = applied
+        assert control.energy_goal.target_kwh == 14.0
+        await observer.async_set_target(0)
+        assert control.energy_goal.target_kwh == 0
+        await hass.async_stop(force=True)
+
+    asyncio.run(run())
+
+
+def test_ending_the_amount_when_another_target_came_in_between_keeps_it(tmp_path):
+    async def run():
+        hass, _entry, control, _cost, observer = setup(tmp_path)
+        await observer.async_set_target(3)
+        raced = control.async_set_energy_goal
+
+        async def someone_first(value, **how):
+            control.energy_goal.set_target(8.0, 100.0)
+            await raced(value, **how)
+
+        control.async_set_energy_goal = someone_first
+        await observer.async_set_target(0)
+        assert control.energy_goal.target_kwh == 8.0
+        assert observer.target == 0
+        await hass.async_stop(force=True)
+
+    asyncio.run(run())

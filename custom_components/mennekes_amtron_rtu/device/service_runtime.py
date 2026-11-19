@@ -909,6 +909,11 @@ class ModbusService:
             # Explicit null matches only a device without a readable serial.
             if expected_serial != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
+            expected_goal = payload.get("expected_energy_goal")
+            if "expected_energy_goal" in payload and (
+                isinstance(expected_goal, bool) or not isinstance(expected_goal, (int, float))
+            ):
+                raise ValueError("expected_energy_goal must be a number")
             if "expected_energy_goal" in payload and (
                 command != "energy_goal"
                 or payload["expected_energy_goal"] != control.energy_goal.target_kwh
