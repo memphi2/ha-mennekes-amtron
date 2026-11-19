@@ -326,8 +326,8 @@ def test_console_names_a_command_that_must_wait_and_a_past_time(tmp_path, monkey
             limited = AmtronRateLimitedError("state_change", 5.0)
             for request, error, expected in (
                 (choice, limited, (409, "write_rate_limited")),
-                # A guest start may have written the release before it had to wait.
-                (guest, limited, (503, "charging_save_uncertain")),
+                # The queue refuses a guest start before its first write.
+                (guest, limited, (409, "write_rate_limited")),
                 (choice, validation_error("target_time_not_future"), (409, "target_time_not_future")),
             ):
                 async def refuse(_payload, error=error):

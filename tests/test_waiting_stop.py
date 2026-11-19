@@ -302,3 +302,39 @@ def test_a_planners_waiting_pause_outlasts_a_manual_current_with_a_goal_controll
         await control.async_shutdown()
 
     asyncio.run(go())
+
+
+def test_a_guest_start_behind_a_waiting_lock_writes_nothing(tmp_path):
+    import pytest
+
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronRateLimitedError,
+    )
+    from tests import service_guest_fixture as runtime
+
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            control = service.control
+            clock[0] += 1000
+            await control.async_pause_charging()
+            await service.refresh()
+            await control.async_set_charging_release(False)
+            await service.refresh()
+            clock[0] += 5
+            await control.async_set_lock_evse(True)
+            assert control.pending_action == "lock"
+            await service.refresh()
+            transport.writes.clear()
+            with pytest.raises(AmtronRateLimitedError):
+                await service.command({
+                    "origin": "app", "command": "guest_start",
+                    "expected_serial_number": service.identity.serial_number,
+                    "expected_guest_revision": service.guest.revision,
+                })
+            # Refused before the release: nothing written, no guest left behind.
+            assert transport.writes == []
+            assert control.pending_action == "lock"
+            assert service.guest.scope is None
+            assert service.client.write_state.guest_permission is None
+
+    asyncio.run(run())

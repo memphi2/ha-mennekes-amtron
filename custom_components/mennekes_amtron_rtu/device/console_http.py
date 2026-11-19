@@ -230,11 +230,9 @@ class ServiceConsole(AppSettings):
         except (ValueError, TypeError, OverflowError) as err:
             raise SettingsError("invalid_request") from err
         except AmtronRateLimitedError as err:
-            # Refused before anything was written: it has to wait itself. A
-            # guest start may already have written the release, so it stays
-            # uncertain.
-            if action == "guest":
-                raise SettingsError("charging_save_uncertain", 503) from err
+            # Refused before anything was written: it has to wait itself.
+            # That holds for a guest start, too; the queue refuses a command
+            # of several steps before its first write.
             raise SettingsError("write_rate_limited", 409) from err
         except (AmtronBusError, OSError) as err:
             # The wallbox or the disk failed after the command went out.
