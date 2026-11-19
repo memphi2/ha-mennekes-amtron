@@ -589,7 +589,8 @@ def test_a_pause_another_owner_holds_is_left_alone(tmp_path, owner):
         box.set(present=False, **{owner: True})
         await plan.tick()
         assert box.resumes == 0
-        assert plan.plan_paused is (owner == "guest_mode")
+        # A guest start ended the plan's pause; a later one is the guest's.
+        assert plan.plan_paused is False
     run(go())
 
 

@@ -661,9 +661,12 @@ class ModbusService:
                         await asyncio.shield(saving)
                     except asyncio.CancelledError:
                         cancelled = True
-                saving.result()
+                    except Exception:  # noqa: BLE001 - raised from the task below
+                        break
                 if cancelled:
-                    raise asyncio.CancelledError
+                    # Cancellation outranks a save that failed meanwhile.
+                    raise asyncio.CancelledError from saving.exception()
+                saving.result()
 
     async def _control_updated(self) -> None:
         """Publish queue changes and persist commands executed by the worker."""

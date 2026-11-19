@@ -85,7 +85,8 @@ class GuestLimits:
             self.restore_pending = False
         # Missing/mismatched evidence remains fenced until an explicit guest
         # start or confirmed unplug. Normal recovery must not open this gate.
-        await self._service._persist()
+        # A disk that refuses the save must not keep the service from starting.
+        await self._service._save_intent()
         self.ready = True
 
     def clear(self) -> None:

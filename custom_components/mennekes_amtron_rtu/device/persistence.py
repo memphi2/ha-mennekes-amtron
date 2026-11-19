@@ -28,7 +28,13 @@ async def finish_goal_save(save: Awaitable[None]) -> None:
                 await asyncio.shield(task)
             except asyncio.CancelledError:
                 continue
-        task.result()
+            except Exception:  # noqa: BLE001 - read from the task below
+                break
+        error = None if task.cancelled() else task.exception()
+        if error is not None:
+            # The caller was cancelled; it must not carry on as if only the
+            # save had failed.
+            raise asyncio.CancelledError from error
         raise
 
 

@@ -569,6 +569,11 @@ class DepartureController:
             self._trail_scope = sample.scope
         if sample.scope is None or sample.total_kwh is None or sample.meter_at is None:
             return
+        if self._trail and sample.meter_at < self._trail[-1][0]:
+            # The clock was set back. Readings stamped later than now would
+            # anchor a new car report to an old meter value; start again.
+            self._trail = []
+            self.anchor = None
         if not self._trail or (sample.meter_at > self._trail[-1][0] and sample.total_kwh != self._trail[-1][1]):
             self._trail.append((sample.meter_at, sample.total_kwh))
             if len(self._trail) > _TRAIL_LIMIT:
@@ -582,6 +587,12 @@ class DepartureController:
             if sample.guest_mode:
                 self._power_window.reset()
                 await self._cancel_command()
+                if self.plan_paused:
+                    # The guest start ended the plan's pause. A pause from now
+                    # on is the guest's, by hand or by its limits, and the
+                    # plan must not end it after the unplug.
+                    self.plan_paused = self._pause_seen = False
+                    await self._save()
                 self.status = "guest_mode"
                 return
             self._now = sample.now

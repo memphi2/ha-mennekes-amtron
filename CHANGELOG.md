@@ -30,6 +30,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   moved or cleared.
 - A refused guest start no longer turns a charging release that was
   switched off by hand into a requested one.
+- Closing the release after an unplug, and an error recovery whose write
+  stayed unanswered, no longer drop a lock or pause that still waits.
+- A lowered current cap is written at once, also while a pause or lock waits
+  for the state-change interval.
+- Plug & Charge: a release given by hand no longer passes to the next car
+  when the released car was unplugged while the service was down.
+- A current above 32 A found in the wallbox, e.g. from another controller, is
+  no longer saved as the current to return to. Before, the next start
+  rejected the saved state and blocked charging until acknowledged.
+- The departure plan no longer ends a guest's pause after the guest unplugs,
+  and its charging current no longer replaces the current chosen by hand: a
+  later resume returns to that.
+- A clock set back no longer ties a new charge level report of the car to an
+  old meter reading.
+- With a guest permission saved, the service starts also while the disk
+  refuses writes; a stop of the service can no longer hang on a save that
+  fails at that moment.
 - Cost target: the app arms an amount at the price of the running amount,
   also after a restart of the service, and a price that changed nothing no
   longer delays the next one by a minute.
