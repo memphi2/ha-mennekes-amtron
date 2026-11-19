@@ -1,5 +1,15 @@
 # Changes
 
+## Unreleased
+
+- After a request without a usable answer the app lets the line fall silent
+  for one reply timeout, so a late answer is never taken for the next one
+  (serial and Modbus RTU over TCP).
+- A queued pause, release-off or lock survives a poll that failed at its due
+  time.
+- Error 200 is recovered while the state cannot be saved.
+- The app does not start without a serial number when that read merely failed.
+
 ## 0.10.0b2
 
 - Integration and app must both be 0.10.0b2; update them together.

@@ -5,6 +5,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixes
+
+- On a serial line and through a transparent gateway (Modbus RTU over TCP),
+  an answer that arrived after its request had timed out was taken for the
+  answer to the next read of the same length, and every answer after it was
+  one late. A charging wallbox could read as idle. After a request without a
+  usable answer the service now waits until nothing arrived for one reply
+  timeout before it asks anything else.
+- A pause, a withdrawn release or a lock that waited for the state-change
+  interval was dropped when the latest poll had failed at its due time. It
+  now waits for the wallbox and is then written.
+- The recovery from wallbox error 200 runs to its end while the service
+  cannot save its state; before, it broke off after its first write on
+  every poll.
+- The state-change interval counts from the acknowledged write even when the
+  command is cancelled right after it.
+- The service no longer starts without a serial number when that read merely
+  failed; only a wallbox that does not know the register starts without one.
+- A system clock set back no longer stretches the time a Plug & Charge
+  connection may stay unknown.
+- A target time in the past or without time zone is refused as a wrong value
+  with a translated message. Before, the entities became unavailable until
+  the next poll.
+- The repair for a rejected saved state reports a service that is down
+  instead of failing with an unknown error.
+- A failed save of the charging-loss averages is written again after a
+  minute, also in the history mode when the car's record is gone.
+- The app answers an `Authorization` header that is no text with 401, and a
+  charging change whose readback was lost with `charging_save_uncertain`.
+
+### Changes
+
+- A command polls the wallbox once after its write instead of twice.
+- The phase details on **Total power** and `duration_minutes` stay visible
+  but are no longer recorded.
+- A learned car power is saved only when it moves visibly, so a charging car
+  no longer writes the plan file at every step.
+- The release attests the contents of the service image (SBOM) besides its
+  provenance.
+- Privacy and legal texts name what is stored and shipped; the manifest no
+  longer claims a quality tier.
+
 ## 0.10.0b2 — 2026-11-18
 
 ### Breaking changes
