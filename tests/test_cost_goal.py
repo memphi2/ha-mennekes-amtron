@@ -209,3 +209,24 @@ def test_the_number_passes_the_amount_on_and_refuses_without_costs():
             await number._set_cost_goal(SimpleNamespace(cost_goal=None), 1)
 
     asyncio.run(run())
+
+
+def test_a_price_that_came_while_the_goal_was_stopped_is_told_again(tmp_path, monkeypatch):
+    async def run():
+        hass, control, cost, clock, observer = setup(tmp_path, monkeypatch)
+        await observer.async_set_target(10)
+        control.energy_goal.observe(None)
+        cost.price = 0.50
+        clock[0] += 61
+        await observe(observer)
+        # The service remembers it but a stopped goal keeps its own price.
+        assert control.calls[-1] == ("price", None, 0.50)
+        clock[0] += 61
+        await observe(observer)
+        assert len(control.calls) == 2
+        control.energy_goal.observe(100.0)
+        assert control.energy_goal.status == "active"
+        await observe(observer)
+        assert len(control.calls) == 3
+        await hass.async_stop(force=True)
+    asyncio.run(run())

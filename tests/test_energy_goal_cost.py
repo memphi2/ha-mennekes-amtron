@@ -122,7 +122,7 @@ def test_a_price_follows_only_a_running_amount():
     asyncio.run(run())
 
 
-def test_less_than_a_step_left_keeps_the_target_in_force():
+def test_less_than_a_step_left_leaves_one_step_at_the_new_price():
     async def run():
         harness, control, runner, _saved, clock = await _cost_runner()
         await runner.async_set_cost_target(1, 0.30)
@@ -130,8 +130,10 @@ def test_less_than_a_step_left_keeps_the_target_in_force():
         await _settle(runner)
         clock[0] += 61
         await runner.async_set_price(0.50)
+        # 0.04 left buys no step at 0.50: one step from the 3.2 kWh so far.
         assert control.energy_goal.target_kwh == 3.3
-        assert control.energy_goal.cost.price == 0.30
+        assert control.energy_goal.cost.price == 0.50
+        assert control.energy_goal.cost.spent == pytest.approx(0.96)
         await runner.async_stop()
     asyncio.run(run())
 

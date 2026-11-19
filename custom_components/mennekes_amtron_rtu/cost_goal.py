@@ -89,7 +89,11 @@ class CostGoalObserver:
             # The service would refuse it at every poll.
             return
         price = self._price()
-        known = control.cost_price
+        # A running amount shows the price it really has: one that came while
+        # its goal was stopped is told again once the goal runs.
+        goal = control.energy_goal
+        running = goal.cost is not None and goal.status == "active"
+        known = goal.cost.price if running and goal.cost is not None else control.cost_price
         if (
             price is None
             or (known is not None and abs(price - known) < PRICE_TOLERANCE)

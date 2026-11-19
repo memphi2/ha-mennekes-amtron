@@ -234,17 +234,16 @@ class EnergyGoal:
 
         Only a running amount changes, and only its target and amount: the
         baseline, the status and every latch stay, so this is no new goal.
-        With less than one step of money left the target in force ends it.
         """
         cost = self.cost
         if cost is None or self._status != "active":
             return False
         delivered = self._delivered(cost)
         spent = cost.spent + (delivered - cost.booked_kwh) * cost.price
-        left = cost.amount - spent
-        if left < price * ENERGY_GOAL_STEP_KWH:
-            return False
-        steps = math.floor((delivered + energy_for(left, price)) / ENERGY_GOAL_STEP_KWH + 1e-9)
+        # With less than one step of money left the rest is one step.
+        steps = math.floor(
+            (delivered + energy_for(cost.amount - spent, price)) / ENERGY_GOAL_STEP_KWH + 1e-9,
+        )
         self._target_kwh = min(MAX_ENERGY_GOAL_KWH, max(MIN_ENERGY_GOAL_KWH, steps / 10))
         self.cost = CostPart(cost.amount, spent, price, delivered)
         return True
