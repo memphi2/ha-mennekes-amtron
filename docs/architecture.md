@@ -82,7 +82,8 @@ rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
 An RTU frame carries no transaction number, on a serial line and through a
 transparent gateway alike. After a request that got no usable answer, the
-client therefore lets the line fall silent for one reply timeout before it
+client therefore lets the line fall silent for one reply timeout, at most a
+second, before it
 asks anything else (`bus_quiet.py`): an answer that arrives late is dropped
 instead of being taken for the answer to the next request. Modbus TCP numbers
 its transactions and needs no such wait.
