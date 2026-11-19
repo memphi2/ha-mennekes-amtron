@@ -242,6 +242,7 @@ device/service_store.py      intent.json
 device/bound_file.py         BoundFile for departure-plan.json and charge-meter.json
 device/service_config.py     service options
 device/server.py             standalone process entrypoint
+device/privileges.py         gives up every capability at the start of that process
 embedded.py           the service inside HA for a direct entry
 service_transport.py  HttpTransport and EmbeddedTransport
 service_client.py     HA service client: snapshot, commands, event cursor

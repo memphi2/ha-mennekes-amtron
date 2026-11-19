@@ -22,6 +22,7 @@ from .app_settings import (
 )
 from .connection import NetworkConfig, SerialConfig
 from .console_http import ServiceConsole, create_console_app
+from .privileges import drop_capabilities
 from .service_config import ServerConfig
 from .service_discovery import app_token, publish_discovery
 from .service_http import create_app
@@ -116,6 +117,8 @@ def main() -> None:
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     _LOGGER.info("Service: starting Mennekes Amtron Modbus service")
+    # Before any thread starts: later ones inherit the empty sets.
+    drop_capabilities()
     supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "")
     phase = "reading options"
     try:

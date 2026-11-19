@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The app holds no capability any more, also with Protection mode off.
 - After a request without a usable answer the app lets the line fall silent
   for one reply timeout, so a late answer is never taken for the next one
   (serial and Modbus RTU over TCP).

@@ -124,7 +124,16 @@ Configure the container with:
 | Network | A private network reachable by HA |
 | Restart policy | Independent of the HA container, for example `unless-stopped` |
 
-No privileged container or host networking is needed. The published image starts
+No privileged container or host networking is needed. The image runs as its
+own user, **UID 10001**, never as root, and the service gives up every
+capability at its start. Make the data directory and `options.json` readable
+and writable for that user, for example `chown -R 10001 /path/to/data`, or run
+the container as the directory's owner with `--user`. For USB, the user needs
+the group of the adapter on the host: add it with
+`--group-add "$(stat -c %g /dev/ttyUSB0)"`. `--cap-drop=ALL` and
+`--security-opt=no-new-privileges` work and are recommended.
+
+The published image starts
 with `/data/options.json` and saves intent to `/data/intent.json`. Keep the data
 mount when replacing the container. Save the image digest with your configuration
 and deliberately choose a new release digest when updating.
@@ -139,7 +148,8 @@ amtron-modbus-service --config /path/to/options.json --state /path/to/intent.jso
 ```
 
 The package contains the driver/service and its dependencies; Home Assistant is
-not a dependency. Give the process a writable state directory and either access
+not a dependency. Run it as an ordinary user, not as root: the service gives up
+every capability at its start, so root could reach only root's own files. Give the process a writable state directory and either access
 to the serial adapter or network access to the LAN gateway. Run it under an
 independent process manager.
 

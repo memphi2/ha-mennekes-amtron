@@ -102,6 +102,10 @@ files. Options are read-only; there is no general filesystem-write or shell
 execution permission. This does not add authentication or encryption to Modbus
 or restrict TCP destinations to a particular gateway.
 
+The image runs as its own user, UID 10001. The app runs as root because
+Supervisor provides its data for root alone; the profile grants no capability,
+and the service gives up every capability at its start in either case.
+
 The profile is separate from the OCI image. Standalone Docker deployments must
 load and select a suitable profile explicitly. Direct HA connections use the
 security policy of Home Assistant and its host, not this service profile.

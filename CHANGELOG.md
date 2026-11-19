@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Breaking changes
+
+- The service image runs as its own user, UID 10001, instead of root, and
+  the service gives up every capability at its start. A standalone container
+  needs a data directory that user can write, and for USB the group of the
+  adapter; see the standalone guide. The Home Assistant app needs nothing: it
+  stays root for Supervisor's data, without any capability.
+
 ### Fixes
 
 - On a serial line and through a transparent gateway (Modbus RTU over TCP),
