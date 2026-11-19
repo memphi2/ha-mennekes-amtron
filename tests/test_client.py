@@ -574,6 +574,7 @@ def test_a_write_refused_before_it_is_sent_leaves_the_line_unsuspected() -> None
         client._quiet.unanswered = lambda: marked.append(1)
         with pytest.raises(AmtronWriteRejectedError, match="finite"):
             await client.async_write_register(R.CHARGING_CURRENT_EMS, float("nan"))
-        assert marked == [] and transport.writes == []
+        assert marked == []
+        assert transport.writes == []
 
     asyncio.run(run())

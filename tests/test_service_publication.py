@@ -269,8 +269,10 @@ def test_api_smoke_as_root_requires_the_root_user_and_keeps_docker_defaults(monk
     with pytest.raises(RuntimeError, match="startup intercepted"):
         images.smoke("amtron-app:test", as_root=True)
     command = commands[-1]
-    assert "--user" not in command and "--cap-drop=ALL" not in command
-    assert "--read-only" in command and "--security-opt=no-new-privileges" in command
+    assert "--user" not in command
+    assert "--cap-drop=ALL" not in command
+    assert "--read-only" in command
+    assert "--security-opt=no-new-privileges" in command
 
 
 @pytest.mark.parametrize("profile", ["", "unconfined", "name/other", "name\n", "name space", "-name", "a" * 129, True])
