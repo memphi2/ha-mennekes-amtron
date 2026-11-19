@@ -21,9 +21,9 @@ def test_measurement_interval_reduces_real_recorder_writes(tmp_path: Path) -> No
         default = await measure(tmp_path / "default", "charging", 30, duration=300)
         lean = await measure(tmp_path / "lean", "charging", 30, duration=300, profile="lean")
         assert 0 < default["state_rows"] < fast["state_rows"] * 0.3
-        # The voltages under load are attributes of the total power: a row per
-        # distinct whole-volt combination, so fewer samples cannot need more.
-        assert 0 < default["attributes_rows"] <= fast["attributes_rows"]
+        # The live phase details and the session duration are not recorded:
+        # more samples while charging store no further attribute records.
+        assert 0 < default["attributes_rows"] == fast["attributes_rows"]
         assert default["rows_by_entity"]["sensor.mennekes_amtron_total_energy"] > 0
         assert default["rows_by_entity"]["sensor.mennekes_amtron_total_power"] > 0
         assert 0 < lean["state_rows"] < default["state_rows"]

@@ -21,8 +21,10 @@ ride on **Total power** (whole volts, and only while power flows, so a
 wobbling mains voltage writes nothing while the wallbox is idle), the
 session duration, maximum current and session count on **Session energy**
 (the duration in minutes, so it changes once a minute), the installation
-settings on **Wallbox settings**. Attributes are stored with the state they
-belong to and never compile long-term statistics of their own.
+settings on **Wallbox settings**. Attributes never compile long-term
+statistics of their own. The phase details on **Total power** and the session
+duration are shown live and not recorded: they change with nearly every
+reading, and each change would store another copy of all attributes.
 
 The **Activity** event entity is enabled by default. Its state changes on
 reported wallbox changes, such as a plug-in, charge start or fault, and on each
