@@ -80,6 +80,13 @@ change of the plug cycle and every five minutes while a car charges. Named comma
 raw register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
+An RTU frame carries no transaction number, on a serial line and through a
+transparent gateway alike. After a request that got no usable answer, the
+client therefore lets the line fall silent for one reply timeout before it
+asks anything else (`bus_quiet.py`): an answer that arrives late is dropped
+instead of being taken for the answer to the next request. Modbus TCP numbers
+its transactions and needs no such wait.
+
 Percentage-target updates reserve a bounded, short-lived service token before
 submission. After a lost reply, resolution either confirms completion or prevents
 an unstarted request from executing later. The HA observer keeps evidence against
