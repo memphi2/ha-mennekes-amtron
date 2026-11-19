@@ -105,7 +105,6 @@ REQUIRED_DOCUMENTS = (
     "PRIVACY.md",
     "SECURITY.md",
     "docs/legal.md",
-    "docs/audits/current-legal-provenance.md",
 )
 
 
@@ -206,12 +205,9 @@ def _check_required_documents() -> list[str]:
         for rel in REQUIRED_DOCUMENTS
         if not (ROOT / rel).is_file()
     ]
-    audit_files = sorted(path.name for path in (ROOT / "docs" / "audits").glob("*.md"))
-    if audit_files != ["current-legal-provenance.md"]:
-        failures.append(
-            "docs/audits must contain only current-legal-provenance.md, got "
-            + ", ".join(audit_files)
-        )
+    if (ROOT / "docs" / "audits").exists():
+        # A dated audit snapshot goes stale and then states what is no longer true.
+        failures.append("docs/audits must not exist; findings are fixed, not filed")
     legal_path = ROOT / "docs" / "legal.md"
     if legal_path.is_file():
         legal = _normalized_text(legal_path)

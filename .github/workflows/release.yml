@@ -327,6 +327,24 @@ jobs:
           subject-name: ${{ steps.image.outputs.image }}
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
+      - name: List what the published container contains
+        if: needs.service-plan.outputs.build_required == 'true'
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ steps.image.outputs.image }}@${{ steps.image.outputs.digest }}
+          format: spdx-json
+          output-file: .release/service-image.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
+      - name: Attest the container's contents
+        if: needs.service-plan.outputs.build_required == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.image }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          sbom-path: .release/service-image.spdx.json
+          push-to-registry: true
       - name: Verify provenance and anonymous access before advertising an update
         env:
           GH_TOKEN: ${{ github.token }}

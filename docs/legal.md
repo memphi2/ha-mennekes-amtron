@@ -117,6 +117,12 @@ dependencies. Every installed package keeps its license files in its
 `*.dist-info` directory under the image's `site-packages`. The project's own
 `LICENSE` and `NOTICE` are in `/app`.
 
+Each release attests an SPDX list of the image's contents to the published
+image, next to its build provenance. `gh attestation verify
+oci://ghcr.io/memphi2/ha-mennekes-amtron-service:<version> --repo
+memphi2/ha-mennekes-amtron --predicate-type https://spdx.dev/Document/v2.3`
+shows it; the list describes the amd64 variant.
+
 ## Optional Waveshare adapter support
 
 The adapter implementation is project-written interoperability code. It uses
@@ -145,10 +151,6 @@ Modbus traffic. Compatibility support is not a security certification.
 `scripts/check_legal_audit.py` for this policy. Together they reject forbidden
 payload suffixes, foreign runtime directories, private keys, identifying
 device paths, unexpected runtime requirements and brand-asset changes.
-
-The current local provenance evidence is retained under
-[docs/audits/current-legal-provenance.md](audits/current-legal-provenance.md).
-That file is a technical audit snapshot, not a live legal opinion.
 
 ## Optional tariff data
 
