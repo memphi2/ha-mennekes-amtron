@@ -1151,7 +1151,7 @@
       },
       "costs": {
         "title": "Electricity price source",
-        "description": "Choose a fixed electricity price or an existing price sensor. Disabled turns off cost estimates. Additional network-tariff steps appear when Home Assistant’s country is Germany.",
+        "description": "Choose a fixed electricity price or an existing price sensor. Disabled turns off cost estimates. Additional network-tariff steps appear when Home Assistant’s country is Germany. Costs are estimates from an uncalibrated meter and not suitable for billing others.",
         "data": {
           "charging_cost_source": "Electricity price source"
         },

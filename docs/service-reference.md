@@ -42,7 +42,8 @@ The app and HA setup clear the saved adapter password when disabling login or
 switching to USB. For standalone JSON, remove `tcp_auth_password` yourself when
 turning login off.
 See [TCP login limits](lan-adapters.md#tcp-login-and-its-limits): this protocol
-provides no encryption and firmware 1.523 has a confirmed handshake weakness.
+provides no encryption, and in this project's own test firmware 1.523 accepted
+a login without the password.
 
 Compatible adapter setup is a separate explicit operation in the HA flow or
 app connection page. It pins the inspected address and native identifier,

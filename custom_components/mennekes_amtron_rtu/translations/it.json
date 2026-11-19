@@ -1151,7 +1151,7 @@
       },
       "costs": {
         "title": "Fonte del prezzo dell’energia",
-        "description": "Scegli un prezzo fisso o un sensore di prezzo esistente. Disabilitato spegne la stima dei costi. I passaggi relativi alla tariffa di rete appaiono se il Paese di Home Assistant è Germania.",
+        "description": "Scegli un prezzo fisso o un sensore di prezzo esistente. Disabilitato spegne la stima dei costi. I passaggi relativi alla tariffa di rete appaiono se il Paese di Home Assistant è Germania. I costi sono stime basate su un contatore non tarato e non sono adatti alla fatturazione a terzi.",
         "data": {
           "charging_cost_source": "Fonte del prezzo dell’energia"
         },

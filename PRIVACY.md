@@ -64,7 +64,8 @@ The Supervisor app exclusively manages its own token in an owner-only
 address and token and transfers them locally to Home Assistant; no network
 broadcast or cloud discovery is involved. Protect Supervisor backups as well. Its
 small `intent.json` file stores the wallbox identity, pause/release intent,
-resume current and charging targets. It is replaced when that durable state
+resume current, charging targets, the source of a vehicle target and the
+Plug & Charge and guest permission state. It is replaced when that durable state
 changes. `departure-plan.json` stores the planned trip, the selected vehicle's
 planning values and what the plan learned about that car's charging power and
 efficiency. `charge-meter.json` stores the wallbox's total-energy readings with
@@ -141,7 +142,7 @@ you decide to share their contents.
 
 ## Optional German tariff import
 
-Selecting **Import for HA Home** in the Module 3 setup sends HA Home latitude and longitude to VNBdigital
+Selecting **Import for HA Home** in the Module 3 setup sends HA Home latitude and longitude, rounded to four decimals, to VNBdigital
 to identify the local low-voltage network operator. Public tariff CSV data is
 downloaded from Par14a-Database through GitHub. Both services see the requesting
 IP address; GitHub receives no Home coordinates. No vehicle history, wallbox
@@ -159,6 +160,8 @@ initial import. It can replace saved manual prices and time windows. Disable
 yearly refresh to stop background imports; manually choosing Import for HA Home
 still performs that one requested lookup.
 
-With a BavarianData vehicle selected for the charging loss, the saved loss
-average is bound to that vehicle by a SHA-256 hash of its VIN; the VIN itself
-is not stored by this integration.
+With a BavarianData vehicle selected, its profile, the saved loss average and
+the service's vehicle-target state (`intent.json`) are bound to that vehicle
+by an unsalted SHA-256 hash of its VIN. The VIN itself is not stored by this
+integration. The hash is a pseudonym, not anonymization: anyone who knows the
+VIN can compute it.

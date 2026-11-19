@@ -1151,7 +1151,7 @@
       },
       "costs": {
         "title": "Source du prix de l’électricité",
-        "description": "Choisissez un prix fixe ou un capteur de prix existant. Désactivé coupe l’estimation des coûts. Les étapes de tarif réseau apparaissent si le pays de Home Assistant est l’Allemagne.",
+        "description": "Choisissez un prix fixe ou un capteur de prix existant. Désactivé coupe l’estimation des coûts. Les étapes de tarif réseau apparaissent si le pays de Home Assistant est l’Allemagne. Les coûts sont des estimations issues d’un compteur non étalonné et ne conviennent pas à une facturation à des tiers.",
         "data": {
           "charging_cost_source": "Source du prix de l’électricité"
         },

@@ -1151,7 +1151,7 @@
       },
       "costs": {
         "title": "Bron van de stroomprijs",
-        "description": "Kies een vaste stroomprijs of een bestaande prijssensor. Uitgeschakeld zet de kostenschatting uit. Extra stappen voor nettarieven verschijnen als het land van Home Assistant Duitsland is.",
+        "description": "Kies een vaste stroomprijs of een bestaande prijssensor. Uitgeschakeld zet de kostenschatting uit. Extra stappen voor nettarieven verschijnen als het land van Home Assistant Duitsland is. De kosten zijn schattingen op basis van een niet-geijkte meter en niet geschikt voor afrekening met derden.",
         "data": {
           "charging_cost_source": "Bron van de stroomprijs"
         },

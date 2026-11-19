@@ -65,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   no longer writes the plan file at every step.
 - The release attests the contents of the service image (SBOM) besides its
   provenance.
+- The network-operator lookup sends the Home coordinates rounded to four
+  decimals, and the price source step says that costs are estimates and not
+  suitable for billing others.
 - Privacy and legal texts name what is stored and shipped; the manifest no
   longer claims a quality tier.
 

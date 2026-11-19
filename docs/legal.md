@@ -142,8 +142,9 @@ materials or Waveshare trademarks.
 
 Support is constrained to the documented family and verified firmware/layout;
 see [supported LAN adapters and verification limits](lan-adapters.md).
-The TCP handshake has a confirmed firmware weakness and does not encrypt
-Modbus traffic. Compatibility support is not a security certification.
+In this project's own test on firmware 1.523 the TCP handshake accepted a
+login without the password; the vendor has not been notified and has not
+confirmed this. The handshake does not encrypt Modbus traffic. Compatibility support is not a security certification.
 
 ## Repository gate
 
@@ -156,5 +157,7 @@ device paths, unexpected runtime requirements and brand-asset changes.
 
 Imported data comes from [Par14a-Database (the78mole)](https://github.com/the78mole/Par14a-Database)
 under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Operator matching
-uses VNBdigital, operated by BDEW. Original operator price sheets remain
+uses VNBdigital, operated by BDEW, through the interface of its website; it
+is not an official API and may stop working. The lookup sends the Home
+coordinates rounded to four decimals. Original operator price sheets remain
 authoritative. The repository does not distribute their PDFs.

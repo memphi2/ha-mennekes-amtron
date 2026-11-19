@@ -92,7 +92,7 @@ class _Session:
         self.chunk_size = chunk_size
 
     def post(self, _url, *, json, timeout):
-        assert json["variables"]["coordinates"] == "50.775300,6.083900"
+        assert json["variables"]["coordinates"] == "50.7753,6.0839"
         assert timeout.total == 10
         import json as json_module
 

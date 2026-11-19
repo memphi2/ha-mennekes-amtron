@@ -55,7 +55,7 @@ async def async_lookup_home_tariff(hass: Any) -> dict[str, Any] | None:
             json={
                 "query": _VNB_QUERY,
                 "variables": {
-                    "coordinates": f"{config.latitude:.6f},{config.longitude:.6f}",
+                    "coordinates": f"{config.latitude:.4f},{config.longitude:.4f}",
                     "filter": {
                         "onlyNap": False,
                         "voltageTypes": ["Niederspannung"],

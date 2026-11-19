@@ -1,7 +1,7 @@
 """Wired Waveshare TCP login, isolated from Modbus and its packet logging.
 
-This vendor compatibility protocol does not encrypt application traffic. Its
-reflection weakness means a successful handshake is not a secure transport.
+This vendor compatibility protocol does not encrypt application traffic. A
+successful handshake is no proof of the password and no secure transport.
 No gateway settings are changed here; each new TCP socket authenticates anew.
 """
 

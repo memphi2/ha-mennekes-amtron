@@ -1151,7 +1151,7 @@
       },
       "costs": {
         "title": "Strompreisquelle",
-        "description": "Wähle einen festen Strompreis oder einen vorhandenen Preissensor. Deaktiviert schaltet die Kostenschätzung aus. Weitere Schritte zu Netzentgelten erscheinen, wenn in Home Assistant Deutschland als Land eingestellt ist.",
+        "description": "Wähle einen festen Strompreis oder einen vorhandenen Preissensor. Deaktiviert schaltet die Kostenschätzung aus. Weitere Schritte zu Netzentgelten erscheinen, wenn in Home Assistant Deutschland als Land eingestellt ist. Die Kosten sind Schätzungen aus einem nicht geeichten Zähler und nicht zur Abrechnung mit Dritten geeignet.",
         "data": {
           "charging_cost_source": "Strompreisquelle"
         },
