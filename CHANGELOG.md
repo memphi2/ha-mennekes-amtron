@@ -39,9 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A current above 32 A found in the wallbox, e.g. from another controller, is
   no longer saved as the current to return to. Before, the next start
   rejected the saved state and blocked charging until acknowledged.
-- The departure plan no longer ends a guest's pause after the guest unplugs,
-  and its charging current no longer replaces the current chosen by hand: a
-  later resume returns to that.
+- The departure plan no longer ends a guest's pause after the guest unplugs.
 - A clock set back no longer ties a new charge level report of the car to an
   old meter reading.
 - With a guest permission saved, the service starts also while the disk

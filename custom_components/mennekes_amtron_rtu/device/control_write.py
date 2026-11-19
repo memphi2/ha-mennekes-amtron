@@ -153,10 +153,6 @@ class WritePath:
         # the old cached snapshot still says "paused".
         transition = not recovery and (energy_goal_stop or self._current_transition(value))
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
-        # A planner's current is its own for the time of its plan; the current
-        # the user chose stays the one a later resume returns to.
-        active = self._control._active_command
-        remembered = not paused and (active is None or active.owner is None)
         previous = self._control._write_state.confirmed_current
         if transition and not phase_preparation and not energy_goal_stop:
             await self.async_check_transition_interval(current_change=True)
@@ -173,7 +169,7 @@ class WritePath:
                     # Recovery is no command: what waits in the queue stays.
                     self._control._clear_pending()
                 self._control._write_state.confirmed_current = None
-                if remembered:
+                if not paused:
                     self._control.charging_setpoint = value
                 if transition:
                     self._control._write_state.mode_change_at = self._control._monotonic()
@@ -183,7 +179,7 @@ class WritePath:
             raise
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
-        if remembered:
+        if not paused:
             self._control.charging_setpoint = value
         else:
             self._remember_pause_setpoint(previous, preserve_setpoint)

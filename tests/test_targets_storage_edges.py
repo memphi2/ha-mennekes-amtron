@@ -189,25 +189,3 @@ def test_the_service_starts_with_a_disk_that_refuses_the_save(
             assert service.control is not None
 
     asyncio.run(run())
-
-
-def test_the_plans_current_does_not_replace_the_users_remembered_current(tmp_path):
-    async def run():
-        async with runtime.guest_service(tmp_path) as (service, transport, clock):
-            serial = service.identity.serial_number
-            await hand_over(service, hours=2)
-            await service.departure.tick()
-            await service.command({
-                "command": "departure_trip", "deadline": None, "source": None, "withdraw": True,
-                "expected_serial_number": serial,
-            })
-            clock[0] += 1000
-            await service.departure.tick()
-            await service.refresh()
-            await service.command({"command": "pause", "expected_serial_number": serial})
-            clock[0] += 1000
-            await service.command({"command": "resume", "expected_serial_number": serial})
-            # Back to the user's 8 A, not the plan's current.
-            assert runtime.current_writes(transport)[-1] == 8
-
-    asyncio.run(run())
