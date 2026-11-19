@@ -22,7 +22,10 @@ from custom_components.mennekes_amtron_rtu.device.departure_plan import (
 from custom_components.mennekes_amtron_rtu.device.departure_store import (
     DepartureStore,
 )
-from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
+    DeviceValidationError,
+)
 from custom_components.mennekes_amtron_rtu.device.session_mark import SessionMark
 
 NOW = datetime(2026, 11, 13, 22, 0, tzinfo=UTC)
@@ -1135,7 +1138,7 @@ def test_app_departure_refuses_a_past_instant_and_uninitialized_inputs(tmp_path)
         box = Box(tmp_path)
         plan = await box.start()
         before = plan.trip.snapshot()
-        with pytest.raises(ValueError, match="future"):
+        with pytest.raises(DeviceValidationError, match="target_time_not_future"):
             await plan.set_trip(NOW, None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
         assert plan.trip.snapshot() == before
         plan.inputs = None

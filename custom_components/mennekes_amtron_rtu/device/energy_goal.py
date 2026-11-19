@@ -208,6 +208,22 @@ class EnergyGoal:
             self.resume_on_recovery = False
         return self.snapshot() != previous
 
+    def _delivered(self, cost: CostPart) -> float:
+        """Energy above the baseline at the last poll, never below the booked."""
+        # An active goal always has both; the fallback only satisfies typing.
+        polled = 0.0 if self._baseline_kwh is None or self._last_total_kwh is None else (
+            self._last_total_kwh - self._baseline_kwh
+        )
+        return max(cost.booked_kwh, polled)
+
+    @property
+    def cost_spent(self) -> float | None:
+        """Money used so far: the booked part plus the energy since, at the price."""
+        cost = self.cost
+        if cost is None:
+            return None
+        return cost.spent + (self._delivered(cost) - cost.booked_kwh) * cost.price
+
     def take_cost(self, other: EnergyGoal) -> None:
         """Adopt the repriced target and amount of the same goal's copy."""
         self._target_kwh = other._target_kwh
@@ -223,11 +239,7 @@ class EnergyGoal:
         cost = self.cost
         if cost is None or self._status != "active":
             return False
-        # An active goal always has both; the fallback only satisfies typing.
-        polled = 0.0 if self._baseline_kwh is None or self._last_total_kwh is None else (
-            self._last_total_kwh - self._baseline_kwh
-        )
-        delivered = max(cost.booked_kwh, polled)
+        delivered = self._delivered(cost)
         spent = cost.spent + (delivered - cost.booked_kwh) * cost.price
         left = cost.amount - spent
         if left < price * ENERGY_GOAL_STEP_KWH:

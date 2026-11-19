@@ -742,6 +742,10 @@ class ModbusService:
                 "soc_maximum_required": self._soc_maximum_required,
                 "soc_goal": control.soc_goal.snapshot() if control else None,
                 "energy_goal": control.energy_goal.snapshot() if control else None,
+                "cost_price": (
+                    control.goal_controller.price
+                    if control is not None and control.goal_controller is not None else None
+                ),
                 "read_only": self.config.read_only or self._intent_rejected,
                 "intent_rejected": self._intent_rejected,
                 "current_cap": self.config.current_cap,

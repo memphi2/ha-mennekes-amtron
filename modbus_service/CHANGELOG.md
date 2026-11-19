@@ -1,5 +1,16 @@
 # Changes
 
+## 0.10.0b5
+
+- Integration and app must both be 0.10.0b5; update them together.
+
+- The Charging page sets and shows the cost ceiling; the service remembers
+  the last price Home Assistant reported (`cost_price` in its state) and
+  `cost_goal` works without a price.
+- A command that has to wait and a past target time are named instead of
+  "Save not confirmed"; an interrupted guest charge asks for a new start; the
+  departure plan's status is shown on the Charging page.
+
 ## 0.10.0b4
 
 - Integration and app must both be 0.10.0b4; update them together.

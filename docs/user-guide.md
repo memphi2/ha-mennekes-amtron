@@ -159,7 +159,8 @@ a reached goal stays stopped. After an owner restart, resume explicitly.
 With charging costs configured, **Cost target** limits a charge by an amount
 of money instead of energy. The service keeps the amount together with the
 **Energy target** that carries it: at the price that applies now it arms the
-energy the amount buys. Home Assistant tells it each new price, at most once
+energy the amount buys. The app's **Charging** page can set it, too, at the
+last price Home Assistant reported. Home Assistant tells it each new price, at most once
 a minute and only for a change of at least 0.1 ct/kWh; the service then books
 the energy so far at the old price and re-arms the rest at the new one. It
 therefore stops the charge on its own; while Home Assistant is down it keeps

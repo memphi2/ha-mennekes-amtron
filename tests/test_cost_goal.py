@@ -27,9 +27,15 @@ class Control:
         self.energy_goal = EnergyGoal()
         self.calls: list[tuple[str, object, object]] = []
         self.fail: Exception | None = None
+        # The last price the service was told.
+        self.cost_price: float | None = None
+        self.read_only = False
+        self.supports_energy_goal = True
 
     async def async_set_cost_goal(self, amount, price):
         self.calls.append(("goal", amount, price))
+        if price is not None:
+            self.cost_price = price
         if amount:
             self.energy_goal.set_target(33.3, 100.0)
             self.energy_goal.cost = CostPart(amount, 0.0, price)
@@ -40,6 +46,7 @@ class Control:
         self.calls.append(("price", None, price))
         if self.fail is not None:
             raise self.fail
+        self.cost_price = price
 
 
 class Cost:
@@ -119,19 +126,26 @@ def test_a_new_price_is_told_after_the_poll_once_a_minute(tmp_path, monkeypatch)
     asyncio.run(run())
 
 
-def test_a_reached_or_plain_target_hears_no_price(tmp_path, monkeypatch):
+def test_the_price_is_told_without_an_amount_so_the_app_can_arm_one(tmp_path, monkeypatch):
     async def run():
         hass, control, cost, clock, observer = setup(tmp_path, monkeypatch)
-        control.energy_goal.set_target(5, 100.0)
+        await observe(observer)
+        assert control.calls == [("price", None, 0.30)]
+        assert control.cost_price == 0.30
         clock[0] += 61
+        await observe(observer)
+        assert len(control.calls) == 1
+        cost.price = None
+        clock[0] += 61
+        await observe(observer)
+        assert len(control.calls) == 1
+        # A service that would refuse it is not asked at every poll.
         cost.price = 0.50
+        control.read_only = True
         await observe(observer)
-        await observer.async_set_target(10)
-        control.energy_goal.observe(200.0)
-        clock[0] += 61
+        control.read_only, control.supports_energy_goal = False, False
         await observe(observer)
-        assert observer.status == "reached"
-        assert [call[0] for call in control.calls] == ["goal"]
+        assert len(control.calls) == 1
         await hass.async_stop(force=True)
     asyncio.run(run())
 

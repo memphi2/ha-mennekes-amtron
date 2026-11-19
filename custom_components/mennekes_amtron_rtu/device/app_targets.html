@@ -6,11 +6,12 @@
 <div class="charging-layout"><section class="card charging-editor" aria-labelledby="limits_title">
 <h2 id="limits_title" data-text="limits"></h2>
 <form id="energy_form"><label for="energy_value" data-text="energy_label"></label><div class="limit-input"><input id="energy_value" type="number" min="0" max="1000" step="0.1" required><span>kWh</span><button id="energy_save" type="submit" class="secondary" data-text="save" disabled></button></div><p class="hint" data-text="energy_hint"></p></form>
+<form id="cost_form"><label for="cost_value" data-text="cost_label"></label><div class="limit-input"><input id="cost_value" type="number" min="0" max="1000" step="0.1" required><span>€</span><button id="cost_save" type="submit" class="secondary" data-text="save" disabled></button></div><p class="hint" data-text="cost_hint"></p></form>
 <form id="departure_form"><label for="departure_value" data-text="time_label"></label><input id="departure_value" type="datetime-local" required><div class="actions"><button id="departure_save" type="submit" class="secondary" data-text="save" disabled></button><button id="departure_clear" type="button" class="secondary" data-text="clear" disabled></button></div><p class="hint" data-text="time_hint"></p></form>
 <form id="soc_form"><label for="soc_value" data-text="soc_label"></label><div class="limit-input"><input id="soc_value" type="number" min="0" max="100" step="1" required><span>%</span><button id="soc_save" type="submit" class="secondary" data-text="save" disabled></button></div><p class="hint" data-text="soc_hint"></p></form>
 </section><section class="card charging-current" aria-labelledby="current_title">
 <h2 id="current_title" data-text="current_title"></h2>
-<dl class="values"><div><dt data-text="energy"></dt><dd id="energy_status"></dd></div><div><dt data-text="time_label"></dt><dd id="departure_status"></dd></div><div><dt data-text="soc"></dt><dd id="soc_status"></dd></div></dl>
+<dl class="values"><div><dt data-text="energy"></dt><dd id="energy_status"></dd></div><div><dt data-text="cost"></dt><dd id="cost_status"></dd></div><div><dt data-text="time_label"></dt><dd id="departure_status"></dd></div><div><dt data-text="soc"></dt><dd id="soc_status"></dd></div></dl>
 <p id="departure_summary" class="hint"></p>
 <hr><h3 data-text="guest"></h3><p data-text="guest_hint"></p>
 <button id="guest_start" type="button" data-text="guest" disabled></button>

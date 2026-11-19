@@ -38,7 +38,7 @@ from .departure_step import (
     same_command,
 )
 from .departure_store import DepartureStore
-from .errors import DeviceError
+from .errors import DeviceError, validation_error
 from .notice import FailureNotice
 from .persistence import finish_goal_save
 from .power_window import PowerWindow
@@ -495,7 +495,7 @@ class DepartureController:
                 if sample.read_only or expected_revision != self.choice_revision or expected_vehicle != sample.vehicle:
                     raise DeviceError("service_unavailable")
                 if deadline is not None and deadline <= sample.now:
-                    raise ValueError("departure time must be in the future")
+                    raise validation_error("target_time_not_future")
                 # Keep the HA source marker, so an unchanged external calendar
                 # timestamp cannot silently re-arm a trip cleared in the app.
                 source = self.trip.source
