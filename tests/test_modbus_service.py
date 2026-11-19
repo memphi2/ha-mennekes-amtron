@@ -532,3 +532,40 @@ def test_a_command_reads_its_own_write_back_beside_a_queued_command(tmp_path):
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_switch_counts_from_its_acknowledgement_even_when_cancelled(tmp_path):
+    """A cancellation during the reads after the write keeps the state-change interval."""
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path, current=1)
+        await service.heartbeat.async_stop()
+        transport.bank[R.EVSE_STATE.address] = 2
+        await service.refresh()
+        clock[0] += 400
+        control = service.control
+        wrote = asyncio.Event()
+        write = transport.write_registers
+
+        async def acknowledged(address, values, **kwargs):
+            result = await write(address, values, **kwargs)
+            transport.read_delay = 0.2
+            wrote.set()
+            return result
+
+        transport.write_registers = acknowledged
+        try:
+            resume = asyncio.create_task(control.async_resume_charging())
+            await wrote.wait()
+            await asyncio.sleep(0.05)
+            resume.cancel()
+            await asyncio.gather(resume, return_exceptions=True)
+            transport.read_delay = 0
+            clock[0] += 6
+            await control.async_pause_charging()
+            # The pause waits for the interval instead of following at once.
+            assert control.pending_action == "pause"
+            assert current_writes(transport) == [6.0]
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
