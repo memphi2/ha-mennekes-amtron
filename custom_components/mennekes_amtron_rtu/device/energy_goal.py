@@ -30,51 +30,65 @@ _SNAPSHOT_KEYS = frozenset({"target_kwh", "baseline_kwh", "status"})
 MAX_COST_GOAL: Final = 1000.0
 MIN_COST_GOAL: Final = 0.1
 COST_GOAL_STEP: Final = 0.1
-_COST_KEYS = frozenset({"amount", "spent", "price"})
+_COST_KEYS = frozenset({"amount", "spent", "price", "booked_kwh"})
 # A smaller price change does not re-arm the amount (0.1 ct/kWh).
 PRICE_TOLERANCE: Final = 0.001
 
 type EnergyGoalSnapshot = dict[str, float | str | dict[str, float] | None]
 
 
+def finite_number(value: object) -> float | None:
+    """A real finite number as float, else None (never bool or huge ints)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except OverflowError:
+        return None
+    return number if math.isfinite(number) else None
+
+
 @dataclass(frozen=True, slots=True)
 class CostPart:
     """The amount of money an energy target stands for.
 
-    ``spent`` is what the energy up to the target's baseline cost; from the
-    baseline on, ``price`` applies. A negative price earns money back.
+    ``spent`` is what the first ``booked_kwh`` above the target's baseline
+    cost; beyond them ``price`` applies. A negative price earns money back.
     """
 
     amount: float
     spent: float
     price: float
+    booked_kwh: float = 0.0
 
     def __post_init__(self) -> None:
-        for value in (self.amount, self.spent, self.price):
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-                raise ValueError("cost values must be finite numbers")
+        if any(finite_number(value) is None for value in (self.amount, self.spent, self.price, self.booked_kwh)):
+            raise ValueError("cost values must be finite numbers")
         if not MIN_COST_GOAL <= self.amount <= MAX_COST_GOAL:
             raise ValueError("cost target must be between 0.1 and 1000")
+        if self.booked_kwh < 0:
+            raise ValueError("cost booked energy must not be negative")
 
     def snapshot(self) -> dict[str, float]:
-        return {"amount": self.amount, "spent": self.spent, "price": self.price}
+        return {"amount": self.amount, "spent": self.spent, "price": self.price, "booked_kwh": self.booked_kwh}
 
     @classmethod
     def restore(cls, raw: object) -> CostPart:
         if not isinstance(raw, dict) or raw.keys() != _COST_KEYS:
             raise ValueError("invalid cost target fields")
-        return cls(raw["amount"], raw["spent"], raw["price"])
+        return cls(raw["amount"], raw["spent"], raw["price"], raw["booked_kwh"])
 
 
 def energy_for(amount: float, price: float) -> float:
-    """The energy target that keeps within ``amount`` at ``price``.
+    """The energy that keeps within ``amount`` at ``price``.
 
     Rounded down to the target's step, so the amount is not exceeded; at
     least one step. A price of zero or below never uses the amount up.
     """
-    if price <= 0:
+    ratio = amount / price / ENERGY_GOAL_STEP_KWH if price > 0 else math.inf
+    if not math.isfinite(ratio):
         return MAX_ENERGY_GOAL_KWH
-    steps = math.floor(amount / price / ENERGY_GOAL_STEP_KWH + 1e-9)
+    steps = math.floor(ratio + 1e-9)
     return min(MAX_ENERGY_GOAL_KWH, max(MIN_ENERGY_GOAL_KWH, steps / 10))
 
 
@@ -191,6 +205,35 @@ class EnergyGoal:
         if self._status in ("reached", "meter_reset"):
             self.resume_on_recovery = False
         return self.snapshot() != previous
+
+    def take_cost(self, other: EnergyGoal) -> None:
+        """Adopt the repriced target and amount of the same goal's copy."""
+        self._target_kwh = other._target_kwh
+        self.cost = other.cost
+
+    def reprice(self, price: float) -> bool:
+        """Book the energy so far at the old price and aim the rest at ``price``.
+
+        Only a running amount changes, and only its target and amount: the
+        baseline, the status and every latch stay, so this is no new goal.
+        With less than one step of money left the target in force ends it.
+        """
+        cost = self.cost
+        if cost is None or self._status != "active":
+            return False
+        # An active goal always has both; the fallback only satisfies typing.
+        polled = 0.0 if self._baseline_kwh is None or self._last_total_kwh is None else (
+            self._last_total_kwh - self._baseline_kwh
+        )
+        delivered = max(cost.booked_kwh, polled)
+        spent = cost.spent + (delivered - cost.booked_kwh) * cost.price
+        left = cost.amount - spent
+        if left < price * ENERGY_GOAL_STEP_KWH:
+            return False
+        steps = math.floor((delivered + energy_for(left, price)) / ENERGY_GOAL_STEP_KWH + 1e-9)
+        self._target_kwh = min(MAX_ENERGY_GOAL_KWH, max(MIN_ENERGY_GOAL_KWH, steps / 10))
+        self.cost = CostPart(cost.amount, spent, price, delivered)
+        return True
 
     def snapshot(self) -> EnergyGoalSnapshot:
         """Return bounded durable state, excluding ordinary meter progress."""

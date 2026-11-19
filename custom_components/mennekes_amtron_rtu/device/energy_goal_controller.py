@@ -9,19 +9,17 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from copy import copy
-from dataclasses import replace
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .control import AmtronControl
 from .data import WallboxData
 from .energy_goal import (
-    ENERGY_GOAL_STEP_KWH,
-    MIN_ENERGY_GOAL_KWH,
     PRICE_TOLERANCE,
     CostPart,
     EnergyGoal,
     energy_for,
+    finite_number,
 )
 from .errors import DeviceError, validation_error
 from .notice import FailureNotice
@@ -109,21 +107,19 @@ class EnergyGoalController:
         self._dirty = False
 
     async def async_set_cost_target(self, amount: object, price: object) -> None:
-        """Arm an amount of money at ``price``; zero ends it with its target.
-
-        The amount is carried by the energy target: at a new price
-        ``async_set_price`` books the energy so far and re-arms the rest.
-        """
-        if isinstance(amount, bool) or not isinstance(amount, (int, float)) or not math.isfinite(amount):
+        """Arm an amount of money at ``price``; zero ends it with its target."""
+        value = finite_number(amount)
+        if value is None:
             raise validation_error("cost_goal_invalid")
-        if amount == 0:
+        if value == 0:
             if self.model.cost is not None:
                 await self.async_set_target(0)
             return
-        if isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price):
+        unit = finite_number(price)
+        if unit is None:
             raise validation_error("cost_goal_price_unknown")
         try:
-            cost = CostPart(float(amount), 0.0, float(price))
+            cost = CostPart(value, 0.0, unit)
         except ValueError as err:
             raise validation_error("cost_goal_invalid") from err
         await self.async_set_target(energy_for(cost.amount, cost.price), cost=cost)
@@ -131,29 +127,41 @@ class EnergyGoalController:
         self._priced_at = self._monotonic()
 
     async def async_set_price(self, price: object) -> None:
-        """Follow a new price: book the energy so far, re-arm what is left.
+        """Follow a new price: book the energy so far, aim the rest anew.
 
-        Only a running amount follows; a reached or latched one stays as it
-        is. At most once a minute, and only for a change of 0.1 ct/kWh.
+        The running goal keeps its baseline, status, generation and latches;
+        only its target and amount change, in the model and in the copy that
+        polls fold into meanwhile. At most once a minute, and only for a
+        change of 0.1 ct/kWh. The energy so far is the last polled meter.
         """
-        if isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price):
+        unit = finite_number(price)
+        if unit is None:
             raise validation_error("cost_goal_price_unknown")
-        cost = self.model.cost
-        if (
-            cost is None or self.model.status != "active"
-            or abs(price - cost.price) < PRICE_TOLERANCE
-            or self._monotonic() - self._priced_at < PRICE_INTERVAL_SECONDS
-        ):
-            return
-        await self.async_set_target(None, price=float(price))
+        async with self._control.energy_goal_guard:
+            if self._stopping:
+                raise validation_error("energy_goal_unavailable")
+            cost = self.model.cost
+            if (
+                cost is None or abs(unit - cost.price) < PRICE_TOLERANCE
+                or self._monotonic() - self._priced_at < PRICE_INTERVAL_SECONDS
+            ):
+                return
+            state = self._client.write_state
+            pending = self._pending if self._pending_generation == state.energy_goal_generation else None
+            newest = pending or self.model
+            self._priced_at = self._monotonic()
+            if newest.stop_requested or not newest.reprice(unit):
+                return
+            if pending is not None:
+                self.model.take_cost(pending)
+            self._dirty = True
+            await self._save_state()
+        self._notify_changed()
 
-    async def async_set_target(
-        self, value: object, *, cost: CostPart | None = None, price: float | None = None,
-    ) -> None:
+    async def async_set_target(self, value: object, *, cost: CostPart | None = None) -> None:
         """Persist a new ceiling before it can affect subsequent commands.
 
-        ``cost`` is the amount the ceiling stands for. ``price`` instead
-        re-arms the running amount at that price, from the live meter.
+        ``cost`` is the amount of money the ceiling stands for.
         """
         if self._stopping:
             raise validation_error("energy_goal_unavailable")
@@ -164,30 +172,15 @@ class EnergyGoalController:
         candidate = EnergyGoal()
         try:
             # Reject invalid input before requesting anything from the wallbox.
-            candidate.set_target(MIN_ENERGY_GOAL_KWH if price is not None else value, 0)
+            candidate.set_target(value, 0)
         except ValueError as err:
             raise validation_error("energy_goal_invalid") from err
         async with self._control.energy_goal_guard:
             if self._stopping:
                 raise validation_error("energy_goal_unavailable")
-            running = self.model.cost
-            if price is not None and (running is None or self.model.status != "active"):
-                return
             if candidate.target_kwh:
                 try:
                     total = await self._client.async_read_register(ENERGY_TOTAL, verify_identity=True)
-                    if price is not None and running is not None:
-                        if isinstance(total, bool) or not isinstance(total, (int, float)):
-                            raise ValueError("energy total is not a number")
-                        baseline = self.model.baseline_kwh or 0.0
-                        spent = running.spent + max(0.0, float(total) - baseline) * running.price
-                        left = running.amount - spent
-                        if left < price * ENERGY_GOAL_STEP_KWH:
-                            # Not one step left: the target in force ends it.
-                            self._priced_at = self._monotonic()
-                            return
-                        value = energy_for(left, price)
-                        cost = replace(running, spent=spent, price=price)
                     candidate.set_target(value, total)
                     candidate.cost = cost
                 except (AmtronBusError, ValueError) as err:
@@ -258,12 +251,7 @@ class EnergyGoalController:
                 self._pending_generation = state.energy_goal_generation
                 self._ensure_task()
                 raise
-        if price is not None:
-            self._priced_at = self._monotonic()
-            # The same amount at another price: no new decision by anybody,
-            # so queued commands of the planners stay.
-        else:
-            self._control.cancel_goal_resume()
+        self._control.cancel_goal_resume()
         self._notify_changed()
 
     async def async_cancel_recovery_locked(self) -> None:

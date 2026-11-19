@@ -692,7 +692,7 @@ def test_the_service_carries_an_amount_and_follows_its_price(tmp_path):
             })
             goal = service.control.energy_goal
             assert goal.target_kwh == 40.0
-            assert goal.cost.snapshot() == {"amount": 10.0, "spent": 0.0, "price": 0.25}
+            assert goal.cost.snapshot() == {"amount": 10.0, "spent": 0.0, "price": 0.25, "booked_kwh": 0.0}
             assert service.snapshot()["control"]["energy_goal"]["cost"]["amount"] == 10.0
             # Within the minute the same price changes nothing.
             await service.command({"command": "cost_price", "price": 0.5, "expected_serial_number": serial})

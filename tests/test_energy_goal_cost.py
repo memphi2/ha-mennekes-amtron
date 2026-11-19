@@ -13,8 +13,8 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal import (
     energy_for,
 )
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
-from tests.fakes import put, raise_connection_error
-from tests.test_energy_goal_controller import _runner
+from tests.fakes import put
+from tests.test_energy_goal_controller import _runner, _settle, _snapshot
 
 
 async def _cost_runner(meter=100.0):
@@ -31,11 +31,15 @@ def test_the_energy_keeps_within_the_amount():
     assert energy_for(0.01, 0.30) == 0.1
     assert energy_for(5, 0) == energy_for(5, -0.1) == 1000.0
     assert energy_for(1000, 0.001) == 1000.0
+    assert energy_for(10, 5e-324) == 1000.0
 
 
 @pytest.mark.parametrize("raw", [
-    None, {}, {"amount": 1, "spent": 0}, {"amount": True, "spent": 0, "price": 0.3},
-    {"amount": 0, "spent": 0, "price": 0.3}, {"amount": 1, "spent": float("nan"), "price": 0.3},
+    None, {}, {"amount": 1, "spent": 0, "price": 0.3},
+    {"amount": True, "spent": 0, "price": 0.3, "booked_kwh": 0},
+    {"amount": 0, "spent": 0, "price": 0.3, "booked_kwh": 0},
+    {"amount": 1, "spent": float("nan"), "price": 0.3, "booked_kwh": 0},
+    {"amount": 1, "spent": 0, "price": 0.3, "booked_kwh": -1},
 ])
 def test_a_malformed_amount_is_refused(raw):
     with pytest.raises(ValueError, match="cost"):
@@ -61,15 +65,26 @@ def test_an_amount_arms_its_energy_and_a_new_price_books_it():
         await runner.async_set_cost_target(10, 0.30)
         assert control.energy_goal.target_kwh == 33.3
         assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.30)
-        assert saved[-1]["cost"] == {"amount": 10.0, "spent": 0.0, "price": 0.30}
-        put(harness.transport.bank, R.ENERGY_TOTAL, 110.0)
+        assert saved[-1]["cost"] == {"amount": 10.0, "spent": 0.0, "price": 0.30, "booked_kwh": 0.0}
+        generation = harness.client.write_state.energy_goal_generation
+        runner.observe(_snapshot(harness, 110.0))
+        await _settle(runner)
         clock[0] += 61
         await runner.async_set_price(0.50)
-        # 10 kWh at 0.30 cost 3; 7 left at 0.50 is 14 kWh from 110.
-        assert control.energy_goal.target_kwh == 14.0
-        assert control.energy_goal.baseline_kwh == 110.0
-        cost = control.energy_goal.cost
-        assert (cost.amount, cost.spent, cost.price) == (10.0, pytest.approx(3.0), 0.50)
+        # 10 kWh at 0.30 cost 3; 7 left at 0.50 is 14 kWh more: 24 from 100.
+        goal = control.energy_goal
+        assert (goal.target_kwh, goal.baseline_kwh, goal.status) == (24.0, 100.0, "active")
+        assert harness.client.write_state.energy_goal_generation == generation
+        cost = goal.cost
+        assert (cost.amount, cost.spent, cost.price, cost.booked_kwh) == (10.0, pytest.approx(3.0), 0.50, 10.0)
+        assert saved[-1]["cost"]["price"] == 0.50
+        runner.observe(_snapshot(harness, 114.0))
+        await _settle(runner)
+        clock[0] += 61
+        await runner.async_set_price(0.25)
+        # 4 more kWh at 0.50 cost 2; 5 left at 0.25 is 20 kWh more than 14.
+        assert control.energy_goal.target_kwh == 34.0
+        assert control.energy_goal.cost.spent == pytest.approx(5.0)
         await runner.async_stop()
     asyncio.run(run())
 
@@ -111,38 +126,79 @@ def test_less_than_a_step_left_keeps_the_target_in_force():
     async def run():
         harness, control, runner, _saved, clock = await _cost_runner()
         await runner.async_set_cost_target(1, 0.30)
-        put(harness.transport.bank, R.ENERGY_TOTAL, 103.3)
+        runner.observe(_snapshot(harness, 103.2))
+        await _settle(runner)
         clock[0] += 61
         await runner.async_set_price(0.50)
         assert control.energy_goal.target_kwh == 3.3
-        assert control.energy_goal.baseline_kwh == 100.0
+        assert control.energy_goal.cost.price == 0.30
         await runner.async_stop()
     asyncio.run(run())
 
 
-def test_a_price_found_stale_under_the_guard_changes_nothing():
+def test_a_price_keeps_a_stop_that_a_poll_latched_meanwhile():
+    async def run():
+        harness, control, runner, _saved, clock = await _cost_runner()
+        await runner.async_set_cost_target(10, 0.30)
+        clock[0] += 61
+        async with control.energy_goal_guard:
+            # A command holds the guard while a poll sees the meter fall.
+            runner.observe(_snapshot(harness, 50.0))
+            price = asyncio.create_task(runner.async_set_price(0.50))
+            await asyncio.sleep(0)
+        await price
+        await _settle(runner)
+        goal = control.energy_goal
+        assert (goal.status, goal.target_kwh, goal.cost.price) == ("meter_reset", 33.3, 0.30)
+        await runner.async_stop()
+    asyncio.run(run())
+
+
+def test_a_price_folds_into_the_copy_a_poll_left_meanwhile():
+    async def run():
+        harness, control, runner, _saved, clock = await _cost_runner()
+        await runner.async_set_cost_target(10, 0.30)
+        clock[0] += 61
+        async with control.energy_goal_guard:
+            # The price waits for the guard first, then a poll leaves its copy.
+            price = asyncio.create_task(runner.async_set_price(0.50))
+            await asyncio.sleep(0)
+            runner.observe(_snapshot(harness, 110.0))
+        await price
+        await _settle(runner)
+        assert control.energy_goal.target_kwh == 24.0
+        assert control.energy_goal.cost.booked_kwh == 10.0
+        runner._stopping = True
+        with pytest.raises(DeviceValidationError, match="energy_goal_unavailable"):
+            await runner.async_set_price(0.25)
+        runner._stopping = False
+        await runner.async_stop()
+    asyncio.run(run())
+
+
+def test_a_price_keeps_a_queued_recovery_resume():
     async def run():
         _harness, control, runner, _saved, clock = await _cost_runner()
         await runner.async_set_cost_target(10, 0.30)
         clock[0] += 61
-        control.energy_goal.set_target(5, 100.0)
-        await runner.async_set_target(None, price=0.50)
-        assert control.energy_goal.target_kwh == 5
+        calls = []
+        control.cancel_goal_resume = lambda *a, **k: calls.append(1)
+        await runner.async_set_price(0.50)
+        assert control.energy_goal.cost.price == 0.50
+        assert calls == []
         await runner.async_stop()
     asyncio.run(run())
 
 
-def test_a_failed_meter_read_keeps_the_running_amount():
-    async def run():
-        harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
-        harness.transport.read_exceptions[R.ENERGY_TOTAL.address] = raise_connection_error()
-        clock[0] += 61
-        with pytest.raises(DeviceValidationError, match="energy_goal_unavailable"):
-            await runner.async_set_price(0.50)
-        assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.30)
-        await runner.async_stop()
-    asyncio.run(run())
+def test_a_price_after_a_restart_books_nothing_twice():
+    goal = EnergyGoal()
+    goal.set_target(24.0, 100.0)
+    goal.cost = CostPart(10.0, 3.0, 0.50, 10.0)
+    restored = EnergyGoal.restore(goal.snapshot())
+    assert restored.reprice(0.25)
+    # Before the first poll only the booked 10 kWh are known.
+    assert restored.cost.spent == 3.0
+    assert restored.target_kwh == 38.0
 
 
 def test_zero_ends_the_amount_with_its_target_but_keeps_a_plain_one():
@@ -163,6 +219,7 @@ def test_zero_ends_the_amount_with_its_target_but_keeps_a_plain_one():
     (True, 0.3, "cost_goal_invalid"), (float("nan"), 0.3, "cost_goal_invalid"),
     (0.05, 0.3, "cost_goal_invalid"), (1001, 0.3, "cost_goal_invalid"),
     (10, None, "cost_goal_price_unknown"), (10, float("inf"), "cost_goal_price_unknown"),
+    (10**400, 0.3, "cost_goal_invalid"), (10, 10**400, "cost_goal_price_unknown"),
 ])
 def test_an_invalid_amount_or_price_is_refused(amount, price, key):
     async def run():
@@ -176,19 +233,8 @@ def test_an_invalid_amount_or_price_is_refused(amount, price, key):
     asyncio.run(run())
 
 
-def test_a_meter_that_is_no_number_keeps_the_running_amount():
-    async def run():
-        harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
-        read = harness.client.async_read_register
-
-        async def text(spec, **how):
-            return "x" if spec is R.ENERGY_TOTAL else await read(spec, **how)
-
-        harness.client.async_read_register = text
-        clock[0] += 61
-        with pytest.raises(DeviceValidationError, match="energy_goal_unavailable"):
-            await runner.async_set_price(0.50)
-        assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.30)
-        await runner.async_stop()
-    asyncio.run(run())
+def test_only_a_running_amount_takes_a_price():
+    assert not EnergyGoal().reprice(0.5)
+    goal = EnergyGoal()
+    goal.set_target(5, 100.0)
+    assert not goal.reprice(0.5)
