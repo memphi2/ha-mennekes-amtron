@@ -26,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A pause, a withdrawn release or a lock that waited for the state-change
   interval was dropped when the latest poll had failed at its due time. It
   now waits for the wallbox and is then written.
+- A waiting pause, lock or withdrawn release is also written again after a
+  reply that did not come, outlasts a current change that switches nothing
+  (such as a surplus adjustment), and a waiting lock outlasts a goal or time
+  stop. Before, each of these dropped the stop and the car went on charging.
+- The recovery from error 200 leaves the charging release closed when
+  nobody has decided it yet and the wallbox has it closed.
+- A manual Plug & Charge release ends when the vehicle state was unknown
+  for a minute, as an automatic grant already did.
+- With a line that does not answer at all, a poll gives up after two
+  register blocks instead of waiting out every block, so the heartbeat gets
+  the bus back within seconds.
 - The recovery from wallbox error 200 runs to its end while the service
   cannot save its state; before, it broke off after its first write on
   every poll.

@@ -35,6 +35,7 @@ from .const import (
 )
 from .control_queue import CommandQueue
 from .control_types import (
+    OTHER_STOPS,
     ControlOptions,
     PendingCommand,
     PhaseChange,
@@ -121,6 +122,8 @@ class AmtronControl:
         self._write_state = client.write_state
         self._events = CommandEvents()
         self._active_command: PendingCommand | None = None
+        # Set by the queue while a command runs that must not settle a waiting stop.
+        self._keep_pending = False
         self._command_acknowledged = False
         self._guest_release_applied = False
         self._command_write_started = False
@@ -331,10 +334,12 @@ class AmtronControl:
         return max(0.0, self._options.state_change_interval_seconds - waited)
 
     def _record_replaced(self, command: PendingCommand | None) -> None:
-        if self._pending is not None and self._pending != command:
+        if self._pending is not None and self._pending != command and not self._keep_pending:
             self.events.record("replaced", self._pending.action, "replaced", source=self._pending.source, requested_value=self._pending.value)
 
     def _clear_pending(self, *, outcome: str | None = None, reason: str = "completed") -> bool:
+        if self._keep_pending and outcome is None:
+            return False
         changed = self._pending is not None
         if self._pending is not None:
             if outcome is not None and self._active_command is None:
@@ -412,7 +417,10 @@ class AmtronControl:
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
                 return
-            self._clear_pending(outcome="cancelled", reason=self._stop_reason())
+            if self._pending is not None and self._pending.action not in OTHER_STOPS:
+                # The stop replaces what waited for the current. A waiting lock
+                # or withdrawn release is another matter and stays.
+                self._clear_pending(outcome="cancelled", reason=self._stop_reason())
             if self.is_paused is not False:
                 try:
                     # A former acknowledgement or cached poll is not proof of
@@ -765,6 +773,14 @@ class AmtronControl:
                 if error != ERROR_CODE_EMS_UNAVAILABLE:
                     raise validation_error("recovery_not_applicable")
                 current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
+                release = self.charging_release_requested
+                if release is None:
+                    # Nobody decided the release yet: it stays what the wallbox
+                    # has. Recovering opens nothing that was closed.
+                    opened = await self._client.async_read_register(CHARGING_RELEASE)
+                    if type(opened) is not int or opened not in (0, 1):
+                        raise validation_error("recovery_state_unknown")
+                    release = bool(opened)
             except AmtronBusError as err:
                 raise validation_error("recovery_state_unknown") from err
             if not isinstance(current, (int, float)) or not math.isfinite(current) or current < 0:
@@ -805,7 +821,7 @@ class AmtronControl:
                 # current step below reasserts a goal stop as the pause value;
                 # rejecting this recovery-only release would leave it faulted.
                 await self.writes.async_write(
-                    CHARGING_RELEASE, int(self.charging_release_requested is not False and not self._plug_charge.state.blocked),
+                    CHARGING_RELEASE, int(release and not self._plug_charge.state.blocked),
                     recovery_release=True,
                 )
                 await self.writes.async_apply_current(
