@@ -76,6 +76,8 @@ def owners(monkeypatch, entry, *, failure=None):
             instance = SimpleNamespace(
                 **{startup: AsyncMock(side_effect=start), shutdown: AsyncMock(side_effect=stop)},
                 async_observe=AsyncMock(side_effect=observe),
+                # The cost target asks the cost owner for the price at a poll.
+                unit_price=lambda _at: None,
             )
             instances[name] = instance
             return instance
