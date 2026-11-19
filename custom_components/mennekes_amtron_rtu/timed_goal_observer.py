@@ -242,11 +242,8 @@ class TimedGoalObserver:
         self, value: datetime | None, *, source: str | None,
         expected: TimedGoal | None = None,
     ) -> None:
-        if value is not None:
-            if value.tzinfo is None or value.utcoffset() is None:
-                raise HomeAssistantError("Departure time needs a timezone")
-            if value <= dt_util.utcnow():
-                raise HomeAssistantError("Departure time must be in the future")
+        if value is not None and (value.utcoffset() is None or value <= dt_util.utcnow()):
+            raise service_validation_error("target_time_not_future")
         async with self._goal_lock:
             if self._stopping or (expected is not None and self.goal is not expected):
                 return

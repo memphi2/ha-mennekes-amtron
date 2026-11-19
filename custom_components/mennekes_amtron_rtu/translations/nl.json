@@ -892,6 +892,9 @@
     "guest_deadline_expired": {
       "message": "Het opgeslagen tijdstip is verstreken. Kies een toekomstig tijdstip of wis het."
     },
+    "target_time_not_future": {
+      "message": "Kies een tijdstip in de toekomst, met tijdzone."
+    },
     "time_limit_reached": {
       "message": "Het gekozen tijdstip is voorbij. Wijzig of wis het vóór hervatten."
     }

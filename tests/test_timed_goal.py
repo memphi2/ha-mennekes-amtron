@@ -197,7 +197,7 @@ def test_timed_goal_source_updates_and_explicit_clear(monkeypatch: pytest.Monkey
         assert len(observer._store.saved) == 2
         with pytest.raises(Exception, match="future"):
             await observer.async_set_deadline(NOW - timedelta(seconds=1))
-        with pytest.raises(Exception, match="timezone"):
+        with pytest.raises(Exception, match="time zone"):
             await observer.async_set_deadline(NOW.replace(tzinfo=None))
         with pytest.raises(Exception, match="source"):
             await observer.async_set_deadline(NOW + timedelta(hours=1), source="")

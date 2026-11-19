@@ -10,7 +10,7 @@ import logging
 import math
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import copy
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
@@ -344,6 +344,10 @@ class ServiceControl:
 
     @ha_command
     async def async_set_target_time(self, deadline: datetime | None) -> None:
+        # The service would answer a past time as a malformed request, which
+        # would read as an unreachable service instead of a wrong value.
+        if deadline is not None and (deadline.utcoffset() is None or deadline <= datetime.now(UTC)):
+            raise DeviceValidationError("target_time_not_future")
         revision = self._control.get("target_time_revision")
         await self._departure_command(
             "departure_choice", deadline=None if deadline is None else deadline.isoformat(),

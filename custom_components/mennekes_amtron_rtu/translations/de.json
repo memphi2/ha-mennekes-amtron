@@ -892,6 +892,9 @@
     "guest_deadline_expired": {
       "message": "Der gespeicherte Zeitpunkt ist abgelaufen. Einen zukünftigen Zeitpunkt wählen oder löschen."
     },
+    "target_time_not_future": {
+      "message": "Einen Zeitpunkt in der Zukunft wählen, mit Zeitzone."
+    },
     "time_limit_reached": {
       "message": "Der gewählte Zeitpunkt ist vorbei. Vor dem Fortsetzen ändern oder löschen."
     }

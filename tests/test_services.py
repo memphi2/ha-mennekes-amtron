@@ -399,6 +399,13 @@ def test_departure_choices_reach_the_service_plan() -> None:
         assert control.departure.trip.deadline == deadline
         await control.async_set_target_time(None)
         assert control.departure.trip is None or control.departure.trip.deadline is None
+        # A past or zoneless time is a wrong value, not an unreachable service:
+        # nothing is sent and the entities stay available.
+        for wrong in (deadline - timedelta(days=1), deadline.replace(tzinfo=None)):
+            with pytest.raises(HomeAssistantError) as refused:
+                await control.async_set_target_time(wrong)
+            assert refused.value.translation_key == "target_time_not_future"
+        assert entry.runtime_data.client.connected
         await control.async_set_departure_inputs(DepartureInputs(vehicle="car", capacity_kwh=60.0))
         await control.async_set_departure_trip(deadline, "calendar.trips")
         assert control.departure.trip.deadline == deadline

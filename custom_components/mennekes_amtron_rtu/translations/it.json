@@ -892,6 +892,9 @@
     "guest_deadline_expired": {
       "message": "Il limite orario è scaduto. Scegliere un orario futuro o cancellarlo."
     },
+    "target_time_not_future": {
+      "message": "Scegliere un orario futuro, con il fuso orario."
+    },
     "time_limit_reached": {
       "message": "L’orario scelto è passato. Modificarlo o cancellarlo prima di riprendere."
     }

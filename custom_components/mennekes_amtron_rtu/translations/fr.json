@@ -892,6 +892,9 @@
     "guest_deadline_expired": {
       "message": "L’heure limite est dépassée. Choisissez une heure future ou effacez-la."
     },
+    "target_time_not_future": {
+      "message": "Choisissez une heure dans le futur, avec son fuseau horaire."
+    },
     "time_limit_reached": {
       "message": "L’heure choisie est passée. Modifiez-la ou effacez-la avant de reprendre."
     }
