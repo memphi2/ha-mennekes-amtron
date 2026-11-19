@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- `energy_goal` takes `expected_energy_goal` and refuses with
-  `energy_goal_changed` when the target is another one by then.
+- New commands `cost_goal` (amount and price) and `cost_price`: the energy
+  target carries an amount of money and is re-armed at each new price.
 - A lock or withdrawn release whose reply did not come is repeated after
   five seconds instead of a whole state-change interval.
 - Refusals of the app pages carry the security headers.

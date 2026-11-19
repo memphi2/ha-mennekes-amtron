@@ -9,14 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Cost target**: a charge target as an amount of money. Home Assistant
-  hands the amount still open to the service as an energy target at the
-  current price and again at every price change, so the service stops the
-  charge itself. It needs configured charging costs and ends when the energy
+- **Cost target**: a charge target as an amount of money. The service keeps
+  the amount with the energy target that carries it, books the energy at
+  each price and stops the charge itself; Home Assistant only tells it the
+  current price. It needs configured charging costs and ends when the energy
   target is set by hand.
-- The service's `energy_goal` command takes `expected_energy_goal` and
-  refuses with `energy_goal_changed` when its target is another one by then.
-  Integration and app must be updated together.
+- The service takes `cost_goal` (amount and price) and `cost_price`, and its
+  energy target state carries the amount. Integration and app must be
+  updated together.
 
 ### Fixes
 

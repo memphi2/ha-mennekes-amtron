@@ -933,9 +933,6 @@
     },
     "cost_goal_price_unknown": {
       "message": "L’obiettivo di costo richiede un prezzo dell’elettricità attuale. Controllare la fonte del prezzo dei costi di ricarica."
-    },
-    "energy_goal_changed": {
-      "message": "L’obiettivo di energia è stato modificato nel frattempo ed è rimasto invariato."
     }
   },
   "issues": {

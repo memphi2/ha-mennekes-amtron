@@ -21,7 +21,7 @@ from .device.const import CHARGING_CURRENT_MINIMUM
 from .device.control_types import pause_state
 from .device.decode import is_hex32
 from .device.departure_plan import DepartureInputs, DepartureState
-from .device.energy_goal import EnergyGoal
+from .device.energy_goal import MAX_COST_GOAL, MIN_COST_GOAL, EnergyGoal
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
 from .device.operation import Operation
@@ -247,8 +247,7 @@ class ServiceControl:
         )
 
     @ha_command
-    async def async_set_energy_goal(self, value: float, *, expected: float | None = None) -> None:
-        """Set the energy target; with ``expected``, only while it still is that."""
+    async def async_set_energy_goal(self, value: float) -> None:
         if not self.supports_energy_goal:
             raise DeviceValidationError("energy_goal_not_supported")
         candidate = EnergyGoal()
@@ -256,10 +255,23 @@ class ServiceControl:
             candidate.set_target(value, 0)
         except ValueError as err:
             raise DeviceValidationError("energy_goal_invalid") from err
-        if expected is None:
-            await self._command("energy_goal", value=value)
-        else:
-            await self._command("energy_goal", value=value, expected_energy_goal=expected)
+        await self._command("energy_goal", value=value)
+
+    @ha_command
+    async def async_set_cost_goal(self, amount: float, price: float | None) -> None:
+        """Arm an amount of money; the service carries it as its energy target."""
+        if not self.supports_energy_goal:
+            raise DeviceValidationError("energy_goal_not_supported")
+        if not math.isfinite(amount) or not (amount == 0 or MIN_COST_GOAL <= amount <= MAX_COST_GOAL):
+            raise DeviceValidationError("cost_goal_invalid")
+        if amount and price is None:
+            raise DeviceValidationError("cost_goal_price_unknown")
+        await self._command("cost_goal", value=amount, price=price)
+
+    @ha_command
+    async def async_set_cost_price(self, price: float) -> None:
+        """Tell the service the price that applies now."""
+        await self._command("cost_price", price=price)
 
     @property
     def supports_soc_goal(self) -> bool:

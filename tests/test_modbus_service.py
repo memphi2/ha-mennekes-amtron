@@ -678,33 +678,33 @@ def test_a_command_the_disk_could_not_save_is_not_reported_as_an_unreachable_ser
     asyncio.run(run())
 
 
-def test_an_energy_target_with_an_expected_one_is_set_only_while_that_holds(tmp_path):
-    from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+def test_the_service_carries_an_amount_and_follows_its_price(tmp_path):
+    from custom_components.mennekes_amtron_rtu.device.errors import (
+        DeviceValidationError,
+    )
 
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             serial = service.identity.serial_number
-            await service.command({"command": "energy_goal", "value": 5.0, "expected_serial_number": serial})
             await service.command({
-                "command": "energy_goal", "value": 7.0, "expected_energy_goal": 5.0,
-                "expected_serial_number": serial,
+                "command": "cost_goal", "value": 10.0, "price": 0.25, "expected_serial_number": serial,
             })
-            assert service.control.energy_goal.target_kwh == 7.0
-            for payload in (
-                {"command": "energy_goal", "value": 9.0, "expected_energy_goal": 5.0},
-                {"command": "pause", "expected_energy_goal": 7.0},
-            ):
-                with pytest.raises(DeviceError) as error:
-                    await service.command({**payload, "expected_serial_number": serial})
-                assert error.value.translation_key == "energy_goal_changed"
-            assert service.control.energy_goal.target_kwh == 7.0
-            for wrong in (None, True, "7"):
-                with pytest.raises(ValueError, match="expected_energy_goal"):
-                    await service.command({
-                        "command": "energy_goal", "value": 0, "expected_energy_goal": wrong,
-                        "expected_serial_number": serial,
-                    })
+            goal = service.control.energy_goal
+            assert goal.target_kwh == 40.0
+            assert goal.cost.snapshot() == {"amount": 10.0, "spent": 0.0, "price": 0.25}
+            assert service.snapshot()["control"]["energy_goal"]["cost"]["amount"] == 10.0
+            # Within the minute the same price changes nothing.
+            await service.command({"command": "cost_price", "price": 0.5, "expected_serial_number": serial})
+            assert service.control.energy_goal.target_kwh == 40.0
+            await service.command({"command": "cost_goal", "value": 0, "expected_serial_number": serial})
+            assert service.control.energy_goal.target_kwh == 0
+            controller, service.control.goal_controller = service.control.goal_controller, None
+            try:
+                with pytest.raises(DeviceValidationError, match="energy_goal_not_supported"):
+                    await service.command({"command": "cost_price", "price": 0.5, "expected_serial_number": serial})
+            finally:
+                service.control.goal_controller = controller
         finally:
             await service.stop()
 

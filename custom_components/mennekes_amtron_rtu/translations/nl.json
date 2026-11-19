@@ -933,9 +933,6 @@
     },
     "cost_goal_price_unknown": {
       "message": "Het kostendoel heeft een actuele stroomprijs nodig. Controleer de prijsbron van de laadkosten."
-    },
-    "energy_goal_changed": {
-      "message": "Het energiedoel is intussen gewijzigd en blijft zoals het is."
     }
   },
   "issues": {

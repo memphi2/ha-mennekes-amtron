@@ -29,7 +29,7 @@ from .departure_planner import DEPARTURE_COMMANDS, DeparturePlanner
 from .energy_goal import EnergyGoal
 from .energy_goal_controller import EnergyGoalController
 from .enums import EvseState, RequestedPhases, SolarChargingMode
-from .errors import DeviceError, DeviceValidationError
+from .errors import DeviceError, DeviceValidationError, validation_error
 from .guest_limits import GuestLimits
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
@@ -882,7 +882,7 @@ class ModbusService:
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
             "source", "soc", "maximum", "deadline", "expected_soc_revision",
             "session", "policy", "maximum_required", "expected_choice_revision",
-            "expected_energy_goal",
+            "price",
         }:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
@@ -909,17 +909,6 @@ class ModbusService:
             # Explicit null matches only a device without a readable serial.
             if expected_serial != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
-            expected_goal = payload.get("expected_energy_goal")
-            if "expected_energy_goal" in payload and (
-                isinstance(expected_goal, bool) or not isinstance(expected_goal, (int, float))
-            ):
-                raise ValueError("expected_energy_goal must be a number")
-            if "expected_energy_goal" in payload and (
-                command != "energy_goal"
-                or payload["expected_energy_goal"] != control.energy_goal.target_kwh
-            ):
-                # Whoever expected a target must not replace a newer one.
-                raise DeviceError("energy_goal_changed")
             if "expected_choice_revision" in payload and payload["expected_choice_revision"] != self.choice_revision:
                 raise DeviceError("soc_goal_source_changed")
             if "expected_soc_revision" in payload and (
@@ -982,6 +971,16 @@ class ModbusService:
                     await control.async_pause_charging()
                 elif command == "energy_goal":
                     await control.async_set_energy_goal(number(value, 0, 1000))
+                elif command in ("cost_goal", "cost_price"):
+                    # Home Assistant knows the price, the service the meter:
+                    # the amount and its target live here, in one place.
+                    if control.goal_controller is None or not control.supports_energy_goal:
+                        raise validation_error("energy_goal_not_supported")
+                    price = payload.get("price")
+                    if command == "cost_goal":
+                        await control.goal_controller.async_set_cost_target(number(value, 0, 1000), price)
+                    else:
+                        await control.goal_controller.async_set_price(price)
                 elif command == "soc_source":
                     source = payload.get("source")
                     if source is not None and not isinstance(source, str):

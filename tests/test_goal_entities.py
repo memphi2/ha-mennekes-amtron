@@ -87,8 +87,15 @@ def test_remote_capabilities_and_quality_change_snapshots_but_old_formats_are_re
             assert wrapper.supports_energy_goal
             await wrapper.async_set_energy_goal(12)
             remote.execute.assert_awaited_once_with("energy_goal", value=12)
-            await wrapper.async_set_energy_goal(14, expected=12)
-            remote.execute.assert_awaited_with("energy_goal", value=14, expected_energy_goal=12)
+            await wrapper.async_set_cost_goal(10, 0.30)
+            remote.execute.assert_awaited_with("cost_goal", value=10, price=0.30)
+            await wrapper.async_set_cost_goal(0, None)
+            remote.execute.assert_awaited_with("cost_goal", value=0, price=None)
+            await wrapper.async_set_cost_price(0.5)
+            remote.execute.assert_awaited_with("cost_price", price=0.5)
+            for amount, price in ((float("nan"), 0.3), (0.05, 0.3), (10, None)):
+                with pytest.raises(ServiceValidationError):
+                    await wrapper.async_set_cost_goal(amount, price)
             with pytest.raises(ServiceValidationError):
                 await wrapper.async_set_energy_goal(float("nan"))
             changed = deepcopy(service.snapshot())

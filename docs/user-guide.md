@@ -157,19 +157,20 @@ a reached goal stays stopped. After an owner restart, resume explicitly.
 ## Cost target
 
 With charging costs configured, **Cost target** limits a charge by an amount
-of money instead of energy. Home Assistant converts the amount still open into
-an **Energy target** at the price that applies now, and again whenever the
-price or the network-charge window changes, at most once a minute and only
-for a change of at least 0.1 ct/kWh. The service therefore stops the
-charge on its own; while Home Assistant is down it stops at the energy of the
-last known price. With a dynamic price the amount is kept to within one
-0.1 kWh step per price change, and it rests on the same estimate as the
-charging costs — it is not for billing.
+of money instead of energy. The service keeps the amount together with the
+**Energy target** that carries it: at the price that applies now it arms the
+energy the amount buys. Home Assistant tells it each new price, at most once
+a minute and only for a change of at least 0.1 ct/kWh; the service then books
+the energy so far at the old price and re-arms the rest at the new one. It
+therefore stops the charge on its own; while Home Assistant is down it keeps
+the last price. With a dynamic price the amount is kept to within one 0.1 kWh
+step per price change, and it rests on the same estimate as the charging
+costs — it is not for billing.
 
-The cost target uses the energy target: setting **Energy target** by hand ends
-the cost target, and setting the cost target to zero clears both. Like the
-energy target it never starts or resumes a charge. Without a current price a
-new amount is refused, and an armed one keeps its last energy target.
+Setting **Energy target** by hand ends the cost target, and setting the cost
+target to zero clears both. Like the energy target it never starts or resumes
+a charge. Without a current price a new amount is refused, and an armed one
+keeps its last price.
 
 ## Phase switching
 
