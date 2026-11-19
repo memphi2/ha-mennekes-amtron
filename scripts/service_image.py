@@ -112,10 +112,7 @@ def smoke(
     )
     if as_root and run("docker", "run", "--rm", image, "id", "-u").decode().strip() != "0":
         raise ValueError("the app image does not run as root")
-    # Root in the container leaves files the runner's user cannot remove.
-    with tempfile.TemporaryDirectory(
-        prefix="amtron-container-", ignore_cleanup_errors=as_root,
-    ) as temporary:
+    with tempfile.TemporaryDirectory(prefix="amtron-container-") as temporary:
         directory = Path(temporary)
         token = secrets.token_urlsafe(32)
         options = directory / "options.json"
@@ -133,102 +130,131 @@ def smoke(
             )
         )
         options.chmod(0o600)
-        container = (
-            run(
-                "docker",
-                "run",
-                "--detach",
-                *confinement,
-                # Match the owner of the private bind mount without granting
-                # DAC override to container root or weakening the token file.
-                *(() if as_root else (
-                    "--user", f"{os.getuid()}:{os.getgid()}", "--cap-drop=ALL",
-                )),
-                "--read-only",
-                "--security-opt=no-new-privileges",
-                "--tmpfs",
-                "/tmp",  # noqa: S108 - isolated container tmpfs
-                "--publish",
-                "127.0.0.1::8765",
-                "--volume",
-                f"{directory}:/data",
-                image,
+        mount = f"{directory}:/data"
+        if as_root:
+            # Supervisor's data belongs to root. Without DAC override the
+            # service cannot read a file of the runner's user, so the options
+            # go into a root-owned volume first.
+            volume = f"amtron-smoke-{secrets.token_hex(6)}"
+            run("docker", "volume", "create", volume)
+            subprocess.run(
+                [
+                    "docker", "run", "--rm", "--interactive", "--user", "0:0",
+                    "--entrypoint", "python", "--volume", f"{volume}:/data", image, "-c",
+                    (
+                        "import os, sys; path = '/data/options.json'; "
+                        "open(path, 'w').write(sys.stdin.read()); os.chmod(path, 0o600)"
+                    ),
+                ],
+                input=options.read_bytes(), capture_output=True, check=True,
             )
-            .decode()
-            .strip()
-        )
+            mount = f"{volume}:/data"
         try:
-            port = json.loads(run("docker", "inspect", container))[0][
-                "NetworkSettings"
-            ]["Ports"]["8765/tcp"][0]["HostPort"]
-            base = f"http://127.0.0.1:{int(port)}"
-            deadline = time.monotonic() + 30
-            while True:
-                try:
-                    with urllib.request.urlopen(  # noqa: S310 - fixed loopback HTTP
-                        base + "/health", timeout=2
-                    ) as response:
-                        if response.status == 200:
-                            break
-                except OSError, urllib.error.URLError:
-                    if time.monotonic() >= deadline:
-                        logs = subprocess.run(
-                            ["docker", "logs", "--tail", "40", container],
-                            capture_output=True,
-                            check=False,
-                        )
-                        detail = (logs.stdout + logs.stderr).decode(errors="replace")
-                        raise ValueError(
-                            "container API did not become ready: "
-                            + detail.replace(token, "<redacted>")
-                        ) from None
-                time.sleep(0.25)
-            try:
-                urllib.request.urlopen(base + "/v2/state", timeout=2)  # noqa: S310 - fixed loopback HTTP
-            except urllib.error.HTTPError as error:
-                if error.code != 401:
-                    raise ValueError("unexpected unauthenticated response") from error
-            else:
-                raise ValueError("container API allowed unauthenticated access")
-            request = urllib.request.Request(  # noqa: S310 - fixed loopback HTTP
-                base + "/v2/state", headers={"Authorization": f"Bearer {token}"}
-            )
-            with urllib.request.urlopen(request, timeout=2) as response:  # noqa: S310 - fixed loopback HTTP
-                data = json.load(response)
-            if (
-                data.get("api_version") != service_api_version()
-                or data.get("available") is not False
-                or data["control"]["read_only"] is not True
-                or data["heartbeat"]["running"] is not False
-            ):
-                raise ValueError("container did not report the missing device safely")
-            # Read through the installed package's HTTP handlers, not through
-            # the source checkout. This runs for both native architecture builds
-            # under their actual AppArmor profile before any candidate is pushed.
-            check_installed_assets(container)
-            check_installed_authentication(container)
-            run("docker", "stop", "--time", "15", container)
-            if (
-                json.loads(run("docker", "inspect", container))[0]["State"]["ExitCode"]
-                != 0
-            ):
-                raise ValueError("container did not shut down cleanly")
-            lifecycle_log = run("docker", "logs", container).decode(errors="replace")
-            if token in lifecycle_log or any(
-                message not in lifecycle_log
-                for message in (
-                    "Service: starting Mennekes Amtron Modbus service",
-                    "Service: API ready",
-                    "Connection: opening serial connection",
-                    "SIGTERM received",
-                    "Service: shutdown complete",
-                )
-            ):
-                raise ValueError("container lifecycle logs are missing or expose credentials")
-            if "Service: privileges kept" in lifecycle_log:
-                raise ValueError("container could not give up its capabilities")
+            _smoke_container(image, token, mount, confinement, as_root=as_root)
         finally:
-            run("docker", "rm", "--force", container)
+            if as_root:
+                run("docker", "volume", "rm", "--force", volume)
+
+
+def _smoke_container(
+    image: str, token: str, mount: str, confinement: tuple[str, ...], *, as_root: bool,
+) -> None:
+    container = (
+        run(
+            "docker",
+            "run",
+            "--detach",
+            *confinement,
+            # Match the owner of the private bind mount without granting
+            # DAC override to container root or weakening the token file.
+            *(() if as_root else (
+                "--user", f"{os.getuid()}:{os.getgid()}", "--cap-drop=ALL",
+            )),
+            "--read-only",
+            "--security-opt=no-new-privileges",
+            "--tmpfs",
+            "/tmp",  # noqa: S108 - isolated container tmpfs
+            "--publish",
+            "127.0.0.1::8765",
+            "--volume",
+            mount,
+            image,
+        )
+        .decode()
+        .strip()
+    )
+    try:
+        port = json.loads(run("docker", "inspect", container))[0][
+            "NetworkSettings"
+        ]["Ports"]["8765/tcp"][0]["HostPort"]
+        base = f"http://127.0.0.1:{int(port)}"
+        deadline = time.monotonic() + 30
+        while True:
+            try:
+                with urllib.request.urlopen(  # noqa: S310 - fixed loopback HTTP
+                    base + "/health", timeout=2
+                ) as response:
+                    if response.status == 200:
+                        break
+            except OSError, urllib.error.URLError:
+                if time.monotonic() >= deadline:
+                    logs = subprocess.run(
+                        ["docker", "logs", "--tail", "40", container],
+                        capture_output=True,
+                        check=False,
+                    )
+                    detail = (logs.stdout + logs.stderr).decode(errors="replace")
+                    raise ValueError(
+                        "container API did not become ready: "
+                        + detail.replace(token, "<redacted>")
+                    ) from None
+            time.sleep(0.25)
+        try:
+            urllib.request.urlopen(base + "/v2/state", timeout=2)  # noqa: S310 - fixed loopback HTTP
+        except urllib.error.HTTPError as error:
+            if error.code != 401:
+                raise ValueError("unexpected unauthenticated response") from error
+        else:
+            raise ValueError("container API allowed unauthenticated access")
+        request = urllib.request.Request(  # noqa: S310 - fixed loopback HTTP
+            base + "/v2/state", headers={"Authorization": f"Bearer {token}"}
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:  # noqa: S310 - fixed loopback HTTP
+            data = json.load(response)
+        if (
+            data.get("api_version") != service_api_version()
+            or data.get("available") is not False
+            or data["control"]["read_only"] is not True
+            or data["heartbeat"]["running"] is not False
+        ):
+            raise ValueError("container did not report the missing device safely")
+        # Read through the installed package's HTTP handlers, not through
+        # the source checkout. This runs for both native architecture builds
+        # under their actual AppArmor profile before any candidate is pushed.
+        check_installed_assets(container)
+        check_installed_authentication(container)
+        run("docker", "stop", "--time", "15", container)
+        if (
+            json.loads(run("docker", "inspect", container))[0]["State"]["ExitCode"]
+            != 0
+        ):
+            raise ValueError("container did not shut down cleanly")
+        lifecycle_log = run("docker", "logs", container).decode(errors="replace")
+        if token in lifecycle_log or any(
+            message not in lifecycle_log
+            for message in (
+                "Service: starting Mennekes Amtron Modbus service",
+                "Service: API ready",
+                "Connection: opening serial connection",
+                "SIGTERM received",
+                "Service: shutdown complete",
+            )
+        ):
+            raise ValueError("container lifecycle logs are missing or expose credentials")
+        if "Service: privileges kept" in lifecycle_log:
+            raise ValueError("container could not give up its capabilities")
+    finally:
+        run("docker", "rm", "--force", container)
 
 
 def build(info: dict[str, str], architecture: str, output: Path) -> None:
