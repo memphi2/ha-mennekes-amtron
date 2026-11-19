@@ -81,7 +81,7 @@ def test_a_current_behind_a_waiting_pause_is_remembered_for_the_resume():
     asyncio.run(run())
 
 
-def test_the_users_pause_takes_over_the_plans_waiting_pause():
+def test_the_users_pause_behind_the_plans_waiting_pause_is_refused_aloud():
     async def run():
         harness, control = await charging()
         control.soc_goal.status, control.soc_goal.target_percent = "active", 80
@@ -89,16 +89,11 @@ def test_the_users_pause_takes_over_the_plans_waiting_pause():
         await control.async_set_timed_current(
             None, deadline=datetime.now(UTC) + timedelta(hours=1), owner="departure",
         )
-        assert control.pending_owner == "departure"
         harness.clock[0] += 10
-        await control.async_pause_charging()
-        assert (control.pending_action, control.pending_owner) == ("pause", None)
-        # The plan cancels only what is its own; the user's pause is written.
-        await control.async_cancel_timed_current("departure")
-        harness.clock[0] += 301
-        await drain(control)
-        assert len(currents(harness)) == 1
-        assert 0 < currents(harness)[0] < 6
+        # The plan's pause keeps its place and its owner; the user is told.
+        with pytest.raises(AmtronRateLimitedError):
+            await control.async_pause_charging()
+        assert (control.pending_action, control.pending_owner) == ("pause", "departure")
         await control.async_shutdown()
 
     asyncio.run(run())
@@ -173,6 +168,18 @@ def test_a_withdrawn_manual_release_waits_for_its_own_write():
         await drain(control)
         assert harness.written(R.CHARGING_RELEASE)[before:] == [[0]]
         assert control.plug_charge["manual"] is False
+        # A refresh that fails after the acknowledged write changes nothing.
+        harness.clock[0] += 1000
+        await control.async_set_charging_release(True)
+        harness.clock[0] += 1000
+
+        async def broken() -> None:
+            raise OSError("refresh failed")
+
+        control._request_refresh = broken
+        with pytest.raises(OSError, match="refresh failed"):
+            await control.async_set_charging_release(False)
+        assert control.plug_charge["manual"] is False
         await control.async_shutdown()
 
     asyncio.run(run())
@@ -242,5 +249,34 @@ def test_a_lifted_guest_deadline_does_not_resume_an_outage_pause(tmp_path, move)
             await service.guest.tick()
             assert len(runtime.current_writes(transport)) == written
             assert control.pause_requested is True
+
+    asyncio.run(run())
+
+
+def test_a_guest_start_whose_release_was_written_keeps_its_guards(tmp_path):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            clock[0] += 1000
+            transport.bank[R.CHARGING_RELEASE.address] = 0
+            await service.refresh()
+            transport.writes.clear()
+            original = transport._write
+
+            def write(address, values, function):
+                result = original(address, values, function)
+                if address == R.CHARGING_RELEASE.address:
+                    # The car leaves between the release and the current.
+                    transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
+                    transport.bank[R.CP_STATE.address] = int(CpState.A1)
+                return result
+
+            transport._write = write
+            # It returns instead of raising a clean refusal after a write.
+            await service.command({
+                "origin": "app", "command": "guest_start",
+                "expected_serial_number": service.identity.serial_number,
+                "expected_guest_revision": service.guest.revision,
+            })
+            assert [address for address, _values in transport.writes] == [R.CHARGING_RELEASE.address]
 
     asyncio.run(run())

@@ -154,7 +154,10 @@ class GuestLimits:
                 departure_queued = control.pending_owner == "departure"
                 await control.async_cancel_timed_current("departure")
                 await control.async_start_guest_charging(current_cap=self._service.config.current_cap)
-                if cancelled and not accepted and not control.pending_guest_start:
+                if (
+                    cancelled and not accepted and not control.pending_guest_start
+                    and not control.guest_release_applied
+                ):
                     # The car left before the first write: nothing started.
                     raise DeviceError("guest_start_not_permitted")
                 accepted = True  # Includes the complete deferred guest start.

@@ -86,10 +86,6 @@ class CommandQueue:
             return False
         if pending.owner is not None and pending.owner == command.owner:
             return False
-        if pending.owner is not None and command.owner is None and pending.action == command.action:
-            # The user's own stop takes over a planner's: the planner may
-            # cancel what it queued, the user's has to stay.
-            return False
         if pending.action == "pause":
             return not (command.action == "resume" or self._starts(command))
         if pending.action == "lock":

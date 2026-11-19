@@ -185,6 +185,11 @@ class AmtronControl:
         return self.goal_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()
 
     @property
+    def guest_release_applied(self) -> bool:
+        """Whether the guest start in progress has already opened the release."""
+        return self._guest_release_applied
+
+    @property
     def foreign_stop_requested(self) -> bool:
         """A stop that is not the energy goal's own: percentage or guest."""
         return self._soc_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()

@@ -254,6 +254,10 @@ class WritePath:
             self._control._release_writes += 1
             if value == 1:
                 self._control._plug_charge.release_written()
+            elif (active := self._control._active_command) is not None and active.action == "disable_charging":
+                # Withdrawn by hand: the gate closes with the acknowledged
+                # write, whatever the refresh after it does.
+                self._control._plug_charge.set_manual(False)
         if switched():
             self._control._write_state.mode_change_at = self._control._monotonic()
         self._control._clear_pending()
@@ -434,8 +438,6 @@ class WritePath:
             await self._async_apply_phases(int(command.value))
         elif command.action in ("enable_charging", "disable_charging"):
             await self.async_apply_release(bool(command.value))
-            if command.action == "disable_charging":
-                self._control._plug_charge.set_manual(False)
         else:
             await self._async_apply_lock(bool(command.value))
 

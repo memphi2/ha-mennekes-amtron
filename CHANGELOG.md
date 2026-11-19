@@ -20,9 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   release stayed open without a guest.
 - A charging current set behind a waiting lock or withdrawn release is
   refused. Before, it was reported as done and never written.
-- A manual pause takes over the departure plan's waiting pause instead of
-  being refused, and a stop by a limit no longer cancels a pause that still
-  waits.
+- A stop by a limit no longer cancels a pause that still waits.
 - Plug & Charge: a release withdrawn by hand closes the gate with its own
   write, not earlier inside the state-change interval.
 - A guest start for a car that was unplugged a moment ago is refused instead
