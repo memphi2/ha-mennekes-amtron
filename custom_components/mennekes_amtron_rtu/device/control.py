@@ -36,6 +36,7 @@ from .const import (
 from .control_queue import CommandQueue
 from .control_types import (
     OTHER_STOPS,
+    STOPS,
     ControlOptions,
     PendingCommand,
     PhaseChange,
@@ -479,11 +480,13 @@ class AmtronControl:
     def cancel_goal_resume(self, *, replaced: bool = False) -> None:
         """Invalidate automatic requests calculated for a previous goal.
 
-        ``replaced``: a command by hand takes the queued one's place.
+        ``replaced``: a command by hand takes the queued one's place. A
+        planner's waiting stop is not a request of that kind: whether the
+        command overrides it is the queue's stop rule.
         """
         if self._pending is not None and (
             self._pending.recovery_generation is not None or self._pending.owner is not None
-        ):
+        ) and not (replaced and self._pending.action in STOPS and self._pending.recovery_generation is None):
             self._clear_pending(
                 outcome="replaced" if replaced else "cancelled",
                 reason="replaced" if replaced else "energy_goal",

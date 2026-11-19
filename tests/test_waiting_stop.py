@@ -275,3 +275,30 @@ def test_a_phase_change_waits_behind_a_waiting_stop():
         await control.async_shutdown()
 
     asyncio.run(go())
+
+
+def test_a_planners_waiting_pause_outlasts_a_manual_current_with_a_goal_controller():
+    from unittest.mock import AsyncMock
+
+    from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import (
+        EnergyGoalController,
+    )
+
+    async def go():
+        h, control = await charging()
+        EnergyGoalController(control, h.client, AsyncMock())
+        control.soc_goal.status = "active"
+        control.soc_goal.target_percent = 80
+        _rate_limited(h)
+        deadline = datetime.now(UTC) + timedelta(hours=1)
+        await control.async_set_timed_current(None, deadline=deadline, owner="departure")
+        h.clock[0] += 10
+        await control.async_set_charging_current(10)
+        assert currents(h) == [10.0]
+        assert control.pending_action == "pause"
+        # A manual resume is still the override.
+        await control.async_resume_charging()
+        assert control.pending_action != "pause"
+        await control.async_shutdown()
+
+    asyncio.run(go())
