@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.10.0b4 — 2026-11-19
 
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/oliver7557)
+
 ### Added
 
 - **Cost target**: a charge target as an amount of money. The service keeps
