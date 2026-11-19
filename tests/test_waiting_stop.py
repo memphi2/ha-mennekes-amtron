@@ -122,3 +122,77 @@ def test_a_manual_release_ends_with_a_long_unknown_vehicle_state():
         state.observe(None, observed_at=start + timedelta(seconds=5 * step))
     state.observe(True, observed_at=start + timedelta(seconds=700))
     assert (state.manual, state.blocked) == (False, True)
+
+
+def _rate_limited(h):
+    h.client.write_state.mode_change_at = h.clock[0]
+
+
+def test_a_waiting_lock_is_not_taken_by_a_pause_that_must_wait_too():
+    import pytest
+
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronRateLimitedError,
+    )
+
+    async def go():
+        h, control = await charging()
+        _rate_limited(h)
+        await control.async_set_lock_evse(True)
+        with pytest.raises(AmtronRateLimitedError):
+            await control.async_pause_charging()
+        assert control.pending_action == "lock"
+        assert ("replaced", "lock") not in events(control)
+        await control.async_shutdown()
+
+    asyncio.run(go())
+
+
+def test_a_waiting_lock_is_not_taken_by_another_stop():
+    import pytest
+
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronRateLimitedError,
+    )
+
+    async def go():
+        h, control = await charging()
+        _rate_limited(h)
+        await control.async_set_lock_evse(True)
+        with pytest.raises(AmtronRateLimitedError):
+            await control.async_set_charging_release(False)
+        assert control.pending_action == "lock"
+        await control.async_shutdown()
+
+    asyncio.run(go())
+
+
+def test_a_waiting_pause_outlasts_a_switch_that_changes_nothing():
+    async def go():
+        h, control = await charging()
+        _rate_limited(h)
+        await control.async_pause_charging()
+        assert control.pending_action == "pause"
+        h.clock[0] += 10
+        await control.async_set_lock_evse(False)
+        assert control.pending_action == "pause"
+        await control.async_shutdown()
+
+    asyncio.run(go())
+
+
+def test_a_newer_decision_of_the_same_owner_replaces_its_waiting_pause():
+    async def go():
+        h, control = await charging()
+        control.soc_goal.status = "active"
+        control.soc_goal.target_percent = 80
+        _rate_limited(h)
+        deadline = datetime.now(UTC) + timedelta(hours=1)
+        await control.async_set_timed_current(None, deadline=deadline, owner="departure")
+        assert control.pending_action == "pause"
+        h.clock[0] += 10
+        await control.async_set_timed_current(10, deadline=deadline, owner="departure")
+        assert control.pending_action != "pause"
+        await control.async_shutdown()
+
+    asyncio.run(go())

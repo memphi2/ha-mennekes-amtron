@@ -78,16 +78,22 @@ class CommandQueue:
     def _outlasts(self, command: PendingCommand) -> bool:
         """Whether the waiting command is a stop that this one does not settle.
 
-        A waiting pause outlasts a current that switches nothing, such as a
-        surplus adjustment; a start after it is the newer wish. A waiting lock
-        or withdrawn release outlasts whatever happens to the current.
+        A stop is replaced only by what overrides it: the planner's own newer
+        decision, a start after a pause, or the opposite switch. Everything
+        else leaves it waiting, including a different stop.
         """
         pending = self._control._pending
         if pending is None or pending == command or pending.action not in STOPS:
             return False
+        if pending.owner is not None and pending.owner == command.owner:
+            return False
         if pending.action in OTHER_STOPS:
+            if command.action in OTHER_STOPS:
+                return command.action != pending.action
             return command.action in ("set_current", "pause", "resume")
-        return command.action == "set_current" and not self._control.writes._current_transition(command.value)
+        if command.action == "set_current":
+            return not self._control.writes._current_transition(command.value)
+        return command.action in ("unlock", "enable_charging")
 
     async def async_submit_locked(self, command: PendingCommand, *, automatic: bool = False) -> None:
         """Accept the latest request, coalescing all deferred commands together."""
@@ -110,9 +116,12 @@ class CommandQueue:
             self._control._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED)
             if command.action in ("set_current", "resume") and command.owner is None:
                 self._control.charging_setpoint = command.value
-            if kept and command.action == "set_current":
-                # The stop keeps its place; the current is remembered above.
-                return
+            if kept:
+                if command.action == "set_current":
+                    # The stop keeps its place; the current is remembered above.
+                    return
+                # It must not take the stop's place, nor pretend to be queued.
+                raise
             await self._async_queue(command, err.retry_after)
             return
         except (DeviceError, asyncio.CancelledError) as err:
@@ -215,6 +224,11 @@ class CommandQueue:
                             await self._async_queue(command, err.retry_after)
                             delay = err.retry_after
                         except (DeviceError, AmtronBusError, OSError) as err:
+                            if self._control._command_acknowledged:
+                                # The wallbox has it; only the refresh failed.
+                                self._control._clear_pending()
+                                await self._async_publish_pending()
+                                return
                             if command.action in STOPS and self._control._uncertain(err):
                                 # A stop may be written twice; it must not be
                                 # lost with a reply that did not come.
