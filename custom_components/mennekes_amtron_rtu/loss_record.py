@@ -65,11 +65,11 @@ class RecordLoss:
 
     def ready(self) -> bool:
         """Wait for a real vehicle identity before replacing a saved aggregate."""
+        self._was_available = self.available
         if self._history is None or not self._history.available:
             return False
         self._ledger.statistics.configure_source(self._history.source_key)
         self._ready = True
-        self._was_available = True
         return True
 
     def subscribe(self) -> list[CALLBACK_TYPE]:
@@ -112,6 +112,9 @@ class RecordLoss:
         return True
 
     async def step(self) -> None:
+        if self._ledger.resting:
+            # A save just failed: the car is asked again with the retry.
+            return
         # Without a plug cycle seen here, no record of the car can be measured.
         since = measurable_since(self._entry)
         self.asked_at = time.monotonic()

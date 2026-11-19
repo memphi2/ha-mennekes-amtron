@@ -23,7 +23,6 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
 )
 from custom_components.mennekes_amtron_rtu.charge_loss_observer import (
     ChargeLossObserver,
-    vehicle_energy,
 )
 from custom_components.mennekes_amtron_rtu.charge_watch import PlugCycle, note_for
 from custom_components.mennekes_amtron_rtu.device.charge_loss import Charge
@@ -40,6 +39,7 @@ from custom_components.mennekes_amtron_rtu.device.registers import (
     CP_STATE,
     EVSE_STATE,
 )
+from custom_components.mennekes_amtron_rtu.loss_plug_cycle import vehicle_energy
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import VehicleProfile
 from custom_components.mennekes_amtron_rtu.vehicle_sources.types import ChargeRecord
 from tests.test_bavarian_history import VIN, vehicle_registry
@@ -929,7 +929,7 @@ def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path
                 await hass.async_block_till_done()
                 assert not observer.available
                 # Another car follows before the disk works again: its cycle is
-                # decided at once, and polls in between do not hammer the disk.
+                # decided at once, and nothing is written before the retry is due.
                 coordinator.owner = SimpleNamespace(id="b" * 32)
                 coordinator.complete(at=now - 1000)
                 await hass.async_block_till_done()
@@ -937,7 +937,7 @@ def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path
                 for _ in range(5):
                     coordinator.async_update_listeners()
                     await hass.async_block_till_done()
-                assert saves.await_count == asked <= 2
+                assert saves.await_count == asked == 1
             assert observer.source.cycle.unplugged_at == now - 1000
             assert observer.source.assignable is None
             assert observer.source.unbooked.charge == charge
@@ -1051,5 +1051,43 @@ def test_only_a_value_of_the_car_can_be_assigned_by_hand(tmp_path):
             assert await observer.ledger.commit(lambda statistics: statistics.configure_source("sensor:other")) is False
         assert observer.statistics.source == "sensor:other"
         await hass.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", [OSError("full"), StorageCommitUncertainError("x")])
+def test_a_failed_save_recovers_even_when_the_cars_record_is_gone(tmp_path, failure):
+    """The estimates neither stay unavailable nor ask the car on every poll."""
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        with patch(READ, new=coordinator.reader()) as read:
+            try:
+                await observer.async_start()
+                with patch.object(observer.ledger.store, "async_save", side_effect=failure) as failed:
+                    coordinator.complete(energy=10)
+                    await hass.async_block_till_done()
+                    assert not observer.available
+                    asked = read.await_count
+                    read.side_effect = lambda *_args, **_kwargs: None
+                    # A change of the car's history meanwhile waits for the retry.
+                    observer._queue()
+                    await hass.async_block_till_done()
+                    assert read.await_count == asked
+                    observer.ledger.attempted_at -= 61
+                    for _ in range(6):
+                        coordinator.async_update_listeners()
+                        await hass.async_block_till_done()
+                    # One retry asks the car and writes once; then it rests again.
+                    assert (read.await_count - asked, failed.await_count) == (1, 2)
+                observer.ledger.attempted_at -= 61
+                coordinator.async_update_listeners()
+                await hass.async_block_till_done()
+                assert observer.available
+                # What an uncertain save left in memory is on disk now.
+                assert (await observer.ledger.store.async_load()).snapshot() == observer.statistics.snapshot()
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
 
     asyncio.run(run())

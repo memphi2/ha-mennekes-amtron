@@ -19,7 +19,7 @@ from .charge_watch import loss_vehicle_options
 from .device.charge_loss import LossStatistics
 from .exceptions import service_validation_error
 from .loss_ledger import LossLedger
-from .loss_plug_cycle import PlugCycleLoss, vehicle_energy
+from .loss_plug_cycle import PlugCycleLoss
 from .loss_record import RecordLoss
 from .loss_store import LossStore
 from .vehicle_profiles import CONF_VEHICLE_PROFILE_ID
@@ -27,9 +27,6 @@ from .vehicle_sources import loss_source
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
-
-__all__ = ["ChargeLossObserver", "vehicle_energy"]
-
 
 class ChargeLossObserver:
     """One optional, bounded loss estimate and its durable weighted aggregate."""
@@ -105,7 +102,14 @@ class ChargeLossObserver:
     async def _run(self) -> None:
         while self._pending and not self.ledger.closed:
             self._pending = False
+            ledger = self.ledger
             await self.source.step()
+            if not ledger.saved and not ledger.resting:
+                # The step had nothing new to book: what the failed save left
+                # is written again, or the estimates would stay unavailable.
+                async with ledger.lock:
+                    if not ledger.closed:
+                        await ledger.commit(lambda _statistics: None)
 
     async def async_assign(self) -> None:
         """Explicitly associate a last-energy value; never change charging state."""

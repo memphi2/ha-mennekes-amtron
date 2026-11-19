@@ -66,7 +66,7 @@ class PlugCycleLoss:
     decided. ``charge`` is what a value of the car may go to, and only while
     that cycle is still the service's last. ``unbooked`` is what the decision
     still owes the saved statistics: it stays until a save succeeded, so a
-    later cycle of another car neither loses nor delays it.
+    later cycle of another car cannot lose it.
     """
 
     available = True
@@ -174,9 +174,8 @@ class PlugCycleLoss:
         await self._decide()
         charge = self.assignable
         unbooked, change = self.unbooked, self._matching(charge)
-        if unbooked is None and change is None and self._ledger.saved:
-            return
-        if self._ledger.resting:
+        if (unbooked is None and change is None) or self._ledger.resting:
+            # Nothing to book, or a save just failed: the poll after the rest comes back.
             return
         async with self._ledger.lock:
             if self._ledger.closed:
