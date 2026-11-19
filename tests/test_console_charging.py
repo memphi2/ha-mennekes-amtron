@@ -344,10 +344,16 @@ def test_console_names_a_command_that_must_wait_and_a_past_time(tmp_path, monkey
 
 
 def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_state(tmp_path, monkeypatch):
-    from custom_components.mennekes_amtron_rtu.device import console_http
+    from custom_components.mennekes_amtron_rtu.device import (
+        console_http,
+        service_runtime,
+    )
     from custom_components.mennekes_amtron_rtu.device.service_overview import (
         service_overview,
     )
+
+    # The overview's own limit must not end its patient read first.
+    assert app_settings.OVERVIEW_SECONDS > service_runtime._PATIENCE_SECONDS
 
     async def body():
         monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
@@ -368,13 +374,6 @@ def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_sta
                         assert (response.status, await response.json()) == (503, {"error": "busy"})
                     # The overview waits shortly and shows the last published state.
                     assert (await client.get("/api/overview", headers=HEADERS)).status == 200
-                    # Its own limit must not end that wait first.
-                    from custom_components.mennekes_amtron_rtu.device import (
-                        service_runtime,
-                    )
-
-                    monkeypatch.undo()
-                    assert app_settings.OVERVIEW_SECONDS > service_runtime._PATIENCE_SECONDS
                 finally:
                     service._command_lock.release()
                 assert (await client.get("/api/charging", headers=HEADERS)).status == 200
