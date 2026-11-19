@@ -863,6 +863,8 @@ async def _async_stop_runtime(
         await runtime.charge_loss.async_stop()
     if runtime.charging_cost is not None and not retain_cost:
         await runtime.charging_cost.async_stop()
+    if runtime.cost_goal is not None:
+        await runtime.cost_goal.async_stop()
     if runtime.timed_goal is not None:
         await runtime.timed_goal.async_stop(withdraw=withdraw_plan)
     if runtime.vehicle_soc is not None:

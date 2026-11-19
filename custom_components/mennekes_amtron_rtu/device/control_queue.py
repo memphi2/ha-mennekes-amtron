@@ -109,6 +109,13 @@ class CommandQueue:
             await self.async_cancel_pending()
         had_pending = self._control._pending is not None
         kept = self._outlasts(command)
+        if kept and command.action in ("single_phase", "all_phases"):
+            # A phase change waits for its own pause and would then take the
+            # stop's place; the stop goes first.
+            raise AmtronRateLimitedError("state_change", max(
+                self._control._pending_due - self._control._monotonic(),
+                MIN_CURRENT_WRITE_INTERVAL_SECONDS,
+            ))
         try:
             await self.async_observe_command(command)
         except PhaseWaitError as err:

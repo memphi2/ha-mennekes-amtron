@@ -251,3 +251,27 @@ def test_a_waiting_pause_is_not_taken_by_a_lock_that_must_wait_too():
         await control.async_shutdown()
 
     asyncio.run(go())
+
+
+def test_a_phase_change_waits_behind_a_waiting_stop():
+    import pytest
+
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronRateLimitedError,
+    )
+    from custom_components.mennekes_amtron_rtu.device.enums import RequestedPhases
+
+    async def go():
+        h, control = await charging()
+        _rate_limited(h)
+        await control.async_set_lock_evse(True)
+        h.clock[0] += 301
+        current = h.transport.bank.get(R.REQUESTED_PHASES.address)
+        other = next(phase for phase in RequestedPhases if int(phase) != current)
+        with pytest.raises(AmtronRateLimitedError):
+            await control.async_set_requested_phases(other)
+        assert control.pending_action == "lock"
+        assert ("replaced", "lock") not in events(control)
+        await control.async_shutdown()
+
+    asyncio.run(go())

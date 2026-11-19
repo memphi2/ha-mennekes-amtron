@@ -13,10 +13,11 @@ else has to be measured or remembered here.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import time
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, NamedTuple
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -105,10 +106,23 @@ class CostGoal:
         )
 
 
+class _Attempt(NamedTuple):
+    """A hand-over whose answer did not come: the service may hold it."""
+
+    energy_kwh: float
+    price: float
+    baseline_kwh: float
+
+
 class CostGoalObserver:
-    """Keeps the service's energy target in step with the amount and the price."""
+    """Keeps the service's energy target in step with the amount and the price.
+
+    The poll only decides; the hand-over runs as its own task, because a
+    command refreshes the poll that would be waiting for it.
+    """
 
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
+        self._hass = hass
         self._entry = entry
         self._store = ModelStore(
             hass, entry.entry_id, entry.runtime_data.identity.serial_number or entry.entry_id,
@@ -117,6 +131,10 @@ class CostGoalObserver:
         self.goal = CostGoal()
         self._notice = FailureNotice(_LOGGER, "Cost target")
         self._storage_notice = FailureNotice(_LOGGER, "Cost target")
+        # One change at a time: the user's amount and a hand-over.
+        self._lock = asyncio.Lock()
+        self._task: asyncio.Task[None] | None = None
+        self._attempt: _Attempt | None = None
         self._retry_at = 0.0
         self._handed_at = -math.inf
         self._dirty = False
@@ -128,6 +146,14 @@ class CostGoalObserver:
             # The energy target in the service stays as it is and still stops
             # the charge; only the amount it stood for is no longer known.
             _LOGGER.warning("Cost target: saved amount unusable (the energy target in the service stays)")
+
+    async def async_stop(self) -> None:
+        task, self._task = self._task, None
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        if self._dirty:
+            await self._save()
 
     @property
     def target(self) -> float:
@@ -147,12 +173,11 @@ class CostGoalObserver:
         cost = self._entry.runtime_data.charging_cost
         return None if cost is None else cost.unit_price(time.time())
 
-    def _spent(self, meter: float | None) -> float:
-        """Money spent up to ``meter``, the newest reading of the energy total."""
-        goal, baseline = self.goal, self._entry.runtime_data.control.energy_goal.baseline_kwh
-        if meter is None or baseline is None or goal.price is None:
-            return goal.spent
-        return goal.spent + max(0.0, meter - baseline) * goal.price
+    def _spent_until(self, baseline: float | None, *, since: float | None, price: float | None) -> float:
+        """What the interval from ``since`` up to ``baseline`` cost at ``price``."""
+        if baseline is None or since is None or price is None:
+            return self.goal.spent
+        return self.goal.spent + max(0.0, baseline - since) * price
 
     async def async_set_target(self, value: float) -> None:
         """Arm a new amount from now on; zero ends it with its energy target."""
@@ -163,69 +188,100 @@ class CostGoalObserver:
         except ValueError as err:
             raise service_validation_error("cost_goal_invalid") from err
         control = self._entry.runtime_data.control
-        if not target:
-            ours = self.goal.target and control.energy_goal.target_kwh == self.goal.energy_kwh
-            if ours:
-                await control.async_set_energy_goal(0)
-            self.goal = CostGoal()
+        async with self._lock:
+            self._attempt = None
+            if not target:
+                ours = self.goal.target and control.energy_goal.target_kwh == self.goal.energy_kwh
+                if ours:
+                    await control.async_set_energy_goal(0)
+                self.goal = CostGoal()
+                await self._save()
+                return
+            price = self._price()
+            if price is None:
+                raise service_validation_error("cost_goal_price_unknown")
+            energy = energy_for(target, price)
+            await control.async_set_energy_goal(energy)
+            self._handed_at = time.monotonic()
+            self.goal = CostGoal(target, 0.0, price, energy)
             await self._save()
-            return
-        price = self._price()
-        if price is None:
-            raise service_validation_error("cost_goal_price_unknown")
-        energy = energy_for(target, price)
-        await control.async_set_energy_goal(energy)
-        self._handed_at = time.monotonic()
-        self.goal = CostGoal(target, 0.0, price, energy)
-        await self._save()
 
     async def async_observe(self, data: WallboxData | None) -> None:
-        """Follow the energy target, and hand it over again at a new price."""
-        goal = self.goal
-        if not goal.target:
+        """Follow the energy target, and start a hand-over at a new price."""
+        if not self.goal.target or self._lock.locked():
             return
         if self._dirty and time.monotonic() >= self._retry_at:
             await self._save()
         if data is None:
             return
-        control = self._entry.runtime_data.control
-        energy_goal = control.energy_goal
-        if energy_goal.target_kwh != goal.energy_kwh:
+        energy_goal = self._entry.runtime_data.control.energy_goal
+        attempt = self._attempt
+        if attempt is not None and energy_goal.target_kwh == attempt.energy_kwh:
+            # The hand-over whose answer was lost did reach the service.
+            self._attempt = None
+            self.goal = CostGoal(
+                self.goal.target,
+                self._spent_until(energy_goal.baseline_kwh, since=attempt.baseline_kwh, price=self.goal.price),
+                attempt.price, attempt.energy_kwh,
+            )
+            await self._save()
+        if energy_goal.target_kwh != self.goal.energy_kwh:
             # Somebody set or cleared the energy target itself: that is the
             # newer wish, and the amount no longer describes it.
+            self._attempt = None
             self.goal = CostGoal()
             await self._save()
             return
         price = self._price()
         now = time.monotonic()
+        goal = self.goal
         if (
             energy_goal.status != "active" or price is None or goal.price is None
             or abs(price - goal.price) < _PRICE_TOLERANCE
             or now < self._retry_at or now - self._handed_at < _HANDOVER_SECONDS
+            or (self._task is not None and not self._task.done())
         ):
             return
         meter = data.get(ENERGY_TOTAL.key)
-        meter = float(meter) if isinstance(meter, (int, float)) and not isinstance(meter, bool) else None
-        if meter is None or not data.energy_read:
+        baseline = energy_goal.baseline_kwh
+        if (
+            isinstance(meter, bool) or not isinstance(meter, (int, float))
+            or not data.energy_read or baseline is None
+        ):
             return
-        old_baseline = energy_goal.baseline_kwh
-        spent = self._spent(meter)
-        energy = energy_for(max(0.0, goal.target - spent), price)
-        try:
-            await control.async_set_energy_goal(energy)
-        except (AmtronBusError, HomeAssistantError):
-            # The earlier energy target stays in force meanwhile.
-            self._notice.failed("energy target not updated for the new price", "retrying")
-            self._retry_at = time.monotonic() + _RETRY_SECONDS
+        left = goal.target - self._spent_until(float(meter), since=baseline, price=goal.price)
+        if left < price * ENERGY_GOAL_STEP_KWH:
+            # Not even one step is left: the target in force ends the charge.
             return
         self._handed_at = now
-        self._notice.recovered("energy target follows the price again")
-        new_baseline = control.energy_goal.baseline_kwh
-        if old_baseline is not None and new_baseline is not None and goal.price is not None:
+        self._task = self._entry.async_create_background_task(
+            self._hass, self._hand_over(goal, price, energy_for(left, price), baseline),
+            "mennekes_amtron_rtu_cost_goal",
+        )
+
+    async def _hand_over(self, goal: CostGoal, price: float, energy: float, baseline: float) -> None:
+        control = self._entry.runtime_data.control
+        async with self._lock:
+            if self.goal is not goal or control.energy_goal.status != "active":
+                return
+            self._attempt = _Attempt(energy, price, baseline)
+            try:
+                await control.async_set_energy_goal(energy)
+            except (AmtronBusError, HomeAssistantError):
+                # The earlier energy target stays in force meanwhile, or the
+                # command arrived and the next poll shows it.
+                self._notice.failed("energy target not updated for the new price", "retrying")
+                self._retry_at = time.monotonic() + _RETRY_SECONDS
+                return
+            self._attempt = None
+            self._notice.recovered("energy target follows the price again")
             # The service read the meter itself for the new baseline.
-            spent = goal.spent + max(0.0, new_baseline - old_baseline) * goal.price
-        self.goal = CostGoal(goal.target, spent, price, energy)
-        await self._save()
+            self.goal = CostGoal(
+                goal.target,
+                self._spent_until(control.energy_goal.baseline_kwh, since=baseline, price=goal.price),
+                price, energy,
+            )
+            await self._save()
 
     async def _save(self) -> None:
         try:
