@@ -504,3 +504,38 @@ def test_ending_the_amount_when_another_target_came_in_between_keeps_it(tmp_path
         await hass.async_stop(force=True)
 
     asyncio.run(run())
+
+
+def test_ending_the_amount_clears_an_attempt_the_mirror_cannot_show_yet(tmp_path, monkeypatch):
+    """A lost answer leaves the mirror as it was; only the service knows."""
+
+    async def run():
+        hass, _entry, control, cost, observer = setup(tmp_path)
+        clock = [1000.0]
+        monkeypatch.setattr(cost_goal, "time", SimpleNamespace(monotonic=lambda: clock[0], time=time.time))
+        await observer.async_set_target(10)
+        service = {"target": control.energy_goal.target_kwh}
+
+        async def wire(value, *, expected=None, lose=False):
+            if expected is not None and expected != service["target"]:
+                raise HomeAssistantError(
+                    translation_domain="mennekes_amtron_rtu", translation_key="energy_goal_changed",
+                )
+            service["target"] = value
+            if lose:
+                raise HomeAssistantError("timeout")
+            control.energy_goal.set_target(value, control.meter)
+
+        control.async_set_energy_goal = lambda value, *, expected=None: wire(value, expected=expected, lose=True)
+        cost.price = 0.50
+        clock[0] += 120
+        await observe(observer, reading(control, 110.0))
+        assert service["target"] == 14.0
+        assert control.energy_goal.target_kwh == 33.3
+        control.async_set_energy_goal = lambda value, *, expected=None: wire(value, expected=expected)
+        await observer.async_set_target(0)
+        assert service["target"] == 0
+        assert observer.target == 0
+        await hass.async_stop(force=True)
+
+    asyncio.run(run())
