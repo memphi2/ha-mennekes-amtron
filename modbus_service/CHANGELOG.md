@@ -4,6 +4,11 @@
 
 - A guest start behind a waiting stop is refused before its first write
   instead of leaving the release open without a guest.
+- A current behind a waiting lock or withdrawn release is refused instead of
+  dropped; a manual pause takes over the plan's waiting pause; a release
+  withdrawn by hand under Plug & Charge keeps the state-change interval.
+- A missing-meter pause no longer resumes by itself after a guest time limit
+  was lifted; a guest start for a car that just left is refused.
 - A price that arrived while a cost ceiling was stopped is applied once it
   runs again.
 - The Charging page names the reported price and its time, and the planned

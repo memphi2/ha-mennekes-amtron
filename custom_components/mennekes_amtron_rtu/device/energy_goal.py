@@ -33,6 +33,9 @@ COST_GOAL_STEP: Final = 0.1
 _COST_KEYS = frozenset({"amount", "spent", "price", "booked_kwh"})
 # A smaller price change does not re-arm the amount (0.1 ct/kWh).
 PRICE_TOLERANCE: Final = 0.001
+# A price that wobbles every few seconds must not re-arm and save the
+# target every few seconds.
+PRICE_INTERVAL_SECONDS: Final = 60.0
 # No real tariff comes near; it keeps every booking finite.
 MAX_PRICE: Final = 100.0
 

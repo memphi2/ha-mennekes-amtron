@@ -185,6 +185,11 @@ class AmtronControl:
         return self.goal_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()
 
     @property
+    def foreign_stop_requested(self) -> bool:
+        """A stop that is not the energy goal's own: percentage or guest."""
+        return self._soc_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()
+
+    @property
     def release_stop_requested(self) -> bool:
         """The same active limits also prevent a Plug & Charge grant."""
         return self.energy_goal_stop_requested

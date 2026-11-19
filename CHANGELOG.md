@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A guest start behind a waiting stop is refused before its first write.
   Before, it opened the charging release and then failed at its current: the
   release stayed open without a guest.
+- A charging current set behind a waiting lock or withdrawn release is
+  refused. Before, it was reported as done and never written.
+- A manual pause takes over the departure plan's waiting pause instead of
+  being refused, and a stop by a limit no longer cancels a pause that still
+  waits.
+- Plug & Charge: a release withdrawn by hand closes the gate with its own
+  write, not earlier inside the state-change interval.
+- A guest start for a car that was unplugged a moment ago is refused instead
+  of reported as started.
+- A charge paused for a missing energy meter no longer resumes by itself
+  when a guest time limit that stopped it meanwhile is moved or cleared.
+- Cost target: the app arms an amount at the price of the running amount,
+  also after a restart of the service, and a price that changed nothing no
+  longer delays the next one by a minute.
 - Cost target: a price that arrived while the target was stopped or its meter
   was missing is applied once the target runs again. With less than one
   0.1 kWh step of money left, a new price now leaves one step at that price

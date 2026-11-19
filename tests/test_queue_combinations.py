@@ -196,3 +196,51 @@ def test_a_guest_start_for_a_car_that_just_left_is_refused(tmp_path):
             assert service.client.write_state.guest_permission is None
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("move", ["later", "clear"])
+def test_a_lifted_guest_deadline_does_not_resume_an_outage_pause(tmp_path, move):
+    async def tasks(service):
+        if service.goal._task is not None:
+            await asyncio.wait_for(service.goal._task, 2)
+
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            control = service.control
+            await control.goal_controller.async_set_cost_target(10, 0.30)
+            await service.departure.set_trip(datetime.now(UTC) + timedelta(hours=1), "manual")
+            await service.command({
+                "command": "guest_start", "expected_serial_number": service.identity.serial_number,
+                "expected_guest_revision": service.guest.revision,
+            })
+            clock[0] += 1000
+            await service.refresh()
+            await tasks(service)
+            assert service.guest.active
+            # The meter drops out: the goal pauses and may resume on recovery.
+            generation = service.client.write_state.energy_goal_generation
+            service.goal.observe(WallboxData(energy_read=True, energy_goal_generation=generation))
+            await tasks(service)
+            assert control.energy_goal.resume_on_recovery is True
+            written = len(runtime.current_writes(transport))
+            # The guest deadline passes during the outage, then the meter is back.
+            await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
+            clock[0] += 1000
+            await service.guest.tick()
+            service._poller._slow_read_at = None
+            await service.refresh()
+            await tasks(service)
+            assert control.energy_goal.status == "active"
+            assert control.energy_goal.resume_on_recovery is False
+            # Moving the time later lifts the limit; it must not start a charge.
+            later = None if move == "clear" else datetime.now(UTC) + timedelta(hours=2)
+            await service.departure.set_trip(later, "manual")
+            clock[0] += 1000
+            service._poller._slow_read_at = None
+            await service.refresh()
+            await tasks(service)
+            await service.guest.tick()
+            assert len(runtime.current_writes(transport)) == written
+            assert control.pause_requested is True
+
+    asyncio.run(run())
