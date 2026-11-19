@@ -220,6 +220,7 @@ def test_zero_ends_the_amount_with_its_target_but_keeps_a_plain_one():
     (0.05, 0.3, "cost_goal_invalid"), (1001, 0.3, "cost_goal_invalid"),
     (10, None, "cost_goal_price_unknown"), (10, float("inf"), "cost_goal_price_unknown"),
     (10**400, 0.3, "cost_goal_invalid"), (10, 10**400, "cost_goal_price_unknown"),
+    (10, -1e308, "cost_goal_price_unknown"), (10, 100.01, "cost_goal_price_unknown"),
 ])
 def test_an_invalid_amount_or_price_is_refused(amount, price, key):
     async def run():

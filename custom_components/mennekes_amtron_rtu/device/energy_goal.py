@@ -33,6 +33,8 @@ COST_GOAL_STEP: Final = 0.1
 _COST_KEYS = frozenset({"amount", "spent", "price", "booked_kwh"})
 # A smaller price change does not re-arm the amount (0.1 ct/kWh).
 PRICE_TOLERANCE: Final = 0.001
+# No real tariff comes near; it keeps every booking finite.
+MAX_PRICE: Final = 100.0
 
 type EnergyGoalSnapshot = dict[str, float | str | dict[str, float] | None]
 

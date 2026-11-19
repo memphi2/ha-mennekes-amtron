@@ -15,6 +15,7 @@ from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .control import AmtronControl
 from .data import WallboxData
 from .energy_goal import (
+    MAX_PRICE,
     PRICE_TOLERANCE,
     CostPart,
     EnergyGoal,
@@ -116,7 +117,7 @@ class EnergyGoalController:
                 await self.async_set_target(0)
             return
         unit = finite_number(price)
-        if unit is None:
+        if unit is None or abs(unit) > MAX_PRICE:
             raise validation_error("cost_goal_price_unknown")
         try:
             cost = CostPart(value, 0.0, unit)
@@ -135,7 +136,7 @@ class EnergyGoalController:
         change of 0.1 ct/kWh. The energy so far is the last polled meter.
         """
         unit = finite_number(price)
-        if unit is None:
+        if unit is None or abs(unit) > MAX_PRICE:
             raise validation_error("cost_goal_price_unknown")
         async with self._control.energy_goal_guard:
             if self._stopping:
