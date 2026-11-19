@@ -15,7 +15,6 @@ from .const import (
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
 )
 from .control_types import (
-    OTHER_STOPS,
     STOPS,
     PendingCommand,
     PhaseWaitError,
@@ -78,22 +77,26 @@ class CommandQueue:
     def _outlasts(self, command: PendingCommand) -> bool:
         """Whether the waiting command is a stop that this one does not settle.
 
-        A stop is replaced only by what overrides it: the planner's own newer
-        decision, a start after a pause, or the opposite switch. Everything
-        else leaves it waiting, including a different stop.
+        Only what overrides a stop takes its place: the same planner's newer
+        decision, a start after a pause, or the switch that undoes it.
+        Everything else leaves it waiting, including a different stop.
         """
         pending = self._control._pending
         if pending is None or pending == command or pending.action not in STOPS:
             return False
         if pending.owner is not None and pending.owner == command.owner:
             return False
-        if pending.action in OTHER_STOPS:
-            if command.action in OTHER_STOPS:
-                return command.action != pending.action
-            return command.action in ("set_current", "pause", "resume")
-        if command.action == "set_current":
-            return not self._control.writes._current_transition(command.value)
-        return command.action in ("unlock", "enable_charging")
+        if pending.action == "pause":
+            return not (command.action == "resume" or self._starts(command))
+        if pending.action == "lock":
+            return command.action != "unlock"
+        return not (
+            command.action == "enable_charging"
+            or (command.action == "resume" and command.grant_release)
+        )
+
+    def _starts(self, command: PendingCommand) -> bool:
+        return command.action == "set_current" and self._control.writes._current_transition(command.value)
 
     async def async_submit_locked(self, command: PendingCommand, *, automatic: bool = False) -> None:
         """Accept the latest request, coalescing all deferred commands together."""
@@ -117,7 +120,7 @@ class CommandQueue:
             if command.action in ("set_current", "resume") and command.owner is None:
                 self._control.charging_setpoint = command.value
             if kept:
-                if command.action == "set_current":
+                if command.action == "set_current" and not self._starts(command):
                     # The stop keeps its place; the current is remembered above.
                     return
                 # It must not take the stop's place, nor pretend to be queued.

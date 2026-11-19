@@ -218,3 +218,36 @@ def test_a_lock_whose_reply_did_not_come_is_repeated_without_a_new_interval():
         await control.async_shutdown()
 
     asyncio.run(go())
+
+
+def test_a_waiting_lock_outlasts_the_other_switch_and_a_refused_start():
+    async def go():
+        h, control = await charging()
+        h.transport.bank[R.CHARGING_RELEASE.address] = 1
+        _rate_limited(h)
+        await control.async_set_lock_evse(True)
+        await control.async_set_charging_release(True)
+        assert control.pending_action == "lock"
+        assert ("replaced", "lock") not in events(control)
+        await control.async_shutdown()
+
+    asyncio.run(go())
+
+
+def test_a_waiting_pause_is_not_taken_by_a_lock_that_must_wait_too():
+    import pytest
+
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronRateLimitedError,
+    )
+
+    async def go():
+        h, control = await charging()
+        _rate_limited(h)
+        await control.async_pause_charging()
+        with pytest.raises(AmtronRateLimitedError):
+            await control.async_set_lock_evse(True)
+        assert control.pending_action == "pause"
+        await control.async_shutdown()
+
+    asyncio.run(go())

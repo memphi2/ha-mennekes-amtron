@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A lock or a withdrawn release whose reply did not come is written again
   after five seconds. Before, the repeat waited for a whole state-change
   interval that the unanswered write itself had started.
+- A waiting pause, lock or withdrawn release is now kept against every
+  command except the one that overrides it. In 0.10.0b3 the other switch, a
+  different stop that had to wait and a phase request could still take its
+  place, and a start refused behind a waiting lock was accepted silently.
 - Repairs of an entry that is disabled while its setup never finished are
   removed as well.
 - The app pages send their security headers also with a refusal (403, 404,
