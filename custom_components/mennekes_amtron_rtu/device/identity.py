@@ -9,7 +9,7 @@ test, so this module stays free of Home Assistant imports.
 from __future__ import annotations
 
 from .client import MennekesModbusClient
-from .client_errors import AmtronBusError
+from .client_errors import AmtronBusError, AmtronIllegalAddressError
 from .const import CHARGING_CURRENT_MINIMUM, DEFAULT_MODEL
 from .data import DeviceIdentity
 from .models import ARTICLE_MODELS
@@ -69,7 +69,10 @@ async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:
 
     identity = DeviceIdentity(layout_version=layout)
     identity.firmware_version = await _optional_text(client, FIRMWARE_VERSION, layout)
-    identity.serial_number = await _optional_text(client, SERIAL_NUMBER, layout)
+    # The serial number guards every write: only a wallbox that says it has
+    # none goes without. A read that merely failed fails the start, which is
+    # tried again, instead of leaving the whole session unguarded.
+    identity.serial_number = await _optional_text(client, SERIAL_NUMBER, layout, required=True)
     identity.article_number = await _optional_text(client, ARTICLE_NUMBER, layout)
     identity.phase_options_hw = await _optional_int(client, PHASE_OPTIONS_HW, layout)
     identity.max_evse_current = usable_max_evse_current(
@@ -83,12 +86,18 @@ async def _optional_value(
     client: MennekesModbusClient,
     spec: RegisterSpec,
     layout: int,
+    *,
+    required: bool = False,
 ) -> object:
     if layout < spec.min_layout:
         return None
     try:
         return await client.async_read_register(spec)
+    except AmtronIllegalAddressError:
+        return None
     except AmtronBusError:
+        if required:
+            raise
         return None
 
 
@@ -96,8 +105,10 @@ async def _optional_text(
     client: MennekesModbusClient,
     spec: RegisterSpec,
     layout: int,
+    *,
+    required: bool = False,
 ) -> str | None:
-    value = await _optional_value(client, spec, layout)
+    value = await _optional_value(client, spec, layout, required=required)
     return value if isinstance(value, str) else None
 
 
