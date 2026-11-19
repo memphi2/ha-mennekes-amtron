@@ -434,6 +434,8 @@ class WritePath:
             await self._async_apply_phases(int(command.value))
         elif command.action in ("enable_charging", "disable_charging"):
             await self.async_apply_release(bool(command.value))
+            if command.action == "disable_charging":
+                self._control._plug_charge.set_manual(False)
         else:
             await self._async_apply_lock(bool(command.value))
 

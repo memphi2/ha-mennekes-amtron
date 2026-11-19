@@ -35,7 +35,6 @@ from .const import (
 )
 from .control_queue import CommandQueue
 from .control_types import (
-    OTHER_STOPS,
     STOPS,
     ControlOptions,
     PendingCommand,
@@ -418,9 +417,10 @@ class AmtronControl:
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
                 return
-            if self._pending is not None and self._pending.action not in OTHER_STOPS:
-                # The stop replaces what waited for the current. A waiting lock
-                # or withdrawn release is another matter and stays.
+            if self._pending is not None and self._pending.action not in STOPS:
+                # The stop replaces a start that waited for the current. A
+                # waiting stop stays, a pause included: this stop's latch may
+                # be lifted before its own pause is written.
                 self._clear_pending(outcome="cancelled", reason=self._stop_reason())
             if self.is_paused is not False:
                 try:
@@ -708,8 +708,11 @@ class AmtronControl:
                 if released and self.energy_goal_stop_requested:
                     raise self.stop_error()
                 # With Plug & Charge, a manual release opens the gate for the
-                # current or the next connection, for any car.
-                self._plug_charge.set_manual(released)
+                # current or the next connection, for any car. Withdrawing it
+                # closes the gate only with its own write: a gate closed
+                # while that still waits would switch inside the interval.
+                if released:
+                    self._plug_charge.set_manual(True)
             written = self._release_writes
             try:
                 await self.queue.async_submit_locked(PendingCommand(

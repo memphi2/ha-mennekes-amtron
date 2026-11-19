@@ -86,6 +86,10 @@ class CommandQueue:
             return False
         if pending.owner is not None and pending.owner == command.owner:
             return False
+        if pending.owner is not None and command.owner is None and pending.action == command.action:
+            # The user's own stop takes over a planner's: the planner may
+            # cancel what it queued, the user's has to stay.
+            return False
         if pending.action == "pause":
             return not (command.action == "resume" or self._starts(command))
         if pending.action == "lock":
@@ -126,14 +130,22 @@ class CommandQueue:
         except AmtronRateLimitedError as err:
             self._control._diagnostics.writes_rate_limited += 1
             self._control._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED)
-            if command.action in ("set_current", "resume") and command.owner is None:
-                self._control.charging_setpoint = command.value
+            remembered = command.action in ("set_current", "resume") and command.owner is None
             if kept:
-                if command.action == "set_current" and not self._starts(command):
-                    # The stop keeps its place; the current is remembered above.
+                pending = self._control._pending
+                if (
+                    remembered and command.action == "set_current" and not self._starts(command)
+                    and pending is not None and pending.action == "pause"
+                ):
+                    # The pause keeps its place; the resume after it uses the
+                    # remembered current. Behind a lock or a withdrawn
+                    # release nothing would ever write it.
+                    self._control.charging_setpoint = command.value
                     return
                 # It must not take the stop's place, nor pretend to be queued.
                 raise
+            if remembered:
+                self._control.charging_setpoint = command.value
             await self._async_queue(command, err.retry_after)
             return
         except (DeviceError, asyncio.CancelledError) as err:
