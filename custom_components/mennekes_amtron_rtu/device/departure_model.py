@@ -135,6 +135,14 @@ class DepartureModel:
     def snapshot(self) -> list[list[Any]]:
         return [[key, car.snapshot()] for key, car in self.cars.items()]
 
+    def visible(self) -> list[tuple[Any, ...]]:
+        """What a plan can tell apart: a step below it is not worth a save."""
+        return [
+            (key, None if car.efficiency is None else round(car.efficiency, 2),
+             *(None if kw is None else round(kw, 1) for kw in car.power_kw))
+            for key, car in self.cars.items()
+        ]
+
     def car(self, vehicle: str | None) -> CarModel:
         return self.cars.get(vehicle_key(vehicle), CarModel()) if vehicle else CarModel()
 
