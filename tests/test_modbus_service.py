@@ -455,3 +455,24 @@ def test_a_failing_intent_save_keeps_the_wallbox_available(tmp_path, monkeypatch
         finally:
             await service.stop()
     asyncio.run(run())
+
+
+def test_a_command_polls_the_wallbox_once_after_its_write(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        try:
+            clock[0] += 100
+            first = len(transport.reads)
+            await service.command({"command": "set_current", "value": 10, "expected_serial_number": "ABC123456789"})
+            # The serial check and one poll that reads the write back.
+            after = transport.reads[first:]
+            assert after.count(after[-1]) == 1
+            assert current_writes(transport)[-1] == 10
+            # A command without a write still polls for its answer.
+            first = len(transport.reads)
+            await service.command({"command": "set_current", "value": 10, "expected_serial_number": "ABC123456789"})
+            assert len(transport.reads) > first
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
