@@ -322,15 +322,19 @@ def test_console_names_a_command_that_must_wait_and_a_past_time(tmp_path, monkey
             state = await (await client.get("/api/charging", headers=HEADERS)).json()
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
             choice = {"action": "pause", "value": True, "revision": state["revision"], "confirm": True}
-            for error, key in (
-                (AmtronRateLimitedError("state_change", 5.0), "write_rate_limited"),
-                (validation_error("target_time_not_future"), "target_time_not_future"),
+            guest = {**choice, "action": "guest", "revision": state["guest_revision"]}
+            limited = AmtronRateLimitedError("state_change", 5.0)
+            for request, error, expected in (
+                (choice, limited, (409, "write_rate_limited")),
+                # A guest start may have written the release before it had to wait.
+                (guest, limited, (503, "charging_save_uncertain")),
+                (choice, validation_error("target_time_not_future"), (409, "target_time_not_future")),
             ):
                 async def refuse(_payload, error=error):
                     raise error
 
                 monkeypatch.setattr(service, "command", refuse)
-                refused = await client.post("/api/charging", headers=headers, json=choice)
-                assert (refused.status, (await refused.json())["error"]) == (409, key)
+                refused = await client.post("/api/charging", headers=headers, json=request)
+                assert (refused.status, (await refused.json())["error"]) == expected
 
     asyncio.run(body())

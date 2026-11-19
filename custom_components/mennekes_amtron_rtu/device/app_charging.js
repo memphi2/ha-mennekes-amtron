@@ -89,9 +89,9 @@
   function localDate(v){if(!v)return "";const d=new Date(v);if(!Number.isFinite(d.getTime()))return "";const z=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;}
   function revision(key){return key==="departure"?state?.departure?.revision:state?.revision;}
   function editable(key){return state&&!state.read_only&&(key==="energy"||(key==="cost"?state.cost_price!==null||state.cost!==null:key==="soc"?state.soc?.configured&&state.soc.maximum_required!==null:state.departure?.configured));}
-  const euro=v=>v.toLocaleString(langs[lang],{style:"currency",currency:"EUR"});
+  const euro=(v,digits=2)=>v.toLocaleString(langs[lang],{style:"currency",currency:"EUR",maximumFractionDigits:digits});
   function costText(){
-    const c=state?.cost;if(c)return `${euro(c.amount)} · ${euro(c.spent)} ${t("cost_used")} · ${euro(c.price)}/kWh`;
+    const c=state?.cost;if(c)return `${euro(c.amount)} · ${euro(c.spent)} ${t("cost_used")} · ${euro(c.price,4)}/kWh`;
     return state?.cost_price===null?t("price_unknown"):t("disabled");
   }
   function render(){
@@ -157,7 +157,7 @@
     const action=key==="guest"&&state.guest_active?"pause":key;
     const csrf=state.csrf,rev=action==="pause"?state.revision:key==="guest"?state.guest_revision:revisions[key];busy=true;suspend();error="";render();
     const own=generation,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
-    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(Object.prototype.hasOwnProperty.call(refusals,data?.error)?refusals[data.error]:"uncertain");return;}validate(data);dirty.delete(key);error=t(action==="guest"?"guest_started":"saved");apply(data);}
+    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(Object.prototype.hasOwnProperty.call(refusals,data?.error)?refusals[data.error]:"uncertain");return;}validate(data);dirty.delete(key);if(key!=="departure"&&key!=="guest")for(const other of keys)if(other!=="departure")revisions[other]=data.revision;error=t(action==="guest"?"guest_started":"saved");apply(data);}
     catch(_){if(own===generation&&live())error=t("uncertain");}
     finally{clearTimeout(timeout);busy=false;render();schedule();}
   }

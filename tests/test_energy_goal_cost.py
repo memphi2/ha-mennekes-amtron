@@ -253,3 +253,15 @@ def test_the_last_reported_price_arms_an_amount_without_one():
         assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.25)
         await runner.async_stop()
     asyncio.run(run())
+
+
+def test_the_money_used_follows_the_polled_meter_between_prices():
+    goal = EnergyGoal()
+    assert goal.cost_spent is None
+    goal.set_target(33.3, 100.0)
+    goal.cost = CostPart(10.0, 0.0, 0.30)
+    goal.observe(110.0)
+    assert goal.cost_spent == pytest.approx(3.0)
+    assert goal.reprice(0.50)
+    goal.observe(112.0)
+    assert goal.cost_spent == pytest.approx(4.0)

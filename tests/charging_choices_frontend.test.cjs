@@ -108,13 +108,13 @@ test('read-only targets say read only instead of asking for setup',async()=>{
 });
 
 test('a cost ceiling is saved in euros and shown with what it used',async()=>{
- const next=initial();next.energy.target=33.3;next.cost={amount:10,spent:1.5,price:0.3};
+ const next=initial();next.energy.target=33.3;next.cost={amount:10,spent:1.5,price:0.2874};
  const h=setup('targets',[initial(),next],'en');await flush();
  assert.equal(h.elements.get('cost_value').disabled,false);
  h.elements.get('cost_value').value='10';await h.emit('cost_form','input');await h.emit('cost_form','submit');
  assert.deepEqual(JSON.parse(h.calls[1].body),{action:'cost',value:10,revision:'r1',confirm:true});
  assert.equal(h.elements.get('cost_value').value,'10');
- assert.match(h.elements.get('cost_status').textContent,/€10\.00 · €1\.50 used · €0\.30\/kWh/);
+ assert.match(h.elements.get('cost_status').textContent,/€10\.00 · €1\.50 used · €0\.2874\/kWh/);
  assert.match(h.elements.get('energy_status').textContent,/from the cost ceiling/);
 });
 test('without a price the cost ceiling waits for Home Assistant',async()=>{
@@ -133,4 +133,15 @@ test('a waiting stop refusal, a past time and a restarted guest are named',async
  h.elements.get('departure_value').value='2026-11-17T08:00';await h.emit('departure_form','input');await h.emit('departure_form','submit');
  assert.match(h.elements.get('notice').textContent,/target time has passed/);
  assert.match(h.elements.get('departure_status').textContent,/Paused until start/);
+});
+
+test('an own save keeps another unsaved field current instead of calling it changed elsewhere',async()=>{
+ const next=initial();next.revision='r2';next.cost={amount:10,spent:0,price:0.3};next.energy.target=33.3;
+ const after=initial();after.revision='r3';after.energy.target=20;
+ const h=setup('targets',[initial(),next,after],'en');await flush();
+ h.elements.get('energy_value').value='20';await h.emit('energy_form','input');
+ h.elements.get('cost_value').value='10';await h.emit('cost_form','input');await h.emit('cost_form','submit');
+ assert.equal(h.elements.get('notice').textContent,'Saved');assert.equal(h.elements.get('energy_value').value,'20');
+ await h.emit('energy_form','submit');
+ assert.equal(JSON.parse(h.calls[2].body).revision,'r2');
 });

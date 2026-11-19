@@ -151,7 +151,7 @@ class ServiceConsole(AppSettings):
             # An amount of money carried by the energy target, and the last
             # price Home Assistant reported (none without charging costs).
             "cost": None if (cost := control.energy_goal.cost) is None else {
-                "amount": cost.amount, "spent": cost.spent, "price": cost.price,
+                "amount": cost.amount, "spent": control.energy_goal.cost_spent, "price": cost.price,
             },
             "cost_price": None if control.goal_controller is None else control.goal_controller.price,
             "guest_confirmation_required": service.guest.restore_pending,
@@ -230,7 +230,11 @@ class ServiceConsole(AppSettings):
         except (ValueError, TypeError, OverflowError) as err:
             raise SettingsError("invalid_request") from err
         except AmtronRateLimitedError as err:
-            # Refused before anything was written: it has to wait itself.
+            # Refused before anything was written: it has to wait itself. A
+            # guest start may already have written the release, so it stays
+            # uncertain.
+            if action == "guest":
+                raise SettingsError("charging_save_uncertain", 503) from err
             raise SettingsError("write_rate_limited", 409) from err
         except (AmtronBusError, OSError) as err:
             # The wallbox or the disk failed after the command went out.

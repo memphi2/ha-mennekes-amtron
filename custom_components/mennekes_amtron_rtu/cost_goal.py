@@ -85,6 +85,9 @@ class CostGoalObserver:
         if data is None:
             return
         control = self._entry.runtime_data.control
+        if control.read_only or not control.supports_energy_goal:
+            # The service would refuse it at every poll.
+            return
         price = self._price()
         known = control.cost_price
         if (

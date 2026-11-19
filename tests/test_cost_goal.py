@@ -29,6 +29,8 @@ class Control:
         self.fail: Exception | None = None
         # The last price the service was told.
         self.cost_price: float | None = None
+        self.read_only = False
+        self.supports_energy_goal = True
 
     async def async_set_cost_goal(self, amount, price):
         self.calls.append(("goal", amount, price))
@@ -135,6 +137,13 @@ def test_the_price_is_told_without_an_amount_so_the_app_can_arm_one(tmp_path, mo
         assert len(control.calls) == 1
         cost.price = None
         clock[0] += 61
+        await observe(observer)
+        assert len(control.calls) == 1
+        # A service that would refuse it is not asked at every poll.
+        cost.price = 0.50
+        control.read_only = True
+        await observe(observer)
+        control.read_only, control.supports_energy_goal = False, False
         await observe(observer)
         assert len(control.calls) == 1
         await hass.async_stop(force=True)
