@@ -589,14 +589,22 @@ class AmtronControl:
             )
             maximum = self.max_charging_current
             if (
-                self._pending is not None or self._phase_change is not None
+                # A waiting stop does not hold the cap back: lowering the
+                # current switches nothing and the stop keeps its place.
+                (self._pending is not None and self._pending.action not in STOPS)
+                or self._phase_change is not None
                 or self._active_command is not None or self.energy_goal_stop_requested
                 or isinstance(current, bool) or not isinstance(current, (int, float))
                 or not math.isfinite(current) or current < CHARGING_CURRENT_MINIMUM
                 or current <= maximum + _CAP_TOLERANCE_A
             ):
                 return False
-            await self.queue.async_submit_locked(PendingCommand("set_current", maximum))
+            try:
+                await self.queue.async_submit_locked(PendingCommand("set_current", maximum))
+            except AmtronRateLimitedError:
+                # Behind a waiting stop inside the current floor: the next
+                # poll tries again.
+                return False
             return True
 
     async def async_set_charging_current(

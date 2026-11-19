@@ -277,8 +277,10 @@ class ModbusService:
         if control.charging_setpoint is None:
             current = self.data.get("charging_current_ems")
             if isinstance(current, (int, float)):
+                # A foreign controller may have written more than this
+                # wallbox is ever asked for; that is no limit to remember.
                 control.charging_setpoint = (
-                    float(current) if current == 0 or current >= 6 else 6.0
+                    min(float(current), 32.0) if current == 0 or current >= 6 else 6.0
                 )
         await self._save_intent()
         self.control = control

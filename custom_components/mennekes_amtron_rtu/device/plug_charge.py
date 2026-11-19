@@ -56,6 +56,9 @@ class PlugChargeState:
     since: datetime | None = None
     last_absent_at: datetime | None = None
     unknown_since: datetime | None = None
+    # A manual release read from disk: its connection may have ended while
+    # the service was down, so it needs a car at the first answer.
+    restored_manual: bool = False
 
     @property
     def blocked(self) -> bool:
@@ -103,6 +106,10 @@ class PlugChargeState:
 
     def observe(self, present: bool | None, *, observed_at: datetime | None = None) -> None:
         now = observed_at or datetime.now(UTC)
+        if present is not None:
+            if present is False and self.restored_manual:
+                self.manual = False
+            self.restored_manual = False
         if not self.enabled or present is False:
             if self.enabled and self.authorized:
                 _LOGGER.info("Plug & Charge: grant ended, vehicle unplugged")
@@ -146,7 +153,7 @@ class PlugChargeState:
             raise ValueError("invalid saved Plug & Charge configuration")
         result = cls(hold=raw["hold"])
         result.configure(raw["enabled"], raw["policy"])
-        result.manual = raw["manual"] and result.enabled
+        result.manual = result.restored_manual = raw["manual"] and result.enabled
         return result
 
 

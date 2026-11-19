@@ -165,7 +165,9 @@ class WritePath:
             )
         except (DeviceError, asyncio.CancelledError) as err:
             if self._control._uncertain(err):
-                self._control._clear_pending()
+                if not recovery:
+                    # Recovery is no command: what waits in the queue stays.
+                    self._control._clear_pending()
                 self._control._write_state.confirmed_current = None
                 if not paused:
                     self._control.charging_setpoint = value
@@ -210,7 +212,8 @@ class WritePath:
             and math.isfinite(previous)
             and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
         ):
-            self._control.charging_setpoint = float(previous)
+            # More than 32 A is a foreign controller's value, no limit to keep.
+            self._control.charging_setpoint = min(float(previous), 32.0)
 
     async def async_read_switch(self, spec: RegisterSpec, *, stopping: bool = False) -> int | None:
         """Recheck live state, but a failed read must not prevent a stop."""
@@ -260,7 +263,10 @@ class WritePath:
                 self._control._plug_charge.set_manual(False)
         if switched():
             self._control._write_state.mode_change_at = self._control._monotonic()
-        self._control._clear_pending()
+        if self._control._active_command is not None:
+            # A write outside a command, e.g. closing the release after an
+            # unplug, settles nothing that waits in the queue.
+            self._control._clear_pending()
         if self._control._request_refresh is not None:
             await self._control._request_refresh()
 
