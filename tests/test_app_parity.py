@@ -30,6 +30,22 @@ CHARGING = (_DEVICE / "app_charging.js").read_text(encoding="utf-8")
 OVERVIEW = (_DEVICE / "app_overview.js").read_text(encoding="utf-8")
 
 
+def _logic(source: str) -> str:
+    """The script without its texts, refusal names and input check.
+
+    A field named only there is not shown: the name of a text or the type
+    check of a payload must not count as using the field.
+    """
+    for start, end in (
+        (r"^  const words ?= ?\{$", r"^  \};$"),
+        (r"^  const refusals=\{", r"\};$"),
+        (r"^  function validate\(data\)\{$", r"^  \}$"),
+    ):
+        source, cut = re.subn(rf"{start}.*?{end}", "", source, count=1, flags=re.DOTALL | re.MULTILINE)
+        assert cut or "validate" in start or "refusals" in start
+    return source
+
+
 def _unused(payload: dict, source: str, *, skip: frozenset[str] = frozenset()) -> list[str]:
     """Keys, one level deep, that the page's script never reads."""
     keys = set(payload) - skip
@@ -50,21 +66,25 @@ def test_the_charging_page_uses_every_field_the_service_sends(tmp_path):
             payload = Console("supervisor-fixture", TOKEN, service=service)._choices()
             assert payload["departure"] is not None
             assert payload["cost"] is not None
-            assert _unused(payload, CHARGING) == []
+            assert _unused(payload, _logic(CHARGING)) == []
 
     asyncio.run(body())
 
 
 def test_the_overview_uses_every_field_the_service_sends():
-    assert _unused(overview_snapshot(snapshot()), OVERVIEW) == []
+    assert _unused(overview_snapshot(snapshot()), _logic(OVERVIEW)) == []
 
 
 @pytest.mark.parametrize(("states", "prefix"), [
     (ENERGY_GOAL_STATES, ""), (SOC_GOAL_STATES, ""), (DEPARTURE_STATES, "plan_"),
 ])
 def test_every_status_of_a_target_has_a_text_on_the_charging_page(states, prefix):
-    missing = [
-        state for state in states
-        if not re.search(rf'(?:^|[\s,{{])"?{prefix}{state}"?:\[', CHARGING, re.MULTILINE)
-    ]
-    assert missing == []
+    texts = {
+        state: re.search(rf'(?:^|[\s,{{])"?{prefix}{state}"?:\[(.*?)\]', CHARGING, re.MULTILINE)
+        for state in states
+    }
+    # One text per language; a missing one would read "Unknown state".
+    assert {
+        state: None if found is None else len(re.findall(r'"(?:[^"\\]|\\.)+"', found.group(1)))
+        for state, found in texts.items()
+    } == dict.fromkeys(states, 5)

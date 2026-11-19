@@ -205,8 +205,36 @@ def test_a_guest_start_for_a_car_that_just_left_is_refused(tmp_path):
     asyncio.run(run())
 
 
+def test_a_refused_guest_start_keeps_a_release_switched_off_by_hand(tmp_path):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            control = service.control
+            clock[0] += 1000
+            await control.async_pause_charging()
+            await service.refresh()
+            clock[0] += 1000
+            await control.async_set_charging_release(False)
+            await service.refresh()
+            assert control.charging_release_requested is False
+            revision = service.guest.revision
+            transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
+            transport.bank[R.CP_STATE.address] = int(CpState.A1)
+            transport.writes.clear()
+            with pytest.raises(DeviceError):
+                await service.command({
+                    "origin": "app", "command": "guest_start",
+                    "expected_serial_number": service.identity.serial_number,
+                    "expected_guest_revision": revision,
+                })
+            assert transport.writes == []
+            assert control.charging_release_requested is False
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("lifted", ["after_recovery", "during_outage"])
 @pytest.mark.parametrize("move", ["later", "clear"])
-def test_a_lifted_guest_deadline_does_not_resume_an_outage_pause(tmp_path, move):
+def test_a_lifted_guest_deadline_does_not_resume_an_outage_pause(tmp_path, move, lifted):
     async def tasks(service):
         if service.goal._task is not None:
             await asyncio.wait_for(service.goal._task, 2)
@@ -234,13 +262,16 @@ def test_a_lifted_guest_deadline_does_not_resume_an_outage_pause(tmp_path, move)
             await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
             clock[0] += 1000
             await service.guest.tick()
+            # The stop by the deadline ended the goal's right to resume.
+            assert control.energy_goal.resume_on_recovery is False
+            later = None if move == "clear" else datetime.now(UTC) + timedelta(hours=2)
+            if lifted == "during_outage":
+                await service.departure.set_trip(later, "manual")
             service._poller._slow_read_at = None
             await service.refresh()
             await tasks(service)
             assert control.energy_goal.status == "active"
-            assert control.energy_goal.resume_on_recovery is False
             # Moving the time later lifts the limit; it must not start a charge.
-            later = None if move == "clear" else datetime.now(UTC) + timedelta(hours=2)
             await service.departure.set_trip(later, "manual")
             clock[0] += 1000
             service._poller._slow_read_at = None

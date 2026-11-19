@@ -409,6 +409,11 @@ class AmtronControl:
         async with self._current_lock:
             if not self.energy_goal_stop_requested:
                 return
+            if self.foreign_stop_requested and self.goal_controller is not None:
+                # Another limit stops the charge. A pause for a missing meter
+                # is no longer the energy goal's to end: lifting this limit
+                # later must not start a charge.
+                self.goal_controller.drop_recovery()
             self._require_write_access()
             confirmed = self._goal_pause_confirmed
             polled = self._state().fresh(CHARGING_CURRENT_EMS.key)

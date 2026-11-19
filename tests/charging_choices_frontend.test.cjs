@@ -165,3 +165,13 @@ test('without an amount the page names the price and since when Home Assistant r
  h=setup('targets',[bare],'en');await flush();
  assert.equal(h.elements.get('cost_status').textContent,'Disabled · €0.30/kWh');
 });
+test('a guest or a failed plan shows no planned start, and broken plan fields are refused',async()=>{
+ const guest=initial();guest.departure.planned_start='2026-11-16T03:00:00.000Z';guest.departure.status='guest_mode';
+ let h=setup('departure',[guest],'en');await flush();
+ assert.equal(h.elements.get('departure_summary').textContent,'');
+ for(const change of [{planned_start:12345},{storage_error:'false'}]){
+  const broken=initial();Object.assign(broken.departure,change);
+  h=setup('departure',[broken],'en');await flush();
+  assert.match(h.elements.get('notice').textContent,/No current response/);
+ }
+});

@@ -292,7 +292,7 @@ class WritePath:
                 CHARGING_RELEASE, int(released), changed=lambda: switches,
                 precondition=admit if released and current != 1 else None,
             )
-        except AmtronRateLimitedError:
+        except (AmtronRateLimitedError, TimedCommandCancelledError):
             # Nothing was sent; the request is not an intent yet.
             self._control.charging_release_requested = previous
             raise

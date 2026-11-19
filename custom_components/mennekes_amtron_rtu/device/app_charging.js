@@ -109,7 +109,8 @@
       if(key==="soc"&&info){input.max=String(info.maximum??100);if(info.maximum_required&&info.maximum===null)el(key+"_status").textContent=t("limit_missing");}
       if(key==="departure"){
         el("departure_clear").disabled=busy||!editable(key);
-        const start=info?.planned_start?new Date(info.planned_start):null;
+        // Only a plan that waits for its start has one; a guest or an error holds it.
+        const start=info?.status==="paused_until_start"&&info.planned_start?new Date(info.planned_start):null;
         el("departure_summary").textContent=info?.storage_error?t("plan_unsaved"):start&&Number.isFinite(start.getTime())?`${t("planned_start")}: ${start.toLocaleString(langs[lang])}`:"";
       }
     }
@@ -133,6 +134,8 @@
         ||typeof data.soc.status!=="string"
         ||(data.departure!==null&&(!data.departure||typeof data.departure.configured!=="boolean"
           ||typeof data.departure.revision!=="string"||typeof data.departure.status!=="string"
+          ||!(data.departure.planned_start===null||typeof data.departure.planned_start==="string")
+          ||typeof data.departure.storage_error!=="boolean"
           ||!(data.departure.deadline===null||typeof data.departure.deadline==="string"&&localDate(data.departure.deadline)))))throw new Error("invalid charging state");
   }
   function apply(data){

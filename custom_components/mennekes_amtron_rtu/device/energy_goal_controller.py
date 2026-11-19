@@ -129,11 +129,12 @@ class EnergyGoalController:
             cost = CostPart(value, 0.0, unit)
         except ValueError as err:
             raise validation_error("cost_goal_invalid") from err
-        await self.async_set_target(energy_for(cost.amount, cost.price), cost=cost)
         if price is not None:
-            # A price that came with the amount is the newest one known.
+            # A price that came with the amount is the newest one known, also
+            # when saving the amount then fails after it took effect.
             self._price, self.price_at = unit, datetime.now(UTC)
             self._notify_changed()
+        await self.async_set_target(energy_for(cost.amount, cost.price), cost=cost)
         # The price came with the amount.
         self._priced_at = self._monotonic()
 
@@ -283,6 +284,18 @@ class EnergyGoalController:
         self._control.cancel_goal_resume()
         self._notify_changed()
 
+    def drop_recovery(self) -> None:
+        """Another limit stopped the charge: the outage pause stays paused.
+
+        Nothing is saved or cancelled here; the stop that calls this runs at
+        every tick. The grant does not survive a restart anyway.
+        """
+        if self.model.resume_on_recovery or (self._pending is not None and self._pending.resume_on_recovery):
+            self.model.resume_on_recovery = False
+            if self._pending is not None:
+                self._pending.resume_on_recovery = False
+            self._dirty = True
+
     async def async_cancel_recovery_locked(self) -> None:
         """A deliberate command revokes permission to resume our outage pause."""
         changed = self.model.resume_on_recovery
@@ -371,14 +384,6 @@ class EnergyGoalController:
                         if pending.stop_requested or self._storage_unknown:
                             self._control.pause_requested = True
                     elif self._dirty or pending.resume_on_recovery:
-                        await self._save_state()
-                    if (
-                        pending.status == "active" and pending.resume_on_recovery
-                        and self._control.foreign_stop_requested
-                    ):
-                        # Another limit stopped the charge meanwhile. The grant
-                        # ends here: lifting that limit later must not start.
-                        pending.resume_on_recovery = False
                         await self._save_state()
                     if (
                         pending.status == "active" and pending.resume_on_recovery

@@ -26,7 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A guest start for a car that was unplugged a moment ago is refused instead
   of reported as started.
 - A charge paused for a missing energy meter no longer resumes by itself
-  when a guest time limit that stopped it meanwhile is moved or cleared.
+  when a guest time limit or percentage target that stopped it meanwhile is
+  moved or cleared.
+- A refused guest start no longer turns a charging release that was
+  switched off by hand into a requested one.
 - Cost target: the app arms an amount at the price of the running amount,
   also after a restart of the service, and a price that changed nothing no
   longer delays the next one by a minute.
