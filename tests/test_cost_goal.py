@@ -216,7 +216,7 @@ def test_a_saved_amount_that_cannot_be_used_starts_without_one(tmp_path):
     {"target": True, "spent": 0, "price": 0.3, "energy_kwh": 1},
 ])
 def test_a_malformed_saved_amount_is_rejected(raw):
-    with pytest.raises(ValueError, match="cost target|amount"):
+    with pytest.raises(ValueError, match=r"cost target|amount"):
         CostGoal.restore(raw)
 
 
