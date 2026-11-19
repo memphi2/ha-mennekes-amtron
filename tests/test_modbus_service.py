@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 
 import pytest
 from aiohttp import ClientSession
@@ -477,6 +478,19 @@ def test_a_command_polls_the_wallbox_once_after_its_write(tmp_path):
             first = len(transport.reads)
             await service.command({"command": "set_current", "value": 10, "expected_serial_number": "ABC123456789"})
             assert len(transport.reads) > first
+            # A poll that only carried a block forward has read nothing back.
+            clock[0] += 100
+            poll = service._poll
+
+            async def carried():
+                await poll()
+                service.data = replace(service.data, held=frozenset({"evse_state"}))
+
+            service._poll = carried
+            polls = []
+            service.guest.after_poll = lambda *, polled: polls.append(polled)
+            await service.command({"command": "set_current", "value": 12, "expected_serial_number": "ABC123456789"})
+            assert polls == [True, True]
         finally:
             await service.stop()
 

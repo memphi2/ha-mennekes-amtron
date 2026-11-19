@@ -669,7 +669,9 @@ class ModbusService:
         await self._save_intent()
         written = self.diagnostics.writes_sent
         await self.refresh()
-        self._read_back = written
+        # A poll that carried a block forward has not read the write back.
+        fresh = not self.data.held and not self.data.failed_blocks
+        self._read_back = written if fresh else None
 
     def _validate_deferred(self) -> None:
         """A queued command needs the same fresh connection as an API request."""

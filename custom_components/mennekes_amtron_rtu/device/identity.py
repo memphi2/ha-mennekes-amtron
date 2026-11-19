@@ -9,7 +9,12 @@ test, so this module stays free of Home Assistant imports.
 from __future__ import annotations
 
 from .client import MennekesModbusClient
-from .client_errors import AmtronBusError, AmtronIllegalAddressError
+from .client_errors import (
+    ILLEGAL_DATA_ADDRESS,
+    ILLEGAL_DATA_VALUE,
+    ILLEGAL_FUNCTION,
+    AmtronBusError,
+)
 from .const import CHARGING_CURRENT_MINIMUM, DEFAULT_MODEL
 from .data import DeviceIdentity
 from .models import ARTICLE_MODELS
@@ -56,11 +61,12 @@ def usable_max_evse_current(value: float | None) -> float | None:
 
 
 async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:
-    """Read the device identity, raising only when the layout is unreadable.
+    """Read the device identity.
 
     The layout version is mandatory: without it the integration cannot know
-    which registers exist. Everything else is optional, because older layouts
-    simply do not have those registers.
+    which registers exist. The serial number must be read or be refused by the
+    wallbox. Everything else is optional, because older layouts simply do not
+    have those registers.
     """
 
     layout = await client.async_read_register(MODBUS_LAYOUT_VERSION)
@@ -93,10 +99,13 @@ async def _optional_value(
         return None
     try:
         return await client.async_read_register(spec)
-    except AmtronIllegalAddressError:
-        return None
-    except AmtronBusError:
-        if required:
+    except AmtronBusError as err:
+        # The wallbox says it has no such register: unknown address, function
+        # or value. Silence or a device fault says nothing about it.
+        refused = getattr(err, "exception_code", None) in (
+            ILLEGAL_FUNCTION, ILLEGAL_DATA_ADDRESS, ILLEGAL_DATA_VALUE,
+        )
+        if required and not refused:
             raise
         return None
 

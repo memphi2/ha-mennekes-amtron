@@ -105,6 +105,14 @@ def test_a_serial_number_that_merely_failed_to_read_fails_the_start() -> None:
     transport.read_exceptions[R.SERIAL_NUMBER.address] = raise_modbus_error()
     with pytest.raises(AmtronBusError):
         asyncio.run(_identity(transport))
+    # A device fault answers nothing about whether the register exists.
+    transport.read_exceptions[R.SERIAL_NUMBER.address] = 4
+    with pytest.raises(AmtronBusError):
+        asyncio.run(_identity(transport))
+    # A wallbox that refuses the register has no serial number.
+    for refusal in (1, 2, 3):
+        transport.read_exceptions[R.SERIAL_NUMBER.address] = refusal
+        assert asyncio.run(_identity(transport)).serial_number is None
     # Any other detail that fails stays simply absent.
     transport.read_exceptions = {R.FIRMWARE_VERSION.address: raise_modbus_error()}
     identity = asyncio.run(_identity(transport))
