@@ -16,6 +16,7 @@ from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.unplug_release import (
     UnplugReleaseState,
 )
+from tests.fakes import put
 from tests.test_modbus_service import service_fixture
 
 
@@ -78,8 +79,11 @@ def test_the_state_owes_only_a_confirmed_unplug_of_an_enabled_rule():
 
 
 @pytest.mark.parametrize("raw", [
-    None, {}, {"enabled": True, "plugged": None}, {"enabled": 1, "plugged": None, "owed": False},
-    {"enabled": True, "plugged": "yes", "owed": False}, {"enabled": True, "plugged": None, "owed": 0},
+    None, {}, {"enabled": True, "plugged": None, "owed": False},
+    {"enabled": 1, "plugged": None, "owed": False, "goal_owed": False},
+    {"enabled": True, "plugged": "yes", "owed": False, "goal_owed": False},
+    {"enabled": True, "plugged": None, "owed": 0, "goal_owed": False},
+    {"enabled": True, "plugged": None, "owed": False, "goal_owed": 1},
 ])
 def test_an_invalid_saved_rule_is_rejected(raw):
     with pytest.raises(ValueError, match="invalid saved unplug rule"):
@@ -89,7 +93,57 @@ def test_an_invalid_saved_rule_is_rejected(raw):
 def test_a_saved_rule_comes_back_and_owes_nothing_once_disabled():
     state = UnplugReleaseState(True, True, True)
     assert UnplugReleaseState.restore(state.snapshot()) == state
-    assert not UnplugReleaseState.restore({"enabled": False, "plugged": False, "owed": True}).owed
+    assert not UnplugReleaseState.restore(
+        {"enabled": False, "plugged": False, "owed": True, "goal_owed": False},
+    ).owed
+    owing = UnplugReleaseState(False, False, False, True)
+    assert UnplugReleaseState.restore(owing.snapshot()) == owing
+
+
+def test_only_an_unplug_with_a_reached_target_owes_its_end():
+    state = UnplugReleaseState()
+    state.observe(True)
+    state.observe(False, reached=False)
+    assert not state.goal_owed
+    # Reached without a car: the target was not that of a charge that ended.
+    state.observe(False, reached=True)
+    assert not state.goal_owed
+    state.observe(True, reached=True)
+    state.observe(None, reached=True)
+    assert not state.goal_owed
+    state.observe(False, reached=True)
+    assert state.goal_owed
+    state.observe(True, reached=True)
+    assert not state.goal_owed
+
+
+@pytest.mark.parametrize("rule", [False, True])
+def test_an_unplug_ends_a_reached_target_and_its_pause(tmp_path, rule):
+    async def run():
+        service, transport, clock = await _rule(tmp_path, enabled=rule)
+        control = service.control
+        await _command(service, "energy_goal", value=1)
+        put(transport.bank, R.ENERGY_TOTAL, control.energy_goal.baseline_kwh + 2)
+        clock[0] += 1000
+        service._poller._slow_read_at = None
+        await service.refresh()
+        if control.goal_controller._task is not None:
+            await control.goal_controller._task
+        assert (control.energy_goal.status, control.pause_requested) == ("reached", True)
+        # Still plugged in: the reached target stays, as does its pause.
+        await _poll(service)
+        assert control.energy_goal.status == "reached"
+        clock[0] += 1000
+        _plug(transport, False)
+        await _poll(service)
+        assert control.write_state.unplug_release.goal_owed is False
+        assert (control.energy_goal.status, control.energy_goal.target_kwh) == ("disabled", 0)
+        # The next car starts without the previous one's limit or pause.
+        assert control.pause_requested is False
+        assert (_release_writes(transport) == [0]) is rule
+        await service.stop()
+
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize(("paused", "resumed"), [(False, False), (True, True)])
@@ -241,7 +295,9 @@ def test_an_unplug_during_a_restart_of_the_service_is_still_found(tmp_path):
         service, transport, _clock = await _rule(tmp_path)
         await service._save_intent()
         saved = json.loads((tmp_path / "intent.json").read_text())
-        assert saved["unplug_release"] == {"enabled": True, "plugged": True, "owed": False}
+        assert saved["unplug_release"] == {
+            "enabled": True, "plugged": True, "owed": False, "goal_owed": False,
+        }
         await service.stop()
         # The car leaves while nothing runs.
         bank = dict(transport.bank)

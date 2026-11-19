@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 SOC_GOAL_STATES = ("disabled", "active", "reached")
-_KEYS = {"source", "target_percent", "maximum_percent", "status"}
+_KEYS = {"source", "target_percent", "chosen_percent", "maximum_percent", "status"}
 
 
 def percentage(value: object, *, maximum: bool = False) -> float:
@@ -26,8 +26,10 @@ class SocGoal:
 
     Missing vehicle data deliberately leaves charging unchanged. A reached
     ceiling stays reached until an explicit new goal, disable or source change,
-    or until a target at the car's limit follows a raised limit that the
-    current charge level has not reached. The last valid car cap remains in force when its
+    or until a raised limit of the car lifts the target above the charge
+    level. A lower limit of the car presses the target down; the chosen value
+    returns when the limit allows it again, and a target chosen at the limit
+    follows it both ways. The last valid car cap remains in force when its
     entity becomes unavailable. None of these operations authorizes starting
     or resuming charging. A reached target at the car's own limit pauses
     nothing: the car ends that charge itself, like at any other charger.
@@ -36,6 +38,9 @@ class SocGoal:
     def __init__(self) -> None:
         self.source: str | None = None
         self.target_percent = 0.0
+        # What was chosen; 100 for a target chosen at the car's limit. The
+        # target in force is this, pressed down by the car's limit.
+        self.chosen_percent = 0.0
         self.maximum_percent: float | None = None
         self.status = "disabled"
 
@@ -52,7 +57,7 @@ class SocGoal:
         if source == self.source:
             return False
         self.source = source
-        self.target_percent = 0.0
+        self.target_percent = self.chosen_percent = 0.0
         self.maximum_percent = None
         self.status = "disabled"
         return True
@@ -64,7 +69,7 @@ class SocGoal:
         target = percentage(value)
         if target == 0:
             previous = self.snapshot()
-            self.target_percent = 0.0
+            self.target_percent = self.chosen_percent = 0.0
             self.status = "disabled"
             return previous != self.snapshot()
         cap = self.maximum_percent if maximum is None else percentage(maximum, maximum=True)
@@ -75,6 +80,7 @@ class SocGoal:
             raise ValueError("target exceeds the vehicle charge limit")
         previous = self.snapshot()
         self.target_percent = target
+        self.chosen_percent = 100.0 if target == cap else target
         self.maximum_percent = cap
         self.status = "active" if target else "disabled"
         if target and current is not None and current >= target:
@@ -93,19 +99,15 @@ class SocGoal:
         except ValueError:
             current = None
         if cap is not None and self.source is not None:
-            # A target at the car's limit follows that limit both ways; any
-            # other target only ever drops to a lower limit.
-            following = bool(self.target_percent) and self.target_percent == self.maximum_percent
             self.maximum_percent = cap
-            if following:
-                if cap > self.target_percent and self.status == "reached":
+            if self.target_percent:
+                target = min(self.chosen_percent, cap)
+                if target > self.target_percent and self.status == "reached":
                     # Only the latch ends; a known charge level at or above
                     # the new target latches again below, and resuming the
                     # stop pause stays manual.
                     self.status = "active"
-                self.target_percent = cap
-            elif self.target_percent:
-                self.target_percent = min(self.target_percent, cap)
+                self.target_percent = target
         if self.status == "active" and current is not None and current >= self.target_percent:
             self.status = "reached"
         return previous != self.snapshot()
@@ -115,6 +117,7 @@ class SocGoal:
         return {
             "source": self.source,
             "target_percent": self.target_percent,
+            "chosen_percent": self.chosen_percent,
             "maximum_percent": self.maximum_percent,
             "status": self.status,
         }
@@ -126,6 +129,7 @@ class SocGoal:
         goal = cls()
         goal.configure_source(raw["source"])
         target = percentage(raw["target_percent"])
+        chosen = percentage(raw["chosen_percent"])
         cap = raw["maximum_percent"]
         if cap is not None:
             cap = percentage(cap, maximum=True)
@@ -135,9 +139,11 @@ class SocGoal:
             or (target == 0) != (status == "disabled")
             or (goal.source is None and (target != 0 or cap is not None))
             or (cap is not None and target > cap)
+            or target != (chosen if cap is None else min(chosen, cap))
         ):
             raise ValueError("inconsistent percentage goal")
         goal.target_percent = target
+        goal.chosen_percent = chosen
         goal.maximum_percent = cap
         goal.status = status
         return goal

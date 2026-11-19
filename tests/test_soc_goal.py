@@ -34,6 +34,21 @@ def test_initial_soc_at_or_above_target_stops_immediately():
     assert goal.stop_requested
 
 
+def test_a_chosen_target_returns_after_the_cars_limit_dipped():
+    goal = configured()
+    goal.set_target(80, 50, 90)
+    assert goal.observe(50, 70)
+    assert goal.target_percent == 70
+    # Reached at the lower limit; the raised limit ends only the latch.
+    assert goal.observe(72, None)
+    assert goal.status == "reached"
+    assert goal.observe(72, 100)
+    assert (goal.target_percent, goal.maximum_percent, goal.status) == (80, 100, "active")
+    assert SocGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()
+    with pytest.raises(ValueError, match="inconsistent"):
+        SocGoal.restore({**goal.snapshot(), "target_percent": 90.0})
+
+
 def test_a_target_at_the_car_limit_follows_it_both_ways():
     goal = configured()
     goal.set_target(100, 0)
@@ -127,7 +142,7 @@ def test_source_change_forgets_other_vehicle_and_disable_does_not_enable_a_goal(
     assert goal.configure_source("sensor.another|number.another")
     assert goal.snapshot() == {
         "source": "sensor.another|number.another", "target_percent": 0.0,
-        "maximum_percent": None, "status": "disabled",
+        "chosen_percent": 0.0, "maximum_percent": None, "status": "disabled",
     }
     assert goal.configure_source(None)
     assert not goal.observe(90, 80)

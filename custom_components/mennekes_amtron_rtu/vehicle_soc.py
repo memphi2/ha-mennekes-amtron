@@ -119,9 +119,12 @@ class _Observations:
         self.latest = _Observation(None, None)
 
     def add(self, observation: _Observation) -> None:
-        reached = self.model.status == "reached"
         self.model.observe(observation.soc, observation.maximum)
-        if not reached and self.model.status == "reached":
+        if self.model.status != "reached":
+            self.reached_soc = None
+        elif observation.soc is not None and observation.soc >= self.model.target_percent:
+            # Also when a raised limit ended the latch and this charge level
+            # reached the higher target at once.
             self.reached_soc = observation.soc
         if observation.maximum is not None:
             self.minimum = (

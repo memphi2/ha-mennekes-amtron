@@ -608,6 +608,7 @@ class ModbusService:
             self._phase = "closing the release after an unplug"
             async with self._command_lock:
                 await self.control.unplug_release.async_apply()
+                await self.control.unplug_release.async_end_reached_goal()
 
     async def _enforce_current_cap(self) -> None:
         """Never leave a confirmed charging current above a lowered cap."""

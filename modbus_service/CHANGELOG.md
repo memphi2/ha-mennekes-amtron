@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Breaking:** the saved control state of 0.10.0b5 is not read; set the
+  targets again after the update.
+- An unplug ends a reached energy or cost target and its pause.
+- A percentage target pressed down by the car's limit returns to the chosen
+  value when the limit rises again.
 - A guest start behind a waiting stop is refused before its first write
   instead of leaving the release open without a guest.
 - A current behind a waiting lock or withdrawn release is refused instead of

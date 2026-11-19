@@ -353,10 +353,10 @@ def test_retry_retains_threshold_evidence_and_current_cap_after_failure(tmp_path
             coordinator.update(False)
             coordinator.update(True)
             await hass.async_block_till_done()
-            # Reached at 60 % (clamped), the target followed the raised limit
-            # while the car reports 20 %: the latch ends, nothing resumes.
+            # Reached at 60 % (pressed down), the chosen 80 % returned with the
+            # raised limit while the car reports 20 %: the latch ends, nothing resumes.
             assert control.soc_goal.status == "active"
-            assert control.soc_goal.target_percent == 90
+            assert control.soc_goal.target_percent == 80
             assert control.soc_goal.maximum_percent == 90
             assert observer._pending is None
         finally:
@@ -394,7 +394,7 @@ def test_pending_observations_account_for_an_inflight_cap_reduction(tmp_path):
             release.set()
             await hass.async_block_till_done()
             assert control.soc_goal.status == "active"
-            assert control.soc_goal.target_percent == 90
+            assert control.soc_goal.target_percent == 80
             assert control.soc_goal.maximum_percent == 90
         finally:
             await observer.async_stop()

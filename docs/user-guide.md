@@ -151,7 +151,13 @@ meter causes a protective pause rather than a claim that the target was reached.
 
 A temporary meter outage can resume only a pause caused by that outage, with the
 same goal and no intervening manual command. A reset counter needs a new goal;
-a reached goal stays stopped. After an owner restart, resume explicitly.
+a reached goal stays stopped while the car is plugged in. After an owner
+restart, resume explicitly.
+
+A reached energy or cost target belongs to the charge that reached it. Once
+the wallbox confirms that the car was unplugged, the target is cleared and the
+pause it caused ends, so the next car charges without the previous limit. A
+target that is not reached yet stays for the next plug-in.
 [Target troubleshooting](troubleshooting.md#targets-and-departure-planning).
 
 ## Cost target

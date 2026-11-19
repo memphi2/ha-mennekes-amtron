@@ -212,8 +212,7 @@ These controls configure charging permission or maintenance.
 (**Configure → Wallbox**, for a direct entry under **Current limit and polling**), off by default. After a confirmed disconnect,
 the service that talks to the wallbox switches **Charging release** off so
 the next car needs an explicit release. It also ends a manual **Charging
-paused**, so the wallbox no longer shows a pause without a car; a stop from a
-reached target stays. It is ignored while Virtual Plug & Charge is enabled,
+paused**, so the wallbox no longer shows a pause without a car. It is ignored while Virtual Plug & Charge is enabled,
 which already closes the release. With the app, the rule also applies while
 Home Assistant is not running.
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- **Breaking:** the saved control state has two new fields and the state of
+  0.10.0b5 is not read. After the update, set percentage, energy and cost
+  targets again and check the pause and release switches.
+- A reached energy or cost target ends when the car is unplugged: the target
+  is cleared and its pause ends, so the next car charges without the previous
+  limit. Before, the stop stayed until it was resumed by hand.
+- A percentage target that a lower charge limit of the car pressed down
+  returns to the chosen value when the limit rises again. Before, it rose to
+  the limit itself. A target chosen at the limit still follows it.
+
 ### Added
 
 - App: without a running amount the **Charging** page names the price and
