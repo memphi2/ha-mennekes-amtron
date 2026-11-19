@@ -133,9 +133,8 @@ parameter images, identities and credentials rather than retaining device data.
 
 Sources are the parameter-management documentation and tools linked from the
 [Waveshare single-channel adapter wiki](https://www.waveshare.com/wiki/RS485_TO_POE_ETH_(B)),
-plus the manufacturer-supplied
-[TCP Secure Handshake Guide](https://drive.google.com/file/d/1NRPLhAJzy-iUi_50va8iRjyM60u2iHa5/view)
-and its [reference script](https://drive.google.com/file/d/1Gh0A4JFFqFNti8vNKh5M1ddvdUcN4CpZ/view).
+plus a handshake guide and reference script that Waveshare support supplied
+on request; they are not public and are not linked here.
 Those materials were used as protocol references, not copied into the runtime
 implementation. The project license does not grant rights to these external
 materials or Waveshare trademarks.
