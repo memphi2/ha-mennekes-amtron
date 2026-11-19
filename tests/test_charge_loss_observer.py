@@ -45,7 +45,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources.types import ChargeRe
 from tests.test_bavarian_history import VIN, vehicle_registry
 
 READ = "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_latest"
-LATER = "custom_components.mennekes_amtron_rtu.charge_loss_observer.async_call_later"
+LATER = "custom_components.mennekes_amtron_rtu.loss_record.async_call_later"
 
 
 class Coordinator:
@@ -248,7 +248,7 @@ def test_history_measures_the_vehicle_record_retries_and_does_not_call_on_each_p
                 await hass.async_block_till_done()
                 assert cancellations == [60]
                 assert [delay for delay, _ in callbacks] == [60, 60]
-                observer._schedule_retry()
+                observer.source._schedule_retry()
                 assert len(callbacks) == 2
                 for expected in (300, 1800):
                     callbacks[-1][1](None)
@@ -261,21 +261,21 @@ def test_history_measures_the_vehicle_record_retries_and_does_not_call_on_each_p
                 assert observer.statistics.last_loss_percent == pytest.approx(20)
                 assert observer.statistics.wallbox_kwh == pytest.approx(10)
                 assert observer.statistics.association == "history"
-                observer._schedule_retry()
+                observer.source._schedule_retry()
                 assert len(callbacks) == 4
                 coordinator.async_update_listeners()
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
                 assert read.await_count == 4
                 # The vehicle corrects its record: same charge, new result.
-                observer._last_query = float("-inf")
+                observer.source.asked_at = float("-inf")
                 read.return_value = coordinator.record(9)
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
                 assert observer.statistics.last_loss_percent == pytest.approx(10)
                 assert observer.statistics.sample_count == 1
-                with patch.object(observer._store, "async_save") as save:
-                    observer._last_query = float("-inf")
+                with patch.object(observer.ledger.store, "async_save") as save:
+                    observer.source.asked_at = float("-inf")
                     hass.bus.async_fire("bavariandata_charging_stopped", {})
                     await hass.async_block_till_done()
                     assert read.await_count == 6
@@ -285,13 +285,13 @@ def test_history_measures_the_vehicle_record_retries_and_does_not_call_on_each_p
                 coordinator.complete(at=time.time()+200)
                 await hass.async_block_till_done()
                 assert callbacks[-1][0] == 60
-                observer._retry = lambda: cancellations.append(1800)
+                observer.source._retry = lambda: cancellations.append(1800)
                 coordinator.complete(at=time.time()+400)
                 await hass.async_block_till_done()
                 assert cancellations[-1] == 1800
                 # More in the car than the meter delivered cannot be a loss.
                 read.return_value = coordinator.record(11)
-                observer._last_query = float("-inf")
+                observer.source.asked_at = float("-inf")
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
                 assert observer.statistics.status == "invalid"
@@ -323,7 +323,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
 
         plugged = [1030]
 
-        client = observer._entry.runtime_data.client
+        client = observer.source._entry.runtime_data.client
         with patch(READ, new=AsyncMock(return_value=None)) as read, patch(LATER, return_value=lambda: None):
             try:
                 await observer.async_start()
@@ -338,14 +338,14 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                 assert read.await_args.kwargs["since"] == 1030 - 120
                 assert observer.statistics.sample_count == 0
                 # The service does not answer: nothing is measured, nothing breaks.
-                observer._last_query = float("-inf")
+                observer.source.asked_at = float("-inf")
                 poll(1150, 506, EvseState.IDLE)
                 answer, client.async_energy_between.side_effect = client.async_energy_between.side_effect, AmtronConnectionError("down")
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
                 assert observer.statistics.sample_count == 0
                 client.async_energy_between.side_effect = answer
-                observer._last_query = float("-inf")
+                observer.source.asked_at = float("-inf")
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
                 assert observer.statistics.wallbox_kwh == pytest.approx(6)
@@ -353,7 +353,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                 assert observer.statistics.last_loss_percent == pytest.approx(10)
                 # A record of a span without delivered energy measures nothing.
                 read.return_value = ChargeRecord(1125, 1145, 2)
-                observer._last_query = float("-inf")
+                observer.source.asked_at = float("-inf")
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
                 assert observer.statistics.sample_count == 1
@@ -365,7 +365,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                     for at, kwh in ((1200, 506), (1390, 510), (1410, 510), (1490, 514), (1500, 514)):
                         meter.observe(at, kwh)
                     read.return_value = record
-                    observer._last_query = float("-inf")
+                    observer.source.asked_at = float("-inf")
                     asked = client.async_energy_between.await_count
                     poll(1500 + (plugged[0] or 0), 514, EvseState.IDLE)
                     hass.bus.async_fire("bavariandata_charging_stopped", {})
@@ -418,16 +418,16 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
             coordinator.complete()
             await hass.async_block_till_done()
             hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
-            with patch.object(observer._store, "async_save", side_effect=OSError):
+            with patch.object(observer.ledger.store, "async_save", side_effect=OSError):
                 with pytest.raises(ServiceValidationError) as error:
                     await observer.async_assign()
                 assert error.value.translation_key == "loss_storage_unavailable"
                 assert observer.statistics.sample_count == 0
                 assert not observer.available
-                observer._last_storage_attempt = float("-inf")
+                observer.ledger.attempted_at = float("-inf")
                 coordinator.async_update_listeners()
                 await hass.async_block_till_done()
-            observer._last_storage_attempt = float("-inf")
+            observer.ledger.attempted_at = float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
@@ -435,7 +435,7 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
             assert observer.statistics.sample_count == 1
             await observer.async_stop()
             broken, coord2 = build(hass)
-            with patch.object(broken._store, "async_load", side_effect=OSError):
+            with patch.object(broken.ledger.store, "async_load", side_effect=OSError):
                 await broken.async_start()
                 assert not broken.available
                 coord2.complete(at=time.time() + 200)
@@ -444,7 +444,7 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
                 await broken.async_stop()
             # Estimates saved in a form nobody reads any more: start without them.
             fresh, _coord3 = build(hass)
-            with patch.object(fresh._store, "async_load", side_effect=ValueError):
+            with patch.object(fresh.ledger.store, "async_load", side_effect=ValueError):
                 await fresh.async_start()
                 assert fresh.available
                 assert fresh.statistics.sample_count == 0
@@ -474,7 +474,7 @@ def test_assignment_sync_failure_keeps_visible_aggregate_and_reports_failure(tmp
                 with pytest.raises(ServiceValidationError) as error:
                     await observer.async_assign()
                 assert error.value.translation_key == "loss_storage_unavailable"
-            visible = await observer._store.async_load()
+            visible = await observer.ledger.store.async_load()
             assert observer.statistics.snapshot() == visible.snapshot()
             assert observer.statistics.sample_count == (1 if failure == "directory_sync" else 0)
             assert not observer.available
@@ -500,17 +500,17 @@ def test_unknown_assignment_is_unavailable_until_pending_candidate_is_saved(tmp_
 
             with monkeypatch.context() as scope:
                 scope.setattr(atomicwrites, "_sync_directory", fail)
-                scope.setattr(observer._store, "_validate_file", fail)
+                scope.setattr(observer.ledger.store, "_validate_file", fail)
                 with pytest.raises(ServiceValidationError) as error:
                     await observer.async_assign()
                 assert error.value.translation_key == "loss_storage_unavailable"
             assert not observer.available
             assert observer.statistics.last_loss_percent == pytest.approx(20)
-            observer._last_storage_attempt -= 61
+            observer.ledger.attempted_at -= 61
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
-            assert (await observer._store.async_load()).snapshot() == observer.statistics.snapshot()
+            assert (await observer.ledger.store.async_load()).snapshot() == observer.statistics.snapshot()
         finally:
             await observer.async_stop()
             await hass.async_stop()
@@ -548,7 +548,7 @@ def test_cancelled_assignment_keeps_memory_and_durable_loss_in_sync(tmp_path, mo
             with pytest.raises(asyncio.CancelledError):
                 await task
             assert observer.statistics.last_loss_percent == pytest.approx(20)
-            assert (await observer._store.async_load()).snapshot() == observer.statistics.snapshot()
+            assert (await observer.ledger.store.async_load()).snapshot() == observer.statistics.snapshot()
         finally:
             release.set()
             await observer.async_stop()
@@ -564,18 +564,18 @@ def _levels(caplog, text):
 @pytest.mark.parametrize("failed_attempts", [1, 2])
 def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_path, caplog, failed_attempts):
     async def run():
-        caplog.set_level(logging.DEBUG, logger="custom_components.mennekes_amtron_rtu.charge_loss_observer")
+        caplog.set_level(logging.DEBUG, logger="custom_components.mennekes_amtron_rtu.loss_ledger")
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass, "vehicle_history")
         with patch(READ, new=coordinator.reader()) as read:
             try:
                 await observer.async_start()
-                with patch.object(observer._store, "async_save", side_effect=OSError) as failed_save:
+                with patch.object(observer.ledger.store, "async_save", side_effect=OSError) as failed_save:
                     coordinator.complete(energy=10)
                     await hass.async_block_till_done()
                     for attempt in range(failed_attempts):
                         if attempt:
-                            observer._last_storage_attempt -= 61
+                            observer.ledger.attempted_at -= 61
                             coordinator.async_update_listeners()
                             await hass.async_block_till_done()
                         assert not observer.available
@@ -588,7 +588,7 @@ def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_
                             await hass.async_block_till_done()
                         assert read.await_count == failed_save.await_count == attempt + 1
 
-                observer._last_storage_attempt -= 61
+                observer.ledger.attempted_at -= 61
                 coordinator.async_update_listeners()
                 await hass.async_block_till_done()
                 assert observer.available
@@ -596,7 +596,7 @@ def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_
                 assert observer.statistics.sample_count == 1
                 assert observer.statistics.association == "history"
                 assert read.await_count == failed_attempts + 1
-                restored = await observer._store.async_load()
+                restored = await observer.ledger.store.async_load()
                 assert restored.snapshot() == observer.statistics.snapshot()
                 # The failure warns once, its repeats stay at debug, and the
                 # recovery is reported once.
@@ -605,7 +605,7 @@ def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_
                 )
                 assert _levels(caplog, "Charging loss: estimate saved again") == [logging.INFO]
 
-                with patch.object(observer._store, "async_save", wraps=observer._store.async_save) as save:
+                with patch.object(observer.ledger.store, "async_save", wraps=observer.ledger.store.async_save) as save:
                     for _ in range(5):
                         coordinator.async_update_listeners()
                         await hass.async_block_till_done()
@@ -658,7 +658,7 @@ def test_account_or_rebound_device_is_unavailable_and_never_matches_a_different_
         hass.data[dr.DATA_REGISTRY] = vehicle_registry()
         observer, _coordinator = build(hass, "vehicle_history")
         assert observer.available
-        assert VIN not in observer._source
+        assert VIN not in observer.source._history.source_key
         hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "WBA98765432109876")})
         assert not observer.available
         await observer.async_stop()
@@ -704,7 +704,7 @@ def test_temporarily_missing_history_vehicle_preserves_statistics_and_recovers(t
                 expected = original.statistics.snapshot()
                 assert original.statistics.sample_count == 1
                 await original.async_stop()
-                saved = original._store.path.read_bytes()
+                saved = original.ledger.store.path.read_bytes()
 
                 # The selected HA device is temporarily absent/invalid on restart.
                 hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "account-entry")})
@@ -713,7 +713,7 @@ def test_temporarily_missing_history_vehicle_preserves_statistics_and_recovers(t
                 await replacement.async_start()
                 assert not replacement.available
                 assert replacement.statistics.snapshot() == expected
-                assert original._store.path.read_bytes() == saved
+                assert original.ledger.store.path.read_bytes() == saved
                 assert read.await_count == 1
 
                 # A registry event recovers even when identical wallbox polls
@@ -751,8 +751,8 @@ def test_explicitly_disabled_history_provider_cannot_match_a_retained_legacy_veh
     async def run():
         hass = HomeAssistant(str(tmp_path))
         old, coordinator = build(hass, "vehicle_history")
-        old._entry.options["charge_loss_vehicle_provider"] = "none"
-        observer = ChargeLossObserver(hass, old._entry)
+        old.source._entry.options["charge_loss_vehicle_provider"] = "none"
+        observer = ChargeLossObserver(hass, old.source._entry)
         try:
             with patch(READ) as read:
                 await observer.async_start()
@@ -781,7 +781,7 @@ def test_consumed_auto_candidate_cannot_replay_over_a_manual_correction(tmp_path
             hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
             await hass.async_block_till_done()
             assert observer.statistics.vehicle_kwh == 8
-            assert observer._change is None
+            assert observer.source._change is None
             hass.states.async_set("sensor.car_energy", "unknown")
             hass.states.async_set("sensor.car_energy", "9", {"unit_of_measurement": "kWh"})
             await observer.async_assign()
@@ -803,7 +803,7 @@ def test_a_result_that_waited_behind_another_save_is_dropped_at_unload(tmp_path,
         with patch(READ, new=coordinator.reader()), patch(LATER, return_value=lambda: None):
             try:
                 await observer.async_start()
-                await observer._lock.acquire()
+                await observer.ledger.lock.acquire()
                 coordinator.complete()
                 await asyncio.sleep(0)
                 # A second trigger while the first still runs starts no second task.
@@ -813,8 +813,8 @@ def test_a_result_that_waited_behind_another_save_is_dropped_at_unload(tmp_path,
                 # The entry is unloaded by the time the result may be saved.
                 for _ in range(5):
                     await asyncio.sleep(0)
-                observer._stopping = True
-                observer._lock.release()
+                observer.ledger.closed = True
+                observer.ledger.lock.release()
                 await hass.async_block_till_done()
                 assert observer.statistics.sample_count == 0
                 assert observer.statistics.status == "waiting_for_session"
@@ -828,7 +828,7 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass)
-        observer._profiled, observer._profile_id = True, "a" * 32
+        observer.source._profile_id = "a" * 32
         meter, now = coordinator.meter, time.time()
         mine = SimpleNamespace(id="a" * 32)
 
@@ -840,7 +840,7 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
 
         # The cars here are no configured profiles: name the owner directly.
         named = patch(
-            "custom_components.mennekes_amtron_rtu.charge_loss_observer.last_cycle",
+            "custom_components.mennekes_amtron_rtu.loss_plug_cycle.last_cycle",
             side_effect=lambda _entry: getattr(coordinator, "last", None),
         )
         named.start()
@@ -851,53 +851,53 @@ def test_the_plug_cycle_of_this_car_is_taken_once_the_meter_covers_it(tmp_path):
                 coordinator.owner = owner
                 coordinator.complete(at=now - 5000 + (0 if owner else 500))
                 await hass.async_block_till_done()
-                assert observer._charge is None
+                assert observer.source.charge is None
                 assert observer.statistics.status == "waiting_for_session"
             # The reading after the unplug is still to come ...
             meter.observe(now - 300, coordinator.total)
             waiting = await cycle(now - 300, now - 10)
-            assert observer._cycle != waiting
+            assert observer.source.cycle != waiting
             # ... and a plug-in without charging leaves everything as it was.
             meter.observe(now - 5, coordinator.total)
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
-            assert observer._cycle == waiting
-            assert observer._charge is None
+            assert observer.source.cycle == waiting
+            assert observer.source.charge is None
             # A span the meter log can no longer place is given up.
             lost = await cycle(now - 9000, now - 8000)
-            assert observer._cycle == lost
+            assert observer.source.cycle == lost
             coordinator.owner = mine
             charge = coordinator.complete(at=now)
             await hass.async_block_till_done()
-            assert observer._charge == charge
+            assert observer.source.charge == charge
             assert observer.statistics.status == "waiting_for_vehicle"
             # Seen again after a restart, it is accounted for: nothing is asked.
-            client = observer._entry.runtime_data.client
+            client = observer.source._entry.runtime_data.client
             answer, client.async_energy_between.side_effect = client.async_energy_between.side_effect, AmtronConnectionError("down")
             asked = client.async_energy_between.await_count
-            observer._cycle = observer._charge = None
+            observer.source.cycle = observer.source.charge = None
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert client.async_energy_between.await_count == asked
-            assert observer._charge == charge
+            assert observer.source.charge == charge
             # A service that does not answer has measured nothing: asked
             # again, and meanwhile nothing goes to the charge before.
-            assert observer._assignable == charge
+            assert observer.source.assignable == charge
             unanswered = await cycle(now - 9500, now - 8500)
-            assert observer._cycle != unanswered
-            assert observer._assignable is None
+            assert observer.source.cycle != unanswered
+            assert observer.source.assignable is None
             assert observer.statistics.status == "waiting_for_vehicle"
             client.async_energy_between.side_effect = answer
             # A cycle the meter cannot measure is no longer the charge before.
             # A save that fails is tried again by the ordinary storage retry.
-            with patch.object(observer._store, "async_save", AsyncMock(side_effect=OSError("full"))):
+            with patch.object(observer.ledger.store, "async_save", AsyncMock(side_effect=OSError("full"))):
                 coordinator.async_update_listeners()
                 await hass.async_block_till_done()
-            assert observer._cycle == unanswered
-            assert observer._booking is not None
-            assert observer._assignable is None
+            assert observer.source.cycle == unanswered
+            assert observer.source.unbooked is not None
+            assert observer.source.assignable is None
             assert not observer.available
-            observer._last_storage_attempt = float("-inf")
+            observer.ledger.attempted_at = float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
@@ -913,10 +913,10 @@ def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path
     async def run():
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass)
-        observer._profiled, observer._profile_id = True, "a" * 32
+        observer.source._profile_id = "a" * 32
         mine, now = SimpleNamespace(id="a" * 32), time.time()
         named = patch(
-            "custom_components.mennekes_amtron_rtu.charge_loss_observer.last_cycle",
+            "custom_components.mennekes_amtron_rtu.loss_plug_cycle.last_cycle",
             side_effect=lambda _entry: getattr(coordinator, "last", None),
         )
         named.start()
@@ -924,7 +924,7 @@ def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path
             await observer.async_start()
             coordinator.owner = mine
             saves = AsyncMock(side_effect=OSError("full"))
-            with patch.object(observer._store, "async_save", saves):
+            with patch.object(observer.ledger.store, "async_save", saves):
                 charge = coordinator.complete(at=now - 2000)
                 await hass.async_block_till_done()
                 assert not observer.available
@@ -938,14 +938,14 @@ def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path
                     coordinator.async_update_listeners()
                     await hass.async_block_till_done()
                 assert saves.await_count == asked <= 2
-            assert observer._cycle.unplugged_at == now - 1000
-            assert observer._assignable is None
-            assert observer._booking.charge == charge
-            observer._last_storage_attempt = float("-inf")
+            assert observer.source.cycle.unplugged_at == now - 1000
+            assert observer.source.assignable is None
+            assert observer.source.unbooked.charge == charge
+            observer.ledger.attempted_at = float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
-            assert observer._booking is None
+            assert observer.source.unbooked is None
             assert observer.statistics.status == "waiting_for_vehicle"
             # A plug-in without charging changes nothing, and revives nothing
             # that another car's cycle made unassignable.
@@ -955,10 +955,10 @@ def test_a_charge_that_could_not_be_saved_is_booked_whatever_came_after(tmp_path
             coordinator.cycle(now - 400, now - 200)
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
-            assert observer._cycle.plugged_at == now - 400
-            assert observer._assignable is None
+            assert observer.source.cycle.plugged_at == now - 400
+            assert observer.source.assignable is None
             # A save whose outcome stayed open is repeated, also with nothing new to book.
-            observer._storage_ok, observer._last_storage_attempt = False, float("-inf")
+            observer.ledger.saved, observer.ledger.attempted_at = False, float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
@@ -975,11 +975,11 @@ def test_a_failing_disk_is_tried_once_a_minute_while_a_newer_cycle_is_open(tmp_p
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass)
         now = time.time()
-        client = observer._entry.runtime_data.client
+        client = observer.source._entry.runtime_data.client
         try:
             await observer.async_start()
             saves = AsyncMock(side_effect=failure)
-            with patch.object(observer._store, "async_save", saves):
+            with patch.object(observer.ledger.store, "async_save", saves):
                 charge = coordinator.complete(at=now - 2000)
                 await hass.async_block_till_done()
                 assert not observer.available
@@ -992,7 +992,7 @@ def test_a_failing_disk_is_tried_once_a_minute_while_a_newer_cycle_is_open(tmp_p
                     coordinator.async_update_listeners()
                     await hass.async_block_till_done()
                 assert saves.await_count == asked
-            observer._last_storage_attempt = float("-inf")
+            observer.ledger.attempted_at = float("-inf")
             coordinator.async_update_listeners()
             await hass.async_block_till_done()
             assert observer.available
@@ -1017,13 +1017,39 @@ def test_after_a_restart_a_plug_in_without_charging_leaves_nothing_assignable(tm
             coordinator.meter.observe(now - 100, coordinator.total)
             coordinator.cycle(now - 400, now - 200)
             await observer.async_stop()
-            again = ChargeLossObserver(hass, observer._entry)
+            again = ChargeLossObserver(hass, observer.source._entry)
             await again.async_start()
             await hass.async_block_till_done()
-            assert again._cycle.plugged_at == now - 400
-            assert again._assignable is None
+            assert again.source.cycle.plugged_at == now - 400
+            assert again.source.assignable is None
             await again.async_stop()
         finally:
             await observer.async_stop()
             await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_only_a_value_of_the_car_can_be_assigned_by_hand(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        with patch(READ, new=coordinator.reader()):
+            try:
+                await observer.async_start()
+                assert not observer.can_assign
+                with pytest.raises(ServiceValidationError):
+                    await observer.async_assign()
+            finally:
+                await observer.async_stop()
+        # Without a sensor of the car there is nothing to follow.
+        observer, _coordinator = build(hass)
+        observer.source._entity = ""
+        assert observer.source.subscribe() == []
+        # A publish that fails does not hide the storage failure behind it.
+        observer.ledger._publish = lambda: 1 / 0
+        with patch.object(observer.ledger.store, "async_save", side_effect=StorageCommitUncertainError("x")):
+            assert await observer.ledger.commit(lambda statistics: statistics.configure_source("sensor:other")) is False
+        assert observer.statistics.source == "sensor:other"
+        await hass.async_stop()
+
     asyncio.run(run())

@@ -251,7 +251,10 @@ vehicle_sources/     optional provider capabilities and explicit selection
 vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapters
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure inputs from HA sources, followed by the service's plan
-charge_loss_observer.py  bounded matching and durable loss aggregate
+charge_loss_observer.py  follows the polls and runs one loss measurement at a time
+loss_plug_cycle.py  decides each plug cycle once and matches the car's energy value to it
+loss_record.py  compares the car's own charging record with the meter over its span
+loss_ledger.py  the saved loss aggregate; a change counts once it is on disk
 charge_watch.py  names the vehicle of a plug cycle to the service that measured it
 cost_observer.py  prices the energy of the running plug cycle
 sensor.py binary_sensor.py  SENSORS and BINARY_SENSORS tables
