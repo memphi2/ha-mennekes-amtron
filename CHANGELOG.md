@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the next poll.
 - The repair for a rejected saved state reports a service that is down
   instead of failing with an unknown error.
+- A successful new sign-in ends with a translated message, the calendar
+  action and a refused save of the departure time report in the user's
+  language, and a reply of the service that is no valid state no longer
+  reaches the interface as an unknown error.
+- Diagnostics can be downloaded for an entry whose setup never finished, and
+  a disabled entry takes its repairs along.
 - A failed save of the charging-loss averages is written again after a
   minute, also in the history mode when the car's record is gone.
 - The app answers an `Authorization` header that is no text with 401, and a

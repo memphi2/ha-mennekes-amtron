@@ -3,6 +3,7 @@
     "abort": {
       "already_configured": "This wallbox is already configured.",
       "reconfigure_successful": "The connection was updated.",
+      "reauth_successful": "Sign-in was updated.",
       "unique_id_mismatch": "This connection belongs to a different wallbox.",
       "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration.",
       "invalid_service_discovery": "The app reported invalid connection details.",
@@ -891,6 +892,18 @@
     },
     "guest_deadline_expired": {
       "message": "The saved time limit has expired. Choose a future time or clear it."
+    },
+    "calendar_not_configured": {
+      "message": "Set a calendar and the exact event title in the vehicle options first."
+    },
+    "calendar_reply_invalid": {
+      "message": "The calendar returned no usable list of events."
+    },
+    "calendar_no_event": {
+      "message": "No timed calendar event with this title in the next 14 days."
+    },
+    "departure_save_failed": {
+      "message": "The departure time could not be saved. Check Home Assistant's storage and try again."
     },
     "target_time_not_future": {
       "message": "Choose a time in the future, with its time zone."

@@ -3,6 +3,7 @@
     "abort": {
       "already_configured": "Cette borne de recharge est déjà configurée.",
       "reconfigure_successful": "La connexion a été mise à jour.",
+      "reauth_successful": "La connexion a été mise à jour.",
       "unique_id_mismatch": "Cette connexion correspond à une autre borne.",
       "service_migration_requires_serial": "Le numéro de série de la borne doit pouvoir être lu pour retrouver l’appareil existant lors de la migration.",
       "invalid_service_discovery": "L’application a fourni des informations de connexion non valides.",
@@ -891,6 +892,18 @@
     },
     "guest_deadline_expired": {
       "message": "L’heure limite est dépassée. Choisissez une heure future ou effacez-la."
+    },
+    "calendar_not_configured": {
+      "message": "Définissez d’abord un calendrier et le titre exact de l’événement dans les options du véhicule."
+    },
+    "calendar_reply_invalid": {
+      "message": "Le calendrier n’a renvoyé aucune liste d’événements utilisable."
+    },
+    "calendar_no_event": {
+      "message": "Aucun événement horodaté portant ce titre dans les 14 prochains jours."
+    },
+    "departure_save_failed": {
+      "message": "L’heure de départ n’a pas pu être enregistrée. Vérifiez le stockage de Home Assistant et réessayez."
     },
     "target_time_not_future": {
       "message": "Choisissez une heure dans le futur, avec son fuseau horaire."

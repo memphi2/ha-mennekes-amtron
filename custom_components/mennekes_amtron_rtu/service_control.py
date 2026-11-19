@@ -184,7 +184,11 @@ class ServiceControl:
             or not isinstance(snapshot, dict)
         ):
             raise DeviceError("service_unavailable")
-        self._client.apply_snapshot(snapshot, require_available=False, consume_energy=False)
+        try:
+            self._client.apply_snapshot(snapshot, require_available=False, consume_energy=False)
+        except AmtronConnectionError as err:
+            # A reply that is no valid state: reported like a lost service.
+            raise DeviceError("service_unavailable") from err
         if outcome == "unknown":
             return outcome
         current = self.soc_goal_revision

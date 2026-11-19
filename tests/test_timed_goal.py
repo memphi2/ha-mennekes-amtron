@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
@@ -195,10 +195,10 @@ def test_timed_goal_source_updates_and_explicit_clear(monkeypatch: pytest.Monkey
         assert len(observer._store.saved) == 2
         await observer.async_set_deadline(None)
         assert len(observer._store.saved) == 2
-        with pytest.raises(Exception, match="future"):
-            await observer.async_set_deadline(NOW - timedelta(seconds=1))
-        with pytest.raises(Exception, match="time zone"):
-            await observer.async_set_deadline(NOW.replace(tzinfo=None))
+        for wrong in (NOW - timedelta(seconds=1), NOW.replace(tzinfo=None)):
+            with pytest.raises(HomeAssistantError) as refused:
+                await observer.async_set_deadline(wrong)
+            assert refused.value.translation_key == "target_time_not_future"
         with pytest.raises(Exception, match="source"):
             await observer.async_set_deadline(NOW + timedelta(hours=1), source="")
 
@@ -319,8 +319,9 @@ def test_calendar_button_selects_one_exact_timed_event(monkeypatch: pytest.Monke
 def test_calendar_requires_a_matching_timed_event(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, _control, hass = setup_observer(monkeypatch)
-        with pytest.raises(Exception, match="calendar"):
+        with pytest.raises(HomeAssistantError) as refused:
             await observer.async_use_next_calendar_event()
+        assert refused.value.translation_key == "calendar_not_configured"
         observer._entry.options.update({
             "timed_calendar_entity": "calendar.trips", "timed_calendar_title": "Departure",
         })
@@ -328,19 +329,22 @@ def test_calendar_requires_a_matching_timed_event(monkeypatch: pytest.MonkeyPatc
         hass.services.async_call.return_value = {"calendar.trips": {"events": [
             {"start": NOW.date().isoformat(), "summary": "Departure"},
         ]}}
-        with pytest.raises(Exception, match="No matching"):
+        with pytest.raises(HomeAssistantError) as refused:
             await observer.async_use_next_calendar_event()
+        assert refused.value.translation_key == "calendar_no_event"
         hass.services.async_call.return_value = None
-        with pytest.raises(Exception, match="valid event list"):
+        with pytest.raises(HomeAssistantError) as refused:
             await observer.async_use_next_calendar_event()
+        assert refused.value.translation_key == "calendar_reply_invalid"
         hass.services.async_call.return_value = {"calendar.trips": {"events": [
             {"start": "2026-11-07Tbad", "summary": "Departure"},
             {"start": "2026-11-07T07:00:00", "summary": "Departure"},
             {"start": (NOW + timedelta(days=15)).isoformat(), "summary": "Departure"},
             "not an event",
         ]}}
-        with pytest.raises(Exception, match="No matching"):
+        with pytest.raises(HomeAssistantError) as refused:
             await observer.async_use_next_calendar_event()
+        assert refused.value.translation_key == "calendar_no_event"
 
     asyncio.run(run())
 
@@ -368,6 +372,12 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         await departure.async_clear_value()
         timed.async_set_deadline.assert_any_await(None)
         assert runtime.control.departure.trip.deadline is None
+        # Home Assistant's own storage refusing is reported in the user's language.
+        timed.async_set_deadline.side_effect = OSError("disk failed")
+        with pytest.raises(HomeAssistantError) as refused:
+            await departure.async_set_value(NOW + timedelta(hours=9))
+        assert refused.value.translation_key == "departure_save_failed"
+        timed.async_set_deadline.side_effect = None
         # Without a selected car the service keeps the time itself.
         runtime.timed_goal = None
         assert departure.native_value is None
@@ -380,7 +390,7 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         assert runtime.control.departure.trip.deadline == later
         await departure.async_clear_value()
         assert departure.native_value is None
-        assert timed.async_set_deadline.await_count == 2
+        assert timed.async_set_deadline.await_count == 3
         await runtime.client.async_close()
 
     asyncio.run(run())

@@ -3,6 +3,7 @@
     "abort": {
       "already_configured": "Questa wallbox è già configurata.",
       "reconfigure_successful": "La connessione è stata aggiornata.",
+      "reauth_successful": "L’accesso è stato aggiornato.",
       "unique_id_mismatch": "Questa connessione appartiene a un’altra wallbox.",
       "service_migration_requires_serial": "Per riconoscere il dispositivo esistente durante la migrazione, il numero di serie della wallbox deve essere leggibile.",
       "invalid_service_discovery": "L'app ha fornito dati di connessione non validi.",
@@ -891,6 +892,18 @@
     },
     "guest_deadline_expired": {
       "message": "Il limite orario è scaduto. Scegliere un orario futuro o cancellarlo."
+    },
+    "calendar_not_configured": {
+      "message": "Impostare prima un calendario e il titolo esatto dell’evento nelle opzioni del veicolo."
+    },
+    "calendar_reply_invalid": {
+      "message": "Il calendario non ha restituito un elenco di eventi utilizzabile."
+    },
+    "calendar_no_event": {
+      "message": "Nessun evento con orario e questo titolo nei prossimi 14 giorni."
+    },
+    "departure_save_failed": {
+      "message": "Impossibile salvare l’orario di partenza. Controllare l’archiviazione di Home Assistant e riprovare."
     },
     "target_time_not_future": {
       "message": "Scegliere un orario futuro, con il fuso orario."

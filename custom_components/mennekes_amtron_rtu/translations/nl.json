@@ -3,6 +3,7 @@
     "abort": {
       "already_configured": "Deze wallbox is al ingesteld.",
       "reconfigure_successful": "De verbinding is bijgewerkt.",
+      "reauth_successful": "De aanmelding is bijgewerkt.",
       "unique_id_mismatch": "Deze verbinding hoort bij een andere wallbox.",
       "service_migration_requires_serial": "De wallbox moet een leesbaar serienummer hebben om deze bij de overstap aan het bestaande apparaat te koppelen.",
       "invalid_service_discovery": "De app heeft ongeldige verbindingsgegevens doorgegeven.",
@@ -891,6 +892,18 @@
     },
     "guest_deadline_expired": {
       "message": "Het opgeslagen tijdstip is verstreken. Kies een toekomstig tijdstip of wis het."
+    },
+    "calendar_not_configured": {
+      "message": "Stel eerst een agenda en de exacte titel van de afspraak in bij de voertuigopties."
+    },
+    "calendar_reply_invalid": {
+      "message": "De agenda gaf geen bruikbare lijst met afspraken terug."
+    },
+    "calendar_no_event": {
+      "message": "Geen afspraak met tijdstip en deze titel in de komende 14 dagen."
+    },
+    "departure_save_failed": {
+      "message": "De vertrektijd kon niet worden opgeslagen. Controleer de opslag van Home Assistant en probeer het opnieuw."
     },
     "target_time_not_future": {
       "message": "Kies een tijdstip in de toekomst, met tijdzone."

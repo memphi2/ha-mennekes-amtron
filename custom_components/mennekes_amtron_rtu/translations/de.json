@@ -3,6 +3,7 @@
     "abort": {
       "already_configured": "Diese Wallbox ist bereits konfiguriert.",
       "reconfigure_successful": "Die Verbindung wurde aktualisiert.",
+      "reauth_successful": "Die Anmeldung wurde aktualisiert.",
       "unique_id_mismatch": "Diese Verbindung gehört zu einer anderen Wallbox.",
       "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich.",
       "invalid_service_discovery": "Die App hat ungültige Verbindungsdaten gemeldet.",
@@ -891,6 +892,18 @@
     },
     "guest_deadline_expired": {
       "message": "Der gespeicherte Zeitpunkt ist abgelaufen. Einen zukünftigen Zeitpunkt wählen oder löschen."
+    },
+    "calendar_not_configured": {
+      "message": "Zuerst in den Fahrzeugoptionen einen Kalender und den genauen Termintitel festlegen."
+    },
+    "calendar_reply_invalid": {
+      "message": "Der Kalender hat keine brauchbare Terminliste geliefert."
+    },
+    "calendar_no_event": {
+      "message": "Kein Termin mit Uhrzeit und diesem Titel in den nächsten 14 Tagen."
+    },
+    "departure_save_failed": {
+      "message": "Die Abfahrtszeit konnte nicht gespeichert werden. Speicher von Home Assistant prüfen und erneut versuchen."
     },
     "target_time_not_future": {
       "message": "Einen Zeitpunkt in der Zukunft wählen, mit Zeitzone."
