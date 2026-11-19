@@ -26,7 +26,7 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 3 and service 0.10.0b2 or newer**,
+separately. The current requirement is **API 3 and service 0.10.0b3 or newer**,
 which carries command-origin metadata for activity reporting. Raise the minimum
 when a newer service feature is required. The published or planned service
 release must satisfy the declared minimum.
@@ -108,7 +108,8 @@ by pulling the standalone OCI image. The [AppArmor check](validation.md#apparmor
 loads it only on disposable CI runners; parser-only results do not substitute
 for an enforcement run.
 
-The catalog's Dockerfile contains only `FROM image@sha256:<attested-index>`;
+The catalog's Dockerfile contains only `FROM image@sha256:<attested-index>` and
+`USER root` (Supervisor needs it for its data);
 its config deliberately has no `image` key. Supervisor's supported local-build
 path downloads that immutable image and adds app metadata. It does not build
 the service from source or resolve a mutable version tag. The release gate

@@ -1,7 +1,9 @@
 # Changes
 
-## Unreleased
+## 0.10.0b3
 
+- Integration and app must both be 0.10.0b3; update them together.
+- The image runs as UID 10001 and the service drops every capability; the app stays root for Supervisor's data.
 - A waiting pause, lock or withdrawn release is not lost to a missing
   reply, a current change or a goal stop.
 - A command that could not be saved answers `intent_not_saved` (409).

@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.10.0b3 — 2026-11-19
 
 ### Breaking changes
 
@@ -27,9 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   interval was dropped when the latest poll had failed at its due time. It
   now waits for the wallbox and is then written.
 - A waiting pause, lock or withdrawn release is also written again after a
-  reply that did not come, outlasts a current change that switches nothing
-  (such as a surplus adjustment), and a waiting lock outlasts a goal or time
-  stop. Before, each of these dropped the stop and the car went on charging.
+  reply that did not come. It is replaced only by what overrides it: the
+  planner's own newer decision, a start after a pause, or the opposite
+  switch. A current change that switches nothing (such as a surplus
+  adjustment), a different stop and a goal or time stop leave it waiting; a
+  command that would have to wait itself is refused instead of taking its
+  place. Before, each of these dropped the stop and the car went on charging.
 - The recovery from error 200 leaves the charging release closed when
   nobody has decided it yet and the wallbox has it closed.
 - A manual Plug & Charge release ends when the vehicle state was unknown
