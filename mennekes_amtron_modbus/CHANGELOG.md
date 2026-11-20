@@ -1,5 +1,41 @@
 # Changes
 
+## 0.10.0
+
+- Publish the 0.10 service in both stable and beta app catalogs. Integration
+  and app must both be 0.10.0; the API is version 3, and each side refuses the
+  other's older version.
+- **Breaking:** control state saved by an earlier version is not taken over;
+  confirm the reset in Home Assistant's Repairs and set the targets again.
+  The image runs as UID 10001 and the service gives up every capability; the
+  app stays root for Supervisor's data, without any capability.
+- **Breaking (API):** a command takes only its own fields, a value that is not
+  permitted is refused with the error's name, and the commands `timed_current`
+  and `cancel_timed_current`, the session summary and the fields
+  `choice_revision`, `supports_plug_charge`, `supports_cancel_pending`,
+  `supports_departure_plan` and `soc_transactions_supported` are gone.
+- A direct connection in Home Assistant runs this same service.
+- New commands: `cost_goal` and `cost_price` for a target as an amount of
+  money, `unplug_release_config` to switch the release off after a confirmed
+  unplug also while Home Assistant is not running, and `charge_note`.
+- The service keeps the meter readings of the running and the last plug cycle
+  (`charge_meter`, `POST /v2/energy`) in `charge-meter.json`.
+- One account of the plug-in decides for Plug & Charge, guest charging and the
+  unplug rule whether a car is connected. A reached energy or cost target ends
+  with the unplug.
+- The Charging page (`/charging`) sorts the targets by whom they apply to,
+  sets the cost target in Home Assistant's currency and shows the price, the
+  departure plan's status and planned start; the overview shows all targets in
+  one card. The app keeps the one target time.
+- After an unanswered request the line falls silent before the next one, so a
+  late answer is never taken for the next (serial and Modbus RTU over TCP),
+  and every guarded write is judged after that wait.
+- A waiting pause, lock or withdrawn release is kept until something undoes
+  it, and is repeated after five seconds when its reply did not come.
+- A returned serial adapter is reopened within seconds; error 200 is recovered
+  while the state cannot be saved; a page read behind a long command ends
+  after five seconds; log lines start with their area.
+
 ## 0.9.1
 
 - Report the trigger, timestamp and requested value of command results. Keep
