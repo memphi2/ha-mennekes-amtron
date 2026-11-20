@@ -6,11 +6,11 @@ import pytest
 from homeassistant.components.number import NumberMode
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
 )
+from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.energy_goal import MAX_ENERGY_GOAL_KWH
 from custom_components.mennekes_amtron_rtu.number import async_setup_entry

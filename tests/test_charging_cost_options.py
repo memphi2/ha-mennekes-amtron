@@ -40,8 +40,8 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
     cost_source_schema,
     cost_windows_schema,
 )
+from custom_components.mennekes_amtron_rtu.const import CONF_CURRENT_LIMIT
 from custom_components.mennekes_amtron_rtu.device.charging_cost import TariffConfig
-from custom_components.mennekes_amtron_rtu.device.const import CONF_CURRENT_LIMIT
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_options_flow import Flow
 

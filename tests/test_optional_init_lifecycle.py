@@ -18,7 +18,7 @@ from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_CHARGING_NETWORK_TARIFF,
     CONF_CHARGING_PRICE,
 )
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
 )

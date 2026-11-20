@@ -11,14 +11,12 @@ from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from custom_components.mennekes_amtron_rtu import _flow_gateway, config_flow
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronBusError,
     AmtronConnectionError,
 )
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.device.waveshare_auth import (
     WaveshareAuthenticationError,

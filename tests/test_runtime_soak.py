@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
@@ -22,10 +23,7 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from scripts.check_runtime_soak import sample_errors
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 from tests.test_home_assistant_smoke import _boot

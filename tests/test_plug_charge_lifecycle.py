@@ -7,12 +7,12 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 
 from custom_components import mennekes_amtron_rtu as integration
-from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
-    DOMAIN,
 )
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_init import _patch_client, _patch_issues

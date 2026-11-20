@@ -46,6 +46,12 @@ from .charging_cost_const import (
     CONF_CHARGING_NETWORK_TARIFF,
     COST_SOURCE_DISABLED,
 )
+from .const import (
+    CONF_RELEASE_OFF_ON_UNPLUG,
+    CONF_SCAN_INTERVAL_SECONDS,
+    CONF_SERIAL_NUMBER,
+    DEFAULT_SCAN_INTERVAL_SECONDS,
+)
 from .coordinator import ServiceCoordinator
 from .cost_goal import CostGoalObserver
 from .cost_observer import ChargingCostObserver, LastChargingCost
@@ -55,13 +61,7 @@ from .data import (
     WallboxData,
 )
 from .device.client_errors import AmtronBusError, AmtronIdentityError
-from .device.const import (
-    CONF_RELEASE_OFF_ON_UNPLUG,
-    CONF_SCAN_INTERVAL_SECONDS,
-    CONF_SERIAL_NUMBER,
-    DEFAULT_SCAN_INTERVAL_SECONDS,
-    DOMAIN,
-)
+from .device.const import DOMAIN
 from .device.errors import DeviceError
 from .device.notice import FailureNotice
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError

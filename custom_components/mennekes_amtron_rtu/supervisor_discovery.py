@@ -5,7 +5,8 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
-from .device.const import DEFAULT_NAME, DOMAIN
+from .const import DEFAULT_NAME
+from .device.const import DOMAIN
 from .device.service_discovery import APP_HOSTNAME
 
 

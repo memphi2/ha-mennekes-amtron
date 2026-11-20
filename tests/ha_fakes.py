@@ -16,18 +16,18 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 
+from custom_components.mennekes_amtron_rtu.const import (
+    CONF_CONTROL_MODE,
+    CONF_PORT,
+    CONF_SERIAL_NUMBER,
+    CONTROL_MODE_MASTER,
+)
 from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
 from custom_components.mennekes_amtron_rtu.data import MennekesAmtronRuntimeData
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
-)
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONF_CONTROL_MODE,
-    CONF_PORT,
-    CONF_SERIAL_NUMBER,
-    CONTROL_MODE_MASTER,
 )
 from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig

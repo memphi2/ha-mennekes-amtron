@@ -16,15 +16,11 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from .const import DEVICE_ID_MAX, DEVICE_ID_MIN, SUPPORTED_PARITY_STOPBITS
 from .data import DeviceIdentity
 from .device.client import MennekesModbusClient, SerialConfig
 from .device.client_errors import AmtronBusError, AmtronConnectionError
-from .device.const import (
-    DEVICE_ID_MAX,
-    DEVICE_ID_MIN,
-    SUPPORTED_BAUDRATES,
-    SUPPORTED_PARITY_STOPBITS,
-)
+from .device.const import SUPPORTED_BAUDRATES
 from .device.identity import async_read_identity
 from .device.registers import MODBUS_LAYOUT_VERSION
 

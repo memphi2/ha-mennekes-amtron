@@ -23,8 +23,7 @@ from .config_schemas import (
     vehicle_soc_schema,
     vehicle_source_schema,
 )
-from .device.capabilities import phase_switch_is_supported
-from .device.const import (
+from .const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
@@ -34,6 +33,7 @@ from .device.const import (
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
 )
+from .device.capabilities import phase_switch_is_supported
 from .service_client import CONF_SERVER_URL
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,

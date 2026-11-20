@@ -10,10 +10,8 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 from homeassistant.config_entries import ConfigEntryState
 
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from tests.fakes import FakeModbusClient, device_bank

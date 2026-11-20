@@ -413,8 +413,10 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(monkeypatch, tmp_p
     from homeassistant.components.repairs import issue_handler
     from homeassistant.helpers import issue_registry as ir
 
-    from custom_components.mennekes_amtron_rtu.device.const import (
+    from custom_components.mennekes_amtron_rtu.const import (
         CONTROL_MODE_MASTER,
+    )
+    from custom_components.mennekes_amtron_rtu.device.const import (
         DOMAIN,
     )
     from tests.test_home_assistant_smoke import _boot
@@ -594,8 +596,10 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
     from homeassistant.components.repairs import issue_handler
     from homeassistant.helpers import issue_registry as ir
 
-    from custom_components.mennekes_amtron_rtu.device.const import (
+    from custom_components.mennekes_amtron_rtu.const import (
         CONTROL_MODE_MASTER,
+    )
+    from custom_components.mennekes_amtron_rtu.device.const import (
         DOMAIN,
     )
     from tests.test_home_assistant_smoke import _boot

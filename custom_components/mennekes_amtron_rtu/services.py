@@ -23,13 +23,9 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_register_platform_entity_service
 
+from .const import ATTR_ALLOW_UNLIMITED, ATTR_CURRENT, SERVICE_SET_CHARGING_CURRENT
 from .data import MennekesAmtronRuntimeData
-from .device.const import (
-    ATTR_ALLOW_UNLIMITED,
-    ATTR_CURRENT,
-    DOMAIN,
-    SERVICE_SET_CHARGING_CURRENT,
-)
+from .device.const import DOMAIN
 from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
 from .recorder_profile import async_setup_recorder_service

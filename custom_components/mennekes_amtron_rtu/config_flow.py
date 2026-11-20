@@ -36,15 +36,7 @@ from .config_schemas import (
     service_schema,
     user_schema,
 )
-from .data import DeviceIdentity
-from .device.client import SerialConfig
-from .device.client_errors import AmtronBusError, AmtronConnectionError
-from .device.connection import (
-    ConnectionConfig,
-    NetworkConfig,
-    validate_tcp_auth_password,
-)
-from .device.const import (
+from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_CONFIGURE_GATEWAY,
@@ -62,17 +54,27 @@ from .device.const import (
     CONF_TCP_PORT,
     CONNECTION_RTU_OVER_TCP,
     CONNECTION_SERIAL,
+    DEFAULT_FRAME,
+    DEFAULT_NAME,
+    DEFAULT_TCP_PORT,
+    SEARCH_FULL,
+    SEARCH_OFF,
+)
+from .data import DeviceIdentity
+from .device.client import SerialConfig
+from .device.client_errors import AmtronBusError, AmtronConnectionError
+from .device.connection import (
+    ConnectionConfig,
+    NetworkConfig,
+    validate_tcp_auth_password,
+)
+from .device.const import (
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
-    DEFAULT_FRAME,
-    DEFAULT_NAME,
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
-    DEFAULT_TCP_PORT,
     DOMAIN,
-    SEARCH_FULL,
-    SEARCH_OFF,
     SUPPORTED_FRAMES,
     frame_display,
     frame_label,

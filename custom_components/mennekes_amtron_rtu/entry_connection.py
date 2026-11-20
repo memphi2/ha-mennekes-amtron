@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .device.connection import ConnectionConfig, NetworkConfig, SerialConfig
-from .device.const import (
+from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_CONNECTION_TYPE,
@@ -18,12 +17,15 @@ from .device.const import (
     CONF_TCP_AUTHENTICATION,
     CONF_TCP_PORT,
     CONNECTION_SERIAL,
+    DEFAULT_TCP_PORT,
+)
+from .device.connection import ConnectionConfig, NetworkConfig, SerialConfig
+from .device.const import (
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
-    DEFAULT_TCP_PORT,
 )
 
 if TYPE_CHECKING:

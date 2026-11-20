@@ -19,16 +19,16 @@ from custom_components.mennekes_amtron_rtu.button import (
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
 )
+from custom_components.mennekes_amtron_rtu.const import (
+    CONF_CONTROL_MODE,
+    CONF_SERIAL_NUMBER,
+    CONTROL_MODE_MASTER,
+)
 from custom_components.mennekes_amtron_rtu.datetime import (
     async_setup_entry as setup_datetime,
 )
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONF_CONTROL_MODE,
-    CONF_SERIAL_NUMBER,
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from custom_components.mennekes_amtron_rtu.entity import (
     AmtronEntity,

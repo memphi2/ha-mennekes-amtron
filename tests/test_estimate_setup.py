@@ -20,13 +20,13 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
 from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_CHARGING_COST_SOURCE,
 )
-from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
-from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
-    DOMAIN,
 )
+from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
+from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.embedded import state_directory
 from custom_components.mennekes_amtron_rtu.goal_store import (

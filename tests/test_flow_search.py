@@ -15,14 +15,12 @@ from custom_components.mennekes_amtron_rtu._flow_search import (
     async_search,
     search_space,
 )
+from custom_components.mennekes_amtron_rtu.const import SUPPORTED_PARITY_STOPBITS
 from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
-from custom_components.mennekes_amtron_rtu.device.const import (
-    SUPPORTED_BAUDRATES,
-    SUPPORTED_PARITY_STOPBITS,
-)
+from custom_components.mennekes_amtron_rtu.device.const import SUPPORTED_BAUDRATES
 from custom_components.mennekes_amtron_rtu.device.data import DeviceIdentity
 from tests.fakes import FakeModbusClient, device_bank
 

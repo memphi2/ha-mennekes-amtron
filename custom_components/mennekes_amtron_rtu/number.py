@@ -19,13 +19,9 @@ from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent, UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import CHARGING_CURRENT_DECIMALS, CHARGING_CURRENT_STEP
 from .cost_goal import COST_GOAL_STEP, MAX_COST_GOAL
-from .device.const import (
-    CHARGING_CURRENT_DECIMALS,
-    CHARGING_CURRENT_MINIMUM,
-    CHARGING_CURRENT_STEP,
-    CHARGING_CURRENT_UNLIMITED,
-)
+from .device.const import CHARGING_CURRENT_MINIMUM, CHARGING_CURRENT_UNLIMITED
 from .device.energy_goal import ENERGY_GOAL_STEP_KWH, MAX_ENERGY_GOAL_KWH
 from .device.registers import CHARGING_CURRENT_EMS, ENERGY_TOTAL
 from .entity import AmtronEntity, Projection, Runtime, wanted

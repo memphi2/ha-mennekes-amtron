@@ -22,8 +22,7 @@ from typing import Any
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 
-from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_BAUDRATE,
     CONF_CONTROL_MODE,
     CONF_DEVICE_ID,
@@ -33,10 +32,11 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
     CONTROL_MODE_MASTER,
-    DOMAIN,
     SEARCH_ADDRESSES,
     SEARCH_OFF,
 )
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import device_bank, put
 from tests.ha_fakes import heartbeat_running
 from tests.options_flow_helpers import async_options

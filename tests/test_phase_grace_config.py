@@ -12,11 +12,11 @@ import pytest
 from aiohttp import ClientSession
 
 from custom_components.mennekes_amtron_rtu.config_schemas import advanced_schema
-from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_RELEASE_OFF_ON_UNPLUG,
 )
+from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService

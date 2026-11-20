@@ -1,14 +1,11 @@
-"""Constants for the MENNEKES AMTRON integration."""
+"""Constants of the wallbox and its bus, shared by the service and Home Assistant."""
 
 from __future__ import annotations
 
 from typing import Final
 
 DOMAIN: Final = "mennekes_amtron_rtu"
-
-MANUFACTURER: Final = "Mennekes"
 DEFAULT_MODEL: Final = "Amtron"
-DEFAULT_NAME: Final = f"{MANUFACTURER} {DEFAULT_MODEL}"
 
 # Vendor bus defaults. All of them are changeable with the MENNEKES
 # configuration tool, so every one of them is a config-flow field.
@@ -17,8 +14,6 @@ DEFAULT_BYTESIZE: Final = 8
 DEFAULT_PARITY: Final = "N"
 DEFAULT_STOPBITS: Final = 2
 DEFAULT_DEVICE_ID: Final = 50
-DEVICE_ID_MIN: Final = 10
-DEVICE_ID_MAX: Final = 50
 SUPPORTED_BAUDRATES: Final = (9600, 14400, 19200, 28800, 38400, 56000, 57600)
 # The device documents exactly three frames, and the data bits never change.
 # Offering parity and stop bits separately would let a user pick 8N1 or 8E2,
@@ -26,10 +21,6 @@ SUPPORTED_BAUDRATES: Final = (9600, 14400, 19200, 28800, 38400, 56000, 57600)
 # Lowercase, because a Home Assistant selector option is an identifier and
 # has to match [a-z0-9-_]+. The translations spell them out in capitals.
 SUPPORTED_FRAMES: Final = ("8n2", "8e1", "8o1")
-DEFAULT_FRAME: Final = "8n2"
-SUPPORTED_PARITY_STOPBITS: Final = (("N", 2), ("E", 1), ("O", 1))
-
-CONF_FRAME: Final = "frame"
 
 
 def frame_label(bytesize: int, parity: str, stopbits: int) -> str:
@@ -49,6 +40,7 @@ def frame_display(bytesize: int, parity: str, stopbits: int) -> str:
 
     return f"{bytesize}{parity}{stopbits}".upper()
 
+
 DEFAULT_TIMEOUT: Final = 1.0
 DEFAULT_RETRIES: Final = 2
 
@@ -57,20 +49,14 @@ DEFAULT_RETRIES: Final = 2
 HEARTBEAT_INTERVAL_SECONDS: Final = 5.0
 HEARTBEAT_RETRY_INTERVAL_SECONDS: Final = 1.0
 HEARTBEAT_DEADLINE_SECONDS: Final = 10.0
-
-DEFAULT_SCAN_INTERVAL_SECONDS: Final = 5
-MIN_SCAN_INTERVAL_SECONDS: Final = 2
-MAX_SCAN_INTERVAL_SECONDS: Final = 300
 DEFAULT_MEASUREMENT_INTERVAL_SECONDS: Final = 30
 
 # The short register floors remain independent of the configurable minimum
 # between charging state changes. Zero disables only the longer interval.
 MIN_CURRENT_WRITE_INTERVAL_SECONDS: Final = 5.0
 MIN_PHASE_CHANGE_INTERVAL_SECONDS: Final = 5.0
-CONF_STATE_CHANGE_INTERVAL_SECONDS: Final = "state_change_interval_seconds"
 DEFAULT_STATE_CHANGE_INTERVAL_SECONDS: Final = 300
 MAX_STATE_CHANGE_INTERVAL_SECONDS: Final = 3600
-CONF_PHASE_SWITCH_GRACE_SECONDS: Final = "phase_switch_grace_seconds"
 DEFAULT_PHASE_SWITCH_GRACE_SECONDS: Final = 5
 MAX_PHASE_SWITCH_GRACE_SECONDS: Final = 30
 
@@ -79,53 +65,8 @@ MAX_PHASE_SWITCH_GRACE_SECONDS: Final = 30
 CHARGING_CURRENT_MINIMUM: Final = 6.0
 CHARGING_CURRENT_UNLIMITED: Final = 0.0
 CHARGING_PAUSE_CURRENT: Final = 1.0
-CHARGING_CURRENT_STEP: Final = 0.1
-# Decimals the charging-current entity may report. The register is a float32,
-# so anything beyond its own step is a conversion artefact that would be
-# recorded on every poll.
-CHARGING_CURRENT_DECIMALS: Final = 1
 
 HEARTBEAT_VALUE: Final = 0x55AA
 SYSTEM_RESTART_VALUE: Final = 0xBB
-
-CONF_PORT: Final = "port"
-CONF_CONNECTION_TYPE: Final = "connection_type"
-CONF_HOST: Final = "host"
-CONF_TCP_PORT: Final = "tcp_port"
-CONF_TCP_AUTHENTICATION: Final = "tcp_authentication"
-CONF_TCP_AUTH_PASSWORD: Final = "tcp_auth_password"  # noqa: S105 - configuration key
-CONF_CONFIGURE_GATEWAY: Final = "configure_gateway"
-CONNECTION_SERIAL: Final = "serial"
-CONNECTION_RTU_OVER_TCP: Final = "rtu_over_tcp"
-CONNECTION_MODBUS_TCP: Final = "modbus_tcp"
-NETWORK_CONNECTION_TYPES: Final = (CONNECTION_RTU_OVER_TCP, CONNECTION_MODBUS_TCP)
-DEFAULT_TCP_PORT: Final = 502
-CONF_BAUDRATE: Final = "baudrate"
-CONF_BYTESIZE: Final = "bytesize"
-CONF_PARITY: Final = "parity"
-CONF_STOPBITS: Final = "stopbits"
-CONF_DEVICE_ID: Final = "device_id"
-CONF_CONTROL_MODE: Final = "control_mode"
-CONF_RELEASE_OFF_ON_UNPLUG: Final = "release_off_on_unplug"
-CONF_SCAN_INTERVAL_SECONDS: Final = "scan_interval_seconds"
-CONF_MEASUREMENT_INTERVAL_SECONDS: Final = "measurement_interval_seconds"
-CONF_CURRENT_LIMIT: Final = "current_limit"
-CONF_SERIAL_NUMBER: Final = "serial_number"
-CONF_SEARCH: Final = "search"
-
-SEARCH_OFF: Final = "off"
-SEARCH_ADDRESSES: Final = "addresses"
-SEARCH_FULL: Final = "full"
-SEARCH_MODES: Final = (SEARCH_ADDRESSES, SEARCH_FULL, SEARCH_OFF)
-DEFAULT_SEARCH: Final = SEARCH_ADDRESSES
-
-CONTROL_MODE_READ_ONLY: Final = "read_only"
-CONTROL_MODE_MASTER: Final = "master"
-CONTROL_MODES: Final = (CONTROL_MODE_READ_ONLY, CONTROL_MODE_MASTER)
-DEFAULT_CONTROL_MODE: Final = CONTROL_MODE_READ_ONLY
-
-SERVICE_SET_CHARGING_CURRENT: Final = "set_charging_current"
-ATTR_CURRENT: Final = "current"
-ATTR_ALLOW_UNLIMITED: Final = "allow_unlimited"
 
 ERROR_CODE_EMS_UNAVAILABLE: Final = 200

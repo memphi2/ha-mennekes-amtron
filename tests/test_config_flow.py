@@ -17,12 +17,7 @@ from custom_components.mennekes_amtron_rtu.config_flow import (
     _entry_title,
     _serial_config,
 )
-from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
-from custom_components.mennekes_amtron_rtu.device.client_errors import (
-    AmtronBusError,
-    AmtronConnectionError,
-)
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_DEVICE_ID,
@@ -32,6 +27,11 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_SEARCH,
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
+)
+from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronBusError,
+    AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.options_flow import MennekesAmtronOptionsFlow
@@ -136,9 +136,11 @@ def test_every_offered_frame_round_trips() -> None:
 
 
 def test_the_offered_frames_are_the_ones_the_device_documents() -> None:
+    from custom_components.mennekes_amtron_rtu.const import (
+        SUPPORTED_PARITY_STOPBITS,
+    )
     from custom_components.mennekes_amtron_rtu.device.const import (
         SUPPORTED_FRAMES,
-        SUPPORTED_PARITY_STOPBITS,
         frame_parts,
     )
 
