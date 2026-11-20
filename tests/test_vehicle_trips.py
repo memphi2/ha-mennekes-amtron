@@ -87,8 +87,9 @@ def test_a_parked_trip_can_be_looked_at_while_it_is_open(tmp_path):
     async def run():
         hass = FakeHass(str(tmp_path))
         memory = m.VehicleTripMemory(hass, "entry", "serial")
-        await memory.async_swap("a", trip(), None)
-        assert (await memory.async_peek("a")).deadline == trip().deadline
+        parked = trip()
+        await memory.async_swap("a", parked, None)
+        assert (await memory.async_peek("a")).deadline == parked.deadline
         # Looking does not use it up; taking it does.
         assert await memory.async_peek("a") is not None
         assert await memory.async_swap(None, None, "a") is not None
