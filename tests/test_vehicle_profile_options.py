@@ -552,3 +552,25 @@ def test_stale_or_empty_profile_menus_return_to_the_vehicle_overview():
         assert result["step_id"] == "vehicle"
 
     asyncio.run(run())
+
+
+def test_a_car_can_be_saved_when_the_saved_list_is_no_longer_valid():
+    async def run():
+        # A list saved with option names the app does not know any more is
+        # unusable as a whole; a new car must start a fresh list, not join it.
+        old = profile_options()
+        old["vehicle_profiles"][A]["options"]["timed_goal_enabled"] = True
+        assert profiles(old) == {}
+        flow = Flow(FakeConfigEntry(options=old))
+        await flow.async_step_vehicle()
+        await flow.async_step_vehicle_profile_add(
+            {"vehicle_profile_name": "My BMW", "vehicle_provider": "bavariandata"}
+        )
+        flow.states["sensor.test_1"] = State("sensor.test_1", "80", {"unit_of_measurement": "%"})
+        await flow.async_step_vehicle_profile_device({"vehicle_device": "car"})
+        saved = (await flow.async_step_wizard_finish())["data"]
+        added = list(profiles(saved).values())
+        assert [item.name for item in added] == ["My BMW"]
+        assert saved["active_vehicle_profile"] == added[0].id
+
+    asyncio.run(run())
