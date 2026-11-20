@@ -50,6 +50,8 @@ class PendingCommand:
     recovery_generation: int | None = None
     owner: str | None = None
     deadline: datetime | None = None
+    # Lowers the line without choosing a current to return to.
+    keeps_setpoint: bool = False
 
 
 # Commands that end a charge or close the wallbox; and those among them that

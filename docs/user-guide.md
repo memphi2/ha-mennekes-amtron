@@ -252,7 +252,7 @@ and [app actions](app-from-home-assistant.md#automation-actions).
 | Field | Meaning |
 |---|---|
 | `device_id` | The wallbox device, or a list of them. Required. |
-| `current` | The limit in ampere: 6 to 32, or 0 with `allow_unlimited`. A value above the wallbox's own maximum or the configured cap is lowered to it. Required. |
+| `current` | The limit in ampere: 6 to 32, or 0 with `allow_unlimited`. A value above the wallbox's own maximum or the configured cap is lowered to it; 0 removes the limit, the cap included. Required. |
 | `allow_unlimited` | Must be `true` to send `current: 0`, which removes the limit. It is not a pause. |
 
 ```yaml

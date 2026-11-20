@@ -915,7 +915,11 @@ async def _async_reload_entry_locked(
             # Applied in place. The same update may also have changed the
             # vehicle, which must still be switched, not silently skipped.
             runtime.vehicle_base_options = base
-        if await _async_switch_vehicle(hass, entry):
+        contradicted = (
+            CONF_VIRTUAL_PLUG_CHARGE not in changed and gate is not None
+            and gate.switch_contradicted(base.get(CONF_VIRTUAL_PLUG_CHARGE))
+        )
+        if not contradicted and await _async_switch_vehicle(hass, entry):
             return
         # A reload that also selects another car keeps the previous car's trip.
         await _async_park_trip(hass, entry)

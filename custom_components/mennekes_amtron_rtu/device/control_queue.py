@@ -126,7 +126,9 @@ class CommandQueue:
         except AmtronRateLimitedError as err:
             self._control._diagnostics.writes_rate_limited += 1
             self._control._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED)
-            remembered = command.action in ("set_current", "resume") and command.owner is None
+            remembered = command.action in ("set_current", "resume") and command.owner is None and not (
+                command.keeps_setpoint and self._control.writes.line_planned
+            )
             if kept:
                 pending = self._control._pending
                 if (

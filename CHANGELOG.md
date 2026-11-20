@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **Breaking:** the saved control state has two new fields and the state of
+- The app's overview state no longer carries `configured`; `state` already
+  says `setup_required`. The Charging page state no longer carries the
+  unused `forecast` of the departure plan.
+- **Breaking:** the saved control state has new fields and the state of
   0.10.0b5 is not read. After the update the service switches the charging
   release off and blocks charging commands until the reset is confirmed
   under **Settings → System → Repairs**; then set the targets again. See
@@ -98,12 +101,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   was missing is applied once the target runs again. With less than one
   0.1 kWh step of money left, a new price now leaves one step at that price
   instead of being ignored.
-
-### Changed
-
-- The app's overview state no longer carries `configured`; `state` already
-  says `setup_required`. The Charging page state no longer carries the
-  unused `forecast` of the departure plan.
 
 ## 0.10.0b5 — 2026-11-19
 

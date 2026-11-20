@@ -596,7 +596,7 @@ class AmtronControl:
                 or current <= maximum + _CAP_TOLERANCE_A
             ):
                 return False
-            await self.queue.async_submit_locked(PendingCommand("set_current", maximum))
+            await self.queue.async_submit_locked(PendingCommand("set_current", maximum, keeps_setpoint=True))
             return True
 
     async def async_set_charging_current(
@@ -820,7 +820,9 @@ class AmtronControl:
                 raise validation_error(
                     "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
                 ) from err
-            remembered = self.charging_setpoint
+            # A planner's current is reasserted as it is: the chosen one is
+            # not the line's while a plan runs.
+            remembered = None if self.writes.line_planned else self.charging_setpoint
             paused = (
                 self.energy_goal_stop_requested or self.pause_requested is True
                 or 0 < current < CHARGING_CURRENT_MINIMUM

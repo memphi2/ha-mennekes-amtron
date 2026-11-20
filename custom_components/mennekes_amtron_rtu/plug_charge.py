@@ -146,6 +146,14 @@ class PlugChargeObserver:
         """Whether the service already runs with this saved value of the switch."""
         return self._applied_enabled is not None and enabled is self._applied_enabled
 
+    def switch_contradicted(self, enabled: object) -> bool:
+        """Whether the options were saved back against what this switch applied.
+
+        A save that undoes the switch before its own notification ran leaves
+        options and record equal, with the service still on the other value.
+        """
+        return self._applied_enabled is not None and bool(enabled) is not self._applied_enabled
+
     async def async_set_enabled(self, enabled: bool) -> None:
         """Apply and remember the gate without restarting its connection owner."""
         locks: dict[str, asyncio.Lock] = self._hass.data.setdefault(f"{DOMAIN}_reload_locks", {})
