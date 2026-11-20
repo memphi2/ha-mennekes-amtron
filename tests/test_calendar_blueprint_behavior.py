@@ -23,6 +23,8 @@ CALENDAR = "calendar.trips"
 ARM = "input_boolean.next_trip"
 DEPARTURE = "datetime.wallbox_departure"
 MARKER = "input_text.last_climate_departure"
+# The Target time while it belongs to the selected car.
+OWN = {"guest": False, "vehicle": "i4"}
 
 
 def _expand(name: str, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -45,7 +47,7 @@ def _expand(name: str, inputs: dict[str, Any]) -> dict[str, Any]:
     return configured.async_substitute()
 
 
-async def _setup_calendar(hass: Any) -> None:
+async def _setup_calendar(hass: Any, vehicle: str | None = None) -> None:
     config = _expand(
         "calendar_departure.yaml",
         {
@@ -54,6 +56,7 @@ async def _setup_calendar(hass: Any) -> None:
             "arm_next_trip": ARM,
             "departure_time": DEPARTURE,
             "planning_lead_hours": 12,
+            **({} if vehicle is None else {"vehicle_name": vehicle}),
         },
     )
     assert await async_setup_component(hass, "automation", {"automation": [config]})
@@ -120,7 +123,7 @@ def test_calendar_chooses_one_exact_future_timed_event_and_disarms(
 
             async def set_departure(call):
                 writes.append(call.data)
-                hass.states.async_set(DEPARTURE, call.data["datetime"])
+                hass.states.async_set(DEPARTURE, call.data["datetime"], OWN)
 
             async def disarm(call):
                 hass.states.async_set(ARM, "off")
@@ -135,7 +138,7 @@ def test_calendar_chooses_one_exact_future_timed_event_and_disarms(
             hass.services.async_register("input_boolean", "turn_off", disarm)
             hass.states.async_set(CALENDAR, "off")
             hass.states.async_set(ARM, "off")
-            hass.states.async_set(DEPARTURE, "unknown")
+            hass.states.async_set(DEPARTURE, "unknown", OWN)
             await _setup_calendar(hass)
             hass.states.async_set(ARM, "on")
             await hass.async_block_till_done()
@@ -195,7 +198,7 @@ def test_calendar_empty_or_invalid_response_keeps_request_armed(
             hass.services.async_register("datetime", "set_value", write)
             hass.states.async_set(CALENDAR, "off")
             hass.states.async_set(ARM, "off")
-            hass.states.async_set(DEPARTURE, "unknown")
+            hass.states.async_set(DEPARTURE, "unknown", OWN)
             await _setup_calendar(hass)
             hass.states.async_set(ARM, "on")
             await hass.async_block_till_done()
@@ -245,7 +248,7 @@ def test_calendar_rechecks_user_changes_while_fetching(
             hass.services.async_register("datetime", "set_value", write)
             hass.states.async_set(CALENDAR, "off")
             hass.states.async_set(ARM, "off")
-            hass.states.async_set(DEPARTURE, "unknown")
+            hass.states.async_set(DEPARTURE, "unknown", OWN)
             await _setup_calendar(hass)
             hass.states.async_set(ARM, "on")
             await asyncio.wait_for(started.wait(), 3)
@@ -257,6 +260,7 @@ def test_calendar_rechecks_user_changes_while_fetching(
                     "unavailable"
                     if changed == "unavailable"
                     else (dt_util.utcnow() + timedelta(hours=3)).isoformat(),
+                    OWN,
                 )
             release.set()
             await hass.async_block_till_done()
@@ -289,7 +293,7 @@ def test_calendar_does_not_query_unavailable_source(
             )
             hass.states.async_set(CALENDAR, calendar_state)
             hass.states.async_set(ARM, "off")
-            hass.states.async_set(DEPARTURE, "unknown")
+            hass.states.async_set(DEPARTURE, "unknown", OWN)
             await _setup_calendar(hass)
             hass.states.async_set(ARM, "on")
             await hass.async_block_till_done()
@@ -300,7 +304,7 @@ def test_calendar_does_not_query_unavailable_source(
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
-async def _setup_climate(hass: Any) -> None:
+async def _setup_climate(hass: Any, vehicle: str | None = None) -> None:
     config = _expand(
         "precondition_before_departure.yaml",
         {
@@ -308,6 +312,7 @@ async def _setup_climate(hass: Any) -> None:
             "last_attempted_departure": MARKER,
             "climate_lead_minutes": 15,
             "climate_actions": [{"action": "test.start_climate"}],
+            **({} if vehicle is None else {"vehicle_name": vehicle}),
         },
     )
     assert await async_setup_component(hass, "automation", {"automation": [config]})
@@ -336,16 +341,16 @@ def test_climate_marks_before_action_and_runs_only_once_per_trip(
             hass.services.async_register("input_text", "set_value", mark)
             hass.services.async_register("test", "start_climate", climate)
             hass.states.async_set(MARKER, "")
-            hass.states.async_set(DEPARTURE, "unknown")
+            hass.states.async_set(DEPARTURE, "unknown", OWN)
             await _setup_climate(hass)
-            hass.states.async_set(DEPARTURE, deadline.isoformat())
+            hass.states.async_set(DEPARTURE, deadline.isoformat(), OWN)
             await hass.async_block_till_done()
             assert attempts == [int(deadline.timestamp())]
             # Same persisted helper value also guards restart/time-pattern checks.
             await _run_again(hass)
             assert attempts == [int(deadline.timestamp())]
             next_deadline = deadline + timedelta(minutes=1)
-            hass.states.async_set(DEPARTURE, next_deadline.isoformat())
+            hass.states.async_set(DEPARTURE, next_deadline.isoformat(), OWN)
             await hass.async_block_till_done()
             assert attempts == [
                 int(deadline.timestamp()),
@@ -381,10 +386,10 @@ def test_climate_requires_future_due_departure_and_restorable_helper(
             hass.services.async_register("input_text", "set_value", record)
             hass.services.async_register("test", "start_climate", record)
             hass.states.async_set(MARKER, marker_state)
-            hass.states.async_set(DEPARTURE, "unknown")
+            hass.states.async_set(DEPARTURE, "unknown", OWN)
             await _setup_climate(hass)
             hass.states.async_set(
-                DEPARTURE, (dt_util.utcnow() + timedelta(minutes=minutes)).isoformat()
+                DEPARTURE, (dt_util.utcnow() + timedelta(minutes=minutes)).isoformat(), OWN
             )
             await hass.async_block_till_done()
             assert writes == []
@@ -425,7 +430,7 @@ def test_climate_marker_survives_a_real_home_assistant_restart(tmp_path: Path) -
                     attempts.append(boot)
 
                 hass.services.async_register("test", "start_climate", climate)
-                hass.states.async_set(DEPARTURE, deadline.isoformat())
+                hass.states.async_set(DEPARTURE, deadline.isoformat(), OWN)
                 await _setup_climate(hass)
                 # Exercise the blueprint's actual start trigger after helpers restore.
                 hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
@@ -434,5 +439,78 @@ def test_climate_marker_survives_a_real_home_assistant_restart(tmp_path: Path) -
                 assert attempts == [0]
             finally:
                 await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
+
+
+# Whose the Target time is, and which car the automation is for.
+WHOSE = [
+    ({"guest": True}, None, False),
+    ({"guest": True}, "i4", False),
+    ({}, None, False),
+    ({"guest": False, "vehicle": "ID.3"}, "i4", False),
+    ({"guest": False, "vehicle": "ID.3"}, None, True),
+    ({"guest": False, "vehicle": "i4"}, " i4 ", True),
+]
+
+
+@pytest.mark.parametrize(("whose", "vehicle", "runs"), WHOSE)
+def test_climate_runs_only_for_the_car_it_serves(tmp_path: Path, whose, vehicle, runs) -> None:
+    async def run() -> None:
+        hass = await _boot(tmp_path / "config")
+        attempts = []
+        try:
+
+            async def mark(call):
+                hass.states.async_set(MARKER, call.data["value"])
+
+            async def climate(call):
+                attempts.append(call.service)
+
+            hass.services.async_register("input_text", "set_value", mark)
+            hass.services.async_register("test", "start_climate", climate)
+            hass.states.async_set(MARKER, "")
+            hass.states.async_set(DEPARTURE, "unknown", whose)
+            await _setup_climate(hass, vehicle)
+            # A guest's end time is as near as a departure would be.
+            hass.states.async_set(
+                DEPARTURE, (dt_util.utcnow() + timedelta(minutes=10)).isoformat(), whose
+            )
+            await hass.async_block_till_done()
+            assert attempts == (["start_climate"] if runs else [])
+        finally:
+            await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
+
+
+@pytest.mark.parametrize(("whose", "vehicle", "runs"), WHOSE)
+def test_calendar_plans_only_for_the_car_it_serves(tmp_path: Path, whose, vehicle, runs) -> None:
+    async def run() -> None:
+        hass = await _boot(tmp_path / "config")
+        writes = []
+        try:
+
+            async def events(call):
+                start = (dt_util.utcnow() + timedelta(hours=2)).isoformat()
+                return {CALENDAR: {"events": [{"summary": "Departure", "start": start}]}}
+
+            async def write(call):
+                writes.append(call.data)
+
+            hass.services.async_register(
+                "calendar", "get_events", events, supports_response=SupportsResponse.ONLY,
+            )
+            hass.services.async_register("datetime", "set_value", write)
+            hass.services.async_register("input_boolean", "turn_off", lambda call: None)
+            hass.states.async_set(CALENDAR, "off")
+            hass.states.async_set(ARM, "off")
+            hass.states.async_set(DEPARTURE, "unknown", whose)
+            await _setup_calendar(hass, vehicle)
+            hass.states.async_set(ARM, "on")
+            await hass.async_block_till_done()
+            assert len(writes) == (1 if runs else 0)
+        finally:
+            await hass.async_stop()
 
     asyncio.run(asyncio.wait_for(run(), 60))

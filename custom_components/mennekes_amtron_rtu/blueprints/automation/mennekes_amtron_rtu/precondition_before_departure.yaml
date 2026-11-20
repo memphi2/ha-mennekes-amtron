@@ -6,7 +6,8 @@ blueprint:
     calendar and vehicle-sensor departure times. A Text helper records
     the attempted departure before calling the actions, so a Home Assistant
     restart does not repeat them. Choose actions that start climate explicitly,
-    not a toggle. Charging remains controlled by the departure plan.
+    not a toggle. It never runs for a guest's end time. Charging remains
+    controlled by the departure plan.
   domain: automation
   homeassistant:
     min_version: "2026.9.0"
@@ -32,6 +33,15 @@ blueprint:
           step: 1
           unit_of_measurement: min
           mode: box
+    vehicle_name:
+      name: Vehicle
+      description: >-
+        The name of the vehicle profile this automation serves. It runs only
+        while the Target time belongs to that car, never for a guest charge.
+        Leave empty when only one car charges here.
+      default: ""
+      selector:
+        text:
     last_attempted_departure:
       name: Last climate departure helper
       description: >-
@@ -58,6 +68,7 @@ variables:
   departure_entity: !input departure_time
   marker_entity: !input last_attempted_departure
   lead_minutes: !input climate_lead_minutes
+  vehicle_name: !input vehicle_name
 
 triggers:
   - trigger: state
@@ -75,7 +86,10 @@ conditions:
       {{ current < departure <= current + (lead_minutes | float * 60)
          and states(marker_entity) != 'unavailable'
          and states[marker_entity] is not none
-         and states(marker_entity) | int(0) != departure | int }}
+         and states(marker_entity) | int(0) != departure | int
+         and state_attr(departure_entity, 'guest') is false
+         and (vehicle_name | trim == ''
+              or state_attr(departure_entity, 'vehicle') == vehicle_name | trim) }}
 
 actions:
   - action: input_text.set_value

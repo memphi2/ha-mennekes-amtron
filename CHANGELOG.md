@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- A start or restart command checks its conditions again after waiting for
+  the line to fall silent: a stop that arrived during that wait of up to about
+  a second no longer lets the write out.
+- A vehicle charge target lowered in the app is reached also when the car
+  keeps reporting the same level: Home Assistant tells the unchanged level
+  again whenever the target changes elsewhere.
+- The climate and calendar blueprints act only for their own car: they never
+  run while a guest charges, whose end time **Target time** then is, and with
+  a **Vehicle** entered not while another car is selected. **Target time**
+  carries the attributes `guest` and `vehicle` for this.
+
 ## 0.10.0b8 — 2026-11-20
 
 ### Fixed
