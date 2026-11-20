@@ -56,6 +56,7 @@ def test_saved_minute_precision_module_three_tariff_survives_ha_restart(tmp_path
             # runtime owners, as happens when installing an integration update.
             shutil.rmtree(config / "custom_components" / DOMAIN)
             hass = await _boot(config)
+            hass.config.country, hass.config.currency = "DE", "EUR"
             try:
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
                 assert entry.options["charging_network_tariff"] == legacy_tariff

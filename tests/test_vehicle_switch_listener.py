@@ -48,6 +48,7 @@ def test_tariff_and_switch_changes_are_applied_in_place_in_any_order(tmp_path, o
 
     async def run():
         hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
         entry, runtime = _owners(hass)
         cost = runtime.charging_cost
         reload = AsyncMock()
@@ -84,6 +85,7 @@ def test_anything_else_reloads_the_entry(tmp_path, monkeypatch, change):
 
     async def run():
         hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
         entry, runtime = _owners(hass)
         entry.state = None
         runtime.retain_cost_on_unload = False
@@ -115,6 +117,7 @@ def test_an_in_place_change_still_switches_the_vehicle(monkeypatch, tmp_path):
 
     async def run():
         hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
         entry, runtime = _owners(hass)
         switch = AsyncMock(return_value=True)
         monkeypatch.setattr(integration, "_async_switch_vehicle", switch)
@@ -240,6 +243,7 @@ def _listening(tmp_path, monkeypatch, body):
 
     async def run():
         hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
         try:
             entry, runtime = _owners(hass)
             entry.state = None

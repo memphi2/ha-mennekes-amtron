@@ -79,7 +79,7 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
     ("field", "value"),
     [
         ("api_version", 2),
-        ("api_version", 4),
+        ("api_version", 5),
         ("api_version", True),
         ("values", []),
         ("values", {"x": float("nan")}),
