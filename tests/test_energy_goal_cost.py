@@ -326,3 +326,23 @@ def test_the_money_used_at_the_end_counts_the_last_reading_and_survives_a_restar
     # A later reading changes nothing once the target is reached.
     assert not goal.observe(140.0)
     assert goal.cost_spent == pytest.approx(10.02)
+
+
+def test_a_reached_amount_is_saved_with_its_money_and_shown_after_a_restart():
+    async def run():
+        harness, control, runner, saved, _clock = await _cost_runner()
+        await runner.async_set_cost_target(3, 0.30)
+        assert control.energy_goal.target_kwh == 10.0
+        runner.observe(_snapshot(harness, 109.0))
+        await _settle(runner)
+        assert control.energy_goal.cost_spent == pytest.approx(2.7)
+        # The reading that reaches the target is saved with the money it used.
+        runner.observe(_snapshot(harness, 110.0))
+        await _settle(runner)
+        assert control.energy_goal.status == "reached"
+        assert control.energy_goal.cost_spent == pytest.approx(3.0)
+        assert saved[-1]["status"] == "reached"
+        # What a restarted service finds on disk shows the same money.
+        assert EnergyGoal.restore(saved[-1]).cost_spent == pytest.approx(3.0)
+        await runner.async_stop()
+    asyncio.run(run())
