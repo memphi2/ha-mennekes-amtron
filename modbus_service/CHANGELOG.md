@@ -1,6 +1,8 @@
 # Changes
 
-## Unreleased
+## 0.10.0b6
+
+- Integration and app must both be 0.10.0b6; update them together.
 
 - **Breaking:** the saved control state of 0.10.0b5 is not read: after the
   update, confirm the reset in Home Assistant's Repairs and set the targets
