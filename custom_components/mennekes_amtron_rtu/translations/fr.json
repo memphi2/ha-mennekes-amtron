@@ -159,6 +159,9 @@
         "description": "Saisissez le jeton d’accès actuel de votre service Modbus hébergé séparément. L’URL du service et l’entrée existante de la borne sont conservées.",
         "data": {
           "server_token": "Jeton d’accès"
+        },
+        "data_description": {
+          "server_token": "Le jeton d’accès que le service Modbus accepte actuellement."
         }
       },
       "reauth_app": {
@@ -532,7 +535,7 @@
           "waiting_for_device": "En attente de la borne",
           "waiting_for_soc": "En attente du niveau de charge",
           "waiting_for_capacity": "En attente de la capacité",
-          "waiting_for_target": "En attente de la cible en %",
+          "waiting_for_target": "En attente de l’objectif de charge du véhicule",
           "read_only": "Lecture seule",
           "command_pending": "Modification en attente",
           "target_reached": "Cible atteinte",
@@ -631,10 +634,10 @@
             }
           },
           "departure_plan": {
-            "name": "État de la charge programmée",
+            "name": "État de la planification du départ",
             "state": {
               "disabled": "Désactivé",
-              "waiting_for_target": "En attente de la cible en %",
+              "waiting_for_target": "En attente de l’objectif de charge du véhicule",
               "waiting_for_capacity": "En attente de la capacité",
               "waiting_for_soc": "En attente du niveau de charge",
               "waiting_for_device": "En attente de la borne",
@@ -676,7 +679,7 @@
               "departure_plan": "La planification du départ prépare le courant",
               "pause_requested": "Charge en pause",
               "release_off": "Autorisation de charge désactivée",
-              "energy_goal_stop": "Objectif d'énergie atteint",
+              "energy_goal_stop": "Objectif énergétique atteint",
               "wallbox_locked": "Borne verrouillée",
               "error_code": "Erreur de la borne",
               "authorization_required": "Authentification activée sur la borne",
@@ -802,9 +805,9 @@
               "error_still_active": "L’erreur est toujours active",
               "unknown": "Motif inconnu",
               "user_cancelled": "Annulé par l’utilisateur",
-              "energy_goal": "Arrêt demandé par un objectif de recharge",
+              "energy_goal": "Arrêt demandé par un objectif",
               "deadline_expired": "Heure de départ dépassée",
-              "time_limit": "Limite horaire atteinte",
+              "time_limit": "Heure cible atteinte",
               "guest_confirmation": "Confirmez le démarrage invité",
               "vehicle_authorized": "Véhicule reconnu autorisé pour ce branchement",
               "vehicle_waiting": "En attente d’un véhicule autorisé"
@@ -925,6 +928,9 @@
     "service_unavailable": {
       "message": "Le service Modbus est indisponible ou n’a pas pu confirmer la commande. Vérifiez l’état actuel avant de la répéter."
     },
+    "connection_unavailable": {
+      "message": "La borne ou le service Modbus est momentanément injoignable ({error}). Home Assistant réessaie automatiquement."
+    },
     "service_auth_failed": {
       "message": "Le service Modbus a refusé l’authentification. Renouvelez son accès dans Paramètres > Appareils et services."
     },
@@ -944,7 +950,7 @@
       "message": "Un objectif énergétique nécessite un compteur d’énergie totale pris en charge et une mesure récente valide. Vérifiez la connexion et réessayez."
     },
     "energy_goal_stop_active": {
-      "message": "Une limite de recharge est atteinte, la recharge reste donc en pause. Pour continuer, augmentez la limite kWh ou l’objectif en pourcentage, ou mettez-la à 0 ; après une remise à zéro du compteur, enregistrez à nouveau la limite. Modifier une limite ne démarre pas la recharge."
+      "message": "Un objectif est atteint, la recharge reste donc en pause. Pour continuer, augmentez ou effacez l’objectif énergétique, l’objectif de coût ou l’objectif de charge du véhicule ; après une remise à zéro du compteur, enregistrez à nouveau l’objectif énergétique. Modifier un objectif ne démarre pas la recharge."
     },
     "energy_goal_not_supported": {
       "message": "Ce service Modbus ne prend pas en charge les objectifs énergétiques. Mettez d’abord à jour l’application ou le service autonome."
@@ -959,10 +965,10 @@
       "message": "La limite de charge sélectionnée n’a pas encore fourni de valeur valide. Attendez une valeur disponible avant de définir un objectif. La valeur 0 permet toujours de le désactiver."
     },
     "soc_goal_source_changed": {
-      "message": "Les sources du véhicule ont changé. Rechargez l’intégration avant de modifier son objectif en pourcentage."
+      "message": "Les sources du véhicule ont changé. Rechargez l’intégration avant de modifier son objectif de charge du véhicule."
     },
     "soc_goal_not_supported": {
-      "message": "Le service Modbus ne prend pas en charge les objectifs en pourcentage du véhicule. Mettez l’application à jour pour utiliser cette fonction facultative."
+      "message": "Le service Modbus ne prend pas en charge les objectifs de charge du véhicule. Mettez l’application à jour pour utiliser cette fonction facultative."
     },
     "loss_source_invalid": {
       "message": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant."
@@ -1019,7 +1025,7 @@
       "message": "La recharge invité ne démarre pas : branchez le véhicule, déverrouillez la borne, corrigez toute erreur et attendez un état actuel. En lecture seule, activez d’abord l’écriture."
     },
     "guest_deadline_expired": {
-      "message": "L’heure limite est dépassée. Choisissez une heure future ou effacez-la."
+      "message": "L’heure cible enregistrée est passée. Choisissez une heure future ou effacez-la."
     },
     "calendar_not_configured": {
       "message": "Définissez d’abord un calendrier et le titre exact de l’événement dans les options du véhicule."
@@ -1130,6 +1136,9 @@
         "description": "Cette borne passe par l’application Modbus. Ses réglages s’y trouvent donc et valent aussi pour Home Assistant.\n\nLimite de courant : {current_cap} A\nDélai minimal entre changements d’état : {state_change_interval} s\nAttente supplémentaire avant un changement de phases : {phase_switch_grace} s\n\nModifiez ces valeurs, les intervalles de lecture et la connexion dans l’application, sous Ouvrir l’interface utilisateur web. L’autorisation d’écriture se trouve dans l’onglet Configuration de l’application.",
         "data": {
           "release_off_on_unplug": "Désactiver l'autorisation de charge au débranchement"
+        },
+        "data_description": {
+          "release_off_on_unplug": "Après un débranchement confirmé, l’autorisation de charge est désactivée ; le véhicule suivant doit être autorisé explicitement. Ignoré tant que Virtual Plug & Charge est actif."
         }
       },
       "wallbox_basic": {
@@ -1142,8 +1151,9 @@
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
-          "current_limit": "Limite supérieure de la commande du courant de charge, en ampères par phase. Ce n’est ni un objectif en pourcentage ni une commande de pause. La limite de la borne s’applique aussi.",
-          "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment."
+          "current_limit": "Limite supérieure de la commande du courant de charge, en ampères par phase. Ce n’est ni un objectif de charge du véhicule ni une commande de pause. La limite de la borne s’applique aussi.",
+          "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment.",
+          "release_off_on_unplug": "Après un débranchement confirmé, l’autorisation de charge est désactivée ; le véhicule suivant doit être autorisé explicitement. Ignoré tant que Virtual Plug & Charge est actif."
         },
         "description": "La limite de courant borne ce qui peut être demandé ici ; la limite de la borne reste active."
       },
@@ -1205,7 +1215,7 @@
           "wizard_next": "Suivant",
           "wizard_finish": "Enregistrer et terminer"
         },
-        "description": "Profil : **{vehicle}**.\n\nUtilisé : départ **{departure_entity}**, capacité de la batterie **{capacity_entity}**.\n\nAvec la planification du départ, Home Assistant démarre la charge assez tôt pour atteindre l’objectif en pourcentage à l’heure de départ au lieu de charger immédiatement.\n\nPlanifiez un seul prochain trajet avec un objectif en pourcentage, la capacité utile et l’heure de départ. Choisissez ensuite l’heure sur la page de l’appareil ou copiez-la depuis une source facultative. Ce n’est pas un programme quotidien. La désactivation efface le trajet et ses commandes en attente ; l’objectif en pourcentage reste."
+        "description": "Profil : **{vehicle}**.\n\nUtilisé : départ **{departure_entity}**, capacité de la batterie **{capacity_entity}**.\n\nAvec la planification du départ, Home Assistant démarre la charge assez tôt pour atteindre l’objectif de charge du véhicule à l’heure de départ au lieu de charger immédiatement.\n\nPlanifiez un seul prochain trajet avec un objectif de charge du véhicule, la capacité utile et l’heure de départ. Choisissez ensuite l’heure sur la page de l’appareil ou copiez-la depuis une source facultative. Ce n’est pas un programme quotidien. La désactivation efface le trajet et ses commandes en attente ; l’objectif de charge du véhicule reste."
       },
       "departure_requires_vehicle": {
         "title": "Niveau de charge requis",
@@ -1282,6 +1292,9 @@
         "data": {
           "timed_vehicle_provider": "Intégration du véhicule"
         },
+        "data_description": {
+          "timed_vehicle_provider": "L’intégration qui fournit déjà les données de ce véhicule dans Home Assistant."
+        },
         "description": "Choisissez une intégration installée avec un adaptateur pris en charge. Les entités HA génériques fonctionnent sans adaptateur. Seules les données locales déjà présentes sont lues."
       },
       "departure_vehicle_details": {
@@ -1295,7 +1308,8 @@
         "data_description": {
           "timed_vehicle_time_zone": "Fuseau horaire du véhicule, par exemple Europe/Paris. Sinon, celui de Home Assistant est utilisé. Les heures BMW ne contiennent pas de fuseau horaire.",
           "timed_timer1_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur de climatisation 1. BavarianData ne fournit pas ces jours. Laissez vide pour ignorer ce programmateur.",
-          "timed_timer2_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur 2. Laissez vide pour l’ignorer."
+          "timed_timer2_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur 2. Laissez vide pour l’ignorer.",
+          "timed_vehicle_device": "Le véhicule de cette intégration dont les entités sont lues."
         },
         "description": "Profil : **{vehicle}**.\n\nUtilisez le bouton de départ pour copier un programmateur actif du véhicule choisi. Avec un profil, le véhicule est déjà sélectionné. Dans BavarianData, activez les capteurs d’action, d’heure et de minute ; indiquez ici les jours récurrents car l’intégration ne les publie pas."
       },
@@ -1406,12 +1420,18 @@
         "data": {
           "charge_loss_vehicle_provider": "Intégration du véhicule"
         },
+        "data_description": {
+          "charge_loss_vehicle_provider": "L’intégration qui fournit déjà les données de ce véhicule dans Home Assistant."
+        },
         "description": "Profil : **{vehicle}**.\n\nChoisissez une intégration installée avec un adaptateur pris en charge. Les entités HA génériques fonctionnent sans adaptateur. Seules les données locales déjà présentes sont lues."
       },
       "loss_vehicle_details": {
         "title": "Véhicule pour l’historique de recharge",
         "data": {
           "charge_loss_vehicle_device": "Véhicule"
+        },
+        "data_description": {
+          "charge_loss_vehicle_device": "Le véhicule de cette intégration dont les entités sont lues."
         },
         "description": "Profil : **{vehicle}**.\n\nSélectionnez le véhicule de cette borne. Seul l’historique local existant est lu ; aucune actualisation du véhicule n’est demandée. Les correspondances absentes ou ambiguës restent inconnues."
       },
@@ -1458,17 +1478,21 @@
         "data": {
           "vehicle_profile_id": "Profil de véhicule"
         },
-        "description": "Choisissez le véhicule branché à cette borne. Le changement ne démarre pas la charge. Chaque véhicule conserve son propre objectif en pourcentage et son propre départ prévu ; un véhicule sans départ enregistré démarre sans départ. Chaque profil conserve ses réglages et sa moyenne des pertes.",
+        "description": "Choisissez le véhicule branché à cette borne. Le changement ne démarre pas la charge. Chaque véhicule conserve son propre objectif de charge du véhicule et son propre départ prévu ; un véhicule sans départ enregistré démarre sans départ. Chaque profil conserve ses réglages et sa moyenne des pertes.",
         "data_description": {
           "vehicle_profile_id": "Sélectionnez le véhicule réellement branché avant le début de la charge, surtout pour comparer les pertes. Ce choix manuel désactive la sélection automatique."
         }
       },
       "vehicle_profile_remove": {
         "title": "Supprimer un profil",
-        "description": "Supprime le profil choisi et les réglages de ses fonctions. Supprimer le profil actif efface aussi son objectif en pourcentage et son départ sans démarrer la charge.",
+        "description": "Supprime le profil choisi et les réglages de ses fonctions. Supprimer le profil actif efface aussi son objectif de charge du véhicule et son départ sans démarrer la charge.",
         "data": {
           "vehicle_profile_id": "Profil de véhicule",
           "confirm": "Supprimer ce profil"
+        },
+        "data_description": {
+          "vehicle_profile_id": "Le profil à supprimer.",
+          "confirm": "Obligatoire : la suppression est définitive."
         }
       },
       "vehicle_profile_device": {
@@ -1510,6 +1534,9 @@
         "description": "Profil : **{vehicle}**.\n\nUtilisé : prise **{plug_entity}**, position **{location_entity}**.\n\nLes signaux de détection indiquent que cette voiture est branchée et à domicile. La sélection automatique et le Plug & Charge virtuel les utilisent.\n\nUtilisez les entités locales compatibles de l’intégration du véhicule, choisissez des entités Home Assistant existantes ou désactivez la détection pour ce profil. Le branchement du câble et la présence à domicile sont tous deux nécessaires. Aucune requête cloud supplémentaire.",
         "data": {
           "vehicle_detection_source": "Source de détection"
+        },
+        "data_description": {
+          "vehicle_detection_source": "D’où viennent les signaux de câble et de présence de ce véhicule, ou aucune détection."
         }
       },
       "vehicle_detection_entities": {
@@ -1539,11 +1566,14 @@
         "description": "Choisissez la voiture dont vous voulez modifier les réglages. Ouvrir un profil ne sélectionne pas cette voiture pour la charge.",
         "data": {
           "vehicle_profile_id": "Profil du véhicule"
+        },
+        "data_description": {
+          "vehicle_profile_id": "Le véhicule dont les réglages s’ouvrent ensuite."
         }
       },
       "vehicle_profile": {
         "title": "Profil du véhicule",
-        "description": "Profil : **{vehicle}**.\n\nTout ce qui se trouve ici appartient uniquement à cette voiture et est conservé même lorsqu’une autre voiture est sélectionnée. Chaque élément est facultatif :\n\n- **Nom et source du véhicule :** renommer le profil ou le lier à la voiture dans une intégration de véhicule comme BavarianData, afin que ses données soient lues automatiquement.\n- **Niveau et limite de charge :** permet à Home Assistant de s’arrêter à un objectif en pourcentage, par exemple 80 %. Nécessaire pour la planification du départ.\n- **Prochain départ :** démarre la charge à temps pour atteindre l’objectif à l’heure de départ au lieu de charger immédiatement.\n- **Pertes de charge :** indique quelle part de l’énergie de la wallbox est réellement arrivée dans la batterie.\n- **Signaux de détection :** signaux de câble et de présence qui reconnaissent cette voiture. La **Sélection automatique** de l’entité **Véhicule actif** les utilise et, lorsque l’interrupteur **Plug & Charge virtuel** de la wallbox est activé, la voiture reconnue commence à charger dès qu’elle est branchée. Avec un départ planifié, la charge est d’abord en pause puis démarre à temps ; elle démarre immédiatement si le temps serait sinon trop court.",
+        "description": "Profil : **{vehicle}**.\n\nTout ce qui se trouve ici appartient uniquement à cette voiture et est conservé même lorsqu’une autre voiture est sélectionnée. Chaque élément est facultatif :\n\n- **Nom et source du véhicule :** renommer le profil ou le lier à la voiture dans une intégration de véhicule comme BavarianData, afin que ses données soient lues automatiquement.\n- **Niveau et limite de charge :** permet à Home Assistant de s’arrêter à un objectif de charge du véhicule, par exemple 80 %. Nécessaire pour la planification du départ.\n- **Prochain départ :** démarre la charge à temps pour atteindre l’objectif à l’heure de départ au lieu de charger immédiatement.\n- **Pertes de charge :** indique quelle part de l’énergie de la wallbox est réellement arrivée dans la batterie.\n- **Signaux de détection :** signaux de câble et de présence qui reconnaissent cette voiture. La **Sélection automatique** de l’entité **Véhicule actif** les utilise et, lorsque l’interrupteur **Plug & Charge virtuel** de la wallbox est activé, la voiture reconnue commence à charger dès qu’elle est branchée. Avec un départ planifié, la charge est d’abord en pause puis démarre à temps ; elle démarre immédiatement si le temps serait sinon trop court.",
         "menu_options": {
           "vehicle_profile_edit": "Nom et source du véhicule",
           "vehicle_battery": "Niveau et limite de charge",
@@ -1555,7 +1585,7 @@
       },
       "vehicle_settings": {
         "title": "Réglages du véhicule",
-        "description": "Il n’y a pas encore de profils de véhicule, ces réglages s’appliquent donc à toutes les voitures. Chaque élément est facultatif :\n\n- **Niveau et limite de charge :** permet à Home Assistant de s’arrêter à un objectif en pourcentage, par exemple 80 %. Nécessaire pour la planification du départ.\n- **Prochain départ :** démarre la charge à temps pour atteindre l’objectif à l’heure de départ au lieu de charger immédiatement.\n- **Pertes de charge :** indique quelle part de l’énergie de la wallbox est réellement arrivée dans la batterie.\n\nAjoutez un profil sous Véhicules pour avoir des réglages séparés pour chaque voiture.",
+        "description": "Il n’y a pas encore de profils de véhicule, ces réglages s’appliquent donc à toutes les voitures. Chaque élément est facultatif :\n\n- **Niveau et limite de charge :** permet à Home Assistant de s’arrêter à un objectif de charge du véhicule, par exemple 80 %. Nécessaire pour la planification du départ.\n- **Prochain départ :** démarre la charge à temps pour atteindre l’objectif à l’heure de départ au lieu de charger immédiatement.\n- **Pertes de charge :** indique quelle part de l’énergie de la wallbox est réellement arrivée dans la batterie.\n\nAjoutez un profil sous Véhicules pour avoir des réglages séparés pour chaque voiture.",
         "menu_options": {
           "vehicle_battery": "Niveau et limite de charge",
           "departure": "Prochain départ",
@@ -1565,7 +1595,7 @@
       },
       "vehicle_battery": {
         "title": "Niveau et limite de charge",
-        "description": "Profil : **{vehicle}**.\n\nUtilisé : niveau de charge **{soc_entity}**, limite de charge **{limit_entity}**.\n\nLe niveau de charge permet à Home Assistant d’arrêter la charge à un objectif en pourcentage, par exemple 80 %, et la planification du départ en a besoin pour calculer la durée de charge. La limite de charge de la voiture peut servir de maximum supplémentaire. Réglez ensuite le pourcentage souhaité sur la page de l’appareil de la wallbox.\n\nPour annuler uniquement l’objectif actuel en pourcentage, réglez Objectif de charge du véhicule sur 0. Ne plus utiliser le niveau de charge retire ici les associations de sources de ce profil, y compris le maximum facultatif, et désactive sa planification du départ ; pour la voiture sélectionnée, l’objectif en pourcentage et le trajet sont aussi effacés. Les entités sources de l’intégration du véhicule restent intactes, tout comme son autorisation, l’objectif en kWh et l’état de charge.",
+        "description": "Profil : **{vehicle}**.\n\nUtilisé : niveau de charge **{soc_entity}**, limite de charge **{limit_entity}**.\n\nLe niveau de charge permet à Home Assistant d’arrêter la charge à un objectif de charge du véhicule, par exemple 80 %, et la planification du départ en a besoin pour calculer la durée de charge. La limite de charge de la voiture peut servir de maximum supplémentaire. Réglez ensuite le pourcentage souhaité sur la page de l’appareil de la wallbox.\n\nPour annuler uniquement l’objectif actuel en pourcentage, réglez Objectif de charge du véhicule sur 0. Ne plus utiliser le niveau de charge retire ici les associations de sources de ce profil, y compris le maximum facultatif, et désactive sa planification du départ ; pour la voiture sélectionnée, l’objectif de charge du véhicule et le trajet sont aussi effacés. Les entités sources de l’intégration du véhicule restent intactes, tout comme son autorisation, l’objectif en kWh et l’état de charge.",
         "menu_options": {
           "vehicle_soc": "Configurer le niveau de charge",
           "vehicle_source": "Configurer le niveau de charge",
@@ -1735,7 +1765,7 @@
     },
     "start_guest_charging": {
       "name": "Démarrer une recharge invité",
-      "description": "Démarre immédiatement pour cette connexion. Les limites en kWh et de temps sont appliquées ; la cible du véhicule reste inchangée.",
+      "description": "Démarre immédiatement pour cette connexion. L’objectif énergétique, l’objectif de coût et l’heure cible enregistrés terminent la recharge ; l’objectif de charge du véhicule ne s’applique pas à un invité.",
       "fields": {
         "device_id": {
           "name": "Borne",
@@ -1745,7 +1775,7 @@
     },
     "clear_target_time": {
       "name": "Effacer l’heure cible",
-      "description": "Efface l’heure commune sans modifier les objectifs d’énergie ou du véhicule."
+      "description": "Efface l’heure cible sans modifier les autres objectifs."
     },
     "use_calendar_departure": {
       "name": "Utiliser le prochain événement",

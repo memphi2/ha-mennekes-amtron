@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Charging page, instead of three links to the same page. Its state carries
   the target time as `targets.time`; the Charging page state carries
   `guest_mode`.
+- Home Assistant uses the same names: "percentage target", "kWh limit", "time
+  limit" and "deadline" are now Vehicle charge target, Energy target and Target
+  time in all states, errors, actions and option texts; the departure plan
+  attribute is called Departure plan status. Every guest rule names the cost
+  target too. A past time typed in the app says so, and a target time changed
+  elsewhere is reported as changed, not as an uncertain save.
+- Errors while the wallbox or service cannot be reached are translated; every
+  configuration field has a description; the Vehicle charge target number has
+  the battery device class.
 - The release publication reads a new draft again for about two minutes before
   it stops, and names the reason when it does.
 

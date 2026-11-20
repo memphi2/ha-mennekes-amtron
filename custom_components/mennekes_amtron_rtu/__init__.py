@@ -256,7 +256,10 @@ async def async_setup_entry(
                 translation_domain=DOMAIN, translation_key="service_version_mismatch"
             ) from err
         if isinstance(err, (AmtronBusError, DeviceError, OSError, TimeoutError, ValueError)):
-            raise ConfigEntryNotReady(str(err)) from err
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="connection_unavailable",
+                translation_placeholders={"error": str(err)},
+            ) from err
         raise
 
     coordinator = ServiceCoordinator(

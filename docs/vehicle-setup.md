@@ -11,7 +11,7 @@ can also supply supported data from one selected BMW vehicle.
 Every setting of a car is in its profile: open **Configure → Vehicles**, then
 the profile.
 
-[Add a car](#vehicle-profiles) · [Automatic selection](#optional-automatic-vehicle-selection) · [Plug & Charge](#optional-virtual-plug--charge) · [Percentage target](#optional-vehicle-percentage-target) · [Missing data](#when-data-is-missing)
+[Add a car](#vehicle-profiles) · [Automatic selection](#optional-automatic-vehicle-selection) · [Plug & Charge](#optional-virtual-plug--charge) · [Percentage target](#optional-vehicle-charge-target) · [Missing data](#when-data-is-missing)
 
 ## Choose the setup that fits
 
@@ -354,7 +354,7 @@ car keeps its own settings. Selection alone does not start charging. If you do n
 enabled, a new grant still needs a recognized active profile and matching
 detection; choosing no vehicle does not bypass that requirement.
 
-## Optional vehicle percentage target
+## Optional vehicle charge target
 
 The percentage target is **off by default**. Open the profile under
 **Configure → Vehicles**, then **Charge level and charge limit → Configure charge

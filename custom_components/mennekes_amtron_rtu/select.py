@@ -9,7 +9,7 @@ from typing import Any
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .device.decode import enum_option
 from .device.enums import RequestedPhases, SolarChargingMode, enum_options
@@ -74,7 +74,7 @@ SELECTS: tuple[AmtronSelectDescription, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     entities: list[SelectEntity] = [
         AmtronSelect(entry, description) for description in wanted(entry, SELECTS)

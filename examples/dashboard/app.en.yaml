@@ -14,7 +14,7 @@ cards:
       {%- set t = state_attr('sensor.mennekes_amtron_charging_wait_reason', 'departure_plan') -%}
       {{ 'Waiting for first reading' if is_state(entity, 'unknown') else 'Connection interrupted' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_session_energy', with_unit=True) if has_value('sensor.mennekes_amtron_session_energy') else '—' }}
 
-      {{ 'Limits: ' ~ p.l | join(' · ') if p.l else 'No charging limit' }}
+      {{ 'Targets: ' ~ p.l | join(' · ') if p.l else 'No target' }}
       {%- if t not in [none, 'disabled'] %} · Planning: {{ state_attr_translated('sensor.mennekes_amtron_charging_wait_reason', 'departure_plan') }}{% endif %}
     multiline_secondary: true
     icon: mdi:ev-station
@@ -100,7 +100,7 @@ cards:
       - type: template
         entity: number.mennekes_amtron_energy_target
         content: >-
-          {% set e = states(entity) | float(0) %}{{ '%g kWh' % e if e > 0 else 'kWh target' }}
+          {% set e = states(entity) | float(0) %}{{ '%g kWh' % e if e > 0 else 'Energy target' }}
         icon: mdi:lightning-bolt
         icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
         tap_action:
@@ -119,7 +119,7 @@ cards:
           target:
             entity_id: datetime.mennekes_amtron_target_time
           confirmation:
-            text: "Clear the target time? kWh and percentage targets stay."
+            text: "Clear the target time? The other targets stay."
       - type: conditional
         conditions:
           - condition: state
@@ -129,7 +129,7 @@ cards:
           type: template
           entity: number.mennekes_amtron_vehicle_charge_target
           content: >-
-            {% set s = states(entity) | float(0) %}{{ '%d %%' % s if s > 0 else '% target' }}
+            {% set s = states(entity) | float(0) %}{{ '%d %%' % s if s > 0 else 'Vehicle target' }}
           icon: mdi:battery-charging-80
           icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
           tap_action:
@@ -150,7 +150,7 @@ cards:
             target:
               entity_id: button.mennekes_amtron_start_guest_charging
             confirmation:
-              text: "Start guest charging now? The kWh target and target time apply."
+              text: "Start guest charging now? Energy target, cost target and target time end it."
       - type: conditional
         conditions:
           - condition: state

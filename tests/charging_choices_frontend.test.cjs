@@ -93,7 +93,7 @@ test('unsaved limits do not block pausing an active guest',async()=>{
  assert.equal(h.elements.get('energy_value').value,'25');
 });
 test('a definite refusal names the fix; anything else stays uncertain',async()=>{
- for(const [code,text] of [['guest_start_not_permitted',/Fahrzeug anstecken/],['guest_deadline_expired',/Zielzeitpunkt ist vorbei/],['energy_goal_stop_active',/Ladeziel ist bereits erreicht/],['charging_save_uncertain',/nicht bestätigt/],['toString',/nicht bestätigt/]]){
+ for(const [code,text] of [['guest_start_not_permitted',/Fahrzeug anstecken/],['guest_deadline_expired',/Zielzeitpunkt ist vorbei/],['energy_goal_stop_active',/Ziel ist bereits erreicht/],['charging_save_uncertain',/nicht bestätigt/],['toString',/nicht bestätigt/]]){
   const h=setup('targets',[initial(),{error:code}]);await flush();await h.emit('guest_start','click');
   assert.match(h.elements.get('notice').textContent,text,code);
  }
@@ -131,7 +131,7 @@ test('a waiting stop refusal, a past time and a restarted guest are named',async
  assert.match(h.elements.get('notice').textContent,/waiting stop/);
  await h.emit('reload','click');
  h.elements.get('departure_value').value='2026-11-17T08:00';await h.emit('departure_form','input');await h.emit('departure_form','submit');
- assert.match(h.elements.get('notice').textContent,/target time has passed/);
+ assert.equal(h.elements.get('notice').textContent,'Choose a time in the future.');
  assert.match(h.elements.get('departure_status').textContent,/Paused until start/);
 });
 

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from homeassistant.components.datetime import DateTimeEntity, DateTimeEntityDescription
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .entity import AmtronEntity, Projection
@@ -25,7 +25,7 @@ class _Description(Projection, DateTimeEntityDescription):
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     async_add_entities([AmtronTargetTime(entry, _Description(key="timed_departure", writes=True))])
 

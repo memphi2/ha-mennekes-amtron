@@ -258,10 +258,9 @@ class TimedGoalObserver:
                     if source_time is not None else original.source
                 )
             candidate = TimedGoal.restore(original.snapshot())
-            try:
-                changed = candidate.set(value, source)
-            except ValueError as err:
-                raise HomeAssistantError(str(err)) from err
+            # The time was checked above; only a malformed source, which no
+            # user input can produce, still fails here.
+            changed = candidate.set(value, source)
             if not changed and not self._save_dirty:
                 return
             if not self._trip_dirty:

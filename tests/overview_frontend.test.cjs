@@ -131,9 +131,9 @@ test("uncertain readings are neutral until persistent; an outage stays explicit"
 });
 
 test("successful target stops do not claim that their command was prevented", async () => {
-  for (const [language, label] of [["en", "Stop requested by a charge target"], ["de", "Ladestopp durch ein Ladeziel"],
-    ["fr", "Arrêt demandé par un objectif de charge"], ["nl", "Laadstop door een laaddoel"],
-    ["it", "Arresto richiesto da un obiettivo di ricarica"]]) {
+  for (const [language, label] of [["en", "Stop requested by a target"], ["de", "Ladestopp durch ein Ziel"],
+    ["fr", "Arrêt demandé par un objectif"], ["nl", "Laadstop door een doel"],
+    ["it", "Arresto richiesto da un obiettivo"]]) {
     const data = overview(null);
     data.commands = [{sequence:1, action:"pause", outcome:"executed", reason:"energy_goal",
       source:"soc_goal", occurred_at:START, requested_value:1}];

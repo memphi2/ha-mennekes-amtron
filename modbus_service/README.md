@@ -12,10 +12,11 @@ change polling intervals without a restart and record the Modbus traffic for ten
 minutes. They need a Home Assistant administrator and Supervisor **2026.10.4 or
 newer**. See [Web pages](DOCS.md#daily-use).
 
-**Charging** shows the shared kWh target, next target time and optional vehicle
-percentage target in one place. Setting a target never starts charging. The
-**Start guest charging** button grants the current connection and uses the saved
-kWh/time limits; whichever active limit is reached first stops the charge.
+**Charging** shows the energy target, cost target, target time and optional
+vehicle charge target in one place. Only the departure plan of your own car can
+start a charge; the other targets never do. The **Start guest charging** button
+grants the current connection; the energy target, cost target and target time
+end it, whichever comes first.
 Intelligent vehicle planning is configured in Home Assistant and continues in
 the app while HA is offline. The wallbox lock and electrical protections still
 apply.

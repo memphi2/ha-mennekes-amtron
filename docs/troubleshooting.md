@@ -418,7 +418,7 @@ when permission was granted.
 |---|---|
 | Setting 80% did not start charging | A percentage target only limits charging. Resume explicitly, or configure a timed departure plan. |
 | A paused car resumed while a departure was active | The timed plan is allowed to lift a manual pause. Clear Next departure when you want the pause to remain. |
-| No percentage-target entity | Enable its SoC source under Vehicle and select the correct profile/source. Check write permission for control availability. |
+| No Vehicle charge target entity | Enable its SoC source under Vehicle and select the correct profile/source. Check write permission for control availability. |
 | No positive target can be set with the vehicle maximum enabled | Wait for its first valid maximum report, or disable that optional source and choose your own maximum. |
 | SoC disappeared but charging continued | This is the configured behavior. Monitoring resumes on valid data; use the vehicle's own limit for protection during data outages. |
 | The planner does not adjust current | Check SoC, usable capacity, target and a future departure time. Missing data leaves the current charging state unchanged. Current adjustments also have their own minimum spacing. |
@@ -427,7 +427,7 @@ when permission was granted.
 | Climate did not start | Importing a departure time does not operate climate. Configure the preconditioning blueprint and your vehicle action/script; inspect that automation's trace. |
 | A target was reached but the car is still briefly drawing power | Meter/vehicle reports and commands take time. Check pending state, power and pause confirmation. These targets are not instantaneous cutoffs. |
 
-[Vehicle targets](vehicle-setup.md#optional-vehicle-percentage-target),
+[Vehicle targets](vehicle-setup.md#optional-vehicle-charge-target),
 [energy-target recovery](user-guide.md#energy-target) and
 [departure setup](departure-planning.md) explain each control's behavior.
 
@@ -435,9 +435,9 @@ when permission was granted.
 
 | Symptom | What to check |
 |---|---|
-| Guest start refused | Car connected, write access enabled, no wallbox lock or fault. Check the saved time is in the future. |
+| Guest start refused | Car connected, write access enabled, no wallbox lock or fault. The target time must be in the future, and no energy or cost target may be reached already: raise or clear it. |
 | Values changed in another window | Reload the saved values and review them before pressing start again. |
-| Starts but immediately pauses | The shared kWh limit may already be reached. Guest start never resets its baseline. |
+| Stops soon after starting | The energy or cost target counts from when it was saved, not from the guest start. Save it again before starting to count from now. |
 | Guest is paused but vehicle planning does not resume | This is intentional: the guest connection stays outside vehicle planning until unplugging. Ordinary current and pause controls remain available. |
 | Interrupted after a restart of the app or HA | The wallbox could not prove the same connection. Review limits and explicitly start again. |
 | Storage unavailable | No fresh start is allowed without saving the session. Check the app log and storage. |

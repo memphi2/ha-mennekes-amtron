@@ -1119,7 +1119,7 @@ def test_stale_ha_selection_cannot_overwrite_a_new_app_trip(tmp_path):
 
 
 @pytest.mark.parametrize(("change", "error"), [
-    ({"read_only": True}, "service_unavailable"),
+    ({"read_only": True}, "read_only_mode"),
 ])
 def test_app_trip_requires_a_writable_selected_vehicle(tmp_path, change, error):
     async def body():

@@ -497,8 +497,11 @@ class DepartureController:
                 return
             sample = self.sample()
             if editor == "app":
-                if sample.read_only or expected_revision != self.choice_revision or expected_vehicle != sample.vehicle:
-                    raise DeviceError("service_unavailable")
+                if sample.read_only:
+                    raise validation_error("read_only_mode")
+                if expected_revision != self.choice_revision or expected_vehicle != sample.vehicle:
+                    # Changed elsewhere, as for every other target.
+                    raise DeviceError("soc_goal_source_changed")
                 if deadline is not None and deadline <= sample.now:
                     raise validation_error("target_time_not_future")
                 # Keep the HA source marker, so an unchanged external calendar

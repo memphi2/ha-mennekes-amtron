@@ -17,7 +17,7 @@ from homeassistant.components.number import (
 )
 from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent, UnitOfEnergy
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .cost_goal import COST_GOAL_STEP, MAX_COST_GOAL
 from .device.const import (
@@ -114,7 +114,7 @@ NUMBERS: tuple[AmtronNumberDescription, ...] = (
     ),
     AmtronNumberDescription(
         key="soc_goal", writes=True, feature=lambda features: SOC in features,
-        native_unit_of_measurement=PERCENTAGE, native_min_value=0.0, native_step=1.0,
+        device_class=NumberDeviceClass.BATTERY, native_unit_of_measurement=PERCENTAGE, native_min_value=0.0, native_step=1.0,
         mode=NumberMode.SLIDER,
         ready=lambda runtime: (
             runtime.control.supports_soc_goal
@@ -129,7 +129,7 @@ NUMBERS: tuple[AmtronNumberDescription, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     async_add_entities(AmtronNumber(entry, description) for description in wanted(entry, NUMBERS))
 

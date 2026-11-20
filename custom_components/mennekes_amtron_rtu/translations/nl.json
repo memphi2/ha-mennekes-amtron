@@ -159,6 +159,9 @@
         "description": "Voer het huidige toegangstoken van je afzonderlijk gehoste Modbus-dienst in. De dienst-URL en de bestaande laadpaalconfiguratie blijven behouden.",
         "data": {
           "server_token": "Toegangstoken"
+        },
+        "data_description": {
+          "server_token": "Het toegangstoken dat de Modbus-dienst nu accepteert."
         }
       },
       "reauth_app": {
@@ -532,7 +535,7 @@
           "waiting_for_device": "Wacht op laadpaal",
           "waiting_for_soc": "Wacht op laadniveau",
           "waiting_for_capacity": "Wacht op accucapaciteit",
-          "waiting_for_target": "Wacht op procentdoel",
+          "waiting_for_target": "Wacht op laaddoel van het voertuig",
           "read_only": "Alleen lezen",
           "command_pending": "Wijziging in wachtrij",
           "target_reached": "Doel bereikt",
@@ -581,7 +584,7 @@
             "name": "Doelwaarde"
           },
           "target_deadline": {
-            "name": "Streeftijd"
+            "name": "Doeltijd"
           },
           "pending": {
             "name": "Geplande wijziging",
@@ -631,10 +634,10 @@
             }
           },
           "departure_plan": {
-            "name": "Status geplande lading",
+            "name": "Status vertrekplanning",
             "state": {
               "disabled": "Uitgeschakeld",
-              "waiting_for_target": "Wacht op procentdoel",
+              "waiting_for_target": "Wacht op laaddoel van het voertuig",
               "waiting_for_capacity": "Wacht op accucapaciteit",
               "waiting_for_soc": "Wacht op laadniveau",
               "waiting_for_device": "Wacht op laadpaal",
@@ -647,7 +650,7 @@
               "charging": "Laadt met volle stroom",
               "finishing": "Rondt af met minimale stroom",
               "unreachable": "Doel mogelijk onhaalbaar",
-              "late": "Streeftijd verstreken",
+              "late": "Doeltijd verstreken",
               "estimated_reached": "Geladen tot het berekende doel",
               "reached": "Doel bereikt",
               "write_pending": "Schrijfopdracht wacht",
@@ -802,9 +805,9 @@
               "error_still_active": "De fout is nog actief",
               "unknown": "Onbekende reden",
               "user_cancelled": "Geannuleerd door de gebruiker",
-              "energy_goal": "Stop door een laaddoel",
+              "energy_goal": "Laadstop door een doel",
               "deadline_expired": "Vertrektijd verstreken",
-              "time_limit": "Tijdslimiet bereikt",
+              "time_limit": "Doeltijd bereikt",
               "guest_confirmation": "Bevestig het starten voor de gast",
               "vehicle_authorized": "Herkend voertuig vrijgegeven voor deze aansluiting",
               "vehicle_waiting": "Wachten op een toegestaan voertuig"
@@ -819,7 +822,7 @@
               "plug_charge": "Virtuele Plug & Charge",
               "departure_plan": "Vertrekplanning",
               "energy_goal": "Bescherming energiedoel",
-              "soc_goal": "Laadniveau voertuig",
+              "soc_goal": "Laaddoel van voertuig",
               "recovery": "Foutherstel",
               "guest": "Gastladen",
               "unplug": "Uitgetrokken"
@@ -925,6 +928,9 @@
     "service_unavailable": {
       "message": "De Modbus-service is niet beschikbaar of kon de opdracht niet bevestigen. Controleer de huidige status voordat je de opdracht herhaalt."
     },
+    "connection_unavailable": {
+      "message": "De wallbox of de Modbus-dienst is nu niet bereikbaar ({error}). Home Assistant probeert het automatisch opnieuw."
+    },
     "service_auth_failed": {
       "message": "De Modbus-dienst heeft de authenticatie geweigerd. Vernieuw de toegang via Instellingen > Apparaten & diensten."
     },
@@ -944,25 +950,25 @@
       "message": "Een energiedoel vereist een ondersteunde meter voor totale energie en een recente geldige meting. Controleer de verbinding en probeer het opnieuw."
     },
     "energy_goal_stop_active": {
-      "message": "Een laadgrens is bereikt, daarom blijft het laden gepauzeerd. Verhoog om verder te laden de kWh-grens of het procentdoel, of zet deze op 0; sla na een meterreset de grens opnieuw op. Een wijziging alleen start het laden niet."
+      "message": "Een doel is bereikt, daarom blijft het laden gepauzeerd. Verhoog of wis om verder te laden het energiedoel, het kostendoel of het laaddoel van het voertuig; sla na een meterreset het energiedoel opnieuw op. Een wijziging alleen start het laden niet."
     },
     "energy_goal_not_supported": {
       "message": "Deze Modbus-dienst ondersteunt geen energiedoelen. Werk eerst de app of de zelfstandige dienst bij."
     },
     "soc_goal_invalid": {
-      "message": "Voer een doel van 0 tot 100% in, niet hoger dan de laadlimiet van het voertuig. 0 schakelt het percentagedoel uit."
+      "message": "Voer een doel van 0 tot 100% in, niet hoger dan de laadlimiet van het voertuig. 0 schakelt het laaddoel van het voertuig uit."
     },
     "soc_goal_unavailable": {
       "message": "Het laaddoel van het voertuig kan nu niet worden gewijzigd. Controleer de gekozen bronnen en probeer opnieuw."
     },
     "soc_goal_limit_unavailable": {
-      "message": "De gekozen laadlimiet heeft nog geen geldige waarde gemeld. Wacht op een beschikbare waarde voordat je een percentagedoel instelt. Met 0 kun je het doel nog steeds uitschakelen."
+      "message": "De gekozen laadlimiet heeft nog geen geldige waarde gemeld. Wacht op een beschikbare waarde voordat je een laaddoel van het voertuig instelt. Met 0 kun je het doel nog steeds uitschakelen."
     },
     "soc_goal_source_changed": {
-      "message": "De voertuigbronnen zijn gewijzigd. Herlaad de integratie voordat je het percentagedoel wijzigt."
+      "message": "De voertuigbronnen zijn gewijzigd. Herlaad de integratie voordat je het laaddoel van het voertuig wijzigt."
     },
     "soc_goal_not_supported": {
-      "message": "De Modbus-dienst ondersteunt geen percentagedoelen voor het voertuig. Werk de app bij om deze optionele functie te gebruiken."
+      "message": "De Modbus-dienst ondersteunt geen laaddoelen van het voertuig. Werk de app bij om deze optionele functie te gebruiken."
     },
     "loss_source_invalid": {
       "message": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in."
@@ -1130,6 +1136,9 @@
         "description": "Deze wallbox loopt via de Modbus-app. De instellingen staan daarom daar en gelden ook voor Home Assistant.\n\nStroomlimiet: {current_cap} A\nMinimale tijd tussen statuswijzigingen: {state_change_interval} s\nExtra wachttijd vóór fasewissels: {phase_switch_grace} s\n\nWijzig deze waarden, de uitleesintervallen en de verbinding in de app onder Open webinterface. De schrijftoestemming staat op het tabblad Configuratie van de app.",
         "data": {
           "release_off_on_unplug": "Laadvrijgave uitschakelen bij loskoppelen"
+        },
+        "data_description": {
+          "release_off_on_unplug": "Na een bevestigde ontkoppeling wordt de laadvrijgave uitgeschakeld; de volgende auto heeft een expliciete vrijgave nodig. Genegeerd zolang Virtual Plug & Charge aan staat."
         }
       },
       "wallbox_basic": {
@@ -1142,8 +1151,9 @@
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
-          "current_limit": "Bovengrens van de laadstroomregeling, in ampère per fase. Dit is geen procentueel laaddoel of pauzeopdracht. De limiet van de wallbox blijft ook gelden.",
-          "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk."
+          "current_limit": "Bovengrens van de laadstroomregeling, in ampère per fase. Dit is geen laaddoel van het voertuig of pauzeopdracht. De limiet van de wallbox blijft ook gelden.",
+          "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk.",
+          "release_off_on_unplug": "Na een bevestigde ontkoppeling wordt de laadvrijgave uitgeschakeld; de volgende auto heeft een expliciete vrijgave nodig. Genegeerd zolang Virtual Plug & Charge aan staat."
         },
         "description": "De stroomlimiet begrenst wat hier kan worden aangevraagd; de limiet van de wallbox blijft gelden."
       },
@@ -1181,10 +1191,10 @@
           "use_vehicle_limit": "Ook de laadlimiet van het voertuig gebruiken"
         },
         "data_description": {
-          "vehicle_soc_entity": "Kies de sensor voor het werkelijke laadniveau in %. Ontbrekende gegevens laten het laden ongewijzigd totdat geldige waarden terugkeren. Een andere bron wist het procentdoel zonder het laden te starten. Uitschakelen kan via het vorige menu.",
+          "vehicle_soc_entity": "Kies de sensor voor het werkelijke laadniveau in %. Ontbrekende gegevens laten het laden ongewijzigd totdat geldige waarden terugkeren. Een andere bron wist het laaddoel van het voertuig zonder het laden te starten. Uitschakelen kan via het vorige menu.",
           "use_vehicle_limit": "Schakel dit in om de laadlimiet van het voertuig als extra maximum te kiezen. Er wordt niets naar het voertuig geschreven."
         },
-        "description": "Profiel: **{vehicle}**.\n\nHiermee stel je het optionele procentuele laaddoel in via een bestaande laadtoestandsensor. Stel daarna het gewenste percentage in op de apparaatpagina van de laadpaal. Een doel begrenst alleen het laden en heft een handmatige pauze niet op."
+        "description": "Profiel: **{vehicle}**.\n\nHiermee stel je het optionele laaddoel van het voertuig in via een bestaande laadtoestandsensor. Stel daarna het gewenste percentage in op de apparaatpagina van de laadpaal. Een doel begrenst alleen het laden en heft een handmatige pauze niet op."
       },
       "vehicle_limit": {
         "title": "Laadlimiet van het voertuig",
@@ -1192,7 +1202,7 @@
           "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig"
         },
         "data_description": {
-          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd."
+          "vehicle_charge_limit_entity": "Optioneel: begrens het laaddoel van het voertuig ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd."
         },
         "description": "Profiel: **{vehicle}**.\n\nGebruik de laadlimiet van het voertuig als extra maximum voor het Home Assistant-laaddoel. Selecteer de ingestelde doellimiet van de auto, niet de actuele laadtoestand."
       },
@@ -1205,7 +1215,7 @@
           "wizard_next": "Volgende",
           "wizard_finish": "Opslaan en afsluiten"
         },
-        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: vertrek **{departure_entity}**, accucapaciteit **{capacity_entity}**.\n\nMet vertrekplanning start Home Assistant het laden vroeg genoeg om het percentagedoel bij de vertrektijd te halen in plaats van meteen te laden.\n\nPlan één volgende rit met een procentueel doel, bruikbare accucapaciteit en vertrektijd. Kies daarna het tijdstip op de apparaatpagina of neem het over uit een optionele bron. Dit is geen dagelijks schema. Uitschakelen wist de rit en geplande opdrachten; het procentuele doel blijft behouden."
+        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: vertrek **{departure_entity}**, accucapaciteit **{capacity_entity}**.\n\nMet vertrekplanning start Home Assistant het laden vroeg genoeg om het laaddoel van het voertuig bij de vertrektijd te halen in plaats van meteen te laden.\n\nPlan één volgende rit met een laaddoel van het voertuig, bruikbare accucapaciteit en vertrektijd. Kies daarna het tijdstip op de apparaatpagina of neem het over uit een optionele bron. Dit is geen dagelijks schema. Uitschakelen wist de rit en geplande opdrachten; het laaddoel van het voertuig blijft behouden."
       },
       "departure_requires_vehicle": {
         "title": "Laadniveau vereist",
@@ -1282,6 +1292,9 @@
         "data": {
           "timed_vehicle_provider": "Voertuigintegratie"
         },
+        "data_description": {
+          "timed_vehicle_provider": "De integratie die de gegevens van deze auto al in Home Assistant levert."
+        },
         "description": "Kies een geïnstalleerde integratie met een ondersteunde adapter. Algemene HA-entiteiten werken zonder adapter. Alleen bestaande lokale voertuiggegevens worden gelezen."
       },
       "departure_vehicle_details": {
@@ -1295,7 +1308,8 @@
         "data_description": {
           "timed_vehicle_time_zone": "Tijdzone van het voertuig, bijvoorbeeld Europe/Amsterdam. Leeg gebruikt de Home Assistant-tijdzone. BMW-tijden bevatten geen tijdzone.",
           "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
-          "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren."
+          "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren.",
+          "timed_vehicle_device": "De auto in die integratie waarvan de entiteiten worden gelezen."
         },
         "description": "Profiel: **{vehicle}**.\n\nGebruik de vertrekknop om één actieve timer van het gekozen voertuig over te nemen. Bij een profiel is het voertuig al gekozen. Schakel in BavarianData de sensoren voor actie, uur en minuut in; geef hier terugkerende weekdagen op, omdat de integratie die niet publiceert."
       },
@@ -1406,12 +1420,18 @@
         "data": {
           "charge_loss_vehicle_provider": "Voertuigintegratie"
         },
+        "data_description": {
+          "charge_loss_vehicle_provider": "De integratie die de gegevens van deze auto al in Home Assistant levert."
+        },
         "description": "Profiel: **{vehicle}**.\n\nKies een geïnstalleerde integratie met een ondersteunde adapter. Algemene HA-entiteiten werken zonder adapter. Alleen bestaande lokale voertuiggegevens worden gelezen."
       },
       "loss_vehicle_details": {
         "title": "Voertuig voor laadgeschiedenis",
         "data": {
           "charge_loss_vehicle_device": "Voertuig"
+        },
+        "data_description": {
+          "charge_loss_vehicle_device": "De auto in die integratie waarvan de entiteiten worden gelezen."
         },
         "description": "Profiel: **{vehicle}**.\n\nKies het voertuig aan deze wallbox. Alleen bestaande lokale laadgeschiedenis wordt gelezen; er wordt geen voertuigupdate gevraagd. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
       },
@@ -1458,17 +1478,21 @@
         "data": {
           "vehicle_profile_id": "Voertuigprofiel"
         },
-        "description": "Kies het voertuig dat op deze laadpaal is aangesloten. Wisselen start het laden niet. Elke auto behoudt zijn eigen percentagedoel en zijn eigen gepland vertrek; een auto zonder eigen vertrek begint zonder vertrek. Elk profiel behoudt zijn instellingen en gemiddelde laadverlies.",
+        "description": "Kies het voertuig dat op deze laadpaal is aangesloten. Wisselen start het laden niet. Elke auto behoudt zijn eigen laaddoel van het voertuig en zijn eigen gepland vertrek; een auto zonder eigen vertrek begint zonder vertrek. Elk profiel behoudt zijn instellingen en gemiddelde laadverlies.",
         "data_description": {
           "vehicle_profile_id": "Selecteer de daadwerkelijk aangesloten auto vóór het laden, vooral voor het vergelijken van laadverliezen. Deze handmatige keuze schakelt automatische voertuigselectie uit."
         }
       },
       "vehicle_profile_remove": {
         "title": "Profiel verwijderen",
-        "description": "Verwijdert het gekozen profiel en zijn functie-instellingen. Het actieve profiel verwijderen wist ook het percentagedoel en vertrekplan zonder het laden te starten.",
+        "description": "Verwijdert het gekozen profiel en zijn functie-instellingen. Het actieve profiel verwijderen wist ook het laaddoel van het voertuig en vertrekplan zonder het laden te starten.",
         "data": {
           "vehicle_profile_id": "Voertuigprofiel",
           "confirm": "Dit profiel verwijderen"
+        },
+        "data_description": {
+          "vehicle_profile_id": "Het profiel dat wordt verwijderd.",
+          "confirm": "Vereist: verwijderen kan niet ongedaan worden gemaakt."
         }
       },
       "vehicle_profile_device": {
@@ -1493,7 +1517,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Laadniveau instellen",
-        "description": "Profiel: **{vehicle}**.\n\nGebruik het gemelde laadniveau van dit profiel voor het optionele percentagedoel. De laadlimiet van dezelfde auto kan ook als extra maximum dienen. Er wordt geen instelling in het voertuig gewijzigd.",
+        "description": "Profiel: **{vehicle}**.\n\nGebruik het gemelde laadniveau van dit profiel voor het optionele laaddoel van het voertuig. De laadlimiet van dezelfde auto kan ook als extra maximum dienen. Er wordt geen instelling in het voertuig gewijzigd.",
         "data": {
           "use_vehicle_limit": "Ook de laadlimiet van het voertuig gebruiken"
         },
@@ -1510,6 +1534,9 @@
         "description": "Profiel: **{vehicle}**.\n\nIn gebruik: stekker **{plug_entity}**, locatie **{location_entity}**.\n\nDetectiesignalen melden dat deze auto is aangesloten en thuis is. Automatische voertuigselectie en virtueel Plug & Charge gebruiken ze.\n\nGebruik ondersteunde lokale entiteiten van de voertuigintegratie, kies bestaande Home Assistant-entiteiten of schakel herkenning voor dit profiel uit. Zowel de kabelverbinding als aanwezigheid thuis is nodig. Er worden geen extra cloudverzoeken gedaan.",
         "data": {
           "vehicle_detection_source": "Bron voor herkenning"
+        },
+        "data_description": {
+          "vehicle_detection_source": "Waar de kabel- en thuissignalen van deze auto vandaan komen, of geen herkenning."
         }
       },
       "vehicle_detection_entities": {
@@ -1539,11 +1566,14 @@
         "description": "Kies de auto waarvan je de instellingen wilt wijzigen. Een profiel openen selecteert die auto niet om te laden.",
         "data": {
           "vehicle_profile_id": "Voertuigprofiel"
+        },
+        "data_description": {
+          "vehicle_profile_id": "De auto waarvan de instellingen daarna worden geopend."
         }
       },
       "vehicle_profile": {
         "title": "Voertuigprofiel",
-        "description": "Profiel: **{vehicle}**.\n\nAlles hier hoort alleen bij deze auto en blijft bewaard, ook als er een andere auto geselecteerd is. Elk onderdeel is optioneel:\n\n- **Naam en voertuigbron:** het profiel hernoemen of koppelen aan de auto in een voertuigintegratie zoals BavarianData, zodat de gegevens automatisch worden gelezen.\n- **Laadniveau en laadlimiet:** laat Home Assistant stoppen bij een percentagedoel, bijvoorbeeld 80 %. Nodig voor vertrekplanning.\n- **Volgend vertrek:** start het laden op tijd om het doel bij de vertrektijd te halen in plaats van meteen te laden.\n- **Laadverliezen:** toont hoeveel van de energie uit de wallbox echt in de accu is aangekomen.\n- **Detectiesignalen:** kabel- en thuissignalen die deze auto herkennen. **Automatische keuze** in de entiteit **Actief voertuig** gebruikt ze, en staat de wallboxschakelaar **Virtueel Plug & Charge** aan, dan begint de herkende auto te laden zodra hij wordt aangesloten. Met een gepland vertrek wordt eerst gepauzeerd en op tijd gestart; is de tijd anders te kort, dan wordt meteen geladen.",
+        "description": "Profiel: **{vehicle}**.\n\nAlles hier hoort alleen bij deze auto en blijft bewaard, ook als er een andere auto geselecteerd is. Elk onderdeel is optioneel:\n\n- **Naam en voertuigbron:** het profiel hernoemen of koppelen aan de auto in een voertuigintegratie zoals BavarianData, zodat de gegevens automatisch worden gelezen.\n- **Laadniveau en laadlimiet:** laat Home Assistant stoppen bij een laaddoel van het voertuig, bijvoorbeeld 80 %. Nodig voor vertrekplanning.\n- **Volgend vertrek:** start het laden op tijd om het doel bij de vertrektijd te halen in plaats van meteen te laden.\n- **Laadverliezen:** toont hoeveel van de energie uit de wallbox echt in de accu is aangekomen.\n- **Detectiesignalen:** kabel- en thuissignalen die deze auto herkennen. **Automatische keuze** in de entiteit **Actief voertuig** gebruikt ze, en staat de wallboxschakelaar **Virtueel Plug & Charge** aan, dan begint de herkende auto te laden zodra hij wordt aangesloten. Met een gepland vertrek wordt eerst gepauzeerd en op tijd gestart; is de tijd anders te kort, dan wordt meteen geladen.",
         "menu_options": {
           "vehicle_profile_edit": "Naam en voertuigbron",
           "vehicle_battery": "Laadniveau en laadlimiet",
@@ -1555,7 +1585,7 @@
       },
       "vehicle_settings": {
         "title": "Voertuiginstellingen",
-        "description": "Er zijn nog geen voertuigprofielen, dus deze instellingen gelden voor elke auto. Elk onderdeel is optioneel:\n\n- **Laadniveau en laadlimiet:** laat Home Assistant stoppen bij een percentagedoel, bijvoorbeeld 80 %. Nodig voor vertrekplanning.\n- **Volgend vertrek:** start het laden op tijd om het doel bij de vertrektijd te halen in plaats van meteen te laden.\n- **Laadverliezen:** toont hoeveel van de energie uit de wallbox echt in de accu is aangekomen.\n\nVoeg onder Voertuigen een profiel toe om per auto eigen instellingen te hebben.",
+        "description": "Er zijn nog geen voertuigprofielen, dus deze instellingen gelden voor elke auto. Elk onderdeel is optioneel:\n\n- **Laadniveau en laadlimiet:** laat Home Assistant stoppen bij een laaddoel van het voertuig, bijvoorbeeld 80 %. Nodig voor vertrekplanning.\n- **Volgend vertrek:** start het laden op tijd om het doel bij de vertrektijd te halen in plaats van meteen te laden.\n- **Laadverliezen:** toont hoeveel van de energie uit de wallbox echt in de accu is aangekomen.\n\nVoeg onder Voertuigen een profiel toe om per auto eigen instellingen te hebben.",
         "menu_options": {
           "vehicle_battery": "Laadniveau en laadlimiet",
           "departure": "Volgend vertrek",
@@ -1565,7 +1595,7 @@
       },
       "vehicle_battery": {
         "title": "Laadniveau en laadlimiet",
-        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: laadniveau **{soc_entity}**, laadlimiet **{limit_entity}**.\n\nMet het laadniveau stopt Home Assistant bij een percentagedoel, bijvoorbeeld 80 %, en de vertrekplanning berekent er de laadtijd mee. De laadlimiet van de auto kan als extra maximum worden gebruikt. Stel het gewenste percentage daarna in op de apparaatpagina van de wallbox.\n\nOm alleen het huidige percentagedoel te annuleren, zet je Voertuiglaaddoel op 0. Laadniveau niet meer gebruiken verwijdert hier de bronkoppelingen van dit profiel, inclusief het optionele maximum, en schakelt de vertrekplanning uit; bij de geselecteerde auto worden ook het percentagedoel en de geplande rit gewist. De bronentiteiten in de voertuigintegratie blijven ongewijzigd, net als voertuigtoestemming, kWh-doel en laadstatus.",
+        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: laadniveau **{soc_entity}**, laadlimiet **{limit_entity}**.\n\nMet het laadniveau stopt Home Assistant bij een laaddoel van het voertuig, bijvoorbeeld 80 %, en de vertrekplanning berekent er de laadtijd mee. De laadlimiet van de auto kan als extra maximum worden gebruikt. Stel het gewenste percentage daarna in op de apparaatpagina van de wallbox.\n\nOm alleen het huidige laaddoel van het voertuig te annuleren, zet je Voertuiglaaddoel op 0. Laadniveau niet meer gebruiken verwijdert hier de bronkoppelingen van dit profiel, inclusief het optionele maximum, en schakelt de vertrekplanning uit; bij de geselecteerde auto worden ook het laaddoel van het voertuig en de geplande rit gewist. De bronentiteiten in de voertuigintegratie blijven ongewijzigd, net als voertuigtoestemming, kWh-doel en laadstatus.",
         "menu_options": {
           "vehicle_soc": "Laadniveau instellen",
           "vehicle_source": "Laadniveau instellen",
@@ -1735,7 +1765,7 @@
     },
     "start_guest_charging": {
       "name": "Gastladen starten",
-      "description": "Start direct voor deze aansluiting. Opgeslagen kWh- en tijdslimieten gelden; het voertuigdoel blijft ongewijzigd.",
+      "description": "Start direct voor deze aansluiting. Het opgeslagen energiedoel, kostendoel en de doeltijd beëindigen het laden; het laaddoel van het voertuig geldt niet voor gasten.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1745,7 +1775,7 @@
     },
     "clear_target_time": {
       "name": "Doeltijd wissen",
-      "description": "Wist de gedeelde tijd zonder energie- of voertuigdoelen te wijzigen."
+      "description": "Wist de doeltijd zonder de andere doelen te wijzigen."
     },
     "use_calendar_departure": {
       "name": "Volgende agenda-afspraak gebruiken",

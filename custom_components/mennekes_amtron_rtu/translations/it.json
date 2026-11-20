@@ -159,6 +159,9 @@
         "description": "Inserisci il token di accesso attuale del servizio Modbus ospitato separatamente. L’URL del servizio e la configurazione esistente della wallbox vengono mantenuti.",
         "data": {
           "server_token": "Token di accesso"
+        },
+        "data_description": {
+          "server_token": "Il token di accesso che il servizio Modbus accetta ora."
         }
       },
       "reauth_app": {
@@ -532,7 +535,7 @@
           "waiting_for_device": "In attesa wallbox",
           "waiting_for_soc": "In attesa livello di carica",
           "waiting_for_capacity": "In attesa capacità",
-          "waiting_for_target": "In attesa obiettivo %",
+          "waiting_for_target": "In attesa obiettivo di carica del veicolo",
           "read_only": "Sola lettura",
           "command_pending": "Modifica in coda",
           "target_reached": "Obiettivo raggiunto",
@@ -631,10 +634,10 @@
             }
           },
           "departure_plan": {
-            "name": "Stato ricarica programmata",
+            "name": "Stato pianificazione partenza",
             "state": {
               "disabled": "Disattivato",
-              "waiting_for_target": "In attesa obiettivo %",
+              "waiting_for_target": "In attesa obiettivo di carica del veicolo",
               "waiting_for_capacity": "In attesa capacità",
               "waiting_for_soc": "In attesa livello di carica",
               "waiting_for_device": "In attesa wallbox",
@@ -647,7 +650,7 @@
               "charging": "Ricarica alla corrente massima",
               "finishing": "Completa alla corrente minima",
               "unreachable": "Obiettivo forse irraggiungibile",
-              "late": "Scadenza superata",
+              "late": "Orario obiettivo superato",
               "estimated_reached": "Caricato fino all’obiettivo stimato",
               "reached": "Obiettivo raggiunto",
               "write_pending": "Scrittura in attesa",
@@ -676,7 +679,7 @@
               "departure_plan": "La pianificazione della partenza prepara la corrente",
               "pause_requested": "Ricarica in pausa",
               "release_off": "Abilitazione alla ricarica disattivata",
-              "energy_goal_stop": "Obiettivo di energia raggiunto",
+              "energy_goal_stop": "Obiettivo energetico raggiunto",
               "wallbox_locked": "Wallbox bloccata",
               "error_code": "Errore della wallbox",
               "authorization_required": "Autorizzazione attiva sulla wallbox",
@@ -802,9 +805,9 @@
               "error_still_active": "L’errore è ancora attivo",
               "unknown": "Motivo sconosciuto",
               "user_cancelled": "Annullato dall’utente",
-              "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
+              "energy_goal": "Arresto richiesto da un obiettivo",
               "deadline_expired": "Ora di partenza trascorsa",
-              "time_limit": "Limite orario raggiunto",
+              "time_limit": "Orario obiettivo raggiunto",
               "guest_confirmation": "Conferma avvio ospite",
               "vehicle_authorized": "Veicolo riconosciuto autorizzato per questo collegamento",
               "vehicle_waiting": "In attesa di un veicolo autorizzato"
@@ -819,7 +822,7 @@
               "plug_charge": "Plug & Charge virtuale",
               "departure_plan": "Pianificazione partenza",
               "energy_goal": "Protezione obiettivo energetico",
-              "soc_goal": "Obiettivo percentuale veicolo",
+              "soc_goal": "Obiettivo di carica del veicolo",
               "recovery": "Ripristino dopo errore",
               "guest": "Ricarica ospite",
               "unplug": "Scollegato"
@@ -925,6 +928,9 @@
     "service_unavailable": {
       "message": "Il servizio Modbus non è disponibile o non ha potuto confermare il comando. Controlla lo stato attuale prima di ripeterlo."
     },
+    "connection_unavailable": {
+      "message": "La wallbox o il servizio Modbus non è raggiungibile al momento ({error}). Home Assistant riprova automaticamente."
+    },
     "service_auth_failed": {
       "message": "Il servizio Modbus ha rifiutato l’autenticazione. Rinnova l’accesso in Impostazioni > Dispositivi e servizi."
     },
@@ -944,13 +950,13 @@
       "message": "Un obiettivo energetico richiede un contatore di energia totale supportato e una lettura recente valida. Controlla la connessione e riprova."
     },
     "energy_goal_stop_active": {
-      "message": "Un limite di ricarica è raggiunto, quindi la ricarica resta in pausa. Per continuare, aumentare il limite kWh o l’obiettivo percentuale, oppure impostarlo a 0; dopo un azzeramento del contatore, salvare di nuovo il limite. Modificare un limite non avvia la ricarica."
+      "message": "Un obiettivo è raggiunto, quindi la ricarica resta in pausa. Per continuare, aumentare o cancellare l’obiettivo energetico, l’obiettivo di costo o l’obiettivo di carica del veicolo; dopo un azzeramento del contatore, salvare di nuovo l’obiettivo energetico. Modificare un obiettivo non avvia la ricarica."
     },
     "energy_goal_not_supported": {
       "message": "Questo servizio Modbus non supporta gli obiettivi energetici. Aggiorna prima l’app o il servizio autonomo."
     },
     "soc_goal_invalid": {
-      "message": "Inserisci un obiettivo da 0 al 100%, senza superare il limite del veicolo. 0 disattiva l’obiettivo percentuale."
+      "message": "Inserisci un obiettivo da 0 al 100%, senza superare il limite del veicolo. 0 disattiva l’obiettivo di carica del veicolo."
     },
     "soc_goal_unavailable": {
       "message": "Non è possibile modificare ora l’obiettivo del veicolo. Controlla le fonti selezionate e riprova."
@@ -959,10 +965,10 @@
       "message": "Il limite di carica selezionato non ha ancora fornito un valore valido. Attendi un valore disponibile prima di impostare un obiettivo. Puoi comunque disattivarlo con 0."
     },
     "soc_goal_source_changed": {
-      "message": "Le fonti del veicolo sono cambiate. Ricarica l’integrazione prima di modificare l’obiettivo percentuale."
+      "message": "Le fonti del veicolo sono cambiate. Ricarica l’integrazione prima di modificare l’obiettivo di carica del veicolo."
     },
     "soc_goal_not_supported": {
-      "message": "Il servizio Modbus non supporta gli obiettivi percentuali del veicolo. Aggiorna l’app per usare questa funzione facoltativa."
+      "message": "Il servizio Modbus non supporta gli obiettivi di carica del veicolo. Aggiorna l’app per usare questa funzione facoltativa."
     },
     "loss_source_invalid": {
       "message": "Seleziona una fonte supportata per le perdite di ricarica e configura il veicolo o il sensore corrispondente."
@@ -1019,7 +1025,7 @@
       "message": "La ricarica ospite non parte: collegare il veicolo, sbloccare la wallbox, eliminare gli errori e attendere uno stato attuale. In sola lettura, abilitare prima la scrittura."
     },
     "guest_deadline_expired": {
-      "message": "Il limite orario è scaduto. Scegliere un orario futuro o cancellarlo."
+      "message": "L’orario obiettivo salvato è passato. Scegliere un orario futuro o cancellarlo."
     },
     "calendar_not_configured": {
       "message": "Impostare prima un calendario e il titolo esatto dell’evento nelle opzioni del veicolo."
@@ -1130,6 +1136,9 @@
         "description": "Questa wallbox passa dall’app Modbus. Le sue impostazioni si trovano quindi lì e valgono anche per Home Assistant.\n\nLimite di corrente: {current_cap} A\nTempo minimo tra i cambi di stato: {state_change_interval} s\nAttesa aggiuntiva prima dei cambi di fase: {phase_switch_grace} s\n\nModifica questi valori, gli intervalli di lettura e la connessione nell’app, in Apri interfaccia utente web. Il permesso di scrittura si trova nella scheda Configurazione dell’app.",
         "data": {
           "release_off_on_unplug": "Disattiva l'abilitazione alla ricarica allo scollegamento"
+        },
+        "data_description": {
+          "release_off_on_unplug": "Dopo uno scollegamento confermato l’abilitazione alla ricarica viene disattivata; il veicolo successivo richiede un’abilitazione esplicita. Ignorato con Virtual Plug & Charge attivo."
         }
       },
       "wallbox_basic": {
@@ -1142,8 +1151,9 @@
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
-          "current_limit": "Limite superiore del controllo della corrente, in ampere per fase. Non è un obiettivo percentuale né un comando di pausa. Si applica anche il limite della wallbox.",
-          "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente."
+          "current_limit": "Limite superiore del controllo della corrente, in ampere per fase. Non è un obiettivo di carica del veicolo né un comando di pausa. Si applica anche il limite della wallbox.",
+          "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente.",
+          "release_off_on_unplug": "Dopo uno scollegamento confermato l’abilitazione alla ricarica viene disattivata; il veicolo successivo richiede un’abilitazione esplicita. Ignorato con Virtual Plug & Charge attivo."
         },
         "description": "Il limite di corrente delimita ciò che si può richiedere qui; resta valido il limite della wallbox."
       },
@@ -1184,7 +1194,7 @@
           "vehicle_soc_entity": "Scegli il sensore del livello reale di carica in %. In assenza di dati, la ricarica prosegue invariata finché tornano valori validi. Cambiare fonte cancella l’obiettivo senza avviare la carica. Per disattivarlo usa il menu precedente.",
           "use_vehicle_limit": "Attiva questa opzione per usare il limite del veicolo come massimo aggiuntivo. Non vengono modificate le impostazioni del veicolo."
         },
-        "description": "Profilo: **{vehicle}**.\n\nAbilita l’obiettivo percentuale facoltativo tramite un sensore di carica esistente. Imposta poi la percentuale desiderata nella pagina del dispositivo wallbox. Un obiettivo limita la carica; non annulla una pausa manuale."
+        "description": "Profilo: **{vehicle}**.\n\nAbilita l’obiettivo di carica del veicolo facoltativo tramite un sensore di carica esistente. Imposta poi la percentuale desiderata nella pagina del dispositivo wallbox. Un obiettivo limita la carica; non annulla una pausa manuale."
       },
       "vehicle_limit": {
         "title": "Limite di carica del veicolo",
@@ -1205,7 +1215,7 @@
           "wizard_next": "Avanti",
           "wizard_finish": "Salva e termina"
         },
-        "description": "Profilo: **{vehicle}**.\n\nIn uso: partenza **{departure_entity}**, capacità della batteria **{capacity_entity}**.\n\nCon la pianificazione della partenza, Home Assistant avvia la ricarica abbastanza presto da raggiungere l’obiettivo percentuale all’ora di partenza invece di caricare subito.\n\nPianifica il prossimo singolo viaggio con obiettivo percentuale, capacità utile e ora di partenza. Scegli poi l’orario nella pagina del dispositivo o copialo da una fonte facoltativa. Non è un programma giornaliero. La disattivazione cancella il viaggio e i comandi in attesa; l’obiettivo percentuale rimane."
+        "description": "Profilo: **{vehicle}**.\n\nIn uso: partenza **{departure_entity}**, capacità della batteria **{capacity_entity}**.\n\nCon la pianificazione della partenza, Home Assistant avvia la ricarica abbastanza presto da raggiungere l’obiettivo di carica del veicolo all’ora di partenza invece di caricare subito.\n\nPianifica il prossimo singolo viaggio con obiettivo di carica del veicolo, capacità utile e ora di partenza. Scegli poi l’orario nella pagina del dispositivo o copialo da una fonte facoltativa. Non è un programma giornaliero. La disattivazione cancella il viaggio e i comandi in attesa; l’obiettivo di carica del veicolo rimane."
       },
       "departure_requires_vehicle": {
         "title": "Livello di carica necessario",
@@ -1282,6 +1292,9 @@
         "data": {
           "timed_vehicle_provider": "Integrazione del veicolo"
         },
+        "data_description": {
+          "timed_vehicle_provider": "L’integrazione che fornisce già i dati di questo veicolo in Home Assistant."
+        },
         "description": "Scegli un’integrazione installata con un adattatore supportato. Le entità HA generiche funzionano senza adattatore. Vengono letti solo dati locali già disponibili."
       },
       "departure_vehicle_details": {
@@ -1295,7 +1308,8 @@
         "data_description": {
           "timed_vehicle_time_zone": "Fuso orario del veicolo, ad esempio Europe/Rome. Se vuoto, viene usato quello di Home Assistant. Gli orari BMW non includono un fuso orario.",
           "timed_timer1_days": "Seleziona i giorni impostati nel BMW per il timer climatizzazione 1. BavarianData non fornisce questi giorni. Lascia vuoto per ignorare il timer.",
-          "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo."
+          "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo.",
+          "timed_vehicle_device": "Il veicolo in quell’integrazione di cui vengono lette le entità."
         },
         "description": "Profilo: **{vehicle}**.\n\nUsa il pulsante di partenza per copiare un timer attivo del veicolo selezionato. Con un profilo il veicolo è già scelto. In BavarianData attiva i sensori di azione, ora e minuto; inserisci qui i giorni ricorrenti perché l’integrazione non li pubblica."
       },
@@ -1406,12 +1420,18 @@
         "data": {
           "charge_loss_vehicle_provider": "Integrazione del veicolo"
         },
+        "data_description": {
+          "charge_loss_vehicle_provider": "L’integrazione che fornisce già i dati di questo veicolo in Home Assistant."
+        },
         "description": "Profilo: **{vehicle}**.\n\nScegli un’integrazione installata con un adattatore supportato. Le entità HA generiche funzionano senza adattatore. Vengono letti solo dati locali già disponibili."
       },
       "loss_vehicle_details": {
         "title": "Veicolo per la cronologia di ricarica",
         "data": {
           "charge_loss_vehicle_device": "Veicolo"
+        },
+        "data_description": {
+          "charge_loss_vehicle_device": "Il veicolo in quell’integrazione di cui vengono lette le entità."
         },
         "description": "Profilo: **{vehicle}**.\n\nSeleziona il veicolo collegato a questa wallbox. Viene letta solo la cronologia locale esistente, senza aggiornare il veicolo. Le corrispondenze mancanti o ambigue restano sconosciute."
       },
@@ -1458,17 +1478,21 @@
         "data": {
           "vehicle_profile_id": "Profilo veicolo"
         },
-        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio non avvia la ricarica. Ogni auto conserva il proprio obiettivo percentuale e la propria partenza prevista; un’auto senza partenza salvata parte senza partenza. Ogni profilo conserva impostazioni e perdite medie.",
+        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio non avvia la ricarica. Ogni auto conserva il proprio obiettivo di carica del veicolo e la propria partenza prevista; un’auto senza partenza salvata parte senza partenza. Ogni profilo conserva impostazioni e perdite medie.",
         "data_description": {
           "vehicle_profile_id": "Seleziona l’auto effettivamente collegata prima della ricarica, soprattutto per confrontare le perdite. Questa scelta manuale disattiva la selezione automatica."
         }
       },
       "vehicle_profile_remove": {
         "title": "Rimuovi profilo",
-        "description": "Rimuove il profilo scelto e le impostazioni delle sue funzioni. Rimuovere il profilo attivo cancella anche il suo obiettivo percentuale e il piano di partenza senza avviare la ricarica.",
+        "description": "Rimuove il profilo scelto e le impostazioni delle sue funzioni. Rimuovere il profilo attivo cancella anche il suo obiettivo di carica del veicolo e il piano di partenza senza avviare la ricarica.",
         "data": {
           "vehicle_profile_id": "Profilo veicolo",
           "confirm": "Rimuovi questo profilo"
+        },
+        "data_description": {
+          "vehicle_profile_id": "Il profilo da rimuovere.",
+          "confirm": "Obbligatorio: la rimozione non può essere annullata."
         }
       },
       "vehicle_profile_device": {
@@ -1493,7 +1517,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Configura livello di carica",
-        "description": "Profilo: **{vehicle}**.\n\nUsa il livello di carica riportato da questo profilo per l’obiettivo percentuale facoltativo. Il limite di carica della stessa auto può anche fungere da massimo. Nessuna impostazione viene scritta nel veicolo.",
+        "description": "Profilo: **{vehicle}**.\n\nUsa il livello di carica riportato da questo profilo per l’obiettivo di carica del veicolo facoltativo. Il limite di carica della stessa auto può anche fungere da massimo. Nessuna impostazione viene scritta nel veicolo.",
         "data": {
           "use_vehicle_limit": "Usa anche il limite di carica del veicolo"
         },
@@ -1510,6 +1534,9 @@
         "description": "Profilo: **{vehicle}**.\n\nIn uso: spina **{plug_entity}**, posizione **{location_entity}**.\n\nI segnali di rilevamento indicano che questa auto è collegata e a casa. La selezione automatica e il Plug & Charge virtuale li usano.\n\nUsa le entità locali supportate dell’integrazione del veicolo, scegli entità Home Assistant esistenti o disattiva il rilevamento per questo profilo. Servono sia il cavo collegato sia la presenza a casa. Nessuna richiesta cloud aggiuntiva.",
         "data": {
           "vehicle_detection_source": "Fonte di rilevamento"
+        },
+        "data_description": {
+          "vehicle_detection_source": "Da dove provengono i segnali di cavo e presenza di questo veicolo, oppure nessun rilevamento."
         }
       },
       "vehicle_detection_entities": {
@@ -1539,11 +1566,14 @@
         "description": "Scegli l’auto di cui vuoi modificare le impostazioni. Aprire un profilo non seleziona quell’auto per la ricarica.",
         "data": {
           "vehicle_profile_id": "Profilo del veicolo"
+        },
+        "data_description": {
+          "vehicle_profile_id": "Il veicolo di cui si aprono le impostazioni."
         }
       },
       "vehicle_profile": {
         "title": "Profilo del veicolo",
-        "description": "Profilo: **{vehicle}**.\n\nTutto ciò che si trova qui appartiene solo a questa auto e viene conservato anche quando è selezionata un’altra auto. Ogni voce è facoltativa:\n\n- **Nome e sorgente del veicolo:** rinomina il profilo o collegalo all’auto in un’integrazione del veicolo come BavarianData, così i suoi dati vengono letti automaticamente.\n- **Livello e limite di carica:** permette a Home Assistant di fermarsi a un obiettivo percentuale, ad esempio 80 %. Necessario per la pianificazione della partenza.\n- **Prossima partenza:** avvia la ricarica in tempo per raggiungere l’obiettivo all’ora di partenza invece di caricare subito.\n- **Perdite di ricarica:** mostra quanta energia della wallbox è davvero arrivata nella batteria.\n- **Segnali di rilevamento:** segnali di cavo e presenza che riconoscono questa auto. La **Selezione automatica** nell’entità **Veicolo attivo** li usa e, con l’interruttore **Plug & Charge virtuale** della wallbox attivo, l’auto riconosciuta inizia a caricare quando viene collegata. Con una partenza pianificata resta prima in pausa e parte in tempo; se altrimenti il tempo non basta, carica subito.",
+        "description": "Profilo: **{vehicle}**.\n\nTutto ciò che si trova qui appartiene solo a questa auto e viene conservato anche quando è selezionata un’altra auto. Ogni voce è facoltativa:\n\n- **Nome e sorgente del veicolo:** rinomina il profilo o collegalo all’auto in un’integrazione del veicolo come BavarianData, così i suoi dati vengono letti automaticamente.\n- **Livello e limite di carica:** permette a Home Assistant di fermarsi a un obiettivo di carica del veicolo, ad esempio 80 %. Necessario per la pianificazione della partenza.\n- **Prossima partenza:** avvia la ricarica in tempo per raggiungere l’obiettivo all’ora di partenza invece di caricare subito.\n- **Perdite di ricarica:** mostra quanta energia della wallbox è davvero arrivata nella batteria.\n- **Segnali di rilevamento:** segnali di cavo e presenza che riconoscono questa auto. La **Selezione automatica** nell’entità **Veicolo attivo** li usa e, con l’interruttore **Plug & Charge virtuale** della wallbox attivo, l’auto riconosciuta inizia a caricare quando viene collegata. Con una partenza pianificata resta prima in pausa e parte in tempo; se altrimenti il tempo non basta, carica subito.",
         "menu_options": {
           "vehicle_profile_edit": "Nome e sorgente del veicolo",
           "vehicle_battery": "Livello e limite di carica",
@@ -1555,7 +1585,7 @@
       },
       "vehicle_settings": {
         "title": "Impostazioni del veicolo",
-        "description": "Non ci sono ancora profili del veicolo, quindi queste impostazioni valgono per ogni auto. Ogni voce è facoltativa:\n\n- **Livello e limite di carica:** permette a Home Assistant di fermarsi a un obiettivo percentuale, ad esempio 80 %. Necessario per la pianificazione della partenza.\n- **Prossima partenza:** avvia la ricarica in tempo per raggiungere l’obiettivo all’ora di partenza invece di caricare subito.\n- **Perdite di ricarica:** mostra quanta energia della wallbox è davvero arrivata nella batteria.\n\nAggiungi un profilo in Veicoli per avere impostazioni separate per ogni auto.",
+        "description": "Non ci sono ancora profili del veicolo, quindi queste impostazioni valgono per ogni auto. Ogni voce è facoltativa:\n\n- **Livello e limite di carica:** permette a Home Assistant di fermarsi a un obiettivo di carica del veicolo, ad esempio 80 %. Necessario per la pianificazione della partenza.\n- **Prossima partenza:** avvia la ricarica in tempo per raggiungere l’obiettivo all’ora di partenza invece di caricare subito.\n- **Perdite di ricarica:** mostra quanta energia della wallbox è davvero arrivata nella batteria.\n\nAggiungi un profilo in Veicoli per avere impostazioni separate per ogni auto.",
         "menu_options": {
           "vehicle_battery": "Livello e limite di carica",
           "departure": "Prossima partenza",
@@ -1565,7 +1595,7 @@
       },
       "vehicle_battery": {
         "title": "Livello e limite di carica",
-        "description": "Profilo: **{vehicle}**.\n\nIn uso: livello di carica **{soc_entity}**, limite di carica **{limit_entity}**.\n\nIl livello di carica permette a Home Assistant di fermare la ricarica a un obiettivo percentuale, ad esempio 80 %, e la pianificazione della partenza lo usa per calcolare il tempo di ricarica. Il limite di carica dell’auto può servire come massimo aggiuntivo. Imposta poi la percentuale desiderata nella pagina del dispositivo della wallbox.\n\nPer annullare solo l’obiettivo percentuale attuale, imposta Obiettivo di carica del veicolo a 0. Non usare più il livello di carica rimuove qui le associazioni delle sorgenti di questo profilo, incluso il massimo facoltativo, e disattiva la sua pianificazione della partenza; per l’auto selezionata cancella anche l’obiettivo percentuale e il viaggio. Le entità sorgente dell’integrazione del veicolo restano invariate, così come l’autorizzazione, l’obiettivo in kWh e lo stato di ricarica.",
+        "description": "Profilo: **{vehicle}**.\n\nIn uso: livello di carica **{soc_entity}**, limite di carica **{limit_entity}**.\n\nIl livello di carica permette a Home Assistant di fermare la ricarica a un obiettivo di carica del veicolo, ad esempio 80 %, e la pianificazione della partenza lo usa per calcolare il tempo di ricarica. Il limite di carica dell’auto può servire come massimo aggiuntivo. Imposta poi la percentuale desiderata nella pagina del dispositivo della wallbox.\n\nPer annullare solo l’obiettivo di carica del veicolo attuale, imposta Obiettivo di carica del veicolo a 0. Non usare più il livello di carica rimuove qui le associazioni delle sorgenti di questo profilo, incluso il massimo facoltativo, e disattiva la sua pianificazione della partenza; per l’auto selezionata cancella anche l’obiettivo di carica del veicolo e il viaggio. Le entità sorgente dell’integrazione del veicolo restano invariate, così come l’autorizzazione, l’obiettivo in kWh e lo stato di ricarica.",
         "menu_options": {
           "vehicle_soc": "Configura livello di carica",
           "vehicle_source": "Configura livello di carica",
@@ -1735,7 +1765,7 @@
     },
     "start_guest_charging": {
       "name": "Avvia ricarica ospite",
-      "description": "Avvia subito per questa connessione. Si applicano i limiti salvati in kWh e di tempo; il target del veicolo resta invariato.",
+      "description": "Avvia subito per questa connessione. L’obiettivo energetico, l’obiettivo di costo e l’orario obiettivo salvati terminano la ricarica; l’obiettivo di carica del veicolo non vale per gli ospiti.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1745,11 +1775,11 @@
     },
     "clear_target_time": {
       "name": "Cancella orario obiettivo",
-      "description": "Cancella l’orario condiviso senza cambiare gli obiettivi energetici o del veicolo."
+      "description": "Cancella l’orario obiettivo senza cambiare gli altri obiettivi."
     },
     "use_calendar_departure": {
       "name": "Usa prossimo evento calendario",
-      "description": "Usa il prossimo evento corrispondente del calendario come ora di destinazione.",
+      "description": "Usa il prossimo evento corrispondente del calendario come orario obiettivo.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1759,7 +1789,7 @@
     },
     "use_vehicle_departure": {
       "name": "Usa la partenza del veicolo",
-      "description": "Usa la prossima partenza del veicolo come ora di destinazione.",
+      "description": "Usa la prossima partenza del veicolo come orario obiettivo.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

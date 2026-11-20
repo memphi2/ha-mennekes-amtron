@@ -37,8 +37,8 @@ rules:
       describe and validate resolution.
   docs-actions:
     status: done
-    comment: The [user guide](docs/user-guide.md) documents the set_charging_current action, parameters
-      and explicit unlimited-current opt-in.
+    comment: The [entity reference](docs/entities.md) and the user guide document all seven actions
+      and their fields.
   docs-conditions:
     status: exempt
     comment: No integration-specific conditions are registered. Users combine standard Home Assistant

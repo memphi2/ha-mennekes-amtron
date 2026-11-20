@@ -14,7 +14,7 @@ cards:
       {%- set t = state_attr('sensor.mennekes_amtron_motif_dattente_de_la_recharge', 'departure_plan') -%}
       {{ 'En attente de la première mesure' if is_state(entity, 'unknown') else 'Connexion interrompue' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_de_la_session', with_unit=True) if has_value('sensor.mennekes_amtron_energie_de_la_session') else '—' }}
 
-      {{ 'Limites: ' ~ p.l | join(' · ') if p.l else 'Aucune limite' }}
+      {{ 'Objectifs : ' ~ p.l | join(' · ') if p.l else 'Aucun objectif' }}
       {%- if t not in [none, 'disabled'] %} · Planification: {{ state_attr_translated('sensor.mennekes_amtron_motif_dattente_de_la_recharge', 'departure_plan') }}{% endif %}
     multiline_secondary: true
     icon: mdi:ev-station
@@ -100,7 +100,7 @@ cards:
       - type: template
         entity: number.mennekes_amtron_objectif_energetique
         content: >-
-          {% set e = states(entity) | float(0) %}{{ '%g kWh' % e if e > 0 else 'Objectif kWh' }}
+          {% set e = states(entity) | float(0) %}{{ '%g kWh' % e if e > 0 else 'Objectif énergétique' }}
         icon: mdi:lightning-bolt
         icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
         tap_action:
@@ -119,7 +119,7 @@ cards:
           target:
             entity_id: datetime.mennekes_amtron_heure_cible
           confirmation:
-            text: "Effacer l’heure cible ? Les objectifs kWh et % restent."
+            text: "Effacer l’heure cible ? Les autres objectifs restent."
       - type: conditional
         conditions:
           - condition: state
@@ -129,7 +129,7 @@ cards:
           type: template
           entity: number.mennekes_amtron_objectif_de_charge_du_vehicule
           content: >-
-            {% set s = states(entity) | float(0) %}{{ '%d %%' % s if s > 0 else 'Objectif %' }}
+            {% set s = states(entity) | float(0) %}{{ '%d %%' % s if s > 0 else 'Objectif véhicule' }}
           icon: mdi:battery-charging-80
           icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
           tap_action:
@@ -150,7 +150,7 @@ cards:
             target:
               entity_id: button.mennekes_amtron_demarrer_la_recharge_invite
             confirmation:
-              text: "Démarrer la recharge invité ? L’objectif kWh et l’heure cible s’appliquent."
+              text: "Démarrer la recharge invité ? Les objectifs énergétique et de coût et l’heure cible la terminent."
       - type: conditional
         conditions:
           - condition: state
