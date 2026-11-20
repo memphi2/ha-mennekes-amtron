@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   that belongs to another command, which was ignored before, is refused.
 - Plug & Charge treats the plan's charge to the minimum level as a plan
   that charges; before, it took that state for no plan at all.
+- A car that is seen again only after more than a minute without a valid
+  reading is no longer taken for surely the same one, also when few polls
+  fell into the gap: a Plug & Charge grant, a release by hand and a guest
+  permission end then.
 - One account of the plug-in decides for Plug & Charge, guest charging, the
   unplug rule and the estimates whether a car is connected. Plug & Charge
   counts a car's evidence from its real plug-in time, also when the gate was

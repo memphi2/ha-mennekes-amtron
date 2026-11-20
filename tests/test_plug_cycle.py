@@ -7,6 +7,7 @@ from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.plug_cycle import (
     UNKNOWN_GRACE_SECONDS,
+    PlugChange,
     PlugCycle,
 )
 from custom_components.mennekes_amtron_rtu.device.registers import CP_STATE
@@ -53,7 +54,8 @@ def test_a_short_unknown_state_keeps_the_connection_and_a_lasting_one_its_identi
     cycle.observe(None, now=10)
     cycle.observe(None, now=10 + UNKNOWN_GRACE_SECONDS - 1)
     assert (cycle.lapsed, cycle.scope) == (False, scope)
-    cycle.observe(True, now=80)
+    assert cycle.observe(True, now=69) == PlugChange()
+    assert cycle.scope == scope
     # Seen again in time: the grace starts anew with the next gap.
     cycle.observe(None, now=100)
     cycle.observe(None, now=159)
@@ -68,6 +70,26 @@ def test_a_short_unknown_state_keeps_the_connection_and_a_lasting_one_its_identi
     assert not cycle.lapsed
     assert cycle.id == token
     assert cycle.scope not in (None, scope)
+
+
+def test_a_car_seen_again_only_after_the_grace_is_not_surely_the_same():
+    # Few polls: no unknown one fell after the grace, the gap was as long.
+    cycle = PlugCycle()
+    cycle.observe(True, now=0)
+    token, scope, stamp = cycle.id, cycle.scope, cycle.stamp
+    cycle.observe(None, now=300)
+    assert cycle.observe(True, now=600) == PlugChange(lapsed=True)
+    assert (cycle.id, cycle.lapsed) == (token, False)
+    assert cycle.scope not in (None, scope)
+    assert cycle.stamp != stamp
+    # So after a reconnect that was followed by nothing for long.
+    cycle.suspect(now=601)
+    assert cycle.observe(True, now=1000).lapsed
+    # The lapse is reported once, when it happens.
+    cycle.observe(None, now=1010)
+    assert cycle.observe(None, now=1070) == PlugChange(lapsed=True)
+    assert cycle.observe(None, now=1080) == PlugChange()
+    assert cycle.observe(True, now=1090) == PlugChange()
 
 
 def test_a_reconnect_counts_as_unknown_from_then_on():

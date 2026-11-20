@@ -775,6 +775,32 @@ def test_manual_gate_release_keeps_a_waiting_lock_but_ends_goal_recovery():
     asyncio.run(run())
 
 
+def test_a_car_seen_again_only_after_the_grace_loses_its_grant_and_gets_a_fresh_one(caplog):
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        token = c.plug_charge["session"]
+        await authorize(c)
+        # One failed poll, and the next one answers only minutes later.
+        c.observe_plug(None)
+        h.clock[0] += 300
+        present(h)
+        await c._plug_charge._task
+        assert "vehicle state unknown for over 60 seconds" in caplog.text
+        assert not c.plug_charge["authorized"]
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1], [0]]
+        assert c.plug_charge["session"] == token
+        # A grant on evidence read in its own command gets the whole grace.
+        c.observe_plug(None)
+        h.clock[0] += 59
+        await authorize(c)
+        h.clock[0] += 59
+        c.observe_plug(None)
+        assert c.plug_charge["authorized"]
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
 def test_unknown_vehicle_state_keeps_the_grant_until_the_grace_ends(caplog):
     async def run():
         h = Harness()
@@ -927,7 +953,7 @@ def test_a_refused_release_keeps_what_was_known_about_the_restored_one(tmp_path)
         control.queue.async_submit_locked = refuse
         with pytest.raises(DeviceError):
             await control.async_set_charging_release(True)
-        assert state.manual_marks(cycle) == (True, True, True, None)
+        assert state.manual_marks(cycle) == (True, True, True, cycle.stamp)
         # The first answer shows no car: the release was that car's and ends.
         see(state, cycle, False)
         assert not state.manual
@@ -1030,3 +1056,22 @@ def test_a_failing_read_back_does_not_close_an_acknowledged_grant():
         assert control.plug_charge["authorized"]
         await control.async_shutdown()
     asyncio.run(run())
+
+
+def test_a_refused_command_cannot_put_back_a_release_that_lapsed_meanwhile():
+    state, cycle = PlugChargeState(), PlugCycle()
+    state.configure(True, POLICY)
+    see(state, cycle, True, now=0)
+    state.manual = state.manual_connected = True
+    # A second command takes the marks and waits; the state stays unknown.
+    marks = state.manual_marks(cycle)
+    see(state, cycle, None, now=10)
+    see(state, cycle, None, now=70)
+    assert not state.manual
+    # Refused afterwards, it restores nothing: the connection is no longer
+    # surely the one the release was given for.
+    state.restore_manual(marks, cycle)
+    assert not state.manual
+    see(state, cycle, True, now=80)
+    state.restore_manual(marks, cycle)
+    assert not state.manual

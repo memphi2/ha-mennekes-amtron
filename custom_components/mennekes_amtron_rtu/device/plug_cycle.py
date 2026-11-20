@@ -27,6 +27,9 @@ class PlugChange:
 
     # A confirmed unplug ended a connection.
     ended: bool = False
+    # The connection was unknown for longer than the grace, also when this
+    # observation finds a car again: nobody can tell whether it is the same.
+    lapsed: bool = False
 
 
 class PlugCycle:
@@ -94,15 +97,27 @@ class PlugCycle:
                     self._unknown_since = now
                 elif now - self._unknown_since >= UNKNOWN_GRACE_SECONDS:
                     self.lapsed, self.reading = True, None
+                    return PlugChange(lapsed=True)
             return PlugChange()
+        # The gap counts as long as it was, also when no poll fell into it
+        # after the grace: a car seen again late is not surely the same one.
+        late = (
+            self.id is not None and not self.lapsed and self._unknown_since is not None
+            and now - self._unknown_since >= UNKNOWN_GRACE_SECONDS
+        )
         self._unknown_since = None
         if self.id is None:
             self.id = secrets.token_hex(16)
             self.since = self._absent_at or at
-        if self.lapsed:
-            self.lapsed = False
+        if self.lapsed or late:
+            self.lapsed, self.reading = False, None
             self._epoch += 1
-        return PlugChange()
+        return PlugChange(lapsed=late)
+
+    @property
+    def stamp(self) -> tuple[str | None, int, bool]:
+        """Changes whenever the connection is no longer surely the same one."""
+        return self.id, self._epoch, self.lapsed
 
     def suspect(self, now: float | None = None) -> None:
         """Treat the state as unknown from now, e.g. after a reconnect."""

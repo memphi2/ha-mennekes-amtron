@@ -119,21 +119,28 @@ class PlugChargeState:
         if present is None:
             if cycle.id is None:
                 self.hold = True
-            elif cycle.lapsed and (self.authorized or self.manual):
-                _LOGGER.warning(
-                    "Plug & Charge: grant withdrawn, vehicle state unknown for over %.0f seconds",
-                    UNKNOWN_GRACE_SECONDS,
-                )
-                self.revoke()
+            elif cycle.lapsed:
+                self._lapse()
             return
+        if change.lapsed:
+            # Seen again, but only after the grace: the grant does not carry over.
+            self._lapse()
         self.manual_connected = self.manual
 
-    def manual_marks(self, cycle: PlugCycle) -> tuple[bool, bool, bool, str | None]:
-        """A release by hand with what is known about it, to take a refused one back."""
-        return self.manual, self.manual_connected, self.restored_manual, cycle.id
+    def _lapse(self) -> None:
+        if self.authorized or self.manual:
+            _LOGGER.warning(
+                "Plug & Charge: grant withdrawn, vehicle state unknown for over %.0f seconds",
+                UNKNOWN_GRACE_SECONDS,
+            )
+            self.revoke()
 
-    def restore_manual(self, marks: tuple[bool, bool, bool, str | None], cycle: PlugCycle) -> None:
-        if marks[3] != cycle.id:
+    def manual_marks(self, cycle: PlugCycle) -> tuple[bool, bool, bool, object]:
+        """A release by hand with what is known about it, to take a refused one back."""
+        return self.manual, self.manual_connected, self.restored_manual, cycle.stamp
+
+    def restore_manual(self, marks: tuple[bool, bool, bool, object], cycle: PlugCycle) -> None:
+        if marks[3] != cycle.stamp:
             # The connection changed while the command waited: what a poll
             # decided about its release meanwhile stands. Only a release the
             # refused command itself added goes: waiting opened nothing.
@@ -307,8 +314,10 @@ class PlugChargeController:
         cp_supported = self._control._identity.layout_version >= CP_STATE.min_layout
         cp = await read(CP_STATE) if cp_supported else None
         present = vehicle_connected(evse, cp, cp_supported=cp_supported)
+        # Evidence read inside a command counts like a poll's, a car seen
+        # included: a grant given on it gets the whole grace of its own.
+        self.state.follow(self.cycle, self.cycle.observe(present, now=self._control.monotonic()))
         if present is not True:
-            self.state.follow(self.cycle, self.cycle.observe(present, now=self._control.monotonic()))
             if present is False:
                 self._end_manual_stop()
             self._schedule_deny()
