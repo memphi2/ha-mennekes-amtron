@@ -613,20 +613,24 @@ class MennekesModbusClient:
                         return decode_register(register, words)
 
                     await precondition(read_locked)
-                    if (
-                        self._require_client() is not client
-                        or generation != self._connection_generation
-                        or not client.connected
-                    ):
-                        # Never apply an observation made on a previous link to
-                        # a write after a transparent disconnect or reconnect.
-                        raise AmtronConnectionError("connection changed during write precondition")
-                    # A priority operation may have run while the bus was free.
-                    self.check_write_interval(spec, min_interval=min_interval)
-                    # The precondition may await one or more live reads while
-                    # deadline or goal evidence changes in another task.
-                    if before_write is not None:
-                        before_write()
+                # A line that has to fall silent first (see bus_quiet) makes this
+                # wait up to a second or more, so every guard is judged only after
+                # it: nothing but the write itself follows the last check.
+                await self._quiet.settle()
+                if precondition is not None and (
+                    self._require_client() is not client
+                    or generation != self._connection_generation
+                    or not client.connected
+                ):
+                    # Never apply an observation made on a previous link to
+                    # a write after a transparent disconnect or reconnect.
+                    raise AmtronConnectionError("connection changed during write precondition")
+                # A priority operation may have run while the bus was free.
+                self.check_write_interval(spec, min_interval=min_interval)
+                # Deadline or goal evidence changes in another task while the
+                # precondition awaits live reads or the line falls silent.
+                if before_write is not None:
+                    before_write()
             rejected = False
             error: BaseException | None = None
             self.write_trace.begin(
