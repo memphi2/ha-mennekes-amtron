@@ -312,6 +312,11 @@ identity:
 }
 ```
 
+Each command takes only its own fields; any other field is refused as an
+invalid request, also one that another command would take. Commands that only
+carry plan data or a rule's setting, and `cancel_pending`, are accepted while
+the wallbox does not answer; every other command needs it.
+
 The recovery command `acknowledge_intent_reset` needs only `command` and
 `expected_serial_number`, apart from the optional activity `origin`. It
 acknowledges a rejected saved control file after the user reviews the reset.

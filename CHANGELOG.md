@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   stays as changed afterwards, and a service that lost its saved plan has no
   trip until one is set again. A time taken from a calendar or the car is
   refused when the trip was edited while that answer was awaited.
+- **Breaking (service API):** a command takes only its own fields. A field
+  that belongs to another command, which was ignored before, is refused.
 - One account of the plug-in decides for Plug & Charge, guest charging, the
   unplug rule and the estimates whether a car is connected. Plug & Charge
   counts a car's evidence from its real plug-in time, also when the gate was

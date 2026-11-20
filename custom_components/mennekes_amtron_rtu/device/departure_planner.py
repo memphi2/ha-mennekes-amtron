@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from .command_events import attributed
+from .commands import COMMANDS
 from .connection_sample import connection_sample
 from .control import AmtronControl
 from .departure_plan import (
@@ -29,11 +30,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _TICK_SECONDS = 5.0
-DEPARTURE_COMMANDS = {
-    "departure_choice": frozenset({"command", "deadline", "revision", "expected_serial_number"}),
-    "departure_trip": frozenset({"command", "deadline", "source", "withdraw", "expected_serial_number", "expected_selection"}),
-    "departure_inputs": frozenset({"command", "value", "expected_serial_number"}),
-}
 
 
 class DeparturePlanner:
@@ -153,9 +149,9 @@ class DeparturePlanner:
                 await asyncio.wait_for(departure.wake.wait(), _TICK_SECONDS)
 
     async def command(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """One of DEPARTURE_COMMANDS."""
+        """A departure command: plan data only, taken without the wallbox."""
         name = payload["command"]
-        if payload.keys() - DEPARTURE_COMMANDS[name]:
+        if COMMANDS[name].refuses(payload):
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
             raise ValueError("expected_serial_number is required")

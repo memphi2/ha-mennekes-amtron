@@ -21,15 +21,16 @@ from .charge_meter_store import ChargeMeterStore
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
 from .command_events import SOURCES, attributed, command_source
+from .commands import COMMANDS, ENVELOPE, needs_wallbox
 from .connection_sample import connection_sample
 from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
 from .departure_plan import DepartureController
-from .departure_planner import DEPARTURE_COMMANDS, DeparturePlanner
+from .departure_planner import DeparturePlanner
 from .energy_goal import EnergyGoal
 from .energy_goal_controller import EnergyGoalController
-from .enums import EvseState, RequestedPhases, SolarChargingMode
-from .errors import DeviceError, DeviceValidationError, validation_error
+from .enums import EvseState
+from .errors import DeviceError, DeviceValidationError
 from .guest_limits import GuestLimits
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
@@ -46,7 +47,7 @@ from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
 from .register_monitor import RegisterMonitor
 from .registers import ENERGY_TOTAL, ERROR_CODE, EVSE_STATE, REGISTERS_BY_KEY
-from .service_config import ServerConfig, integer, number
+from .service_config import ServerConfig, number
 from .service_store import IntentStore
 from .service_version import SERVICE_VERSION
 from .soc_choice import SocChoice
@@ -481,9 +482,31 @@ class ModbusService:
                 self._meter_saved = saved
                 self._meter_notice.recovered("meter log saved again")
 
-    async def _charge_note(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def acknowledge_intent_reset(self, control: AmtronControl) -> None:
+        """Take over safe defaults for a saved intent that could not be read."""
+        if not self._intent_rejected:
+            return
+        if self._store is None:
+            raise DeviceError("service_unavailable")
+        safe = WriteState(pause_requested=True, charging_release_requested=False, charging_setpoint=6)
+        async with self._store_lock:
+            await finish_goal_save(asyncio.to_thread(self._store.save, safe))
+        # Vehicle absence can clear the temporary gate's release intent.
+        # Restore the durable safe intent without replacing the live state
+        # and its Modbus write limiter.
+        state = self.client.write_state
+        state.pause_requested = safe.pause_requested
+        state.charging_release_requested = safe.charging_release_requested
+        state.charging_setpoint = safe.charging_setpoint
+        state.plug_charge = safe.plug_charge
+        state.guest_permission = None
+        self._intent_rejected = False
+        self._rejected_notice.recovered("saved intent reset acknowledged")
+        control.startup_hold = False
+
+    async def charge_note(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Home Assistant names the car of the running plug cycle; no bus access."""
-        if payload.keys() != {"command", "plugged_at", "note", "expected_serial_number"}:
+        if payload.keys() != COMMANDS["charge_note"].fields | ENVELOPE:
             raise ValueError("invalid charge note")
         try:
             plugged_at = moment(payload["plugged_at"])
@@ -889,37 +912,29 @@ class ModbusService:
         _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None,
     ) -> dict[str, Any]:
         name = payload.get("command")
-        if name in DEPARTURE_COMMANDS:
-            return await self.planner.command(payload)
-        if name == "guest_start":
-            return await self.guest.start(payload)
-        if name == "charge_note":
-            return await self._charge_note(payload)
-        if payload.keys() - {
-            "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
-            "source", "soc", "maximum", "deadline", "expected_soc_revision",
-            "session", "policy", "maximum_required", "expected_choice_revision",
-            "price", "currency",
-        }:
+        if not isinstance(name, str) or (spec := COMMANDS.get(name)) is None:
+            raise ValueError("unknown command")
+        if spec.refuses(payload):
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
             raise ValueError("expected_serial_number is required")
+        if spec.direct is not None:
+            return await spec.direct(self, payload)
         expected_serial = payload["expected_serial_number"]
         if expected_serial is not None and (
             not isinstance(expected_serial, str) or not 1 <= len(expected_serial) <= 256
         ):
             raise ValueError("expected_serial_number must be a non-empty string or null")
+        run = spec.run
+        if run is None:
+            raise ValueError("unknown command")
         async with self._command_lock:
             control = self.control
             written = self.diagnostics.writes_sent
             # A request can age while another command owns the lock. Only admit
             # it against the same current state that the API reports as usable.
-            command = payload.get("command")
-            cancelling = command == "cancel_pending"
-            metadata = command in ("soc_source", "soc_observation", "unplug_release_config") or (
-                command == "plug_charge_config" and payload.get("value") is False
-            )
-            if control is None or self._stopping or (not cancelling and not metadata and not self._is_available()):
+            wallbox = needs_wallbox(name, payload)
+            if control is None or self._stopping or (wallbox and not self._is_available()):
                 raise DeviceError("service_unavailable")
             # The service can restart against another wallbox between HA polls,
             # or while this command waits. Bind the write before any bus access.
@@ -928,108 +943,16 @@ class ModbusService:
                 raise DeviceError("device_identity_changed")
             if "expected_choice_revision" in payload and payload["expected_choice_revision"] != self.choice_revision:
                 raise DeviceError("soc_goal_source_changed")
-            if "expected_soc_revision" in payload and (
-                command != "soc_observation"
-                or payload["expected_soc_revision"] != self.soc_choice.revision
-            ):
+            if "expected_soc_revision" in payload and payload["expected_soc_revision"] != self.soc_choice.revision:
                 raise DeviceError("soc_goal_source_changed")
-            if command == "acknowledge_intent_reset":
-                if payload.keys() != {"command", "expected_serial_number"}:
-                    raise ValueError("invalid reset acknowledgement")
-                if self._intent_rejected:
-                    if self._store is None:
-                        raise DeviceError("service_unavailable")
-                    safe = WriteState(pause_requested=True, charging_release_requested=False, charging_setpoint=6)
-                    async with self._store_lock:
-                        await finish_goal_save(asyncio.to_thread(self._store.save, safe))
-                    # Vehicle absence can clear the temporary gate's release
-                    # intent. Restore the durable safe intent without replacing
-                    # the live state and its Modbus write limiter.
-                    state = self.client.write_state
-                    state.pause_requested = safe.pause_requested
-                    state.charging_release_requested = safe.charging_release_requested
-                    state.charging_setpoint = safe.charging_setpoint
-                    state.plug_charge = safe.plug_charge
-                    state.guest_permission = None
-                    self._intent_rejected = False
-                    self._rejected_notice.recovered("saved intent reset acknowledged")
-                    control.startup_hold = False
+            if spec.reset:
+                await run(self, control, payload)
                 return self.snapshot()
             if self._intent_rejected:
                 raise DeviceValidationError("read_only_mode")
             initial_revision = self.soc_choice.revision
-            value = payload.get("value")
             try:
-                if command == "plug_charge_config":
-                    enabled = payload.get("value")
-                    policy = payload.get("policy", "")
-                    if type(enabled) is not bool or not isinstance(policy, str):
-                        raise ValueError("invalid Plug & Charge configuration")
-                    await control.async_configure_plug_charge(enabled, policy=policy)
-                elif command == "unplug_release_config":
-                    # A setting of the rule only: nothing is written to the wallbox.
-                    self.client.write_state.unplug_release.configure(payload.get("value"))
-                elif command == "plug_charge_authorize":
-                    session = payload.get("session")
-                    deadline = payload.get("deadline")
-                    if not isinstance(session, str) or not isinstance(deadline, str) or len(deadline) > 64:
-                        raise ValueError("invalid Plug & Charge authorization")
-                    await control.async_authorize_plug_charge(session, deadline=datetime.fromisoformat(deadline))
-                elif cancelling:
-                    await control.async_cancel_pending_change()
-                elif command == "set_current":
-                    unlimited = payload.get("allow_unlimited", False)
-                    if not isinstance(unlimited, bool):
-                        raise ValueError("allow_unlimited must be boolean")
-                    await control.async_set_charging_current(
-                        number(value, 0, 32), allow_unlimited=unlimited
-                    )
-                elif command == "pause":
-                    await control.async_pause_charging()
-                elif command == "energy_goal":
-                    await control.async_set_energy_goal(number(value, 0, 1000))
-                elif command in ("cost_goal", "cost_price"):
-                    # Home Assistant knows the price, the service the meter:
-                    # the amount and its target live here, in one place.
-                    if control.goal_controller is None or not control.supports_energy_goal:
-                        raise validation_error("energy_goal_not_supported")
-                    price = payload.get("price")
-                    control.goal_controller.note_currency(payload.get("currency"))
-                    if command == "cost_goal":
-                        await control.goal_controller.async_set_cost_target(number(value, 0, 1000), price)
-                    else:
-                        await control.goal_controller.async_set_price(price)
-                elif command == "soc_source":
-                    await self.soc_choice.configure(control, payload)
-                elif command in ("soc_goal", "soc_observation", "soc_goal_choice"):
-                    await self.soc_choice.apply(control, command, payload)
-                elif command == "resume":
-                    await control.async_resume_charging(
-                        current_cap=number(
-                            payload.get("current_cap", self.config.current_cap), 6, 32
-                        )
-                    )
-                elif command in ("release", "lock"):
-                    if not isinstance(value, bool):
-                        raise ValueError("value must be boolean")
-                    if command == "release":
-                        await control.async_set_charging_release(value)
-                    else:
-                        await control.async_set_lock_evse(value)
-                elif command == "solar":
-                    await control.async_set_solar_charging_mode(
-                        SolarChargingMode(integer(value, 0, 3))
-                    )
-                elif command == "phases":
-                    await control.async_set_requested_phases(
-                        RequestedPhases(integer(value, 0, 1))
-                    )
-                elif command == "recover":
-                    await control.async_recover_from_error()
-                elif command == "restart":
-                    await control.async_restart()
-                else:
-                    raise ValueError("unknown command")
+                await run(self, control, payload)
             finally:
                 failure = command_failed = sys.exception()
                 try:
@@ -1048,7 +971,7 @@ class ModbusService:
             # Something was written during this command and a poll followed
             # the last write: the state to answer with is already read.
             read_back = written < self.diagnostics.writes_sent == self._read_back
-            if not cancelling and not metadata and not read_back:
+            if wallbox and not read_back:
                 await self.refresh()
             return self._publish()
 

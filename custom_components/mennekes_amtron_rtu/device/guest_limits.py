@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from .client_errors import AmtronBusError
 from .command_events import CommandEvent
+from .commands import COMMANDS, ENVELOPE
 from .connection_sample import connection_sample
 from .control import AmtronControl
 from .errors import DeviceError, device_error
@@ -88,7 +89,7 @@ class GuestLimits:
 
     async def start(self, payload: dict[str, Any]) -> dict[str, Any]:
         """The guest_start command."""
-        if payload.keys() != {"command", "expected_serial_number", "expected_guest_revision"}:
+        if payload.keys() != COMMANDS["guest_start"].fields | ENVELOPE:
             raise ValueError("invalid guest command")
         async with self._service._command_lock:
             if payload["expected_serial_number"] != self._service.identity.serial_number:

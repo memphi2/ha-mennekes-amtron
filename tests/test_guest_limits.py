@@ -43,8 +43,10 @@ def test_stopping_and_malformed_guest_requests_never_write(tmp_path):
         async with runtime.guest_service(tmp_path) as (service, transport, _clock):
             payload = {"command":"guest_start", "expected_serial_number":service.identity.serial_number,
                        "expected_guest_revision":service.guest.revision}
-            with pytest.raises(ValueError, match="guest command"):
+            with pytest.raises(ValueError, match="unknown command field"):
                 await service.command({**payload, "extra":True})
+            with pytest.raises(ValueError, match="guest command"):
+                await service.command({key: value for key, value in payload.items() if key != "expected_guest_revision"})
             service._stopping = True
             with pytest.raises(DeviceError, match="service_unavailable"):
                 await service.command(payload)

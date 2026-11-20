@@ -6,6 +6,12 @@
   charge, own car only, guest charging. Names match Home Assistant, every
   target has Save and Clear, and the guest card lists what ends a guest charge.
 - The overview shows the saved targets in one card with one link to Charging.
+- Money is shown in Home Assistant's currency, which it reports with the price.
+- The app keeps the one target time; Home Assistant no longer stores a copy.
+  A time changed while a guest charges stays as changed afterwards.
+- One account of the plug-in decides for Plug & Charge, guest charging and the
+  unplug rule whether a car is connected.
+- A command takes only its own fields; a field of another command is refused.
 
 ## 0.10.0b6
 

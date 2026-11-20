@@ -172,7 +172,7 @@ class ServiceConsole(AppSettings):
                 "configured": control.soc_goal.source is not None,
                 "target": control.soc_goal.target_percent,
                 "maximum": control.soc_goal.maximum_percent,
-                "maximum_required": service.snapshot()["control"]["soc_maximum_required"],
+                "maximum_required": service.soc_choice.maximum_required,
                 "status": control.soc_goal.status,
             },
             "departure": None if plan is None or departure is None else {
@@ -205,42 +205,25 @@ class ServiceConsole(AppSettings):
         service = self._configured_service()
         if not isinstance(payload["revision"], str):
             raise SettingsError("invalid_request")
-        action = payload["action"]
+        action, value, revision = payload["action"], payload["value"], payload["revision"]
+        if isinstance(action, str) and action in ("guest", "pause") and value is not True:
+            # A start or a pause must be explicit.
+            raise SettingsError("invalid_request")
+        commands: dict[str, dict[str, Any]] = {
+            "energy": {"command": "energy_goal", "value": value, "expected_choice_revision": revision},
+            "soc": {"command": "soc_goal_choice", "value": value, "expected_choice_revision": revision},
+            "cost": {"command": "cost_goal", "value": value, "expected_choice_revision": revision},
+            "guest": {"command": "guest_start", "expected_guest_revision": revision},
+            "pause": {"command": "pause"},
+            "departure": {"command": "departure_choice", "deadline": value, "revision": revision},
+        }
+        if not isinstance(action, str) or action not in commands:
+            raise SettingsError("invalid_request")
         try:
-            if action in ("energy", "soc"):
-                await service.command({"origin": "app",
-                    "command": "energy_goal" if action == "energy" else "soc_goal_choice",
-                    "value": payload["value"], "expected_choice_revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "cost":
-                await service.command({"origin": "app",
-                    "command": "cost_goal", "value": payload["value"],
-                    "expected_choice_revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "guest":
-                if payload["value"] is not True:
-                    raise ValueError("guest start must be explicit")
-                await service.command({"origin": "app",
-                    "command": "guest_start", "expected_guest_revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "pause":
-                if payload["value"] is not True:
-                    raise ValueError("pause must be explicit")
-                await service.command({"origin": "app",
-                    "command": "pause", "value": True,
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "departure":
-                await service.command({"origin": "app",
-                    "command": "departure_choice", "deadline": payload["value"],
-                    "revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            else:
-                raise SettingsError("invalid_request")
+            # The same command, checks and answer as for every other caller.
+            await service.command({
+                **commands[action], "origin": "app", "expected_serial_number": service.identity.serial_number,
+            })
         except DeviceError as err:
             # Codes only; never expose source IDs, credentials or arbitrary errors.
             code = str(err)

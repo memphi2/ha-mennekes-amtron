@@ -207,8 +207,9 @@ def test_service_uses_the_shared_command_guards(
         try:
             await service.command(
                 {
-                    "command": command, "value": value, "allow_unlimited": True,
-                    "expected_serial_number": "ABC123456789",
+                    "command": command, "expected_serial_number": "ABC123456789",
+                    **({} if value is None else {"value": value}),
+                    **({"allow_unlimited": True} if command == "set_current" else {}),
                 }
             )
             writes = [

@@ -18,6 +18,7 @@ from aiohttp import ClientError, ClientSession
 from .device.charging_display import DISPLAY_OPTIONS
 from .device.client_errors import AmtronConnectionError
 from .device.command_events import CommandEvents, command_source
+from .device.commands import needs_wallbox
 from .device.const import (
     MAX_PHASE_SWITCH_GRACE_SECONDS,
     MAX_STATE_CHANGE_INTERVAL_SECONDS,
@@ -512,15 +513,10 @@ class ServiceClient:
                 # Permission may have changed while this command waited for a
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.
-                cancelling = command == "cancel_pending"
+                # The service's own table says which commands need the wallbox.
+                wallbox = needs_wallbox(command, values)
                 soc_metadata = command in {"soc_source", "soc_observation"}
-                departure = command in {"departure_trip", "departure_inputs", "departure_choice", "charge_note"}
-                metadata = soc_metadata or departure or command == "unplug_release_config" or (
-                    command == "plug_charge_config" and values.get("value") is False
-                )
-                if not self._connected or (
-                    not cancelling and not metadata and self.snapshot.get("available") is not True
-                ):
+                if not self._connected or (wallbox and self.snapshot.get("available") is not True):
                     raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
                 if command == "cancel_pending" and self.snapshot.get("control", {}).get("read_only") is not False:
                     raise DeviceValidationError("read_only_mode")
@@ -533,7 +529,7 @@ class ServiceClient:
                             "expected_serial_number": self.bound_serial,
                         }
                     ),
-                    require_available=not (cancelling or metadata),
+                    require_available=wallbox,
                     consume_energy=False,
                 )
         except AmtronConnectionError as err:
