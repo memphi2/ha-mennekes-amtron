@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import errno
 import logging
 import struct
 
@@ -13,13 +14,21 @@ class Libc:
     def __init__(self, failing=()):
         self.calls, self.failing = [], failing
 
+    def _result(self, name):
+        if name not in self.failing:
+            return 0
+        # A refusal sets errno, as the real call does: the error is then
+        # this one, whatever an earlier call left behind.
+        ctypes.set_errno(errno.EPERM)
+        return -1
+
     def prctl(self, *arguments):
         self.calls.append(("prctl", arguments))
-        return -1 if "prctl" in self.failing else 0
+        return self._result("prctl")
 
     def capset(self, header, data):
         self.calls.append(("capset", struct.unpack("=Ii", header), data))
-        return -1 if "capset" in self.failing else 0
+        return self._result("capset")
 
 
 def test_all_capability_sets_are_emptied_and_none_can_be_gained(monkeypatch, caplog):
@@ -35,13 +44,15 @@ def test_all_capability_sets_are_emptied_and_none_can_be_gained(monkeypatch, cap
 
 def test_a_refused_drop_is_reported_and_the_service_still_starts(monkeypatch, caplog):
     caplog.set_level(logging.WARNING)
+    # Left over from something before: it must not decide the error.
+    ctypes.set_errno(errno.ENOENT)
     for failing in ("prctl", "capset"):
         monkeypatch.setattr(ctypes, "CDLL", lambda *_a, failing=failing, **_k: Libc((failing,)))
         privileges.drop_capabilities()
     monkeypatch.setattr(ctypes, "CDLL", lambda *_a, **_k: object())
     privileges.drop_capabilities()
     assert caplog.messages == [
-        "Service: privileges kept (OSError)", "Service: privileges kept (OSError)",
+        "Service: privileges kept (PermissionError)", "Service: privileges kept (PermissionError)",
         "Service: privileges kept (AttributeError)",
     ]
 
