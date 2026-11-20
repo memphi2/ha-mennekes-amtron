@@ -480,7 +480,7 @@ def test_cancelled_save_keeps_the_target_that_may_already_be_committed():
     asyncio.run(run())
 
 
-def test_cancelled_committed_target_invalidates_queued_timed_command():
+def test_cancelled_committed_target_invalidates_queued_departure_command():
     async def run():
         harness, control, runner, _saved = await _runner()
         control.soc_goal.configure_source("sensor.car_soc")
@@ -489,7 +489,7 @@ def test_cancelled_committed_target_invalidates_queued_timed_command():
         control._sleep = lambda _delay: release.wait()
         try:
             await control.async_pause_charging()
-            await control.async_set_timed_current(
+            await control.async_set_departure_current(
                 6, deadline=datetime.now(UTC) + timedelta(hours=1), owner="timed:entry"
             )
             assert control.pending_action == "set_current"

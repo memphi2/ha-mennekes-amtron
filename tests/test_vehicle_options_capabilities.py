@@ -66,7 +66,7 @@ def test_disappearing_capability_rechecks_profile_form_before_save(remaining, us
 def test_departure_remove_action_is_offered_only_when_enabled(enabled):
     async def run():
         entry = FakeConfigEntry(options=profile_options(feature={
-            "vehicle_soc_entity": "sensor.soc", "timed_goal_enabled": enabled,
+            "vehicle_soc_entity": "sensor.soc", "departure_enabled": enabled,
         }))
         flow = Flow(entry)
         await open_profile(flow)
@@ -87,7 +87,7 @@ def test_departure_remove_action_is_offered_only_when_enabled(enabled):
 def test_open_form_keeps_its_original_vehicle_name_after_automatic_selection(section):
     async def run():
         entry = FakeConfigEntry(options=profile_options(feature={
-            "vehicle_soc_entity": "sensor.original", "timed_goal_enabled": True,
+            "vehicle_soc_entity": "sensor.original", "departure_enabled": True,
         }))
         flow = Flow(entry)
         await open_profile(flow)
@@ -99,7 +99,7 @@ def test_open_form_keeps_its_original_vehicle_name_after_automatic_selection(sec
         else:
             form = await flow.async_step_departure_configure()
             await flow.async_step_departure_configure({"capacity_source": "fixed"})
-            result = await flow.async_step_departure_capacity_fixed({"timed_capacity_kwh": 80})
+            result = await flow.async_step_departure_capacity_fixed({"departure_capacity_kwh": 80})
         assert form["description_placeholders"] == {"vehicle": "Car A"}
         assert result["step_id"] == "options_changed"
         assert entry.options["active_vehicle_profile"] == B

@@ -61,7 +61,7 @@ def test_profile_add_uses_current_vehicle_sources_without_implicit_migration():
     async def run():
         old = {
             "vehicle_soc_entity": "sensor.manual",
-            "timed_bavarian_device": "car",
+            "departure_bavarian_device": "car",
             "charge_loss_bavarian_device": "other",
             "charging_price": 0.4,
         }
@@ -91,7 +91,7 @@ def test_profile_add_uses_current_vehicle_sources_without_implicit_migration():
         # A newly linked car uses everything it reports.
         assert added[0].options == {
             "vehicle_soc_use_profile": True, "vehicle_limit_use_profile": True,
-            "timed_use_vehicle_capacity": True, "charge_loss_source": "vehicle_history", "charge_loss_vehicle_provider": "profile",
+            "departure_use_vehicle_capacity": True, "charge_loss_source": "vehicle_history", "charge_loss_vehicle_provider": "profile",
         }
         assert added[0].detection is None
         assert added[0].provider_id == "bavariandata"
@@ -111,7 +111,7 @@ def test_first_manual_profile_is_active_but_all_vehicle_features_stay_off():
         saved = (await flow.async_step_wizard_finish())["data"]
         assert len(profiles(saved)) == 1
         assert profiles(saved)[saved["active_vehicle_profile"]].options == {}
-        assert saved["timed_goal_reset_pending"] is True
+        assert saved["departure_reset_pending"] is True
         assert saved["vehicle_profile_selected_at"] > 0
 
     asyncio.run(run())
@@ -161,7 +161,7 @@ def test_profile_edit_rename_keeps_features_but_changed_vehicle_resets_them():
     async def run():
         entry = FakeConfigEntry(
             options=profile_options(
-                feature={"vehicle_soc_use_profile": True, "timed_goal_enabled": True}
+                feature={"vehicle_soc_use_profile": True, "departure_enabled": True}
             )
         )
         flow = Flow(entry)
@@ -198,7 +198,7 @@ def test_profile_edit_rename_keeps_features_but_changed_vehicle_resets_them():
         assert changed["vehicle_profiles"][A]["options"] == {
             "charge_loss_source": "vehicle_history", "charge_loss_vehicle_provider": "profile",
         }
-        assert changed["timed_goal_reset_pending"] is True
+        assert changed["departure_reset_pending"] is True
         assert changed["vehicle_profile_selected_at"] > 0
 
     asyncio.run(run())
@@ -335,12 +335,12 @@ def test_profile_features_are_selected_independently_and_saved_into_their_car():
             {"capacity_source": "profile", "use_vehicle_timer": True}
         )
         assert form["step_id"] == "departure_vehicle_details"
-        assert "timed_vehicle_device" not in fields(form)
+        assert "departure_vehicle_device" not in fields(form)
         saved = (await flow.async_step_departure_vehicle_details({}))["data"]
         options = saved["vehicle_profiles"][A]["options"]
-        assert options["timed_use_vehicle_capacity"] is True
-        assert options["timed_vehicle_provider"] == "profile"
-        assert "timed_vehicle_device" not in options
+        assert options["departure_use_vehicle_capacity"] is True
+        assert options["departure_vehicle_provider"] == "profile"
+        assert "departure_vehicle_device" not in options
         entry.options = saved
         assert "loss_profile" in (await flow.async_step_losses())["menu_options"]
         final = (await flow.async_step_loss_profile())["data"]
@@ -379,7 +379,7 @@ def test_manual_entity_override_and_disabled_features_do_not_delete_the_profile(
         assert "vehicle_disable" in (await flow.async_step_vehicle_battery())["menu_options"]
         disabled = (await flow.async_step_vehicle_disable())["data"]
         assert disabled["vehicle_profiles"][A]["options"] == {
-            "timed_goal_enabled": False
+            "departure_enabled": False
         }
         assert disabled["active_vehicle_profile"] == A
         assert disabled["vehicle_profiles"][B] == entry.options["vehicle_profiles"][B]

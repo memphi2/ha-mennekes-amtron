@@ -84,6 +84,18 @@ from .const import (
     NETWORK_CONNECTION_TYPES,
     SEARCH_MODES,
 )
+from .departure_const import (
+    CONF_DEPARTURE_CALENDAR_ENTITY,
+    CONF_DEPARTURE_CALENDAR_TITLE,
+    CONF_DEPARTURE_CAPACITY_ENTITY,
+    CONF_DEPARTURE_CAPACITY_KWH,
+    CONF_DEPARTURE_ENTITY,
+    CONF_DEPARTURE_MINIMUM_SOC,
+    CONF_DEPARTURE_TIMER1_DAYS,
+    CONF_DEPARTURE_TIMER2_DAYS,
+    CONF_DEPARTURE_VEHICLE_TIME_ZONE,
+    DEPARTURE_WEEKDAYS,
+)
 from .device.const import (
     DEFAULT_BAUDRATE,
     DEFAULT_DEVICE_ID,
@@ -94,18 +106,6 @@ from .device.const import (
     MAX_STATE_CHANGE_INTERVAL_SECONDS,
     SUPPORTED_BAUDRATES,
     SUPPORTED_FRAMES,
-)
-from .timed_goal_const import (
-    CONF_TIMED_CALENDAR_ENTITY,
-    CONF_TIMED_CALENDAR_TITLE,
-    CONF_TIMED_CAPACITY_ENTITY,
-    CONF_TIMED_CAPACITY_KWH,
-    CONF_TIMED_DEPARTURE_ENTITY,
-    CONF_TIMED_MINIMUM_SOC,
-    CONF_TIMED_TIMER1_DAYS,
-    CONF_TIMED_TIMER2_DAYS,
-    CONF_TIMED_VEHICLE_TIME_ZONE,
-    TIMED_WEEKDAYS,
 )
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
@@ -368,7 +368,7 @@ def departure_configure_schema(
 ) -> probatio.Schema:
     profile = current.get("vehicle_provider") not in (None, "none")
     capacity_sources = ["fixed", "entity", "profile"] if profile_capacity else ["fixed", "entity"]
-    default_source = "profile" if profile_capacity and current.get("timed_use_vehicle_capacity") is True else "entity" if current.get(CONF_TIMED_CAPACITY_ENTITY) else "fixed"
+    default_source = "profile" if profile_capacity and current.get("departure_use_vehicle_capacity") is True else "entity" if current.get(CONF_DEPARTURE_CAPACITY_ENTITY) else "fixed"
     selected_source = current.get("capacity_source", default_source)
     if selected_source not in capacity_sources:
         selected_source = default_source
@@ -386,19 +386,19 @@ def departure_configure_schema(
             probatio.Required(
                 "use_calendar",
                 default=current.get(
-                    "use_calendar", bool(current.get(CONF_TIMED_CALENDAR_ENTITY))
+                    "use_calendar", bool(current.get(CONF_DEPARTURE_CALENDAR_ENTITY))
                 ),
             ): BooleanSelector(),
             probatio.Required(
                 "use_departure_entity",
                 default=current.get(
                     "use_departure_entity",
-                    bool(current.get(CONF_TIMED_DEPARTURE_ENTITY)),
+                    bool(current.get(CONF_DEPARTURE_ENTITY)),
                 ),
             ): BooleanSelector(),
             probatio.Required(
-                CONF_TIMED_MINIMUM_SOC,
-                default=current.get(CONF_TIMED_MINIMUM_SOC, 0),
+                CONF_DEPARTURE_MINIMUM_SOC,
+                default=current.get(CONF_DEPARTURE_MINIMUM_SOC, 0),
             ): NumberSelector(
                 NumberSelectorConfig(
                     min=0, max=100, step=1, unit_of_measurement="%",
@@ -420,7 +420,7 @@ def departure_configure_schema(
 def departure_capacity_schema(
     current: dict[str, Any], *, entity: bool
 ) -> probatio.Schema:
-    key = CONF_TIMED_CAPACITY_ENTITY if entity else CONF_TIMED_CAPACITY_KWH
+    key = CONF_DEPARTURE_CAPACITY_ENTITY if entity else CONF_DEPARTURE_CAPACITY_KWH
     return probatio.Schema(
         {
             probatio.Required(
@@ -444,15 +444,15 @@ def departure_calendar_schema(current: dict[str, Any]) -> probatio.Schema:
     return probatio.Schema(
         {
             probatio.Required(
-                CONF_TIMED_CALENDAR_ENTITY,
+                CONF_DEPARTURE_CALENDAR_ENTITY,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_CALENDAR_ENTITY),
+                    "suggested_value": current.get(CONF_DEPARTURE_CALENDAR_ENTITY),
                 },
             ): _entity_selector(("calendar",)),
             probatio.Required(
-                CONF_TIMED_CALENDAR_TITLE,
+                CONF_DEPARTURE_CALENDAR_TITLE,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_CALENDAR_TITLE),
+                    "suggested_value": current.get(CONF_DEPARTURE_CALENDAR_TITLE),
                 },
             ): TextSelector(),
         }
@@ -463,9 +463,9 @@ def departure_entity_schema(current: dict[str, Any]) -> probatio.Schema:
     return probatio.Schema(
         {
             probatio.Required(
-                CONF_TIMED_DEPARTURE_ENTITY,
+                CONF_DEPARTURE_ENTITY,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_DEPARTURE_ENTITY),
+                    "suggested_value": current.get(CONF_DEPARTURE_ENTITY),
                 },
             ): _entity_selector(("sensor", "input_datetime")),
         }
@@ -595,22 +595,22 @@ def vehicle_device_schema(
     if timer_options:
         fields[
             probatio.Optional(
-                CONF_TIMED_VEHICLE_TIME_ZONE,
+                CONF_DEPARTURE_VEHICLE_TIME_ZONE,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_VEHICLE_TIME_ZONE),
+                    "suggested_value": current.get(CONF_DEPARTURE_VEHICLE_TIME_ZONE),
                 },
             )
         ] = TextSelector()
-        for option in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+        for option in (CONF_DEPARTURE_TIMER1_DAYS, CONF_DEPARTURE_TIMER2_DAYS):
             fields[
                 probatio.Optional(
                     option, description={"suggested_value": current.get(option)}
                 )
             ] = SelectSelector(
                 SelectSelectorConfig(
-                    options=list(TIMED_WEEKDAYS),
+                    options=list(DEPARTURE_WEEKDAYS),
                     multiple=True,
-                    translation_key="timed_weekdays",
+                    translation_key="departure_weekdays",
                     mode=SelectSelectorMode.DROPDOWN,
                 ),
             )

@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from custom_components.mennekes_amtron_rtu.options_flow import (
-    _timed_errors,
+    _departure_errors,
     _timer_errors,
 )
 from tests.ha_fakes import FakeConfigEntry
@@ -17,53 +17,53 @@ from tests.test_options_flow import fields
     ("extra", "key", "error"),
     [
         (
-            {"timed_capacity_entity": 123},
-            "timed_capacity_entity",
-            "timed_source_invalid",
+            {"departure_capacity_entity": 123},
+            "departure_capacity_entity",
+            "departure_source_invalid",
         ),
         (
-            {"timed_capacity_entity": "bad"},
-            "timed_capacity_entity",
-            "timed_source_invalid",
+            {"departure_capacity_entity": "bad"},
+            "departure_capacity_entity",
+            "departure_source_invalid",
         ),
         (
-            {"timed_capacity_entity": "switch.bad"},
-            "timed_capacity_entity",
-            "timed_source_invalid",
+            {"departure_capacity_entity": "switch.bad"},
+            "departure_capacity_entity",
+            "departure_source_invalid",
         ),
         (
-            {"timed_calendar_title": "Trip"},
-            "timed_calendar_title",
-            "timed_calendar_required",
+            {"departure_calendar_title": "Trip"},
+            "departure_calendar_title",
+            "departure_calendar_required",
         ),
         (
-            {"timed_calendar_entity": "calendar.car"},
-            "timed_calendar_title",
-            "timed_calendar_title_required",
+            {"departure_calendar_entity": "calendar.car"},
+            "departure_calendar_title",
+            "departure_calendar_title_required",
         ),
-        ({"timed_timer1_days": "mon"}, "timed_timer1_days", "timed_weekdays_invalid"),
+        ({"departure_timer1_days": "mon"}, "departure_timer1_days", "departure_weekdays_invalid"),
         (
-            {"timed_timer2_days": ["invalid"]},
-            "timed_timer2_days",
-            "timed_weekdays_invalid",
-        ),
-        (
-            {"timed_vehicle_time_zone": "Mars/Olympus"},
-            "timed_vehicle_time_zone",
-            "timed_timezone_invalid",
+            {"departure_timer2_days": ["invalid"]},
+            "departure_timer2_days",
+            "departure_weekdays_invalid",
         ),
         (
-            {"timed_vehicle_time_zone": 9},
-            "timed_vehicle_time_zone",
-            "timed_timezone_invalid",
+            {"departure_vehicle_time_zone": "Mars/Olympus"},
+            "departure_vehicle_time_zone",
+            "departure_timezone_invalid",
+        ),
+        (
+            {"departure_vehicle_time_zone": 9},
+            "departure_vehicle_time_zone",
+            "departure_timezone_invalid",
         ),
     ],
 )
-def test_invalid_timed_sources(extra, key, error):
+def test_invalid_departure_sources(extra, key, error):
     validator = (
         _timer_errors
-        if key in {"timed_timer1_days", "timed_timer2_days", "timed_vehicle_time_zone"}
-        else _timed_errors
+        if key in {"departure_timer1_days", "departure_timer2_days", "departure_vehicle_time_zone"}
+        else _departure_errors
     )
     assert validator(extra)[key] == error
 
@@ -73,10 +73,10 @@ def test_invalid_timed_sources(extra, key, error):
 )
 def test_invalid_capacity(capacity):
     assert (
-        _timed_errors(
-            {"vehicle_soc_entity": "sensor.soc", "timed_capacity_kwh": capacity}
-        )["timed_capacity_kwh"]
-        == "timed_capacity_invalid"
+        _departure_errors(
+            {"vehicle_soc_entity": "sensor.soc", "departure_capacity_kwh": capacity}
+        )["departure_capacity_kwh"]
+        == "departure_capacity_invalid"
     )
 
 
@@ -87,12 +87,12 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
             options={
                 "vehicle_soc_entity": "sensor.soc",
                 "charging_price": 0.3,
-                "timed_calendar_entity": "calendar.old",
-                "timed_calendar_title": "Old",
-                "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car",
-                "timed_timer1_days": ["mon"],
-                "timed_departure_entity": "sensor.old",
-                "timed_goal_reset_pending": True,
+                "departure_calendar_entity": "calendar.old",
+                "departure_calendar_title": "Old",
+                "departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "car",
+                "departure_timer1_days": ["mon"],
+                "departure_entity": "sensor.old",
+                "departure_reset_pending": True,
             }
         )
         flow = Flow(entry)
@@ -103,12 +103,12 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
             "use_calendar",
             "use_departure_entity",
             "use_vehicle_timer",
-            "timed_minimum_soc",
+            "departure_minimum_soc",
         }
         result = await flow.async_step_departure_configure(
-            {"capacity_source": "entity" if dynamic else "fixed", "timed_minimum_soc": 30}
+            {"capacity_source": "entity" if dynamic else "fixed", "departure_minimum_soc": 30}
         )
-        key = "timed_capacity_entity" if dynamic else "timed_capacity_kwh"
+        key = "departure_capacity_entity" if dynamic else "departure_capacity_kwh"
         assert set(fields(result)) == {key}
         method = (
             flow.async_step_departure_capacity_entity
@@ -118,18 +118,18 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
         assert result["last_step"] is True
         saved = (await method({key: "sensor.capacity" if dynamic else 75}))["data"]
         assert saved[key] == ("sensor.capacity" if dynamic else 75)
-        assert saved["timed_goal_enabled"] is True
-        assert saved["timed_goal_reset_pending"] is True
-        assert saved["timed_vehicle_provider"] == "none"
-        assert saved["timed_minimum_soc"] == 30
+        assert saved["departure_enabled"] is True
+        assert saved["departure_reset_pending"] is True
+        assert saved["departure_vehicle_provider"] == "none"
+        assert saved["departure_minimum_soc"] == 30
         assert saved["charging_price"] == 0.3
         assert (
             not {
-                "timed_calendar_entity",
-                "timed_calendar_title",
-                "timed_vehicle_device",
-                "timed_timer1_days",
-                "timed_departure_entity",
+                "departure_calendar_entity",
+                "departure_calendar_title",
+                "departure_vehicle_device",
+                "departure_timer1_days",
+                "departure_entity",
             }
             & saved.keys()
         )
@@ -138,12 +138,12 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
         again = Flow(entry)
         await again.async_step_departure()
         await again.async_step_departure_configure(
-            {"capacity_source": "entity" if dynamic else "fixed", "timed_minimum_soc": 0}
+            {"capacity_source": "entity" if dynamic else "fixed", "departure_minimum_soc": 0}
         )
-        assert "timed_minimum_soc" not in (await getattr(again, method.__name__)({key: saved[key]}))["data"]
+        assert "departure_minimum_soc" not in (await getattr(again, method.__name__)({key: saved[key]}))["data"]
         await flow.async_step_departure()
         disabled = (await flow.async_step_departure_disable())["data"]
-        assert disabled["timed_goal_enabled"] is False
+        assert disabled["departure_enabled"] is False
         assert disabled[key] == saved[key]
 
     asyncio.run(run())
@@ -170,45 +170,45 @@ def test_all_optional_departure_sources_coexist_and_generic_provider_saves():
         capacity = await flow.async_step_departure_capacity_fixed()
         assert capacity["last_step"] is False
         assert (
-            await flow.async_step_departure_capacity_fixed({"timed_capacity_kwh": 80})
+            await flow.async_step_departure_capacity_fixed({"departure_capacity_kwh": 80})
         )["step_id"] == "departure_calendar"
         assert (
             await flow.async_step_departure_calendar(
                 {
-                    "timed_calendar_entity": "calendar.car",
-                    "timed_calendar_title": "Trip",
+                    "departure_calendar_entity": "calendar.car",
+                    "departure_calendar_title": "Trip",
                 }
             )
         )["step_id"] == "departure_entity"
         assert (
             await flow.async_step_departure_entity(
-                {"timed_departure_entity": "input_datetime.trip"}
+                {"departure_entity": "input_datetime.trip"}
             )
         )["step_id"] == "departure_vehicle"
         details = await flow.async_step_departure_vehicle(
-            {"timed_vehicle_provider": "bavariandata"}
+            {"departure_vehicle_provider": "bavariandata"}
         )
         markers = {marker.schema: marker for marker in details["data_schema"].schema}
-        assert markers["timed_vehicle_device"].description["suggested_value"] == "car"
+        assert markers["departure_vehicle_device"].description["suggested_value"] == "car"
         assert {
-            "timed_vehicle_time_zone",
-            "timed_timer1_days",
-            "timed_timer2_days",
+            "departure_vehicle_time_zone",
+            "departure_timer1_days",
+            "departure_timer2_days",
         } <= markers.keys()
         saved_result = await flow.async_step_departure_vehicle_details(
                 {
-                    "timed_vehicle_device": "car",
-                    "timed_vehicle_time_zone": "Europe/Berlin",
-                    "timed_timer1_days": ["mon"],
-                    "timed_timer2_days": [],
+                    "departure_vehicle_device": "car",
+                    "departure_vehicle_time_zone": "Europe/Berlin",
+                    "departure_timer1_days": ["mon"],
+                    "departure_timer2_days": [],
                 }
             )
         saved = saved_result["data"]
-        assert saved["timed_vehicle_provider"] == "bavariandata"
-        assert saved["timed_vehicle_device"] == "car"
-        assert saved["timed_calendar_entity"] == "calendar.car"
-        assert saved["timed_departure_entity"] == "input_datetime.trip"
-        assert "timed_timer2_days" not in saved
+        assert saved["departure_vehicle_provider"] == "bavariandata"
+        assert saved["departure_vehicle_device"] == "car"
+        assert saved["departure_calendar_entity"] == "calendar.car"
+        assert saved["departure_entity"] == "input_datetime.trip"
+        assert "departure_timer2_days" not in saved
 
     asyncio.run(run())
 
@@ -229,39 +229,39 @@ def test_departure_validates_every_selected_detail_before_review():
             }
         )
         assert (
-            await flow.async_step_departure_capacity_fixed({"timed_capacity_kwh": 0})
+            await flow.async_step_departure_capacity_fixed({"departure_capacity_kwh": 0})
         )["errors"]
-        await flow.async_step_departure_capacity_fixed({"timed_capacity_kwh": 80})
+        await flow.async_step_departure_capacity_fixed({"departure_capacity_kwh": 80})
         assert (await flow.async_step_departure_calendar({}))["errors"]
         await flow.async_step_departure_calendar(
-            {"timed_calendar_entity": "calendar.car", "timed_calendar_title": "Trip"}
+            {"departure_calendar_entity": "calendar.car", "departure_calendar_title": "Trip"}
         )
         assert (
             await flow.async_step_departure_entity(
-                {"timed_departure_entity": "switch.bad"}
+                {"departure_entity": "switch.bad"}
             )
         )["errors"]
         await flow.async_step_departure_entity(
-            {"timed_departure_entity": "sensor.trip"}
+            {"departure_entity": "sensor.trip"}
         )
         assert (
-            await flow.async_step_departure_vehicle({"timed_vehicle_provider": "no"})
+            await flow.async_step_departure_vehicle({"departure_vehicle_provider": "no"})
         )["errors"]
         await flow.async_step_departure_vehicle(
-            {"timed_vehicle_provider": "bavariandata"}
+            {"departure_vehicle_provider": "bavariandata"}
         )
         assert (
             await flow.async_step_departure_vehicle_details(
                 {
-                    "timed_vehicle_device": "account",
-                    "timed_timer1_days": ["no"],
-                    "timed_vehicle_time_zone": "bad",
+                    "departure_vehicle_device": "account",
+                    "departure_timer1_days": ["no"],
+                    "departure_vehicle_time_zone": "bad",
                 }
             )
         )["errors"]
         assert (
             await flow.async_step_departure_vehicle_details(
-                {"timed_vehicle_device": "car"}
+                {"departure_vehicle_device": "car"}
             )
         )["type"] == "create_entry"
 
@@ -282,7 +282,7 @@ def test_departure_requires_soc_before_entering_and_again_before_save():
         await flow.async_step_departure()
         await flow.async_step_departure_configure({"capacity_source": "fixed"})
         entry.options.clear()
-        assert (await flow.async_step_departure_capacity_fixed({"timed_capacity_kwh": 80}))["step_id"] == "options_changed"
+        assert (await flow.async_step_departure_capacity_fixed({"departure_capacity_kwh": 80}))["step_id"] == "options_changed"
 
     asyncio.run(run())
 
@@ -293,7 +293,7 @@ def test_departure_keeps_distinct_vehicle_and_empty_dynamic_source_is_error():
             FakeConfigEntry(
                 options={
                     "vehicle_soc_entity": "sensor.soc",
-                    "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "own",
+                    "departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "own",
                     "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "other",
                 }
             )
@@ -304,15 +304,15 @@ def test_departure_keeps_distinct_vehicle_and_empty_dynamic_source_is_error():
         )
         assert (await flow.async_step_departure_capacity_entity({}))["errors"]
         await flow.async_step_departure_capacity_entity(
-            {"timed_capacity_entity": "sensor.capacity"}
+            {"departure_capacity_entity": "sensor.capacity"}
         )
         details = await flow.async_step_departure_vehicle(
-            {"timed_vehicle_provider": "bavariandata"}
+            {"departure_vehicle_provider": "bavariandata"}
         )
         marker = next(
             marker
             for marker in details["data_schema"].schema
-            if marker.schema == "timed_vehicle_device"
+            if marker.schema == "departure_vehicle_device"
         )
         assert marker.description["suggested_value"] == "own"
 

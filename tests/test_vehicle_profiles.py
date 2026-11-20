@@ -88,7 +88,7 @@ def test_malformed_profile_catalog_cannot_revive_legacy_vehicle_settings(catalog
     }
     assert profiles(raw) == {}
     assert active_profile(raw) is None
-    assert vehicle_options(raw) == {"charging_price": 0.4, "timed_goal_enabled": False}
+    assert vehicle_options(raw) == {"charging_price": 0.4, "departure_enabled": False}
 
 
 def test_profile_catalog_is_bounded_and_names_are_distinct():
@@ -107,7 +107,7 @@ def test_profile_catalog_is_bounded_and_names_are_distinct():
 
 
 def test_legacy_configuration_and_explicit_manual_profile_remain_manual():
-    raw = {"vehicle_soc_entity": "sensor.manual", "timed_bavarian_device": "old-car"}
+    raw = {"vehicle_soc_entity": "sensor.manual", "departure_bavarian_device": "old-car"}
     assert vehicle_options(raw) == raw
     projected = vehicle_options(
         profile_options(
@@ -116,7 +116,7 @@ def test_legacy_configuration_and_explicit_manual_profile_remain_manual():
                 "vehicle_soc_entity": "sensor.manual",
                 "vehicle_soc_use_profile": True,
                 "vehicle_limit_use_profile": True,
-                "timed_use_vehicle_capacity": True,
+                "departure_use_vehicle_capacity": True,
             },
         )
     )
@@ -125,7 +125,7 @@ def test_legacy_configuration_and_explicit_manual_profile_remain_manual():
         not {
             "vehicle_soc_use_profile",
             "vehicle_limit_use_profile",
-            "timed_use_vehicle_capacity",
+            "departure_use_vehicle_capacity",
         }
         & projected.keys()
     )
@@ -169,7 +169,7 @@ def test_profile_switch_is_explicit_atomic_and_marks_old_trip_unusable():
         assert activate_profile(raw, A) == raw
         switched = activate_profile(raw, B)
         assert switched["active_vehicle_profile"] == B
-        assert switched["timed_goal_reset_pending"] is True
+        assert switched["departure_reset_pending"] is True
         assert switched["vehicle_profile_selected_at"] == 1000
         assert switched["vehicle_profiles"] == raw["vehicle_profiles"]
         cleared = activate_profile(switched, None)
@@ -183,23 +183,23 @@ def test_profile_switch_is_explicit_atomic_and_marks_old_trip_unusable():
 def test_profile_draft_merges_other_sections_without_overwriting_them():
     raw = profile_options(feature={"vehicle_soc_entity": "sensor.first"})
     draft = OptionsDraft(
-        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}, A
+        "vehicle", raw, {"vehicle_soc_entity", "departure_reset_pending"}, A
     )
     draft.values["vehicle_soc_entity"] = "sensor.replacement"
-    draft.values["timed_goal_reset_pending"] = True
+    draft.values["departure_reset_pending"] = True
     current = deepcopy(raw)
     current["charging_price"] = 0.6
     current["vehicle_profiles"][A]["name"] = "Renamed"
-    current["vehicle_profiles"][A]["options"]["timed_capacity_kwh"] = 80
+    current["vehicle_profiles"][A]["options"]["departure_capacity_kwh"] = 80
     result = draft.merge(current)
     assert result["charging_price"] == 0.6
     assert result["vehicle_profiles"][A]["name"] == "Renamed"
     assert result["vehicle_profiles"][A]["options"] == {
         "vehicle_soc_entity": "sensor.replacement",
-        "timed_capacity_kwh": 80,
+        "departure_capacity_kwh": 80,
     }
     assert result["vehicle_profiles"][B] == raw["vehicle_profiles"][B]
-    assert result["timed_goal_reset_pending"] is True
+    assert result["departure_reset_pending"] is True
     assert "vehicle_soc_entity" not in result
 
 
@@ -230,16 +230,16 @@ def test_stale_profile_draft_cannot_write_into_another_vehicle(change):
 
 def test_profile_draft_deletes_only_selected_feature_and_keeps_global_reset_global():
     raw = profile_options(
-        feature={"vehicle_soc_entity": "sensor.first", "timed_capacity_kwh": 80}
+        feature={"vehicle_soc_entity": "sensor.first", "departure_capacity_kwh": 80}
     )
-    raw["timed_goal_reset_pending"] = True
+    raw["departure_reset_pending"] = True
     draft = OptionsDraft(
-        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}, A
+        "vehicle", raw, {"vehicle_soc_entity", "departure_reset_pending"}, A
     )
-    draft.clear({"vehicle_soc_entity", "timed_goal_reset_pending"})
+    draft.clear({"vehicle_soc_entity", "departure_reset_pending"})
     result = draft.merge(raw)
-    assert result["vehicle_profiles"][A]["options"] == {"timed_capacity_kwh": 80}
-    assert "timed_goal_reset_pending" not in result
+    assert result["vehicle_profiles"][A]["options"] == {"departure_capacity_kwh": 80}
+    assert "departure_reset_pending" not in result
     empty = profile_options(active=None)
     with pytest.raises(OptionsChangedError):
         OptionsDraft("vehicle", empty, {"vehicle_soc_entity"}).merge(empty)
@@ -267,31 +267,31 @@ def test_draft_distinguishes_missing_from_explicit_none_in_both_storage_modes(
 def test_draft_has_the_same_deletion_copy_and_global_reset_semantics_in_both_modes(
     profiled,
 ):
-    feature = {"vehicle_soc_entity": "sensor.old", "timed_timer1_days": ["mon"]}
+    feature = {"vehicle_soc_entity": "sensor.old", "departure_timer1_days": ["mon"]}
     raw = profile_options(feature=feature) if profiled else deepcopy(feature)
     draft = OptionsDraft(
         "departure", raw,
-        {"vehicle_soc_entity", "timed_timer1_days", "timed_goal_reset_pending"},
+        {"vehicle_soc_entity", "departure_timer1_days", "departure_reset_pending"},
         A if profiled else None,
     )
     draft.clear({"vehicle_soc_entity"})
-    draft.values["timed_timer1_days"] = ["tue"]
-    draft.values["timed_goal_reset_pending"] = True
+    draft.values["departure_timer1_days"] = ["tue"]
+    draft.values["departure_reset_pending"] = True
     current = deepcopy(raw)
     current["charging_price"] = 0.8
     live = current["vehicle_profiles"][A]["options"] if profiled else current
-    live["timed_capacity_kwh"] = 75
+    live["departure_capacity_kwh"] = 75
     saved = draft.merge(current)
     options = saved["vehicle_profiles"][A]["options"] if profiled else saved
     assert "vehicle_soc_entity" not in options
-    assert options["timed_capacity_kwh"] == 75
+    assert options["departure_capacity_kwh"] == 75
     assert saved["charging_price"] == 0.8
-    assert saved["timed_goal_reset_pending"] is True
+    assert saved["departure_reset_pending"] is True
     if profiled:
-        assert "timed_goal_reset_pending" not in options
-    options["timed_timer1_days"].append("wed")
-    assert draft.values["timed_timer1_days"] == ["tue"]
-    assert live["timed_timer1_days"] == ["mon"]
+        assert "departure_reset_pending" not in options
+    options["departure_timer1_days"].append("wed")
+    assert draft.values["departure_timer1_days"] == ["tue"]
+    assert live["departure_timer1_days"] == ["mon"]
 
 
 @pytest.mark.parametrize("profiled", [False, True])
@@ -309,18 +309,18 @@ def test_unchanged_explicit_none_can_be_saved_without_becoming_a_deletion(profil
 def test_a_car_that_is_not_selected_is_edited_without_touching_the_selected_trip():
     raw = profile_options(feature={"vehicle_soc_entity": "sensor.first"})
     draft = OptionsDraft(
-        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}, B
+        "vehicle", raw, {"vehicle_soc_entity", "departure_reset_pending"}, B
     )
     assert draft.values["vehicle_soc_entity"] == "sensor.other"
     draft.values["vehicle_soc_entity"] = "sensor.second"
-    draft.values["timed_goal_reset_pending"] = True
+    draft.values["departure_reset_pending"] = True
     # Automatic selection may switch between other cars meanwhile.
     current = deepcopy(raw)
     current["vehicle_profile_selected_at"] = 1234
     saved = draft.merge(current)
     assert saved["vehicle_profiles"][B]["options"]["vehicle_soc_entity"] == "sensor.second"
     assert saved["vehicle_profiles"][A]["options"] == {"vehicle_soc_entity": "sensor.first"}
-    assert "timed_goal_reset_pending" not in saved
+    assert "departure_reset_pending" not in saved
     current["active_vehicle_profile"] = B
     with pytest.raises(OptionsChangedError):
         draft.merge(current)

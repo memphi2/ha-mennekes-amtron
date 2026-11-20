@@ -289,7 +289,7 @@ def test_quarantine_does_not_block_ha_setup_with_existing_options(tmp_path, conf
                 else:
                     options.update(catalog())
                     if configured == "trip_disabled":
-                        options["vehicle_profiles"][A]["options"]["timed_goal_enabled"] = False
+                        options["vehicle_profiles"][A]["options"]["departure_enabled"] = False
                 hass.config_entries.async_update_entry(entry, options=options)
                 await hass.async_block_till_done()
                 assert entry.state is ConfigEntryState.LOADED

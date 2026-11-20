@@ -21,11 +21,11 @@ if TYPE_CHECKING:
     from .coordinator import ServiceCoordinator
     from .cost_goal import CostGoalObserver
     from .cost_observer import ChargingCostObserver
+    from .departure_observer import DepartureObserver
     from .guest_charging import GuestCharging
     from .plug_charge import PlugChargeObserver
     from .service_client import ServiceClient
     from .service_control import ServiceControl, ServiceHeartbeat
-    from .timed_goal_observer import TimedGoalObserver
     from .vehicle_binding import VehicleBinding
     from .vehicle_detection import VehicleDetectionObserver, VehicleEvidence
     from .vehicle_soc import VehicleSocObserver
@@ -63,7 +63,7 @@ class MennekesAmtronRuntimeData:
     vehicle_binding: VehicleBinding | None = None
     vehicle_evidence: VehicleEvidence | None = None
     plug_charge: PlugChargeObserver | None = None
-    timed_goal: TimedGoalObserver | None = None
+    departure_observer: DepartureObserver | None = None
     charge_loss: ChargeLossObserver | None = None
     charging_cost: ChargingCostObserver | None = None
     cost_goal: CostGoalObserver | None = None

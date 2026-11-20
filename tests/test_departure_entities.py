@@ -32,7 +32,7 @@ async def _entities(hass, entry):
     return datetimes, sensors
 
 
-def _timed_observer():
+def _departure_observer():
     return SimpleNamespace(
         goal=SimpleNamespace(deadline=datetime(2026, 11, 10, 7, tzinfo=UTC)),
         status="charging", planned_start=None, forecast=None,
@@ -43,14 +43,14 @@ def _timed_observer():
 
 
 def _plan_departures(entry):
-    entry.options.update(vehicle_soc_entity="sensor.car_soc", timed_goal_enabled=True)
+    entry.options.update(vehicle_soc_entity="sensor.car_soc", departure_enabled=True)
 
 
 def test_without_departure_planning_the_service_keeps_the_time_and_no_plan_is_shown():
     async def run():
         hass, entry, transport = await build_runtime()
         datetimes, sensors = await _entities(hass, entry)
-        departure = datetimes["timed_departure"]
+        departure = datetimes["departure_time"]
         assert departure.available
         assert departure.native_value is None
         waiting = sensors["operation_waiting"]
@@ -67,9 +67,9 @@ def test_departure_status_and_forecast_are_shown_with_the_services_summary():
         hass, entry, transport = await build_runtime()
         _plan_departures(entry)
         runtime = entry.runtime_data
-        runtime.timed_goal = observer = _timed_observer()
+        runtime.departure_observer = observer = _departure_observer()
         datetimes, sensors = await _entities(hass, entry)
-        departure, waiting = datetimes["timed_departure"], sensors["operation_waiting"]
+        departure, waiting = datetimes["departure_time"], sensors["operation_waiting"]
         assert departure.available
         # The time shown is the service's, not a copy the observer keeps.
         assert departure.native_value is None
@@ -98,7 +98,7 @@ def test_departure_status_and_forecast_are_shown_with_the_services_summary():
         runtime.coordinator.last_update_success = True
         # A car without departure planning shows no plan, and the time is the
         # service's own again.
-        runtime.timed_goal = None
+        runtime.departure_observer = None
         assert not set(PLAN) & waiting.extra_state_attributes.keys()
         assert departure.available
         assert departure.native_value is None
@@ -145,9 +145,9 @@ def test_departure_time_respects_read_only_but_status_is_observable():
     async def run():
         hass, entry, transport = await build_runtime(read_only=True)
         _plan_departures(entry)
-        entry.runtime_data.timed_goal = _timed_observer()
+        entry.runtime_data.departure_observer = _departure_observer()
         datetimes, sensors = await _entities(hass, entry)
-        assert not datetimes["timed_departure"].available
+        assert not datetimes["departure_time"].available
         waiting = sensors["operation_waiting"]
         assert waiting.available
         assert waiting.extra_state_attributes["departure_plan"] == "charging"
@@ -162,17 +162,17 @@ def test_calendar_and_vehicle_departure_follow_the_selected_cars_planning(monkey
         _hass, entry, transport = await build_runtime()
         runtime = entry.runtime_data
         _plan_departures(entry)
-        runtime.timed_goal = observer = _timed_observer()
+        runtime.departure_observer = observer = _departure_observer()
         await DEVICE_ACTIONS["use_vehicle_departure"](runtime)
         observer.async_use_vehicle_departure.assert_awaited_once()
         await DEVICE_ACTIONS["use_calendar_departure"](runtime)
         observer.async_use_next_calendar_event.assert_awaited_once()
         # A car without departure planning has no trip to take a time for.
-        runtime.timed_goal = None
+        runtime.departure_observer = None
         for action in ("use_vehicle_departure", "use_calendar_departure"):
             with pytest.raises(ServiceValidationError) as error:
                 await DEVICE_ACTIONS[action](runtime)
-            assert error.value.translation_key == "timed_goal_unavailable"
+            assert error.value.translation_key == "departure_unavailable"
         observer.async_use_vehicle_departure.assert_awaited_once()
         assert not transport.writes
         await runtime.client.async_close()
@@ -189,10 +189,10 @@ def test_the_time_entity_shows_the_guests_time_and_hands_edits_to_the_cars_obser
         monkeypatch.setattr(ServiceControl, "departure", property(lambda _: remote))
         control.guest_active = lambda: True
         control.async_set_target_time = AsyncMock()
-        entry.runtime_data.timed_goal = observer = _timed_observer()
+        entry.runtime_data.departure_observer = observer = _departure_observer()
         _plan_departures(entry)
         dates, _sensors = await _entities(hass, entry)
-        entity = dates["timed_departure"]
+        entity = dates["departure_time"]
         assert entity.available
         assert entity.native_value == guest_time
         # The observer knows that a guest charges and sets the guest's time.
@@ -202,7 +202,7 @@ def test_the_time_entity_shows_the_guests_time_and_hands_edits_to_the_cars_obser
         observer.async_set_deadline.assert_awaited_with(None)
         control.async_set_target_time.assert_not_awaited()
         # Neither a car's trip nor a plan of the service: nothing to show.
-        entry.runtime_data.timed_goal = None
+        entry.runtime_data.departure_observer = None
         monkeypatch.setattr(ServiceControl, "departure", property(lambda _: None))
         assert not entity.available
         await entry.runtime_data.client.async_close()

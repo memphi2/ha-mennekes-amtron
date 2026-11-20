@@ -6,18 +6,18 @@ from datetime import timedelta
 import pytest
 from homeassistant.exceptions import HomeAssistantError
 
-import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
-from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
-from tests.test_timed_goal import NOW, setup_observer, state
+import custom_components.mennekes_amtron_rtu.departure_observer as observer_module
+from custom_components.mennekes_amtron_rtu.departure_observer import departure_time
+from custom_components.mennekes_amtron_rtu.device.departure_trip import DepartureTrip
+from tests.test_departure import NOW, setup_observer, state
 
 
 def test_completed_trip_roundtrip_and_invalid_completion() -> None:
-    goal = TimedGoal()
+    goal = DepartureTrip()
     goal.set(NOW + timedelta(hours=1), "external:next-trip")
     goal.finish("reached")
     assert goal.deadline == NOW + timedelta(hours=1)
-    assert TimedGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()
+    assert DepartureTrip.restore(goal.snapshot()).snapshot() == goal.snapshot()
     goal.finish("reached", clear_deadline=True)
     assert goal.deadline is None
     assert goal.set(None, goal.source)
@@ -30,7 +30,7 @@ def test_completed_trip_roundtrip_and_invalid_completion() -> None:
         {"deadline": None, "source": None, "finished": []},
     ):
         with pytest.raises(ValueError, match="invalid departure"):
-            TimedGoal.restore(raw)
+            DepartureTrip.restore(raw)
 
 
 @pytest.mark.parametrize("attributes", [
@@ -46,7 +46,7 @@ def test_manual_selection_wins_until_external_departure_changes(monkeypatch: pyt
     async def run() -> None:
         observer, _control, hass = setup_observer(monkeypatch)
         future = NOW + timedelta(hours=8)
-        observer._entry.options["timed_departure_entity"] = "sensor.departure"
+        observer._entry.options["departure_entity"] = "sensor.departure"
         hass.states["sensor.departure"] = state("sensor.departure", future.isoformat())
         await observer.async_set_deadline(future + timedelta(hours=1))
         await observer._evaluate()
@@ -62,7 +62,7 @@ def test_slow_calendar_lookup_cannot_overwrite_a_new_manual_selection(monkeypatc
     async def run() -> None:
         observer, _control, hass = setup_observer(monkeypatch)
         observer._entry.options.update({
-            "timed_calendar_entity": "calendar.trip", "timed_calendar_title": "Trip",
+            "departure_calendar_entity": "calendar.trip", "departure_calendar_title": "Trip",
         })
         started, finish = asyncio.Event(), asyncio.Event()
 
@@ -117,7 +117,7 @@ def test_detected_vehicle_phases_bound_the_planning_phases(monkeypatch: pytest.M
 def test_missing_external_timestamp_does_not_replace_manual_trip(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, _control, _hass = setup_observer(monkeypatch)
-        observer._entry.options["timed_departure_entity"] = "sensor.missing"
+        observer._entry.options["departure_entity"] = "sensor.missing"
         deadline = NOW + timedelta(hours=8)
         await observer.async_set_deadline(deadline)
         await observer._evaluate()
@@ -133,7 +133,7 @@ def test_observer_coalesces_events_and_cancels_inflight_work(monkeypatch: pytest
         unsubscribed: list[bool] = []
         monkeypatch.setattr(observer_module, "async_track_time_interval",
                             lambda *_args: lambda: unsubscribed.append(True))
-        observer.request_evaluate = observer_module.TimedGoalObserver.request_evaluate.__get__(observer)
+        observer.request_evaluate = observer_module.DepartureObserver.request_evaluate.__get__(observer)
         await observer.async_start()
         await observer._task
         waiting = asyncio.Event()

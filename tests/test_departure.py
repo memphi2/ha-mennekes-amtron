@@ -11,23 +11,23 @@ import pytest
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.util import dt as dt_util
 
-import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
+import custom_components.mennekes_amtron_rtu.departure_observer as observer_module
 from custom_components.mennekes_amtron_rtu.datetime import (
     async_setup_entry as setup_datetime,
 )
-from custom_components.mennekes_amtron_rtu.device.data import WallboxData
-from custom_components.mennekes_amtron_rtu.device.departure_plan import DepartureState
-from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
-from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.options_flow import (
-    _timed_errors,
-)
-from custom_components.mennekes_amtron_rtu.services import DEVICE_ACTIONS
-from custom_components.mennekes_amtron_rtu.timed_goal_observer import (
-    TimedGoalObserver,
+from custom_components.mennekes_amtron_rtu.departure_observer import (
+    DepartureObserver,
     capacity_from_state,
     departure_time,
 )
+from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.departure_plan import DepartureState
+from custom_components.mennekes_amtron_rtu.device.departure_trip import DepartureTrip
+from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.options_flow import (
+    _departure_errors,
+)
+from custom_components.mennekes_amtron_rtu.services import DEVICE_ACTIONS
 from tests.ha_fakes import build_runtime, collect
 
 NOW = datetime(2026, 11, 7, 6, tzinfo=UTC)
@@ -38,9 +38,9 @@ def state(entity: str, value: str, **attributes: object) -> SimpleNamespace:
 
 
 def test_one_trip_goal_round_trip_and_cancelled_entity_does_not_rearm() -> None:
-    goal = TimedGoal()
+    goal = DepartureTrip()
     assert goal.set(NOW + timedelta(hours=1), "entity:sensor.departure:time")
-    assert TimedGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()
+    assert DepartureTrip.restore(goal.snapshot()).snapshot() == goal.snapshot()
     assert goal.set(None, goal.source)
     assert goal.deadline is None
     assert goal.source == "entity:sensor.departure:time"
@@ -48,7 +48,7 @@ def test_one_trip_goal_round_trip_and_cancelled_entity_does_not_rearm() -> None:
     with pytest.raises(ValueError, match="timezone"):
         goal.set(NOW.replace(tzinfo=None))
     with pytest.raises(ValueError, match="fields"):
-        TimedGoal.restore({"deadline": None})
+        DepartureTrip.restore({"deadline": None})
     for raw in (
         {"deadline": 123, "source": None},
         {"deadline": None, "source": 1},
@@ -56,7 +56,7 @@ def test_one_trip_goal_round_trip_and_cancelled_entity_does_not_rearm() -> None:
         {"deadline": "2026-11-07T06:00:00", "source": None},
     ):
         with pytest.raises(ValueError, match="invalid departure"):
-            TimedGoal.restore({**raw, "finished": None})
+            DepartureTrip.restore({**raw, "finished": None})
     with pytest.raises(ValueError, match="source"):
         goal.set(NOW, "")
 
@@ -81,33 +81,33 @@ def test_time_and_capacity_sources_need_dated_valid_data() -> None:
 
 
 @pytest.mark.parametrize(("values", "error"), [
-    ({"timed_capacity_entity": "switch.bad"}, "timed_source_invalid"),
-    ({"timed_departure_entity": "switch.bad"}, "timed_source_invalid"),
-    ({"timed_calendar_entity": "sensor.bad"}, "timed_source_invalid"),
-    ({"timed_calendar_title": "Trip"}, "timed_calendar_required"),
-    ({"timed_calendar_entity": "calendar.trip"}, "timed_calendar_title_required"),
-    ({"timed_capacity_kwh": 0}, "timed_capacity_invalid"),
-    ({"timed_capacity_kwh": float("nan")}, "timed_capacity_invalid"),
+    ({"departure_capacity_entity": "switch.bad"}, "departure_source_invalid"),
+    ({"departure_entity": "switch.bad"}, "departure_source_invalid"),
+    ({"departure_calendar_entity": "sensor.bad"}, "departure_source_invalid"),
+    ({"departure_calendar_title": "Trip"}, "departure_calendar_required"),
+    ({"departure_calendar_entity": "calendar.trip"}, "departure_calendar_title_required"),
+    ({"departure_capacity_kwh": 0}, "departure_capacity_invalid"),
+    ({"departure_capacity_kwh": float("nan")}, "departure_capacity_invalid"),
 ])
-def test_timed_options_reject_ambiguous_or_unsafe_sources(values: dict, error: str) -> None:
-    assert error in _timed_errors(values).values()
+def test_departure_options_reject_ambiguous_or_unsafe_sources(values: dict, error: str) -> None:
+    assert error in _departure_errors(values).values()
 
 
-def test_timed_options_accept_separate_fixed_and_dynamic_sources() -> None:
-    fixed = {"vehicle_soc_entity": "sensor.soc", "timed_capacity_kwh": 80,
-             "timed_calendar_entity": "calendar.trip", "timed_calendar_title": "Departure"}
-    assert _timed_errors(fixed) == {}
-    assert _timed_errors({**fixed, "timed_departure_entity": "sensor.time"}) == {}
-    dynamic = {"vehicle_soc_entity": "sensor.soc", "timed_capacity_entity": "sensor.cap",
-               "timed_departure_entity": "input_datetime.trip"}
-    assert _timed_errors(dynamic) == {}
+def test_departure_options_accept_separate_fixed_and_dynamic_sources() -> None:
+    fixed = {"vehicle_soc_entity": "sensor.soc", "departure_capacity_kwh": 80,
+             "departure_calendar_entity": "calendar.trip", "departure_calendar_title": "Departure"}
+    assert _departure_errors(fixed) == {}
+    assert _departure_errors({**fixed, "departure_entity": "sensor.time"}) == {}
+    dynamic = {"vehicle_soc_entity": "sensor.soc", "departure_capacity_entity": "sensor.cap",
+               "departure_entity": "input_datetime.trip"}
+    assert _departure_errors(dynamic) == {}
 
 
 
-def plan_state(trip: TimedGoal | None = None, **changes: object) -> dict:
+def plan_state(trip: DepartureTrip | None = None, **changes: object) -> dict:
     """The service's plan as it reports it."""
     return {
-        "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
+        "trip": (trip or DepartureTrip()).snapshot(), "status": "disabled", "planned_start": None,
         "estimated_soc": None, "inputs": None, "scope": None, "confirmed": False, "forecast": None,
         "editor": "ha", "selection_vehicle": None, "edit_revision": "a" * 32, "withdrawn": False, **changes,
     }
@@ -143,7 +143,7 @@ class FakeControl:
         self.trips.append((deadline, source, withdraw))
         self.expected.append(expected_selection)
         if self.state is not None:
-            trip = TimedGoal.restore(self.state["trip"])
+            trip = DepartureTrip.restore(self.state["trip"])
             trip.set(deadline, source)
             self.edits += 1
             self.state = {**self.state, "trip": trip.snapshot(), "edit_revision": f"{self.edits:032x}"}
@@ -155,7 +155,7 @@ class FakeControl:
         self.target_times.append(deadline)
 
 
-def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, FakeControl, SimpleNamespace]:
+def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[DepartureObserver, FakeControl, SimpleNamespace]:
     data = WallboxData(values={
         "charging_current_ems": 16.0,
         "switched_phases": 0,
@@ -174,14 +174,14 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
                               identity=SimpleNamespace(serial_number="SERIAL", layout_version=310))
     entry = SimpleNamespace(
         entry_id="entry", runtime_data=runtime,
-        options={"vehicle_soc_entity": "sensor.soc", "timed_capacity_kwh": 80},
+        options={"vehicle_soc_entity": "sensor.soc", "departure_capacity_kwh": 80},
     )
     hass = SimpleNamespace(
         states={"sensor.soc": state("sensor.soc", "20", unit_of_measurement="%")},
         data={}, services=SimpleNamespace(async_call=AsyncMock()),
     )
     hass.async_create_task = lambda coro, _name, **_kwargs: asyncio.create_task(coro)
-    observer = TimedGoalObserver(hass, entry)
+    observer = DepartureObserver(hass, entry)
     # Unit cases configure this observer's captured options. A real HA options
     # update replaces the entry mapping and creates a new observer on reload.
     entry.options = observer._options
@@ -190,11 +190,11 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
     return observer, control, hass
 
 
-def test_timed_goal_source_updates_and_explicit_clear(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_departure_source_updates_and_explicit_clear(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, _control, hass = setup_observer(monkeypatch)
         future = NOW + timedelta(hours=8)
-        observer._entry.options["timed_departure_entity"] = "sensor.departure"
+        observer._entry.options["departure_entity"] = "sensor.departure"
         hass.states["sensor.departure"] = state("sensor.departure", future.isoformat())
         await observer._evaluate()
         assert observer.goal.deadline == future
@@ -235,7 +235,7 @@ def test_observer_lifecycle_and_write_failure_status(
                             lambda *_args: lambda: unsubs.append("state"))
         monkeypatch.setattr(observer_module, "async_track_time_interval",
                             lambda *_args: lambda: unsubs.append("time"))
-        observer.request_evaluate = observer_module.TimedGoalObserver.request_evaluate.__get__(observer)
+        observer.request_evaluate = observer_module.DepartureObserver.request_evaluate.__get__(observer)
         # The binding re-evaluates the plan when a car confirms or rests.
         observer._runtime.vehicle_binding = SimpleNamespace(
             resting=False, subscribe=lambda _listener: lambda: unsubs.append("binding"),
@@ -316,8 +316,8 @@ def test_calendar_button_selects_one_exact_timed_event(monkeypatch: pytest.Monke
     async def run() -> None:
         observer, _control, hass = setup_observer(monkeypatch)
         observer._entry.options.update({
-            "timed_calendar_entity": "calendar.trips",
-            "timed_calendar_title": "Departure",
+            "departure_calendar_entity": "calendar.trips",
+            "departure_calendar_title": "Departure",
         })
         events = [
             {"start": (NOW + timedelta(hours=3)).isoformat(), "summary": "Other"},
@@ -342,7 +342,7 @@ def test_calendar_requires_a_matching_timed_event(monkeypatch: pytest.MonkeyPatc
             await observer.async_use_next_calendar_event()
         assert refused.value.translation_key == "calendar_not_configured"
         observer._entry.options.update({
-            "timed_calendar_entity": "calendar.trips", "timed_calendar_title": "Departure",
+            "departure_calendar_entity": "calendar.trips", "departure_calendar_title": "Departure",
         })
 
         hass.services.async_call.return_value = {"calendar.trips": {"events": [
@@ -375,10 +375,10 @@ def test_departure_controls_show_the_services_time_and_delegate_actions() -> Non
             async_set_deadline=AsyncMock(), async_use_next_calendar_event=AsyncMock(),
         )
         runtime = entry.runtime_data
-        runtime.timed_goal = timed
+        runtime.departure_observer = timed
         datetimes: dict[str, object] = {}
         await setup_datetime(hass, entry, lambda items: datetimes.update(collect(items)))
-        departure = datetimes["timed_departure"]
+        departure = datetimes["departure_time"]
         # The entity shows the service's one time, whoever set it.
         soon = dt_util.utcnow() + timedelta(hours=8)
         await runtime.control.async_set_target_time(soon)
@@ -391,7 +391,7 @@ def test_departure_controls_show_the_services_time_and_delegate_actions() -> Non
         await departure.async_clear_value()
         timed.async_set_deadline.assert_any_await(None)
         # Without a selected car the time goes to the service directly.
-        runtime.timed_goal = None
+        runtime.departure_observer = None
         await runtime.control.async_set_target_time(None)
         assert departure.native_value is None
         with pytest.raises(ServiceValidationError):

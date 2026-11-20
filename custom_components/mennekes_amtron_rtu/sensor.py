@@ -153,7 +153,7 @@ def _waiting_details(runtime: Runtime) -> dict[str, Any]:
             if runtime.vehicle_soc is not None and runtime.vehicle_soc.source is not None else None
         ),
     }
-    if (plan := runtime.timed_goal) is not None:
+    if (plan := runtime.departure_observer) is not None:
         forecast = plan.forecast
         details |= {
             "departure_plan": plan.status,

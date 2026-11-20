@@ -8,7 +8,7 @@ from typing import Any, Self
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from .device.timed_goal import TimedGoal
+from .device.departure_trip import DepartureTrip
 from .model_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ MAX_TRIPS = 16
 class VehicleTrips:
     """Open departures of the vehicles that are not selected, by profile."""
 
-    def __init__(self, trips: dict[str, TimedGoal] | None = None) -> None:
+    def __init__(self, trips: dict[str, DepartureTrip] | None = None) -> None:
         self.trips = dict(trips or {})
 
     def snapshot(self) -> dict[str, Any]:
@@ -34,7 +34,7 @@ class VehicleTrips:
             isinstance(key, str) and 0 < len(key) <= 64 for key in trips
         ):
             raise ValueError("invalid saved vehicle trips")
-        return cls({key: TimedGoal.restore(trip) for key, trip in trips.items()})
+        return cls({key: DepartureTrip.restore(trip) for key, trip in trips.items()})
 
 
 class VehicleTripStore(ModelStore[VehicleTrips]):
@@ -44,7 +44,7 @@ class VehicleTripStore(ModelStore[VehicleTrips]):
         super().__init__(hass, entry_id, identity, kind="vehicle_trips", model=VehicleTrips)
 
 
-def _open(trip: TimedGoal | None) -> bool:
+def _open(trip: DepartureTrip | None) -> bool:
     return (
         trip is not None and trip.finished is None
         and trip.deadline is not None and trip.deadline > dt_util.utcnow()
@@ -71,15 +71,15 @@ class VehicleTripMemory:
             _LOGGER.warning("Departure plan: vehicle departure not saved (%s)", err)
 
     async def async_swap(
-        self, previous: str | None, trip: TimedGoal | None, selected: str | None,
-    ) -> TimedGoal | None:
+        self, previous: str | None, trip: DepartureTrip | None, selected: str | None,
+    ) -> DepartureTrip | None:
         """Park the previous car's open trip and return the selected car's."""
         trips = await self._async_load()
         before = trips.snapshot()
         if previous is not None:
             trips.trips.pop(previous, None)
             if _open(trip):
-                trips.trips[previous] = TimedGoal.restore(trip.snapshot())  # type: ignore[union-attr]
+                trips.trips[previous] = DepartureTrip.restore(trip.snapshot())  # type: ignore[union-attr]
         resumed = trips.trips.pop(selected, None) if selected is not None else None
         while len(trips.trips) > MAX_TRIPS:
             del trips.trips[next(iter(trips.trips))]
@@ -87,7 +87,7 @@ class VehicleTripMemory:
             await self._async_save(trips)
         return resumed if _open(resumed) else None
 
-    async def async_peek(self, selected: str) -> TimedGoal | None:
+    async def async_peek(self, selected: str) -> DepartureTrip | None:
         """The selected car's parked trip, while it is still open."""
         trip = (await self._async_load()).trips.get(selected)
         return trip if _open(trip) else None

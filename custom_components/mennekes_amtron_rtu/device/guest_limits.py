@@ -126,7 +126,7 @@ class GuestLimits:
                 # Make the ownership fence durable before any charging write.
                 await self._service.persist()
                 departure_queued = control.pending_owner == "departure"
-                await control.async_cancel_timed_current("departure")
+                await control.async_cancel_departure_current("departure")
                 await control.async_start_guest_charging(current_cap=self._service.config.current_cap)
                 if (
                     cancelled and not accepted and not control.pending_guest_start

@@ -22,11 +22,11 @@ from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
 )
+from custom_components.mennekes_amtron_rtu.departure_const import (
+    CONF_DEPARTURE_ENABLED,
+)
 from custom_components.mennekes_amtron_rtu.network_tariff_config import (
     parse_tariff_inputs as _network_tariff,
-)
-from custom_components.mennekes_amtron_rtu.timed_goal_const import (
-    CONF_TIMED_GOAL_ENABLED,
 )
 from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_SOC_ENTITY,
@@ -105,27 +105,27 @@ def test_annual_import_starts_after_wallbox_setup_and_is_cancelled_on_unload(tmp
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
-@pytest.mark.parametrize("failure", ["timed", "timed_connection"])
-def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_path, monkeypatch, failure):
+@pytest.mark.parametrize("failure", ["departure", "departure_connection"])
+def test_partial_departure_setup_stops_already_started_soc_and_heartbeat_owners(tmp_path, monkeypatch, failure):
     async def run():
         hass = FakeHass(str(tmp_path))
         entry = FakeConfigEntry(options={
             CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
             CONF_VEHICLE_SOC_ENTITY: "sensor.car_soc",
-            CONF_TIMED_GOAL_ENABLED: True,
+            CONF_DEPARTURE_ENABLED: True,
         })
         transport = FakeModbusClient(device_bank())
         _patch_client(monkeypatch, transport)
         _patch_issues(monkeypatch)
         vehicle = Mock(async_start=AsyncMock(), async_stop=AsyncMock())
-        timed_error = {"timed": ValueError("invalid saved trip"), "timed_connection": HomeAssistantError("service offline")}[failure]
-        timed = Mock(async_start=AsyncMock(side_effect=timed_error), async_stop=AsyncMock())
+        departure_error = {"departure": ValueError("invalid saved trip"), "departure_connection": HomeAssistantError("service offline")}[failure]
+        timed = Mock(async_start=AsyncMock(side_effect=departure_error), async_stop=AsyncMock())
         monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args, **_kwargs: vehicle)
-        monkeypatch.setattr(integration, "TimedGoalObserver", lambda *_args: timed)
+        monkeypatch.setattr(integration, "DepartureObserver", lambda *_args: timed)
         timers = capture_timers(monkeypatch, integration.embedded)
         with pytest.raises(ConfigEntryNotReady) as caught:
             await integration.async_setup_entry(hass, entry)
-        assert caught.value.translation_key == ("timed_goal_state_invalid" if failure == "timed" else "timed_goal_unavailable")
+        assert caught.value.translation_key == ("departure_state_invalid" if failure == "departure" else "departure_unavailable")
         vehicle.async_start.assert_awaited_once()
         vehicle.async_stop.assert_awaited_once()
         timed.async_start.assert_awaited_once()

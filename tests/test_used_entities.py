@@ -38,13 +38,13 @@ def test_the_charge_level_area_names_its_entities(feature, expected):
 
 
 @pytest.mark.parametrize(("feature", "expected"), [
-    ({"timed_use_vehicle_capacity": True, "timed_calendar_entity": "calendar.trips",
-      "timed_departure_entity": "input_datetime.leave", "timed_vehicle_provider": "profile"},
+    ({"departure_use_vehicle_capacity": True, "departure_calendar_entity": "calendar.trips",
+      "departure_entity": "input_datetime.leave", "departure_vehicle_provider": "profile"},
      {"departure_entity": "calendar.trips, input_datetime.leave, sensor.test_3",
       "capacity_entity": "sensor.test_2"}),
-    ({"timed_capacity_entity": "sensor.capacity"},
+    ({"departure_capacity_entity": "sensor.capacity"},
      {"departure_entity": "—", "capacity_entity": "sensor.capacity"}),
-    ({"timed_capacity_kwh": 77.5}, {"departure_entity": "—", "capacity_entity": "77.5 kWh"}),
+    ({"departure_capacity_kwh": 77.5}, {"departure_entity": "—", "capacity_entity": "77.5 kWh"}),
 ])
 def test_the_departure_area_names_its_entities(feature, expected):
     async def run():
@@ -149,8 +149,8 @@ def test_a_car_without_climate_timers_offers_no_departure_from_the_car(keep):
 def test_departures_already_read_from_the_car_stay_visible():
     async def run():
         flow = Flow(FakeConfigEntry(options=profile_options(feature={
-            "vehicle_soc_entity": "sensor.soc", "timed_goal_enabled": True,
-            "timed_vehicle_provider": "profile",
+            "vehicle_soc_entity": "sensor.soc", "departure_enabled": True,
+            "departure_vehicle_provider": "profile",
         })))
         without_timers(flow)
         await open_profile(flow)

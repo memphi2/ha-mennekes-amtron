@@ -23,7 +23,7 @@ def setup_case(tmp_path, monkeypatch):
     options["control_mode"] = "master"
     for profile in options["vehicle_profiles"].values():
         profile["options"]["charge_loss_source"] = "disabled"
-        profile["options"]["timed_goal_enabled"] = True
+        profile["options"]["departure_enabled"] = True
     entry = FakeConfigEntry(options=options)
     transport = FakeModbusClient(device_bank())
     # The service embedded for this direct entry reaches the simulated wallbox.
@@ -76,12 +76,12 @@ def test_changed_vehicle_aborts_setup_before_old_trip_can_start(tmp_path, monkey
         monkeypatch.setattr(transport, "connect", connect)
         monkeypatch.setattr(integration.ServiceCoordinator, "async_config_entry_first_refresh", refresh)
         monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args, **_kwargs: vehicle)
-        monkeypatch.setattr(integration, "TimedGoalObserver", timed)
+        monkeypatch.setattr(integration, "DepartureObserver", timed)
         try:
             with pytest.raises(ConfigEntryNotReady):
                 await integration.async_setup_entry(hass, entry)
             assert entry.options["active_vehicle_profile"] is None
-            assert entry.options["timed_goal_reset_pending"] is True
+            assert entry.options["departure_reset_pending"] is True
             timed.assert_not_called()
             if stage == "soc_start":
                 vehicle.async_start.assert_awaited_once()

@@ -34,8 +34,8 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 options = profile_options(provider="none", feature={
                     "vehicle_soc_entity": "sensor.car_soc",
                     "vehicle_charge_limit_entity": "number.car_maximum",
-                    "timed_goal_enabled": True,
-                    "timed_capacity_kwh": 80,
+                    "departure_enabled": True,
+                    "departure_capacity_kwh": 80,
                 })
                 options.update({
                     "control_mode": "master", "scan_interval_seconds": 300,
@@ -69,12 +69,12 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 assert entry.options["active_vehicle_profile"] == A
                 assert entry.options["vehicle_profiles"][B] == second_profile
                 assert entry.options["vehicle_profiles"][A]["options"] == {
-                    "timed_capacity_kwh": 80, "timed_goal_enabled": False,
+                    "departure_capacity_kwh": 80, "departure_enabled": False,
                 }
                 assert entry.runtime_data.control.soc_goal.target_percent == 0
                 assert entry.runtime_data.control.soc_goal.source is None
                 assert entry.runtime_data.control.soc_goal.maximum_percent is None
-                assert entry.runtime_data.timed_goal is None
+                assert entry.runtime_data.departure_observer is None
                 # The service's one trip went with the car's planning.
                 assert entry.runtime_data.control.departure.trip.deadline is None
                 assert entry.runtime_data.control.is_paused is True

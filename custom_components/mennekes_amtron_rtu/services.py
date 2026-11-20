@@ -33,7 +33,7 @@ from .service_control import ServiceControl
 
 if TYPE_CHECKING:
     from .charge_loss_observer import ChargeLossObserver
-    from .timed_goal_observer import TimedGoalObserver
+    from .departure_observer import DepartureObserver
 
 SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
     {
@@ -49,10 +49,10 @@ SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
 _DEVICE = {probatio.Optional(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string])}
 
 
-def _departure_planning(runtime: MennekesAmtronRuntimeData) -> TimedGoalObserver:
-    if runtime.timed_goal is None:
-        raise service_validation_error("timed_goal_unavailable")
-    return runtime.timed_goal
+def _departure_planning(runtime: MennekesAmtronRuntimeData) -> DepartureObserver:
+    if runtime.departure_observer is None:
+        raise service_validation_error("departure_unavailable")
+    return runtime.departure_observer
 
 
 def _loss_estimate(runtime: MennekesAmtronRuntimeData) -> ChargeLossObserver:

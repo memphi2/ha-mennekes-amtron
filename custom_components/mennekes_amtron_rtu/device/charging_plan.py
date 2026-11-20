@@ -1,4 +1,4 @@
-"""Bounded, side-effect-free calculations for a timed vehicle charge target."""
+"""Bounded, side-effect-free calculations for a vehicle charge target with a departure time."""
 
 from __future__ import annotations
 

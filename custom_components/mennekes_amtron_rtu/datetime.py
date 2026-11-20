@@ -25,7 +25,7 @@ async def async_setup_entry(
     entry: MennekesAmtronConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    async_add_entities([AmtronTargetTime(entry, _Description(key="timed_departure", writes=True))])
+    async_add_entities([AmtronTargetTime(entry, _Description(key="departure_time", writes=True))])
 
 
 class AmtronTargetTime(AmtronEntity, DateTimeEntity):
@@ -45,7 +45,7 @@ class AmtronTargetTime(AmtronEntity, DateTimeEntity):
         return plan.trip.deadline if plan is not None else None
 
     async def _async_set(self, value: datetime | None) -> None:
-        if (observer := self.runtime.timed_goal) is not None:
+        if (observer := self.runtime.departure_observer) is not None:
             await observer.async_set_deadline(value)
         else:
             await self.runtime.control.async_set_target_time(value)

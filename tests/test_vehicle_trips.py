@@ -12,13 +12,13 @@ from homeassistant.util import dt as dt_util
 
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import vehicle_trips as m
-from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
+from custom_components.mennekes_amtron_rtu.device.departure_trip import DepartureTrip
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_vehicle_profiles import A, B, profile_options
 
 
-def trip(hours: float = 8, *, finished: bool = False) -> TimedGoal:
-    goal = TimedGoal()
+def trip(hours: float = 8, *, finished: bool = False) -> DepartureTrip:
+    goal = DepartureTrip()
     goal.set(dt_util.utcnow().replace(microsecond=0) + timedelta(hours=hours), "manual")
     if finished:
         goal.finish("reached")
@@ -100,10 +100,10 @@ def test_a_parked_trip_can_be_looked_at_while_it_is_open(tmp_path):
 def test_a_guests_time_is_not_parked_as_the_cars_trip(tmp_path):
     async def run():
         hass = FakeHass(str(tmp_path))
-        entry = FakeConfigEntry(options={**profile_options(active=A), "timed_goal_reset_pending": True})
+        entry = FakeConfigEntry(options={**profile_options(active=A), "departure_reset_pending": True})
         entry.runtime_data = SimpleNamespace(
             identity=SimpleNamespace(serial_number="serial"), vehicle_profile_id=A,
-            timed_goal=SimpleNamespace(goal=trip()), control=SimpleNamespace(guest_active=lambda: True),
+            departure_observer=SimpleNamespace(goal=trip()), control=SimpleNamespace(guest_active=lambda: True),
         )
         memory = m.VehicleTripMemory(hass, entry.entry_id, "serial")
         await integration._async_park_trip(hass, entry)
@@ -118,10 +118,10 @@ def test_a_guests_time_is_not_parked_as_the_cars_trip(tmp_path):
 def test_a_deleted_cars_trip_is_dropped_instead_of_parked(tmp_path):
     async def run():
         hass = FakeHass(str(tmp_path))
-        entry = FakeConfigEntry(options={"timed_goal_reset_pending": True})
+        entry = FakeConfigEntry(options={"departure_reset_pending": True})
         entry.runtime_data = SimpleNamespace(
             identity=SimpleNamespace(serial_number="serial"), vehicle_profile_id="a" * 32,
-            timed_goal=SimpleNamespace(goal=trip()),
+            departure_observer=SimpleNamespace(goal=trip()),
         )
         memory = m.VehicleTripMemory(hass, entry.entry_id, "serial")
         await memory.async_swap("a" * 32, trip(), None)
@@ -136,7 +136,7 @@ def test_a_car_that_stops_planning_loses_its_parked_trip(tmp_path):
         hass = FakeHass(str(tmp_path))
         # Car B plans departures; car A, selected, has none configured.
         entry = FakeConfigEntry(options=profile_options())
-        entry.options["vehicle_profiles"][B]["options"]["timed_goal_enabled"] = True
+        entry.options["vehicle_profiles"][B]["options"]["departure_enabled"] = True
         entry.runtime_data = SimpleNamespace(client=SimpleNamespace(snapshot={}), identity=SimpleNamespace(serial_number="serial"))
         memory = m.VehicleTripMemory(hass, entry.entry_id, "serial")
         await memory.async_swap(B, trip(), None)
@@ -148,7 +148,7 @@ def test_a_car_that_stops_planning_loses_its_parked_trip(tmp_path):
         assert await memory.async_swap(None, None, B) is not None
         # Switching B's planning off, even without selecting B, drops its trip.
         await memory.async_swap(B, trip(), None)
-        entry.options["vehicle_profiles"][B]["options"]["timed_goal_enabled"] = False
+        entry.options["vehicle_profiles"][B]["options"]["departure_enabled"] = False
         await integration._async_retain_trips(hass, entry)
         assert await memory.async_swap(None, None, B) is None
 

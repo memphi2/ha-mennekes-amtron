@@ -71,7 +71,7 @@ def test_independent_sections_and_scoped_wallbox_save():
         entry = FakeConfigEntry(
             options={
                 "charging_price": 0.3,
-                "timed_capacity_kwh": 80,
+                "departure_capacity_kwh": 80,
                 "state_change_interval_seconds": 175,
             },
         )
@@ -99,7 +99,7 @@ def test_independent_sections_and_scoped_wallbox_save():
         assert entry.options["charging_price"] == 0.3
         assert result["data"]["scan_interval_seconds"] == 7
         assert result["data"]["state_change_interval_seconds"] == 175
-        assert result["data"]["timed_capacity_kwh"] == 80
+        assert result["data"]["departure_capacity_kwh"] == 80
         assert "control_mode" in result["data"]
         assert result["data"]["release_off_on_unplug"] is False
 
@@ -235,7 +235,7 @@ def test_missing_section_cannot_skip_into_detail_or_save(step):
 def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit):
     async def run():
         entry = FakeConfigEntry(
-            options={"timed_goal_enabled": True, "timed_capacity_kwh": 80}
+            options={"departure_enabled": True, "departure_capacity_kwh": 80}
         )
         flow = Flow(entry)
         await flow.async_step_vehicle_battery()
@@ -258,9 +258,9 @@ def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit)
         assert "vehicle_disable" in (await flow.async_step_vehicle_battery())["menu_options"]
         disabled = (await flow.async_step_vehicle_disable())["data"]
         assert "vehicle_soc_entity" not in disabled
-        assert disabled["timed_goal_enabled"] is False
-        assert disabled["timed_goal_reset_pending"] is True
-        assert disabled["timed_capacity_kwh"] == 80
+        assert disabled["departure_enabled"] is False
+        assert disabled["departure_reset_pending"] is True
+        assert disabled["departure_capacity_kwh"] == 80
         entry.options = disabled
         assert "vehicle_disable" not in (await flow.async_step_vehicle_battery())["menu_options"]
 

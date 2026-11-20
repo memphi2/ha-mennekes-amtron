@@ -167,7 +167,7 @@ waits charges back up to it.
 
 Each SoC report recalculates this. A charge that is faster than estimated never
 pauses again once it has started; it reaches the 6 A step sooner. A slower one
-returns to full current. **An active timed goal can lift even a
+returns to full current. **An active departure plan can lift even a
 manually set charging pause** to meet the selected time. To prevent that,
 clear **Target time**. The ordinary percentage target without a departure
 time still only limits charging and never resumes a pause.

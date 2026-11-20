@@ -166,7 +166,7 @@ def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, mo
                     await real_persist(**kwargs)
                 monkeypatch.setattr(service, "persist", fail_once)
             else:
-                method = "async_cancel_timed_current" if failure == "cancel" else "async_start_guest_charging"
+                method = "async_cancel_departure_current" if failure == "cancel" else "async_start_guest_charging"
                 monkeypatch.setattr(service.control, method, AsyncMock(side_effect=DeviceError("guest_start_not_permitted")))
             with pytest.raises((OSError, DeviceError)):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,

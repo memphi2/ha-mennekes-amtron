@@ -24,29 +24,29 @@ CONF_VEHICLE_DEVICE: Final = "vehicle_device"
 CONF_VEHICLE_SOURCE_IDENTITY: Final = "vehicle_source_identity"
 CONF_VEHICLE_SOC_USE_PROFILE: Final = "vehicle_soc_use_profile"
 CONF_VEHICLE_LIMIT_USE_PROFILE: Final = "vehicle_limit_use_profile"
-CONF_TIMED_USE_VEHICLE_CAPACITY: Final = "timed_use_vehicle_capacity"
+CONF_DEPARTURE_USE_VEHICLE_CAPACITY: Final = "departure_use_vehicle_capacity"
 MAX_VEHICLE_PROFILES: Final = 8
 MAX_CONNECTED_STATES: Final = 8
-RESET_PENDING: Final = "timed_goal_reset_pending"
+RESET_PENDING: Final = "departure_reset_pending"
 PROFILE_OPTION_KEYS: Final = frozenset(
     {
         "vehicle_soc_entity",
         "vehicle_charge_limit_entity",
         CONF_VEHICLE_SOC_USE_PROFILE,
         CONF_VEHICLE_LIMIT_USE_PROFILE,
-        "timed_goal_enabled",
-        "timed_capacity_entity",
-        "timed_capacity_kwh",
-        "timed_minimum_soc",
-        CONF_TIMED_USE_VEHICLE_CAPACITY,
-        "timed_calendar_entity",
-        "timed_calendar_title",
-        "timed_departure_entity",
-        "timed_vehicle_provider",
-        "timed_vehicle_device",
-        "timed_vehicle_time_zone",
-        "timed_timer1_days",
-        "timed_timer2_days",
+        "departure_enabled",
+        "departure_capacity_entity",
+        "departure_capacity_kwh",
+        "departure_minimum_soc",
+        CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
+        "departure_calendar_entity",
+        "departure_calendar_title",
+        "departure_entity",
+        "departure_vehicle_provider",
+        "departure_vehicle_device",
+        "departure_vehicle_time_zone",
+        "departure_timer1_days",
+        "departure_timer2_days",
         "charge_loss_source",
         "vehicle_last_charge_energy_entity",
         "charge_loss_auto_match",
@@ -234,7 +234,7 @@ def vehicle_options(raw: Mapping[str, Any]) -> dict[str, Any]:
         and key not in {CONF_VEHICLE_PROFILES, CONF_ACTIVE_VEHICLE_PROFILE}
     }
     if (profile := active_profile(raw)) is None:
-        result["timed_goal_enabled"] = False
+        result["departure_enabled"] = False
         return result
     result.update(deepcopy(profile.options))
     result.update(
@@ -249,7 +249,7 @@ def vehicle_options(raw: Mapping[str, Any]) -> dict[str, Any]:
         for key in (
             CONF_VEHICLE_SOC_USE_PROFILE,
             CONF_VEHICLE_LIMIT_USE_PROFILE,
-            CONF_TIMED_USE_VEHICLE_CAPACITY,
+            CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
         ):
             result.pop(key, None)
     return result

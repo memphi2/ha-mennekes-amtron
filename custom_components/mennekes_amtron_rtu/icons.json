@@ -182,7 +182,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "default": "mdi:calendar-clock"
       }
     }

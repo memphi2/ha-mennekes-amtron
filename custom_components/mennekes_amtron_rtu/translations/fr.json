@@ -870,7 +870,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "name": "Heure cible"
       }
     }
@@ -981,13 +981,13 @@
     "loss_storage_unavailable": {
       "message": "La perte de charge n’a pas pu être enregistrée. Vérifiez la disponibilité du stockage et réessayez."
     },
-    "timed_goal_state_invalid": {
+    "departure_state_invalid": {
       "message": "L’heure de départ enregistrée n’a pas pu être restaurée. Vérifiez le plan avant de recharger."
     },
-    "timed_goal_unavailable": {
+    "departure_unavailable": {
       "message": "Les commandes de départ en attente n’ont pas pu être vérifiées. L’intégration réessaiera lorsque la connexion sera disponible."
     },
-    "timed_vehicle_unavailable": {
+    "departure_vehicle_unavailable": {
       "message": "Aucun prochain départ utilisable n’a été trouvé pour le véhicule choisi. Vérifiez son intégration, ses capteurs et réglages de programmation."
     },
     "gateway_authentication_failed": {
@@ -1229,7 +1229,7 @@
           "capacity_source": "Source de la capacité de batterie",
           "use_calendar": "Utiliser un calendrier",
           "use_departure_entity": "Utiliser une entité d’heure de départ",
-          "timed_minimum_soc": "Niveau de charge minimal (%)",
+          "departure_minimum_soc": "Niveau de charge minimal (%)",
           "use_vehicle_timer": "Utiliser les départs programmés du véhicule"
         },
         "description": "Profil : **{vehicle}**.\n\nLa date et l’heure restent saisissables manuellement. Activez uniquement les sources supplémentaires souhaitées ; leurs réglages suivront. Un plan actif peut lever une pause manuelle pour atteindre l’objectif de départ.",
@@ -1237,75 +1237,75 @@
           "capacity_source": "Utilisez la capacité utile : valeur fixe, capteur en kWh/Wh ou valeur du profil si disponible. Le plan attend si la capacité choisie ou le niveau de charge est indisponible.",
           "use_calendar": "Ajoute un bouton pour copier le prochain événement correspondant. Chaque appui choisit un trajet ; utilisez le blueprint fourni pour des imports programmés.",
           "use_departure_entity": "Reprend automatiquement une nouvelle date et heure futures de l’entité choisie. Le choix manuel reste possible ; un autre horodatage futur de cette source peut le remplacer.",
-          "timed_minimum_soc": "En dessous de ce niveau, la voiture se recharge immédiatement à pleine intensité, puis attend le départ planifié de la recharge. 0 désactive cette fonction.",
+          "departure_minimum_soc": "En dessous de ce niveau, la voiture se recharge immédiatement à pleine intensité, puis attend le départ planifié de la recharge. 0 désactive cette fonction.",
           "use_vehicle_timer": "Ajoute un bouton pour copier un minuteur de départ/climatisation actif de l’intégration du véhicule. Il lit le minuteur signalé ; il n’active pas la climatisation."
         }
       },
       "departure_capacity_fixed": {
         "title": "Capacité utile de la batterie",
         "data": {
-          "timed_capacity_kwh": "Capacité utile de la batterie (kWh)"
+          "departure_capacity_kwh": "Capacité utile de la batterie (kWh)"
         },
         "data_description": {
-          "timed_capacity_kwh": "Saisissez la capacité utile de la batterie, pas sa capacité nominale."
+          "departure_capacity_kwh": "Saisissez la capacité utile de la batterie, pas sa capacité nominale."
         },
         "description": "Profil : **{vehicle}**.\n\nSaisissez l’énergie réellement utilisable pour rouler. Elle sert à estimer le temps de charge nécessaire ; aucun réglage de la batterie du véhicule n’est modifié."
       },
       "departure_capacity_entity": {
         "title": "Entité de capacité de batterie",
         "data": {
-          "timed_capacity_entity": "Entité de capacité utile"
+          "departure_capacity_entity": "Entité de capacité utile"
         },
         "data_description": {
-          "timed_capacity_entity": "Choisissez un capteur de capacité utile en kWh ou Wh."
+          "departure_capacity_entity": "Choisissez un capteur de capacité utile en kWh ou Wh."
         },
         "description": "Profil : **{vehicle}**.\n\nChoisissez un capteur de capacité utile, pas d’énergie restante ni de pourcentage. L’unité doit être kWh ou Wh. Sans valeur valide, le plan attend la capacité au lieu de la deviner."
       },
       "departure_calendar": {
         "title": "Calendrier des départs",
         "data": {
-          "timed_calendar_entity": "Calendrier de départ",
-          "timed_calendar_title": "Titre exact de l’événement"
+          "departure_calendar_entity": "Calendrier de départ",
+          "departure_calendar_title": "Titre exact de l’événement"
         },
         "data_description": {
-          "timed_calendar_entity": "Choisissez un calendrier, puis copiez un événement avec le bouton correspondant.",
-          "timed_calendar_title": "Seuls les événements portant exactement ce titre sont retenus. Les événements sur une journée entière sont ignorés."
+          "departure_calendar_entity": "Choisissez un calendrier, puis copiez un événement avec le bouton correspondant.",
+          "departure_calendar_title": "Seuls les événements portant exactement ce titre sont retenus. Les événements sur une journée entière sont ignorés."
         },
         "description": "Profil : **{vehicle}**.\n\nChoisissez un calendrier et un titre exact, par exemple « Trajet au travail ». Le début de l’événement devient l’heure de départ. Le bouton recherche sur 14 jours ; les événements sur toute la journée sont ignorés."
       },
       "departure_entity": {
         "title": "Entité de l’heure de départ",
         "data": {
-          "timed_departure_entity": "Entité d’heure de départ"
+          "departure_entity": "Entité d’heure de départ"
         },
         "data_description": {
-          "timed_departure_entity": "Choisissez un horodatage avec date et heure ou un input_datetime complet. Une heure seule ne suffit pas."
+          "departure_entity": "Choisissez un horodatage avec date et heure ou un input_datetime complet. Une heure seule ne suffit pas."
         },
         "description": "Profil : **{vehicle}**.\n\nChoisissez une source avec date et heure. Un nouvel horodatage futur valide est repris automatiquement. Configurez une seule source pour cela ; la saisie manuelle et les boutons calendrier/véhicule restent disponibles."
       },
       "departure_vehicle": {
         "title": "Intégration du véhicule",
         "data": {
-          "timed_vehicle_provider": "Intégration du véhicule"
+          "departure_vehicle_provider": "Intégration du véhicule"
         },
         "data_description": {
-          "timed_vehicle_provider": "L’intégration qui fournit déjà les données de ce véhicule dans Home Assistant."
+          "departure_vehicle_provider": "L’intégration qui fournit déjà les données de ce véhicule dans Home Assistant."
         },
         "description": "Choisissez une intégration installée avec un adaptateur pris en charge. Les entités HA génériques fonctionnent sans adaptateur. Seules les données locales déjà présentes sont lues."
       },
       "departure_vehicle_details": {
         "title": "Programmation des départs du véhicule",
         "data": {
-          "timed_vehicle_device": "Véhicule",
-          "timed_vehicle_time_zone": "Fuseau horaire du véhicule (facultatif)",
-          "timed_timer1_days": "Jours du programmateur BMW 1 (facultatif)",
-          "timed_timer2_days": "Jours du programmateur BMW 2 (facultatif)"
+          "departure_vehicle_device": "Véhicule",
+          "departure_vehicle_time_zone": "Fuseau horaire du véhicule (facultatif)",
+          "departure_timer1_days": "Jours du programmateur BMW 1 (facultatif)",
+          "departure_timer2_days": "Jours du programmateur BMW 2 (facultatif)"
         },
         "data_description": {
-          "timed_vehicle_time_zone": "Fuseau horaire du véhicule, par exemple Europe/Paris. Sinon, celui de Home Assistant est utilisé. Les heures BMW ne contiennent pas de fuseau horaire.",
-          "timed_timer1_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur de climatisation 1. BavarianData ne fournit pas ces jours. Laissez vide pour ignorer ce programmateur.",
-          "timed_timer2_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur 2. Laissez vide pour l’ignorer.",
-          "timed_vehicle_device": "Le véhicule de cette intégration dont les entités sont lues."
+          "departure_vehicle_time_zone": "Fuseau horaire du véhicule, par exemple Europe/Paris. Sinon, celui de Home Assistant est utilisé. Les heures BMW ne contiennent pas de fuseau horaire.",
+          "departure_timer1_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur de climatisation 1. BavarianData ne fournit pas ces jours. Laissez vide pour ignorer ce programmateur.",
+          "departure_timer2_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur 2. Laissez vide pour l’ignorer.",
+          "departure_vehicle_device": "Le véhicule de cette intégration dont les entités sont lues."
         },
         "description": "Profil : **{vehicle}**.\n\nUtilisez le bouton de départ pour copier un programmateur actif du véhicule choisi. Avec un profil, le véhicule est déjà sélectionné. Dans BavarianData, activez les capteurs d’action, d’heure et de minute ; indiquez ici les jours récurrents car l’intégration ne les publie pas."
       },
@@ -1609,12 +1609,12 @@
       "cost_source_invalid": "Sélectionnez une source de coût prise en charge et une entité capteur pour un prix issu d’un capteur.",
       "cost_price_invalid": "Saisissez un prix TTC fini entre −1000 et 1000 par kWh. Les prix négatifs sont autorisés.",
       "network_tariff_invalid": "Vérifiez les prix bruts, l’année, deux à quatre trimestres et les périodes hautes/basses. Une période HH:MM-HH:MM par ligne, par quarts d’heure, sans chevauchement et avec une plage standard.",
-      "timed_source_invalid": "Source de planification invalide",
-      "timed_calendar_required": "Choisissez un calendrier",
-      "timed_calendar_title_required": "Saisissez le titre exact",
-      "timed_capacity_invalid": "Saisissez une capacité utile entre 1 et 250 kWh",
-      "timed_weekdays_invalid": "Sélectionnez des jours valides",
-      "timed_timezone_invalid": "Saisissez un fuseau horaire valide, par exemple Europe/Paris",
+      "departure_source_invalid": "Source de planification invalide",
+      "departure_calendar_required": "Choisissez un calendrier",
+      "departure_calendar_title_required": "Saisissez le titre exact",
+      "departure_capacity_invalid": "Saisissez une capacité utile entre 1 et 250 kWh",
+      "departure_weekdays_invalid": "Sélectionnez des jours valides",
+      "departure_timezone_invalid": "Saisissez un fuseau horaire valide, par exemple Europe/Paris",
       "options_changed": "Cette section a changé pendant la modification. Revenez et rouvrez-la avec les valeurs actuelles ; votre brouillon n’a pas été enregistré.",
       "vehicle_provider_invalid": "Choisissez une intégration de véhicule prise en charge.",
       "vehicle_device_invalid": "Choisissez un véhicule de l’intégration sélectionnée.",
@@ -1681,7 +1681,7 @@
         "4": "T4 : octobre–décembre"
       }
     },
-    "timed_weekdays": {
+    "departure_weekdays": {
       "options": {
         "mon": "Lundi",
         "tue": "Mardi",

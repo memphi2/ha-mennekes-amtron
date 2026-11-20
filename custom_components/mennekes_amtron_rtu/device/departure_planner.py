@@ -98,7 +98,7 @@ class DeparturePlanner:
 
     async def _apply_departure(self, value: float | None, deadline: datetime) -> None:
         await self._departure_write(
-            lambda control: control.async_set_timed_current(value, deadline=deadline, owner=DEPARTURE_OWNER),
+            lambda control: control.async_set_departure_current(value, deadline=deadline, owner=DEPARTURE_OWNER),
         )
 
     @attributed("departure_plan")
@@ -126,7 +126,7 @@ class DeparturePlanner:
         # Queue bookkeeping only; it needs no bus and works in read-only mode.
         async with self._service.command_lock:
             if self._service.control is not None:
-                await self._service.control.async_cancel_timed_current(DEPARTURE_OWNER)
+                await self._service.control.async_cancel_departure_current(DEPARTURE_OWNER)
 
     async def loop(self) -> None:
         while True:

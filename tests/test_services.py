@@ -180,8 +180,8 @@ class _Recorder:
 
 
 @pytest.mark.parametrize(("action", "owner", "method", "missing"), [
-    ("use_calendar_departure", "timed_goal", "async_use_next_calendar_event", "timed_goal_unavailable"),
-    ("use_vehicle_departure", "timed_goal", "async_use_vehicle_departure", "timed_goal_unavailable"),
+    ("use_calendar_departure", "departure_observer", "async_use_next_calendar_event", "departure_unavailable"),
+    ("use_vehicle_departure", "departure_observer", "async_use_vehicle_departure", "departure_unavailable"),
     ("assign_vehicle_charge", "charge_loss", "async_assign", "loss_unavailable"),
 ])
 def test_each_device_action_reaches_its_owner_or_names_what_is_missing(
@@ -597,18 +597,18 @@ def test_an_action_for_several_wallboxes_acts_on_none_when_one_cannot(
         async def use() -> None:
             used.append("first")
 
-        first.runtime_data.timed_goal = SimpleNamespace(async_use_next_calendar_event=use)
+        first.runtime_data.departure_observer = SimpleNamespace(async_use_next_calendar_event=use)
         # The second wallbox has no departure planning.
-        second.runtime_data = SimpleNamespace(timed_goal=None)
+        second.runtime_data = SimpleNamespace(departure_observer=None)
         second.state = ConfigEntryState.LOADED
         services.async_setup_services(hass)
         handler, schema = hass.services.registered[(DOMAIN, "use_calendar_departure")]
         call = SimpleNamespace(context=Context(), data=schema({"device_id": ["one", "two"]}))
         with pytest.raises(ServiceValidationError) as error:
             await handler(call)
-        assert error.value.translation_key == "timed_goal_unavailable"
+        assert error.value.translation_key == "departure_unavailable"
         assert used == []
-        second.runtime_data.timed_goal = SimpleNamespace(async_use_next_calendar_event=use)
+        second.runtime_data.departure_observer = SimpleNamespace(async_use_next_calendar_event=use)
         await handler(call)
         assert used == ["first", "first"]
 

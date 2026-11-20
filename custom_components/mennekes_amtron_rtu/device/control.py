@@ -37,9 +37,9 @@ from .control_queue import CommandQueue
 from .control_types import (
     STOPS,
     ControlOptions,
+    DepartureCommandCancelledError,
     PendingCommand,
     PhaseChange,
-    TimedCommandCancelledError,
     pause_state,
 )
 from .control_write import WritePath
@@ -327,9 +327,9 @@ class AmtronControl:
         return pause_state(self._write_state.confirmed_current)
 
     @staticmethod
-    def _validate_timed_owner(owner: str) -> None:
+    def _validate_departure_owner(owner: str) -> None:
         if not isinstance(owner, str) or not 1 <= len(owner) <= 128:
-            raise ValueError("invalid timed command owner")
+            raise ValueError("invalid departure command owner")
 
     @staticmethod
     def _uncertain(error: BaseException) -> bool:
@@ -377,7 +377,7 @@ class AmtronControl:
     def _check_command_context(self) -> None:
         command = self._active_command
         if command is not None and (reason := self._command_cancellation_reason(command)):
-            raise TimedCommandCancelledError(reason)
+            raise DepartureCommandCancelledError(reason)
 
     def _require_write_access(self) -> None:
         if self.read_only:
@@ -650,14 +650,14 @@ class AmtronControl:
         async with self._current_lock:
             await self.queue.async_submit_locked(PendingCommand("pause", CHARGING_PAUSE_CURRENT))
 
-    async def async_set_timed_current(
+    async def async_set_departure_current(
         self, value: float | None, *, deadline: datetime, owner: str,
     ) -> None:
         """Apply a trip's current without leaving an unbounded queued command."""
         self._require_write_access()
-        self._validate_timed_owner(owner)
+        self._validate_departure_owner(owner)
         if not isinstance(deadline, datetime) or deadline.tzinfo is None or deadline.utcoffset() is None:
-            raise ValueError("timed command deadline needs a timezone")
+            raise ValueError("departure command deadline needs a timezone")
         if value is not None and (
             isinstance(value, bool) or not isinstance(value, (int, float))
             or not math.isfinite(value) or value < CHARGING_CURRENT_MINIMUM
@@ -680,9 +680,9 @@ class AmtronControl:
                 return
             await self.queue.async_submit_locked(command)
 
-    async def async_cancel_timed_current(self, owner: str) -> None:
+    async def async_cancel_departure_current(self, owner: str) -> None:
         """Cancel only this planner's queue, even when writes became disabled."""
-        self._validate_timed_owner(owner)
+        self._validate_departure_owner(owner)
         async with self._current_lock:
             if self._pending is not None and self._pending.owner == owner:
                 self._clear_pending(outcome="cancelled", reason="user_cancelled")

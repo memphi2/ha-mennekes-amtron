@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   stays as changed afterwards, and a service that lost its saved plan has no
   trip until one is set again. A time taken from a calendar or the car is
   refused when the trip was edited while that answer was awaited.
+- **Breaking:** everything named `timed_*` is named `departure_*`, including
+  the vehicle options of departure planning. A vehicle profile saved with the
+  old option names is no longer valid, and with it the whole vehicle list:
+  set the vehicles up again. The target time entity gets a new unique ID
+  (`…_departure_time`); delete the old, now unavailable entity first, or the
+  new one gets `_2` appended to its entity ID.
 - **Breaking (service API):** a number that is not a permitted value is
   refused with the error's name (for example `energy_goal_invalid`) instead of
   as an invalid request; a current above the maximum is capped.

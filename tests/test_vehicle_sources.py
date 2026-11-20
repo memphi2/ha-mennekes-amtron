@@ -48,7 +48,7 @@ def test_only_implemented_capabilities_are_advertised_and_vehicle_bound():
 
 
 @pytest.mark.parametrize(("capability", "prefix", "legacy"), [
-    ("departure", "timed", "timed_bavarian_device"),
+    ("departure", "departure", "departure_bavarian_device"),
     ("charge_history", "charge_loss", "charge_loss_bavarian_device"),
 ])
 def test_explicit_generic_selection_never_revives_a_retained_legacy_device(capability, prefix, legacy):
@@ -65,23 +65,23 @@ def test_explicit_generic_selection_never_revives_a_retained_legacy_device(capab
 
 def test_history_and_departure_keep_independent_devices_and_generic_inputs_need_no_adapter():
     options = {
-        "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "departure-car",
+        "departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "departure-car",
         "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "history-car",
     }
     assert provider_selection(options, "departure").device_id == "departure-car"
     assert provider_selection(options, "charge_history").device_id == "history-car"
-    options.update({"timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "other-car"})
+    options.update({"departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "other-car"})
     assert provider_selection(options, "departure").device_id == "other-car"
     assert provider_selection(options, "charge_history").device_id == "history-car"
     generic = {
-        "timed_departure_entity": "sensor.trip", "timed_calendar_entity": "calendar.trip",
-        "vehicle_soc_entity": "sensor.soc", "timed_capacity_entity": "sensor.capacity",
+        "departure_entity": "sensor.trip", "departure_calendar_entity": "calendar.trip",
+        "vehicle_soc_entity": "sensor.soc", "departure_capacity_entity": "sensor.capacity",
     }
     # The baseline paths need neither an installed vehicle adapter nor its registry.
     assert resolve_departure_source(SimpleNamespace(), generic) is None
     assert resolve_history_source(SimpleNamespace(), generic) is None
     for provider in ("none", "unsupported", "bavariandata"):
-        assert resolve_departure_source(SimpleNamespace(), {"timed_vehicle_provider": provider}) is None
+        assert resolve_departure_source(SimpleNamespace(), {"departure_vehicle_provider": provider}) is None
         assert resolve_history_source(SimpleNamespace(), {"charge_loss_vehicle_provider": provider}) is None
 
 
@@ -103,8 +103,8 @@ def test_departure_adapter_binds_local_options_and_cannot_follow_a_rebound_vehic
     hass = local_hass()
     now = datetime(2026, 11, 7, tzinfo=UTC)
     options = {
-        "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car",
-        "timed_vehicle_time_zone": zone, "timed_timer1_days": days,
+        "departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "car",
+        "departure_vehicle_time_zone": zone, "departure_timer1_days": days,
     }
     source = resolve_departure_source(hass, options)
     assert source is not None
@@ -124,7 +124,7 @@ def test_departure_adapter_binds_local_options_and_cannot_follow_a_rebound_vehic
 
 def test_departure_falls_back_to_home_timezone_only_with_adapter_selected():
     hass = local_hass()
-    source = resolve_departure_source(hass, {"timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car"})
+    source = resolve_departure_source(hass, {"departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "car"})
     assert source is not None
     now = datetime(2026, 11, 7, tzinfo=UTC)
     with patch(f"{ADAPTER}.read_bavarian_departure", return_value=None) as read:

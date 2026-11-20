@@ -66,7 +66,7 @@ def test_profile_selection_is_shared_only_when_explicit(tmp_path):
             selected = {"vehicle_provider": "bavariandata", "vehicle_device": "car"}
             for capability in ("soc", "charge_limit", "capacity"):
                 assert provider_selection(selected, capability) == ProviderSelection("bavariandata", "car")
-            for feature, resolver in (("timed", resolve_departure_source), ("charge_loss", resolve_history_source)):
+            for feature, resolver in (("departure", resolve_departure_source), ("charge_loss", resolve_history_source)):
                 assert resolver(hass, selected) is None
                 assert resolver(hass, {**selected, f"{feature}_vehicle_provider": "profile"}) is not None
             source = resolve_telemetry_source(hass, selected)
@@ -79,7 +79,7 @@ def test_profile_selection_is_shared_only_when_explicit(tmp_path):
             # projection uses an empty string, which must retain legacy binding.
             unpinned = {**selected, "vehicle_source_identity": ""}
             assert resolve_telemetry_source(hass, unpinned).available
-            assert resolve_departure_source(hass, {**unpinned, "timed_vehicle_provider": "profile"}).available
+            assert resolve_departure_source(hass, {**unpinned, "departure_vehicle_provider": "profile"}).available
             assert resolve_history_source(hass, {**unpinned, "charge_loss_vehicle_provider": "profile"}).available
             for provider, device in (("unsupported", "car"), ("none", "car"), ("bavariandata", "")):
                 assert resolve_telemetry_source(hass, {"vehicle_provider": provider, "vehicle_device": device}) is None
@@ -307,7 +307,7 @@ def test_persisted_vehicle_identity_survives_missing_registry_but_rejects_replac
             assert telemetry_capabilities(hass, "car") == frozenset()
             options = {
                 "vehicle_provider": "bavariandata", "vehicle_device": "car", "vehicle_source_identity": identity,
-                "timed_vehicle_provider": "profile", "charge_loss_vehicle_provider": "profile",
+                "departure_vehicle_provider": "profile", "charge_loss_vehicle_provider": "profile",
             }
             sources = [resolver(hass, options) for resolver in (resolve_telemetry_source, resolve_departure_source, resolve_history_source)]
             assert all(source is not None and not source.available for source in sources)

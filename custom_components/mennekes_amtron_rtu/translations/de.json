@@ -870,7 +870,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "name": "Zielzeitpunkt"
       }
     }
@@ -981,13 +981,13 @@
     "loss_storage_unavailable": {
       "message": "Der Ladeverlust konnte nicht gespeichert werden. Prüfe den verfügbaren Speicher und versuche es erneut."
     },
-    "timed_goal_state_invalid": {
+    "departure_state_invalid": {
       "message": "Die gespeicherte Abfahrtszeit konnte nicht wiederhergestellt werden. Prüfe den gespeicherten Plan vor dem nächsten Laden."
     },
-    "timed_goal_unavailable": {
+    "departure_unavailable": {
       "message": "Vorgemerkte Abfahrtsbefehle konnten nicht geprüft werden. Die Integration versucht es erneut, sobald die Verbindung verfügbar ist."
     },
-    "timed_vehicle_unavailable": {
+    "departure_vehicle_unavailable": {
       "message": "Für das ausgewählte Fahrzeug wurde keine nutzbare kommende Abfahrt gefunden. Prüfe seine Integration, Timer-Sensoren und Einstellungen."
     },
     "gateway_authentication_failed": {
@@ -1229,7 +1229,7 @@
           "capacity_source": "Quelle der Akkukapazität",
           "use_calendar": "Kalender verwenden",
           "use_departure_entity": "Entität für Abfahrtszeit verwenden",
-          "timed_minimum_soc": "Mindestladestand (%)",
+          "departure_minimum_soc": "Mindestladestand (%)",
           "use_vehicle_timer": "Abfahrtszeiten des Fahrzeugs verwenden"
         },
         "description": "Profil: **{vehicle}**.\n\nDatum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen.",
@@ -1237,75 +1237,75 @@
           "capacity_source": "Verwende die nutzbare Akkukapazität: als festen Wert, kWh-/Wh-Sensor oder unterstützten Profilwert. Fehlt die gewählte Kapazität oder der Ladestand, wartet die Planung.",
           "use_calendar": "Ergänzt einen Button zum Übernehmen des nächsten passenden Kalendereintrags. Jeder Druck wählt eine Fahrt; für zeitgesteuerte Kalenderübernahmen kannst du die mitgelieferte Blaupause nutzen.",
           "use_departure_entity": "Übernimmt ein neues Datum mit Uhrzeit in der Zukunft automatisch aus der gewählten Entität. Manuelle Auswahl bleibt möglich; ein neuer zukünftiger Zeitstempel dieser Quelle kann sie ersetzen.",
-          "timed_minimum_soc": "Unter diesem Ladestand lädt das Auto sofort mit vollem Strom und wartet danach auf den geplanten Start. 0 schaltet das aus.",
+          "departure_minimum_soc": "Unter diesem Ladestand lädt das Auto sofort mit vollem Strom und wartet danach auf den geplanten Start. 0 schaltet das aus.",
           "use_vehicle_timer": "Ergänzt einen Button zum Übernehmen eines aktiven Abfahrts-/Klimatimers aus der Fahrzeugintegration. Er liest den gemeldeten Timer; die Klimaanlage des Autos schaltet er nicht ein."
         }
       },
       "departure_capacity_fixed": {
         "title": "Nutzbare Akkukapazität",
         "data": {
-          "timed_capacity_kwh": "Nutzbare Akkukapazität (kWh)"
+          "departure_capacity_kwh": "Nutzbare Akkukapazität (kWh)"
         },
         "data_description": {
-          "timed_capacity_kwh": "Gib die nutzbare Akkukapazität ein, nicht die Nennkapazität."
+          "departure_capacity_kwh": "Gib die nutzbare Akkukapazität ein, nicht die Nennkapazität."
         },
         "description": "Profil: **{vehicle}**.\n\nTrage die Energie ein, die der Akku tatsächlich zum Fahren speichern kann. Daraus wird die nötige Ladezeit geschätzt; die Akkueinstellungen des Autos werden nicht verändert."
       },
       "departure_capacity_entity": {
         "title": "Entität für Akkukapazität",
         "data": {
-          "timed_capacity_entity": "Entität für nutzbare Akkukapazität"
+          "departure_capacity_entity": "Entität für nutzbare Akkukapazität"
         },
         "data_description": {
-          "timed_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen."
+          "departure_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen."
         },
         "description": "Profil: **{vehicle}**.\n\nWähle einen Sensor für die nutzbare Gesamtkapazität, nicht für Restenergie oder Ladeprozent. Die Einheit muss kWh oder Wh sein. Ohne gültigen Wert wartet die Planung auf Kapazitätsdaten, statt zu schätzen."
       },
       "departure_calendar": {
         "title": "Abfahrtskalender",
         "data": {
-          "timed_calendar_entity": "Abfahrtskalender",
-          "timed_calendar_title": "Genauer Titel des Kalendertermins"
+          "departure_calendar_entity": "Abfahrtskalender",
+          "departure_calendar_title": "Genauer Titel des Kalendertermins"
         },
         "data_description": {
-          "timed_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
-          "timed_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert."
+          "departure_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
+          "departure_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert."
         },
         "description": "Profil: **{vehicle}**.\n\nWähle einen Kalender und einen exakten Termin-Titel, zum Beispiel „Fahrt zur Arbeit“. Der Terminbeginn wird zur Abfahrtszeit. Der Button durchsucht die nächsten 14 Tage; ganztägige Termine werden ignoriert."
       },
       "departure_entity": {
         "title": "Entität für Abfahrtszeit",
         "data": {
-          "timed_departure_entity": "Entität für Abfahrtszeit"
+          "departure_entity": "Entität für Abfahrtszeit"
         },
         "data_description": {
-          "timed_departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht."
+          "departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht."
         },
         "description": "Profil: **{vehicle}**.\n\nWähle eine Quelle mit Datum und Uhrzeit. Ein neuer gültiger Zeitpunkt in der Zukunft wird automatisch übernommen. Richte dafür nur eine Quelle ein; manuelle Eingabe und Kalender-/Fahrzeugbuttons bleiben verfügbar."
       },
       "departure_vehicle": {
         "title": "Fahrzeug-Integration",
         "data": {
-          "timed_vehicle_provider": "Fahrzeug-Integration"
+          "departure_vehicle_provider": "Fahrzeug-Integration"
         },
         "data_description": {
-          "timed_vehicle_provider": "Die Integration, die die Daten dieses Fahrzeugs bereits in Home Assistant liefert."
+          "departure_vehicle_provider": "Die Integration, die die Daten dieses Fahrzeugs bereits in Home Assistant liefert."
         },
         "description": "Wähle eine installierte Integration mit unterstütztem Adapter. Allgemeine HA-Entitäten lassen sich ohne Adapter auswählen. Es werden nur bereits vorhandene lokale Fahrzeugdaten gelesen."
       },
       "departure_vehicle_details": {
         "title": "Abfahrtszeiten des Fahrzeugs",
         "data": {
-          "timed_vehicle_device": "Fahrzeug",
-          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs (optional)",
-          "timed_timer1_days": "Wochentage BMW-Timer 1 (optional)",
-          "timed_timer2_days": "Wochentage BMW-Timer 2 (optional)"
+          "departure_vehicle_device": "Fahrzeug",
+          "departure_vehicle_time_zone": "Zeitzone des Fahrzeugs (optional)",
+          "departure_timer1_days": "Wochentage BMW-Timer 1 (optional)",
+          "departure_timer2_days": "Wochentage BMW-Timer 2 (optional)"
         },
         "data_description": {
-          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs, zum Beispiel Europe/Berlin. Leer lassen, um die Home-Assistant-Zeitzone zu verwenden. BMW-Timer enthalten keine Zeitzone.",
-          "timed_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
-          "timed_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren.",
-          "timed_vehicle_device": "Das Fahrzeug in dieser Integration, dessen Entitäten gelesen werden."
+          "departure_vehicle_time_zone": "Zeitzone des Fahrzeugs, zum Beispiel Europe/Berlin. Leer lassen, um die Home-Assistant-Zeitzone zu verwenden. BMW-Timer enthalten keine Zeitzone.",
+          "departure_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
+          "departure_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren.",
+          "departure_vehicle_device": "Das Fahrzeug in dieser Integration, dessen Entitäten gelesen werden."
         },
         "description": "Profil: **{vehicle}**.\n\nÜbernimm mit der Abfahrtsschaltfläche einen aktiven Timer des gewählten Fahrzeugs. Bei einem Profil steht das Fahrzeug bereits fest. Aktiviere in BavarianData die Timer-Sensoren für Aktion, Stunde und Minute. Wiederkehrende Wochentage gibst du hier an, weil die Integration sie nicht veröffentlicht."
       },
@@ -1609,12 +1609,12 @@
       "cost_source_invalid": "Wähle eine unterstützte Kostenquelle und für einen sensorbasierten Preis eine Sensor-Entität.",
       "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 je kWh an. Negative Preise sind erlaubt.",
       "network_tariff_invalid": "Prüfe Brutto-Netzentgelte, Tarifjahr, zwei bis vier aktive Quartale und HT/NT-Zeiträume. Je Zeile HH:MM-HH:MM mit Viertelstundengrenzen; keine Überschneidung und eine Standardtarifzeit muss bleiben.",
-      "timed_source_invalid": "Ungültige Quelle für das Zeitziel",
-      "timed_calendar_required": "Für diesen Titel einen Kalender wählen",
-      "timed_calendar_title_required": "Genauen Termintitel eingeben",
-      "timed_capacity_invalid": "Nutzbare Kapazität zwischen 1 und 250 kWh eingeben",
-      "timed_weekdays_invalid": "Wähle gültige Wochentage",
-      "timed_timezone_invalid": "Gib eine gültige Zeitzone ein, zum Beispiel Europe/Berlin",
+      "departure_source_invalid": "Ungültige Quelle für das Zeitziel",
+      "departure_calendar_required": "Für diesen Titel einen Kalender wählen",
+      "departure_calendar_title_required": "Genauen Termintitel eingeben",
+      "departure_capacity_invalid": "Nutzbare Kapazität zwischen 1 und 250 kWh eingeben",
+      "departure_weekdays_invalid": "Wähle gültige Wochentage",
+      "departure_timezone_invalid": "Gib eine gültige Zeitzone ein, zum Beispiel Europe/Berlin",
       "options_changed": "Dieser Bereich wurde während der Bearbeitung geändert. Kehre zurück und öffne ihn mit den aktuellen Werten erneut; dein Entwurf wurde nicht gespeichert.",
       "vehicle_provider_invalid": "Wähle eine unterstützte Fahrzeug-Integration.",
       "vehicle_device_invalid": "Wähle ein Fahrzeug der ausgewählten Integration.",
@@ -1681,7 +1681,7 @@
         "4": "Q4: Oktober–Dezember"
       }
     },
-    "timed_weekdays": {
+    "departure_weekdays": {
       "options": {
         "mon": "Montag",
         "tue": "Dienstag",

@@ -34,10 +34,10 @@ from .const import (
     MIN_PHASE_CHANGE_INTERVAL_SECONDS,
 )
 from .control_types import (
+    DepartureCommandCancelledError,
     PendingCommand,
     PhaseChange,
     PhaseWaitError,
-    TimedCommandCancelledError,
 )
 from .enums import CpState, EvseState
 from .errors import DeviceError, device_error, validation_error
@@ -327,7 +327,7 @@ class WritePath:
                 CHARGING_RELEASE, int(released), changed=lambda: switches,
                 precondition=admit if released and current != 1 else None,
             )
-        except (AmtronRateLimitedError, TimedCommandCancelledError):
+        except (AmtronRateLimitedError, DepartureCommandCancelledError):
             # Nothing was sent; the request is not an intent yet.
             self._control.charging_release_requested = previous
             raise
@@ -485,7 +485,7 @@ class WritePath:
         try:
             await self.async_apply_release(True)
         except BaseException as err:
-            refused = isinstance(err, (AmtronRateLimitedError, TimedCommandCancelledError))
+            refused = isinstance(err, (AmtronRateLimitedError, DepartureCommandCancelledError))
             if self._control._release_writes == written and (refused or not self._control._command_write_started or not self._control._uncertain(err)):
                 gate.restore_manual(manual, self._control.write_state.plug_cycle)
             raise
@@ -594,4 +594,4 @@ class WritePath:
     async def _async_check_command_vehicle(self, read: LockedRegisterReader) -> None:
         """Cancel a bound command if live EVSE and CP both prove unplugging."""
         if await self.async_vehicle_absent(read):
-            raise TimedCommandCancelledError("unknown")
+            raise DepartureCommandCancelledError("unknown")

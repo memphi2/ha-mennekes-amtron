@@ -16,12 +16,12 @@ from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureInputs,
     DepartureState,
 )
-from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
+from custom_components.mennekes_amtron_rtu.device.departure_trip import DepartureTrip
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
+from tests.test_departure import NOW, setup_observer
 from tests.test_modbus_service import TOKEN, service_fixture
-from tests.test_timed_goal import NOW, setup_observer
 
 SCOPE = "a" * 64
 CAR = "profile:bmw:sensor.soc|"
@@ -37,12 +37,12 @@ def test_a_time_kept_only_for_a_guest_gives_way_to_the_parked_trip(tmp_path, mon
         observer._hass.async_add_executor_job = asyncio.to_thread
         observer._options["vehicle_profile_id"] = "car"
         observer._resume = True
-        parked = TimedGoal()
+        parked = DepartureTrip()
         parked.set(dt_util.utcnow() + timedelta(hours=8), "manual")
         memory = VehicleTripMemory(observer._hass, "entry", "SERIAL")
         await memory.async_swap("car", parked, None)
         # The previous car's time, which the service kept for a guest.
-        left = TimedGoal()
+        left = DepartureTrip()
         left.set(NOW + timedelta(hours=3), "manual")
         service.state = plan(left, withdrawn=True)
         if not taken:
@@ -66,9 +66,9 @@ FORECAST = {
 }
 
 
-def plan(trip: TimedGoal | None = None, **changes) -> dict:
+def plan(trip: DepartureTrip | None = None, **changes) -> dict:
     return {
-        "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
+        "trip": (trip or DepartureTrip()).snapshot(), "status": "disabled", "planned_start": None,
         "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "withdrawn": False, "edit_revision": "a" * 32,
         **changes,
     }
@@ -100,7 +100,7 @@ class Service:
             raise self.fail
         self.trips.append((deadline, source, withdraw))
         self.expected.append(expected_selection)
-        trip = TimedGoal()
+        trip = DepartureTrip()
         trip.set(deadline, source)
         self.state = {**self.state, "trip": trip.snapshot(), "edit_revision": f"{len(self.trips):032x}"}
 
@@ -108,10 +108,10 @@ class Service:
         self.inputs.append(inputs)
         self.state = {**self.state, "inputs": inputs.digest}
 
-    async def async_cancel_timed_current(self, _owner):
+    async def async_cancel_departure_current(self, _owner):
         self.cancelled += 1
 
-    async def async_set_timed_current(self, *_args, **_kwargs):
+    async def async_set_departure_current(self, *_args, **_kwargs):
         pytest.fail("Home Assistant planned although the service does")
 
 
@@ -134,7 +134,7 @@ def test_the_trip_and_car_are_handed_over_once_and_the_service_state_is_shown(mo
         assert service.trips == [(deadline, "manual", False)]
         assert service.inputs == [DepartureInputs(CAR, SCOPE, 80.0, None, 20.0, REPORTED)]
         # A changed minimum level is handed over as well.
-        observer._options["timed_minimum_soc"] = 30
+        observer._options["departure_minimum_soc"] = 30
         await observer._evaluate()
         assert service.inputs[-1] == DepartureInputs(CAR, SCOPE, 80.0, None, 20.0, REPORTED, 30.0)
         start = NOW + timedelta(hours=5)
@@ -173,7 +173,7 @@ def test_the_service_decides_how_a_trip_ends(monkeypatch):
         deadline = NOW + timedelta(hours=8)
         await observer.async_set_deadline(deadline, source="manual")
         await observer._evaluate()
-        reached = TimedGoal.restore(service.state["trip"])
+        reached = DepartureTrip.restore(service.state["trip"])
         reached.finish("reached")
         service.state = {**service.state, "trip": reached.snapshot(), "status": "reached"}
         await observer._evaluate()
@@ -191,7 +191,7 @@ def test_the_service_keeps_the_only_trip(monkeypatch):
     async def run():
         observer, service, _hass = handover(monkeypatch)
         # A time chosen in the app is the trip, whoever chose it.
-        chosen = TimedGoal()
+        chosen = DepartureTrip()
         chosen.set(NOW + timedelta(hours=7), "manual")
         service.state = plan(chosen, editor="app", selection_vehicle="another-car", edit_revision="b" * 32)
         await observer._evaluate()
@@ -222,7 +222,7 @@ def test_a_refused_edit_is_reported_and_leaves_nothing_behind(monkeypatch):
 def test_a_time_from_the_calendar_or_the_car_replaces_only_the_trip_it_was_asked_for(monkeypatch):
     async def run():
         observer, service, hass = handover(monkeypatch)
-        observer._options.update({"timed_calendar_entity": "calendar.trips", "timed_calendar_title": "Departure"})
+        observer._options.update({"departure_calendar_entity": "calendar.trips", "departure_calendar_title": "Departure"})
         start = NOW + timedelta(hours=2)
         hass.services.async_call.return_value = {"calendar.trips": {"events": [
             {"start": start.isoformat(), "summary": "Departure"},
@@ -246,12 +246,12 @@ def test_a_parked_trip_is_given_back_once_and_only_to_an_empty_plan(tmp_path, mo
         observer._hass.async_add_executor_job = asyncio.to_thread
         observer._options["vehicle_profile_id"] = "car"
         observer._resume = True
-        parked = TimedGoal()
+        parked = DepartureTrip()
         parked.set(dt_util.utcnow() + timedelta(hours=8), "manual")
         memory = VehicleTripMemory(observer._hass, "entry", "SERIAL")
         await memory.async_swap("car", parked, None)
         if occupied:
-            current = TimedGoal()
+            current = DepartureTrip()
             current.set(NOW + timedelta(hours=3), "manual")
             service.state = plan(current)
         # A service that cannot take it yet gets it at the next evaluation.
@@ -373,7 +373,7 @@ def test_guest_mode_holds_vehicle_handover_but_keeps_explicit_time_editing(monke
         service.state["status"] = "guest_mode"
         original = observer.goal.snapshot()
         # Not even a new time from the car's own source replaces the guest's.
-        observer._options["timed_departure_entity"] = "sensor.departure"
+        observer._options["departure_entity"] = "sensor.departure"
         _hass.states["sensor.departure"] = SimpleNamespace(
             entity_id="sensor.departure", state=(NOW + timedelta(hours=4)).isoformat(), attributes={},
         )
@@ -415,8 +415,8 @@ def test_a_new_trip_hides_the_old_planned_start_until_the_service_plans_it(monke
 def test_a_capacity_sensor_in_wh_is_handed_over_in_kwh(monkeypatch):
     async def run():
         observer, service, hass = handover(monkeypatch)
-        observer._options.pop("timed_capacity_kwh")
-        observer._options["timed_capacity_entity"] = "sensor.capacity"
+        observer._options.pop("departure_capacity_kwh")
+        observer._options["departure_capacity_entity"] = "sensor.capacity"
         hass.states["sensor.capacity"] = SimpleNamespace(
             entity_id="sensor.capacity", state="64000", attributes={"unit_of_measurement": "Wh"},
         )

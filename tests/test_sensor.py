@@ -230,7 +230,7 @@ def test_the_waiting_reason_carries_who_controls_and_what_comes_next() -> None:
             "pending": "none", "energy_target": "disabled",
         }
         runtime.vehicle_soc = SimpleNamespace(source="sensor.car_soc")
-        runtime.timed_goal = SimpleNamespace(
+        runtime.departure_observer = SimpleNamespace(
             status="paused_until_start", planned_start="2026-11-16T03:00:00+00:00",
             forecast=SimpleNamespace(finish_at="2026-11-16T06:00:00+00:00", level_at_departure=80.0),
         )
@@ -243,7 +243,7 @@ def test_the_waiting_reason_carries_who_controls_and_what_comes_next() -> None:
         assert details["estimated_level_at_departure"] == 80.0
         assert details["plug_charge"] == "blocked"
         assert details["plug_charge_blocked"] == "release_off"
-        runtime.timed_goal = SimpleNamespace(status="queued", planned_start=None, forecast=None)
+        runtime.departure_observer = SimpleNamespace(status="queued", planned_start=None, forecast=None)
         assert "estimated_finish" not in waiting.extra_state_attributes
 
         # A service without an operation summary leaves the reason unknown.

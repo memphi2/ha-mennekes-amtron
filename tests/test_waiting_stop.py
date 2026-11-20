@@ -188,10 +188,10 @@ def test_a_newer_decision_of_the_same_owner_replaces_its_waiting_pause():
         control.soc_goal.target_percent = 80
         _rate_limited(h)
         deadline = datetime.now(UTC) + timedelta(hours=1)
-        await control.async_set_timed_current(None, deadline=deadline, owner="departure")
+        await control.async_set_departure_current(None, deadline=deadline, owner="departure")
         assert control.pending_action == "pause"
         h.clock[0] += 10
-        await control.async_set_timed_current(10, deadline=deadline, owner="departure")
+        await control.async_set_departure_current(10, deadline=deadline, owner="departure")
         assert control.pending_action != "pause"
         await control.async_shutdown()
 
@@ -291,7 +291,7 @@ def test_a_planners_waiting_pause_outlasts_a_manual_current_with_a_goal_controll
         control.soc_goal.target_percent = 80
         _rate_limited(h)
         deadline = datetime.now(UTC) + timedelta(hours=1)
-        await control.async_set_timed_current(None, deadline=deadline, owner="departure")
+        await control.async_set_departure_current(None, deadline=deadline, owner="departure")
         h.clock[0] += 10
         await control.async_set_charging_current(10)
         assert currents(h) == [10.0]

@@ -32,7 +32,7 @@ class PhaseWaitError(Exception):
         self.preserve_deadline = preserve_deadline
 
 
-class TimedCommandCancelledError(Exception):
+class DepartureCommandCancelledError(Exception):
     """The trip or its charge target no longer authorizes a pending command."""
 
     def __init__(self, reason: str) -> None:

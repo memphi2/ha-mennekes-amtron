@@ -19,10 +19,10 @@ from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseStat
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from tests.test_departure_control import OWNER, SOC_SOURCE, Harness, service_fixture
 from tests.test_modbus_service import TOKEN, current_writes
 from tests.test_plug_charge_observer import observer_harness, plug_in_paused
 from tests.test_plug_charge_remote import remote_control
-from tests.test_timed_control import OWNER, SOC_SOURCE, Harness, service_fixture
 
 POLICY = "c" * 64
 BLOCKERS = ("manual_stop", "lock", "rfid", "error", "energy_goal")
@@ -45,7 +45,7 @@ async def control_path(tmp_path, *, remote):
             control, owner = remote_control(client), service.control
             refused = HomeAssistantError
             # The departure plan runs inside the service, never over HTTP.
-            set_timed_current = owner.async_set_timed_current
+            set_departure_current = owner.async_set_departure_current
         else:
             harness = Harness()
             control = owner = await harness.connect()
@@ -53,7 +53,7 @@ async def control_path(tmp_path, *, remote):
             stack.push_async_callback(owner.async_shutdown)
             transport, clock = harness.transport, harness.clock
             refused = DeviceError
-            set_timed_current = owner.async_set_timed_current
+            set_departure_current = owner.async_set_departure_current
         await control.async_configure_plug_charge(True, policy=POLICY)
         transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
         transport.bank[R.CP_STATE.address] = int(CpState.B1)
@@ -74,7 +74,7 @@ async def control_path(tmp_path, *, remote):
         assert not owner.plug_charge["authorized"]
         yield SimpleNamespace(
             control=control, owner=owner, transport=transport, clock=clock,
-            refused=refused, set_timed_current=set_timed_current,
+            refused=refused, set_departure_current=set_departure_current,
         )
 
 
@@ -145,7 +145,7 @@ def test_reached_target_cancels_queued_departure_even_after_plug_charge_grant(tm
             wake = asyncio.Event()
             path.owner._sleep = lambda _delay: wake.wait()
             try:
-                await path.set_timed_current(
+                await path.set_departure_current(
                     16, deadline=datetime.now(UTC) + timedelta(hours=1), owner=OWNER,
                 )
                 assert path.owner.pending_action == "set_current"
@@ -192,7 +192,7 @@ def test_plan_ready_then_new_stop_invalidates_the_old_settle_timer(tmp_path, mon
         async with observer_harness(tmp_path, monkeypatch) as h:
             await plug_in_paused(h, plan=plan)
             assert h.observer.blocked_reason == "departure_plan"
-            h.entry.runtime_data.timed_goal.status = "paused_until_start"
+            h.entry.runtime_data.departure_observer.status = "paused_until_start"
             h.coordinator.async_update_listeners()
             assert h.observer.status == "waiting_release"
             old = h.timers[-1]

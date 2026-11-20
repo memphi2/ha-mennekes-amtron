@@ -86,7 +86,7 @@ def test_the_users_pause_behind_the_plans_waiting_pause_is_refused_aloud():
         harness, control = await charging()
         control.soc_goal.status, control.soc_goal.target_percent = "active", 80
         harness.client.write_state.mode_change_at = harness.clock[0]
-        await control.async_set_timed_current(
+        await control.async_set_departure_current(
             None, deadline=datetime.now(UTC) + timedelta(hours=1), owner="departure",
         )
         harness.clock[0] += 10

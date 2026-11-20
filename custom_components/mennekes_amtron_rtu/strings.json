@@ -870,7 +870,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "name": "Target time"
       }
     }
@@ -981,13 +981,13 @@
     "loss_storage_unavailable": {
       "message": "The charging loss could not be saved. Check storage availability and try again."
     },
-    "timed_goal_state_invalid": {
+    "departure_state_invalid": {
       "message": "The saved departure time could not be restored. Check the stored plan before charging again."
     },
-    "timed_goal_unavailable": {
+    "departure_unavailable": {
       "message": "Queued departure commands could not be checked. The integration will retry when the connection is available."
     },
-    "timed_vehicle_unavailable": {
+    "departure_vehicle_unavailable": {
       "message": "No usable upcoming departure was found for the selected vehicle. Check its integration, timer sensors and settings."
     },
     "gateway_authentication_failed": {
@@ -1229,7 +1229,7 @@
           "capacity_source": "Battery capacity source",
           "use_calendar": "Use a calendar",
           "use_departure_entity": "Use a departure time entity",
-          "timed_minimum_soc": "Minimum charge level (%)",
+          "departure_minimum_soc": "Minimum charge level (%)",
           "use_vehicle_timer": "Use vehicle departure timers"
         },
         "description": "Profile: **{vehicle}**.\n\nManual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure.",
@@ -1237,75 +1237,75 @@
           "capacity_source": "Use usable battery capacity: a fixed value, a kWh/Wh sensor, or the profile value when supported. The plan waits if its chosen capacity or charge level is unavailable.",
           "use_calendar": "Adds a button to copy the next matching calendar event. Each press chooses one trip; use the supplied blueprint if you want scheduled calendar imports.",
           "use_departure_entity": "Automatically adopts a new future date and time from the selected entity. Manual selection remains possible; a different future timestamp from this source can replace it.",
-          "timed_minimum_soc": "Below this charge level the car charges at once at full current, then waits for the planned start. 0 switches it off.",
+          "departure_minimum_soc": "Below this charge level the car charges at once at full current, then waits for the planned start. 0 switches it off.",
           "use_vehicle_timer": "Adds a button to copy one active departure/climate timer from the vehicle integration. It reads the reported timer; it does not switch on the car’s climate control."
         }
       },
       "departure_capacity_fixed": {
         "title": "Usable battery capacity",
         "data": {
-          "timed_capacity_kwh": "Usable battery capacity (kWh)"
+          "departure_capacity_kwh": "Usable battery capacity (kWh)"
         },
         "data_description": {
-          "timed_capacity_kwh": "Enter the usable battery capacity, not the nominal capacity."
+          "departure_capacity_kwh": "Enter the usable battery capacity, not the nominal capacity."
         },
         "description": "Profile: **{vehicle}**.\n\nEnter the energy the battery can actually store for driving. This value is used to estimate the required charging time; changing it does not change the car’s own battery settings."
       },
       "departure_capacity_entity": {
         "title": "Battery capacity entity",
         "data": {
-          "timed_capacity_entity": "Usable battery capacity entity"
+          "departure_capacity_entity": "Usable battery capacity entity"
         },
         "data_description": {
-          "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh."
+          "departure_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh."
         },
         "description": "Profile: **{vehicle}**.\n\nChoose a sensor for usable capacity, not remaining energy or charge percentage. Its unit must be kWh or Wh. Without a valid value, the plan waits for capacity instead of guessing."
       },
       "departure_calendar": {
         "title": "Departure calendar",
         "data": {
-          "timed_calendar_entity": "Departure calendar",
-          "timed_calendar_title": "Exact calendar event title"
+          "departure_calendar_entity": "Departure calendar",
+          "departure_calendar_title": "Exact calendar event title"
         },
         "data_description": {
-          "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
-          "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored."
+          "departure_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
+          "departure_calendar_title": "Only events with this exact title are eligible. All-day events are ignored."
         },
         "description": "Profile: **{vehicle}**.\n\nChoose a calendar and an exact event title, for example “Drive to work”. The event start becomes the departure time. The button searches the next 14 days; all-day events are ignored."
       },
       "departure_entity": {
         "title": "Departure time entity",
         "data": {
-          "timed_departure_entity": "Departure time entity"
+          "departure_entity": "Departure time entity"
         },
         "data_description": {
-          "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip."
+          "departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip."
         },
         "description": "Profile: **{vehicle}**.\n\nChoose a source containing both date and time. A valid new future timestamp is adopted automatically. Configure only one source for this purpose; manual entry and the calendar/vehicle buttons remain available."
       },
       "departure_vehicle": {
         "title": "Vehicle integration",
         "data": {
-          "timed_vehicle_provider": "Vehicle integration"
+          "departure_vehicle_provider": "Vehicle integration"
         },
         "data_description": {
-          "timed_vehicle_provider": "The integration that already provides this car’s data in Home Assistant."
+          "departure_vehicle_provider": "The integration that already provides this car’s data in Home Assistant."
         },
         "description": "Choose an installed integration with a supported adapter. Generic HA entities can be selected without an adapter. Only existing local vehicle data is read."
       },
       "departure_vehicle_details": {
         "title": "Vehicle departure timers",
         "data": {
-          "timed_vehicle_device": "Vehicle",
-          "timed_vehicle_time_zone": "Vehicle time zone (optional)",
-          "timed_timer1_days": "BMW timer 1 weekdays (optional)",
-          "timed_timer2_days": "BMW timer 2 weekdays (optional)"
+          "departure_vehicle_device": "Vehicle",
+          "departure_vehicle_time_zone": "Vehicle time zone (optional)",
+          "departure_timer1_days": "BMW timer 1 weekdays (optional)",
+          "departure_timer2_days": "BMW timer 2 weekdays (optional)"
         },
         "data_description": {
-          "timed_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
-          "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
-          "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer.",
-          "timed_vehicle_device": "The car in that integration whose entities are read."
+          "departure_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
+          "departure_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
+          "departure_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer.",
+          "departure_vehicle_device": "The car in that integration whose entities are read."
         },
         "description": "Profile: **{vehicle}**.\n\nUse the departure button to copy one active timer from the selected vehicle. With a profile, the vehicle is already selected. For BavarianData, enable the timer action, hour and minute sensors; enter recurring weekdays here because the integration does not publish them."
       },
@@ -1609,12 +1609,12 @@
       "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
       "cost_price_invalid": "Enter a finite gross price per kWh between −1000 and 1000. Negative prices are allowed.",
       "network_tariff_invalid": "Check the gross prices, tariff year, two to four active quarters and HT/NT periods. Use one 15-minute-aligned HH:MM-HH:MM period per line; periods must not overlap and must leave standard-tariff time.",
-      "timed_source_invalid": "Invalid timed-goal source",
-      "timed_calendar_required": "Choose a calendar for this event title",
-      "timed_calendar_title_required": "Enter the exact event title",
-      "timed_capacity_invalid": "Enter a usable capacity between 1 and 250 kWh",
-      "timed_weekdays_invalid": "Choose valid weekdays",
-      "timed_timezone_invalid": "Enter a valid time zone, for example Europe/Berlin",
+      "departure_source_invalid": "Invalid timed-goal source",
+      "departure_calendar_required": "Choose a calendar for this event title",
+      "departure_calendar_title_required": "Enter the exact event title",
+      "departure_capacity_invalid": "Enter a usable capacity between 1 and 250 kWh",
+      "departure_weekdays_invalid": "Choose valid weekdays",
+      "departure_timezone_invalid": "Enter a valid time zone, for example Europe/Berlin",
       "options_changed": "This section changed while you were editing it. Return and reopen it to use the latest values; your draft was not saved.",
       "vehicle_provider_invalid": "Select a supported vehicle integration.",
       "vehicle_device_invalid": "Select a vehicle belonging to the chosen integration.",
@@ -1681,7 +1681,7 @@
         "4": "Q4: October–December"
       }
     },
-    "timed_weekdays": {
+    "departure_weekdays": {
       "options": {
         "mon": "Monday",
         "tue": "Tuesday",

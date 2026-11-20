@@ -299,10 +299,10 @@ class PlugChargeObserver:
 
     def _plan_status(self) -> str | None:
         """The status of an armed departure plan that controls the current."""
-        timed = self._entry.runtime_data.timed_goal
-        if timed is None or timed.goal.deadline is None or timed.goal.finished is not None:
+        observer = self._entry.runtime_data.departure_observer
+        if observer is None or observer.goal.deadline is None or observer.goal.finished is not None:
             return None
-        status = timed.status
+        status = observer.status
         return status if status in PLAN_DECIDING | PLAN_CHARGING | {PLAN_PAUSED} else None
 
     def _plan_applied(self) -> bool:

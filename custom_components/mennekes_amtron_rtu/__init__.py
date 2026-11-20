@@ -61,6 +61,11 @@ from .data import (
     RuntimeHandoff,
     WallboxData,
 )
+from .departure_const import (
+    CONF_DEPARTURE_RESET_PENDING,
+    departure_is_enabled,
+)
+from .departure_observer import DepartureObserver
 from .device.client_errors import AmtronBusError, AmtronIdentityError
 from .device.const import DOMAIN
 from .device.errors import DeviceError
@@ -99,11 +104,6 @@ from .service_control import ServiceControl, ServiceHeartbeat
 from .service_errors import ServiceConnectionError
 from .service_transport import HttpTransport, ServiceTransport
 from .services import async_setup_services
-from .timed_goal_const import (
-    CONF_TIMED_GOAL_RESET_PENDING,
-    timed_goal_is_enabled,
-)
-from .timed_goal_observer import TimedGoalObserver
 from .vehicle_binding import VehicleBinding, VehicleBindingStore
 from .vehicle_detection import (
     VehicleDetectionObserver,
@@ -481,13 +481,13 @@ def _trip_memory(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> Vehic
 async def _async_park_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     """Remember the selected car's open trip before another car is selected."""
     runtime = entry.runtime_data
-    if runtime.vehicle_profile_id is None or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
+    if runtime.vehicle_profile_id is None or entry.options.get(CONF_DEPARTURE_RESET_PENDING) is not True:
         return
     # A deleted profile's trip is dropped rather than kept for no car.
     # While a guest charges, the one target time is the guest's.
     trip = (
-        runtime.timed_goal.goal
-        if runtime.timed_goal is not None and runtime.vehicle_profile_id in profiles(entry.options)
+        runtime.departure_observer.goal
+        if runtime.departure_observer is not None and runtime.vehicle_profile_id in profiles(entry.options)
         and not runtime.control.guest_active()
         else None
     )
@@ -506,24 +506,24 @@ async def _async_retain_trips(hass: HomeAssistant, entry: MennekesAmtronConfigEn
     await _trip_memory(hass, entry).async_retain({
         key for key in profiles(entry.options)
         if vehicle_soc_is_configured(each := profile_options(entry.options, key))
-        and timed_goal_is_enabled(each)
+        and departure_is_enabled(each)
     })
 
 
 async def _async_cancel_old_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     """Withdraw a disabled or replaced trip's current before a car starts."""
     runtime = entry.runtime_data
-    if _service_intent_rejected(runtime.client) or CONF_TIMED_GOAL_RESET_PENDING not in entry.options:
+    if _service_intent_rejected(runtime.client) or CONF_DEPARTURE_RESET_PENDING not in entry.options:
         return
-    if entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True:
+    if entry.options.get(CONF_DEPARTURE_RESET_PENDING) is True:
         try:
             # The service still plans the old trip, e.g. after an unload that
             # could not reach it; withdrawing it also ends that plan's pause.
             await runtime.control.async_set_departure_trip(None, None, withdraw=True)
         except (AmtronBusError, HomeAssistantError) as err:
-            _raise_optional_setup_error(runtime.client, err, "timed_goal_unavailable")
+            _raise_optional_setup_error(runtime.client, err, "departure_unavailable")
     stored_options = dict(entry.options)
-    stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
+    stored_options.pop(CONF_DEPARTURE_RESET_PENDING)
     # Only a withdrawn trip uses up the authority to withdraw it: a failed
     # reconnect must still cancel the old plan on the next attempt.
     hass.config_entries.async_update_entry(entry, options=stored_options)
@@ -566,17 +566,17 @@ async def _async_start_vehicle(
         except (AmtronBusError, HomeAssistantError, OSError) as err:
             _raise_optional_setup_error(client, err, "soc_goal_unavailable")
     validate_vehicle_selection()
-    if vehicle_soc_is_configured(options) and timed_goal_is_enabled(options):
-        timed = TimedGoalObserver(hass, entry)
-        runtime.timed_goal = timed
+    if vehicle_soc_is_configured(options) and departure_is_enabled(options):
+        plan = DepartureObserver(hass, entry)
+        runtime.departure_observer = plan
         try:
-            await timed.async_start()
+            await plan.async_start()
         except (OSError, ValueError) as err:
             raise ConfigEntryNotReady(
-                translation_domain=DOMAIN, translation_key="timed_goal_state_invalid"
+                translation_domain=DOMAIN, translation_key="departure_state_invalid"
             ) from err
         except (AmtronBusError, HomeAssistantError) as err:
-            _raise_optional_setup_error(client, err, "timed_goal_unavailable")
+            _raise_optional_setup_error(client, err, "departure_unavailable")
     runtime.vehicle_profile_id = options.get(CONF_VEHICLE_PROFILE_ID)
 
 
@@ -588,11 +588,11 @@ async def _async_stop_vehicle(
     ``withdraw`` ends the car's plan pause when another car takes over.
     """
     runtime.vehicle_profile_id = None
-    timed, soc, loss = runtime.timed_goal, runtime.vehicle_soc, runtime.charge_loss
-    runtime.timed_goal = runtime.vehicle_soc = runtime.charge_loss = None
+    observer, soc, loss = runtime.departure_observer, runtime.vehicle_soc, runtime.charge_loss
+    runtime.departure_observer = runtime.vehicle_soc = runtime.charge_loss = None
     runtime.vehicle_telemetry = None
-    if timed is not None:
-        await timed.async_stop(withdraw=withdraw)
+    if observer is not None:
+        await observer.async_stop(withdraw=withdraw)
     for owner in (soc, loss):
         if owner is not None:
             await owner.async_stop()
@@ -603,7 +603,7 @@ def _remember_vehicle(entry: MennekesAmtronConfigEntry) -> None:
     runtime = entry.runtime_data
     runtime.vehicle_base_options = without_selection(entry.options)
     runtime.vehicle_selection = {
-        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_TIMED_GOAL_RESET_PENDING
+        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_DEPARTURE_RESET_PENDING
     }
 
 
@@ -623,9 +623,9 @@ async def _async_switch_vehicle(
     ):
         return False
     selection = {
-        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_TIMED_GOAL_RESET_PENDING
+        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_DEPARTURE_RESET_PENDING
     }
-    if selection == runtime.vehicle_selection and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
+    if selection == runtime.vehicle_selection and entry.options.get(CONF_DEPARTURE_RESET_PENDING) is not True:
         return True
     # Like at setup, a poll during the switch must not retry the previous
     # car's stop before the new car's source has been bound or cleared.
@@ -636,7 +636,7 @@ async def _async_switch_vehicle(
         # its plan's pause stay with it.
         same_car = (
             vehicle_options(entry.options).get(CONF_VEHICLE_PROFILE_ID) == runtime.vehicle_profile_id
-            and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True
+            and entry.options.get(CONF_DEPARTURE_RESET_PENDING) is not True
         )
         await _async_stop_vehicle(runtime, withdraw=not same_car)
         auto = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
@@ -784,8 +784,8 @@ async def async_unload_entry(
     # So does switching the car's departure planning off: the app would
     # otherwise keep planning a trip that Home Assistant no longer shows.
     withdraw = withdraw or (
-        runtime_data.timed_goal is not None
-        and not (vehicle_soc_is_configured(options) and timed_goal_is_enabled(options))
+        runtime_data.departure_observer is not None
+        and not (vehicle_soc_is_configured(options) and departure_is_enabled(options))
     )
     try:
         await _async_stop_runtime(runtime_data, retain_cost=retain_cost, withdraw_plan=withdraw)
@@ -820,8 +820,8 @@ async def _async_stop_runtime(
         await runtime.charging_cost.async_stop()
     if runtime.cost_goal is not None:
         await runtime.cost_goal.async_stop()
-    if runtime.timed_goal is not None:
-        await runtime.timed_goal.async_stop(withdraw=withdraw_plan)
+    if runtime.departure_observer is not None:
+        await runtime.departure_observer.async_stop(withdraw=withdraw_plan)
     if runtime.vehicle_soc is not None:
         await runtime.vehicle_soc.async_stop()
     await runtime.client.async_close()

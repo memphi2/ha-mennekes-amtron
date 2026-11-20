@@ -38,13 +38,13 @@ from .departure_step import (
     same_command,
 )
 from .departure_store import DepartureStore
+from .departure_trip import DepartureTrip
 from .errors import DeviceError, validation_error
 from .notice import FailureNotice
 from .persistence import finish_goal_save
 from .power_window import PowerWindow
 from .session_mark import SessionMark
 from .soc_goal import percentage
-from .timed_goal import TimedGoal
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -232,7 +232,7 @@ class DepartureForecast:
 class DepartureState:
     """The service's plan as Home Assistant shows it."""
 
-    trip: TimedGoal
+    trip: DepartureTrip
     status: str
     planned_start: datetime | None
     estimated_soc: float | None
@@ -268,7 +268,7 @@ class DepartureState:
         if type(raw["withdrawn"]) is not bool:
             raise ValueError("invalid departure plan state")
         return cls(
-            TimedGoal.restore(raw["trip"]), status, None if start is None else instant(start),
+            DepartureTrip.restore(raw["trip"]), status, None if start is None else instant(start),
             None if level is None else percentage(level), digest, scope, confirmed,
             None if raw["forecast"] is None else DepartureForecast.restore(raw["forecast"]),
             raw["editor"], raw["selection_vehicle"], raw["edit_revision"], raw["withdrawn"],
@@ -312,7 +312,7 @@ class DepartureSample:
 class DepartureController:
     """Plan one trip for the confirmed car; own nothing but plan commands.
 
-    Writes take the control's ordinary timed-command path under the service's
+    Writes take the control's ordinary departure-command path under the service's
     command lock: manual and solar commands win at once, and the plan applies
     its current again only after its write interval.
     """
@@ -364,7 +364,7 @@ class DepartureController:
         # Withdrawn while a guest charged: the time stays for the guest and
         # ends with it, unless someone sets a time meanwhile.
         self.withdrawn = False
-        self.trip = TimedGoal()
+        self.trip = DepartureTrip()
         self.inputs: DepartureInputs | None = None
         self.anchor: SocAnchor | None = None
         self.planned_start: datetime | None = None
@@ -405,7 +405,7 @@ class DepartureController:
             raise ValueError("invalid departure edit revision")
         self.editor, self.selection_vehicle = raw["editor"], raw["selection_vehicle"]
         self.edit_revision = raw["edit_revision"]
-        trip = TimedGoal.restore(raw["trip"])
+        trip = DepartureTrip.restore(raw["trip"])
         inputs = None if raw["inputs"] is None else DepartureInputs.restore(raw["inputs"])
         anchor = None if raw["anchor"] is None else SocAnchor.restore(raw["anchor"])
         session = None if raw["session"] is None else SessionMark.restore(raw["session"])
@@ -523,7 +523,7 @@ class DepartureController:
                 # timestamp cannot silently re-arm a trip cleared in the app.
                 source = self.trip.source
             _selection(editor, sample.vehicle)
-            candidate = TimedGoal.restore(self.trip.snapshot())
+            candidate = DepartureTrip.restore(self.trip.snapshot())
             if candidate.set(deadline, source):
                 if deadline is None and self.estimated_stop and not withdraw:
                     # The car stands at its projected target: a cleared trip
@@ -635,7 +635,7 @@ class DepartureController:
             if self.withdrawn:
                 # The guest is gone, and nobody set a time since the car this
                 # one belonged to was withdrawn: no other car inherits it.
-                self.trip = TimedGoal()
+                self.trip = DepartureTrip()
                 self._reached_target = self.planned_start = None
                 self.estimated_stop = self.withdrawn = False
                 self.edit_revision = secrets.token_hex(16)
@@ -783,7 +783,7 @@ class DepartureController:
             if self._target_raised(s):
                 # A higher target plans the trip again. A charge level that
                 # falls before departure, e.g. from preconditioning, does not.
-                self.trip = TimedGoal()
+                self.trip = DepartureTrip()
                 self.trip.set(deadline, trip.source)
                 self._reached_target = self.planned_start = None
                 await self._evaluate(s)
@@ -916,7 +916,7 @@ class DepartureController:
         return level is not None and level < s.target_percent
 
     async def _finish(self, reason: str, s: DepartureSample, *, clear_deadline: bool = False) -> None:
-        candidate = TimedGoal.restore(self.trip.snapshot())
+        candidate = DepartureTrip.restore(self.trip.snapshot())
         candidate.finish(reason, clear_deadline=clear_deadline)
         await self._cancel_command()
         self.trip = candidate

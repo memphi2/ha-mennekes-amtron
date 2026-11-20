@@ -870,7 +870,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "name": "Doeltijd"
       }
     }
@@ -981,13 +981,13 @@
     "loss_storage_unavailable": {
       "message": "Het laadverlies kon niet worden opgeslagen. Controleer of opslag beschikbaar is en probeer het opnieuw."
     },
-    "timed_goal_state_invalid": {
+    "departure_state_invalid": {
       "message": "De opgeslagen vertrektijd kon niet worden hersteld. Controleer het plan voordat je opnieuw laadt."
     },
-    "timed_goal_unavailable": {
+    "departure_unavailable": {
       "message": "Wachtende vertrekopdrachten konden niet worden gecontroleerd. De integratie probeert het opnieuw zodra de verbinding beschikbaar is."
     },
-    "timed_vehicle_unavailable": {
+    "departure_vehicle_unavailable": {
       "message": "Er is geen bruikbare komende vertrektijd gevonden voor het gekozen voertuig. Controleer de integratie, timersensoren en instellingen."
     },
     "gateway_authentication_failed": {
@@ -1229,7 +1229,7 @@
           "capacity_source": "Bron van accucapaciteit",
           "use_calendar": "Kalender gebruiken",
           "use_departure_entity": "Entiteit voor vertrektijd gebruiken",
-          "timed_minimum_soc": "Minimaal laadniveau (%)",
+          "departure_minimum_soc": "Minimaal laadniveau (%)",
           "use_vehicle_timer": "Vertrektijden van het voertuig gebruiken"
         },
         "description": "Profiel: **{vehicle}**.\n\nDatum en tijd kun je altijd handmatig invoeren. Kies alleen gewenste extra bronnen; hun instellingen volgen hierna. Een actief plan kan een handmatige pauze opheffen om het vertrekdoel te halen.",
@@ -1237,75 +1237,75 @@
           "capacity_source": "Gebruik de bruikbare capaciteit: een vaste waarde, kWh/Wh-sensor of ondersteunde profielwaarde. De planning wacht als de gekozen capaciteit of laadtoestand ontbreekt.",
           "use_calendar": "Voegt een knop toe om de volgende passende kalenderafspraak over te nemen. Elke druk kiest één rit; gebruik de meegeleverde blauwdruk voor geplande kalenderimports.",
           "use_departure_entity": "Neemt automatisch een nieuwe toekomstige datum en tijd over uit de gekozen entiteit. Handmatige selectie blijft mogelijk; een ander toekomstig tijdstip uit deze bron kan die vervangen.",
-          "timed_minimum_soc": "Onder dit laadniveau laadt de auto meteen op volle stroom en wacht daarna op de geplande start. 0 schakelt dit uit.",
+          "departure_minimum_soc": "Onder dit laadniveau laadt de auto meteen op volle stroom en wacht daarna op de geplande start. 0 schakelt dit uit.",
           "use_vehicle_timer": "Voegt een knop toe om een actieve vertrek-/klimaattimer uit de voertuigintegratie over te nemen. De knop leest de gemelde timer en schakelt de klimaatregeling niet in."
         }
       },
       "departure_capacity_fixed": {
         "title": "Bruikbare accucapaciteit",
         "data": {
-          "timed_capacity_kwh": "Bruikbare accucapaciteit (kWh)"
+          "departure_capacity_kwh": "Bruikbare accucapaciteit (kWh)"
         },
         "data_description": {
-          "timed_capacity_kwh": "Voer de bruikbare accucapaciteit in, niet de nominale capaciteit."
+          "departure_capacity_kwh": "Voer de bruikbare accucapaciteit in, niet de nominale capaciteit."
         },
         "description": "Profiel: **{vehicle}**.\n\nVul de energie in die de accu daadwerkelijk voor het rijden kan opslaan. Hiermee wordt de benodigde laadtijd geschat; de accu-instellingen van de auto veranderen niet."
       },
       "departure_capacity_entity": {
         "title": "Entiteit voor accucapaciteit",
         "data": {
-          "timed_capacity_entity": "Entiteit voor bruikbare capaciteit"
+          "departure_capacity_entity": "Entiteit voor bruikbare capaciteit"
         },
         "data_description": {
-          "timed_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh."
+          "departure_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh."
         },
         "description": "Profiel: **{vehicle}**.\n\nKies een sensor voor de bruikbare capaciteit, niet voor resterende energie of laadpercentage. De eenheid moet kWh of Wh zijn. Zonder geldige waarde wacht de planning op capaciteit in plaats van die te raden."
       },
       "departure_calendar": {
         "title": "Vertrekkalender",
         "data": {
-          "timed_calendar_entity": "Vertrekkalender",
-          "timed_calendar_title": "Exacte titel van agenda-afspraak"
+          "departure_calendar_entity": "Vertrekkalender",
+          "departure_calendar_title": "Exacte titel van agenda-afspraak"
         },
         "data_description": {
-          "timed_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
-          "timed_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd."
+          "departure_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
+          "departure_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd."
         },
         "description": "Profiel: **{vehicle}**.\n\nKies een kalender en een exacte afspraaktitel, bijvoorbeeld ‘Naar het werk’. Het begin van de afspraak wordt de vertrektijd. De knop zoekt 14 dagen vooruit en negeert afspraken die de hele dag duren."
       },
       "departure_entity": {
         "title": "Entiteit voor vertrektijd",
         "data": {
-          "timed_departure_entity": "Entiteit voor vertrektijd"
+          "departure_entity": "Entiteit voor vertrektijd"
         },
         "data_description": {
-          "timed_departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende."
+          "departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende."
         },
         "description": "Profiel: **{vehicle}**.\n\nKies een bron met datum en tijd. Een nieuw geldig toekomstig tijdstip wordt automatisch overgenomen. Stel hiervoor één bron in; handmatige invoer en kalender-/voertuigknoppen blijven beschikbaar."
       },
       "departure_vehicle": {
         "title": "Voertuigintegratie",
         "data": {
-          "timed_vehicle_provider": "Voertuigintegratie"
+          "departure_vehicle_provider": "Voertuigintegratie"
         },
         "data_description": {
-          "timed_vehicle_provider": "De integratie die de gegevens van deze auto al in Home Assistant levert."
+          "departure_vehicle_provider": "De integratie die de gegevens van deze auto al in Home Assistant levert."
         },
         "description": "Kies een geïnstalleerde integratie met een ondersteunde adapter. Algemene HA-entiteiten werken zonder adapter. Alleen bestaande lokale voertuiggegevens worden gelezen."
       },
       "departure_vehicle_details": {
         "title": "Vertrektijden van het voertuig",
         "data": {
-          "timed_vehicle_device": "Voertuig",
-          "timed_vehicle_time_zone": "Tijdzone van het voertuig (optioneel)",
-          "timed_timer1_days": "Weekdagen BMW-timer 1 (optioneel)",
-          "timed_timer2_days": "Weekdagen BMW-timer 2 (optioneel)"
+          "departure_vehicle_device": "Voertuig",
+          "departure_vehicle_time_zone": "Tijdzone van het voertuig (optioneel)",
+          "departure_timer1_days": "Weekdagen BMW-timer 1 (optioneel)",
+          "departure_timer2_days": "Weekdagen BMW-timer 2 (optioneel)"
         },
         "data_description": {
-          "timed_vehicle_time_zone": "Tijdzone van het voertuig, bijvoorbeeld Europe/Amsterdam. Leeg gebruikt de Home Assistant-tijdzone. BMW-tijden bevatten geen tijdzone.",
-          "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
-          "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren.",
-          "timed_vehicle_device": "De auto in die integratie waarvan de entiteiten worden gelezen."
+          "departure_vehicle_time_zone": "Tijdzone van het voertuig, bijvoorbeeld Europe/Amsterdam. Leeg gebruikt de Home Assistant-tijdzone. BMW-tijden bevatten geen tijdzone.",
+          "departure_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
+          "departure_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren.",
+          "departure_vehicle_device": "De auto in die integratie waarvan de entiteiten worden gelezen."
         },
         "description": "Profiel: **{vehicle}**.\n\nGebruik de vertrekknop om één actieve timer van het gekozen voertuig over te nemen. Bij een profiel is het voertuig al gekozen. Schakel in BavarianData de sensoren voor actie, uur en minuut in; geef hier terugkerende weekdagen op, omdat de integratie die niet publiceert."
       },
@@ -1609,12 +1609,12 @@
       "cost_source_invalid": "Selecteer een ondersteunde kostenbron en een sensorentiteit voor een prijs uit een sensor.",
       "cost_price_invalid": "Voer een eindige prijs inclusief belastingen tussen −1000 en 1000 per kWh in. Negatieve prijzen zijn toegestaan.",
       "network_tariff_invalid": "Controleer brutoprijzen, tariefjaar, twee tot vier actieve kwartalen en hoog/laagperioden. Eén HH:MM-HH:MM per regel op kwartiergrenzen, zonder overlap en met ruimte voor het standaardtarief.",
-      "timed_source_invalid": "Ongeldige tijdbron",
-      "timed_calendar_required": "Kies een kalender",
-      "timed_calendar_title_required": "Voer de exacte titel in",
-      "timed_capacity_invalid": "Voer een bruikbare capaciteit in van 1 tot 250 kWh",
-      "timed_weekdays_invalid": "Kies geldige weekdagen",
-      "timed_timezone_invalid": "Vul een geldige tijdzone in, bijvoorbeeld Europe/Amsterdam",
+      "departure_source_invalid": "Ongeldige tijdbron",
+      "departure_calendar_required": "Kies een kalender",
+      "departure_calendar_title_required": "Voer de exacte titel in",
+      "departure_capacity_invalid": "Voer een bruikbare capaciteit in van 1 tot 250 kWh",
+      "departure_weekdays_invalid": "Kies geldige weekdagen",
+      "departure_timezone_invalid": "Vul een geldige tijdzone in, bijvoorbeeld Europe/Amsterdam",
       "options_changed": "Deze sectie is tijdens het bewerken gewijzigd. Ga terug en open haar opnieuw met de actuele waarden; je concept is niet opgeslagen.",
       "vehicle_provider_invalid": "Kies een ondersteunde voertuigintegratie.",
       "vehicle_device_invalid": "Kies een voertuig van de gekozen integratie.",
@@ -1681,7 +1681,7 @@
         "4": "K4: oktober–december"
       }
     },
-    "timed_weekdays": {
+    "departure_weekdays": {
       "options": {
         "mon": "Maandag",
         "tue": "Dinsdag",

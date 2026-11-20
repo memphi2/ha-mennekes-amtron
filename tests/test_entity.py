@@ -263,7 +263,7 @@ def test_the_target_time_is_the_services_and_a_selected_car_adds_its_source() ->
         hass, entry, _transport = await build_runtime()
         added: dict[str, object] = {}
         await setup_datetime(hass, entry, lambda items: added.update(collect(items)))
-        target = added["timed_departure"]
+        target = added["departure_time"]
         runtime = entry.runtime_data
         deadline = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=6)
         # Without a car's plan, the service keeps the time itself.
@@ -276,15 +276,15 @@ def test_the_target_time_is_the_services_and_a_selected_car_adds_its_source() ->
 
         # A selected car's observer takes the edit, to mark the source it replaces.
         trip = _Trip()
-        runtime.timed_goal = trip
+        runtime.departure_observer = trip
         assert target.native_value is None
         await target.async_set_value(deadline)
         await target.async_clear_value()
         assert trip.set == [deadline, None]
         # What is shown is always the service's time, never a copy of the car's.
-        runtime.timed_goal = None
+        runtime.departure_observer = None
         await target.async_set_value(deadline)
-        runtime.timed_goal = trip
+        runtime.departure_observer = trip
         assert target.native_value == deadline
         # Without the service's plan there is no time to show or to set.
         runtime.client.departure = None

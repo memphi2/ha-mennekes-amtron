@@ -188,11 +188,11 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
             vehicle_detection=None, vehicle_binding=None,
             charge_watch_unsubscribe=None,
             plug_charge=None, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
-            cost_goal=None, timed_goal=timed, vehicle_soc=None,
+            cost_goal=None, departure_observer=timed, vehicle_soc=None,
             client=SimpleNamespace(async_close=AsyncMock()),
         )
         options = {**detection_catalog(), "active_vehicle_profile": selected}
-        options["vehicle_profiles"]["a" * 32]["options"]["timed_goal_enabled"] = planning
+        options["vehicle_profiles"]["a" * 32]["options"]["departure_enabled"] = planning
         entry = SimpleNamespace(entry_id="entry", options=options, runtime_data=runtime, disabled_by=None)
         handoff = SimpleNamespace()
         hass = SimpleNamespace(
