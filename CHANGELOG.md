@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0b8 — 2026-11-20
+
+### Fixed
+
+- Saving a car works again when the saved vehicle list is no longer valid, for
+  example after the `departure_*` rename: the car starts a fresh list instead
+  of being added to the unusable one, which stayed empty.
+
 ## 0.10.0b7 — 2026-11-20
 
 ### Changed
