@@ -542,6 +542,11 @@ class VehicleSocObserver:
             previous = self._pending
             self._pending = None
             soc, maximum = self.latest_soc, self.maximum
+            limit = maximum if maximum is not None else self._control.soc_goal.maximum_percent
+            if not automatic and value > 0 and value == limit:
+                # Picked at the top of the scale: the car's limit, wherever
+                # it goes. Only a choice by hand means that.
+                value = 100.0
             self._previous_target_model = copy(self._control.soc_goal)
             self._previous_target_revision = getattr(self._control, "soc_goal_revision", None)
             original = self._previous_target_model.snapshot()

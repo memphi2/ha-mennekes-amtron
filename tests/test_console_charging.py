@@ -47,7 +47,12 @@ def test_console_targets_auth_cas_and_vehicle_maximum(tmp_path, monkeypatch):
             assert (await refused.json())["error"] == "soc_goal_limit_unavailable"
             await service.command({"command": "soc_observation", "source": CAR, "soc": 40, "maximum": 75, "expected_serial_number": service.identity.serial_number})
             choice["revision"] = service.choice_revision
-            assert (await client.post("/api/charging", headers=headers, json=choice)).status != 200
+            above = await client.post("/api/charging", headers=headers, json=choice)
+            assert (above.status, (await above.json())["error"]) == (409, "soc_goal_invalid")
+            # The top of the scale is allowed and means the car's limit.
+            choice.update(value=75, revision=service.choice_revision)
+            assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
+            assert (service.control.soc_goal.target_percent, service.control.soc_goal.chosen_percent) == (75, 100)
             reading = service._soc_reading
             choice.update(value=70, revision=service.choice_revision)
             saved = await client.post("/api/charging", headers=headers, json=choice)

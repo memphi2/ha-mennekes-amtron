@@ -1019,6 +1019,10 @@ class ModbusService:
                         if cap is not None and isinstance(value, (int, float)) and value > cap:
                             # Typed into the app: said, not pressed down in silence.
                             raise DeviceError("soc_goal_invalid")
+                        if cap is not None and value == cap:
+                            # The top of the app's scale: the car's limit,
+                            # wherever it goes.
+                            value = 100
                         reading = self._soc_reading
                         payload = {**payload, "source": control.soc_goal.source,
                             "maximum": control.soc_goal.maximum_percent,

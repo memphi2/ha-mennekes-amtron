@@ -357,7 +357,8 @@ class PlugChargeObserver:
 
         async def adopt() -> None:
             try:
-                await observer.async_set_target(limit, automatic=True, expected_choice=revision)
+                # 100: the car's limit, also when it changes while connected.
+                await observer.async_set_target(100.0, automatic=True, expected_choice=revision)
             except (HomeAssistantError, DeviceError, OSError):
                 self._target_retry_at = time.monotonic() + 5
                 _LOGGER.debug("Vehicle charge limit adoption deferred")

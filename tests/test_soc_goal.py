@@ -73,7 +73,9 @@ def test_a_target_below_the_car_limit_never_rises():
 
 def test_following_a_raised_limit_lifts_only_the_reached_latch():
     goal = configured()
-    goal.set_target(80, 50, 80)
+    # 100 is what the top of a scale sends: the car's limit, wherever it goes.
+    goal.set_target(100, 50, 80)
+    assert goal.target_percent == 80
     assert goal.observe(80)
     assert goal.status == "reached"
     assert goal.observe(82, 95)
@@ -87,7 +89,7 @@ def test_following_a_raised_limit_lifts_only_the_reached_latch():
 
 def test_a_raised_limit_below_the_charge_level_keeps_the_latch():
     goal = configured()
-    goal.set_target(80, 50, 80)
+    goal.set_target(100, 50, 80)
     assert goal.observe(85)
     assert goal.observe(90, 88)
     assert (goal.target_percent, goal.status) == (88, "reached")
@@ -212,10 +214,11 @@ def test_setting_the_chosen_value_again_keeps_it_under_a_pressing_limit():
     assert (goal.target_percent, goal.chosen_percent, goal.status) == (60, 70, "active")
     goal.observe(None, 90)
     assert goal.target_percent == 70
-    # The pressed value chosen on purpose is at the limit and follows it.
+    # A value that happens to equal the limit is that value, not the limit:
+    # a release or a restore per car sets it and must not change its meaning.
     goal.observe(None, 60)
     goal.set_target(60)
-    assert (goal.target_percent, goal.chosen_percent) == (60, 100)
+    assert (goal.target_percent, goal.chosen_percent) == (60, 60)
     goal.observe(None, 90)
-    assert goal.target_percent == 90
+    assert goal.target_percent == 60
     assert SocGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()

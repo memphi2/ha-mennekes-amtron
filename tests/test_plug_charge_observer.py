@@ -534,7 +534,7 @@ def test_each_recognized_connection_starts_at_the_car_limit(tmp_path, monkeypatc
         async with observer_harness(tmp_path, monkeypatch) as h:
             observer = vehicle_limit(h, 80)
             await report(h)
-            observer.async_set_target.assert_awaited_once_with(80, automatic=True, expected_choice=0)
+            observer.async_set_target.assert_awaited_once_with(100.0, automatic=True, expected_choice=0)
             h.coordinator.async_update_listeners()
             await h.hass.async_block_till_done()
             observer.async_set_target.assert_awaited_once()
@@ -663,7 +663,7 @@ def test_late_vehicle_limit_is_adopted_after_grant(tmp_path, monkeypatch):
             observer.maximum = 80
             h.coordinator.async_update_listeners()
             await h.hass.async_block_till_done()
-            observer.async_set_target.assert_awaited_once_with(80, automatic=True, expected_choice=0)
+            observer.async_set_target.assert_awaited_once_with(100.0, automatic=True, expected_choice=0)
     asyncio.run(run())
 
 

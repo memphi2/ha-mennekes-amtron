@@ -67,9 +67,11 @@ class SocGoal:
     ) -> bool:
         """Choose a ceiling using the current vehicle data; zero only disables.
 
-        The value is what was chosen; the target in force is never above the
-        car's charge limit. A value at the limit follows the limit, one above
-        it comes into force as far as the limit allows.
+        The value is what was chosen and is kept as it is; the target in
+        force is never above the car's charge limit. A value above the limit
+        comes into force as far as the limit allows, so 100 follows it. Where
+        somebody picks a value, the top of the scale is sent as 100; nothing
+        here guesses that from a value that happens to equal the limit.
         """
         chosen = percentage(value)
         if chosen == 0:
@@ -84,7 +86,7 @@ class SocGoal:
         previous = self.snapshot()
         target = chosen if cap is None else min(chosen, cap)
         self.target_percent = target
-        self.chosen_percent = 100.0 if chosen == cap else chosen
+        self.chosen_percent = chosen
         self.maximum_percent = cap
         self.status = "active" if target else "disabled"
         if target and current is not None and current >= target:
