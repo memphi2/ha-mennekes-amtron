@@ -1,5 +1,5 @@
 name: Mennekes Amtron Modbus Service
-version: 0.10.0b5
+version: 0.10.0b6
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
 description: Unofficial Modbus connection and heartbeat for Mennekes Amtron wallboxes
@@ -10,7 +10,6 @@ startup: services
 boot: auto
 init: true
 uart: true
-udev: true
 apparmor: true
 ingress: true
 ingress_port: 8099
