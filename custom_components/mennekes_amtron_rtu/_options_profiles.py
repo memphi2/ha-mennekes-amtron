@@ -322,8 +322,10 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
         draft = self._section("profiles")
         if draft is None:
             raise RuntimeError("cannot save an incomplete profile")
-        if CONF_VEHICLE_PROFILES not in draft.values:
-            draft.clear(set(PROFILE_OPTION_KEYS))
+        if not profiles(draft.values):
+            # No usable list, also when a saved one is invalid as a whole:
+            # a new car starts a fresh list instead of joining a broken one.
+            draft.clear(set(PROFILE_OPTION_KEYS) | {CONF_ACTIVE_VEHICLE_PROFILE})
             draft.values[CONF_VEHICLE_PROFILES] = {}
         key = self._details["profile_key"] or uuid4().hex
         # The guided setup continues with this car's settings.
