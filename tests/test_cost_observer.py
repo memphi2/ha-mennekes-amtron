@@ -53,18 +53,16 @@ def test_tariff_only_update_keeps_cost_observer_and_modbus_connection(tmp_path):
                 "price_includes_network": True,
             },
         }
-        assert observer.apply_tariff_only_update()
+        assert observer.apply_tariff_update()
         assert observer._accumulator is original_accumulator
         assert observer._accumulator.tariff.module == "module_2"
-        configured.options["charging_price"] = 0.4
-        assert not observer.apply_tariff_only_update()
         await hass.async_stop()
 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("change", ["unchanged", "credentials", "connection_with_tariff"])
-def test_only_actual_tariff_changes_with_unchanged_connection_can_skip_reload(tmp_path, change):
+@pytest.mark.parametrize("change", ["credentials", "connection_with_tariff"])
+def test_only_tariff_changes_with_unchanged_connection_can_skip_reload(tmp_path, change):
     async def run():
         hass = HomeAssistant(str(tmp_path))
         configured = entry()
@@ -76,7 +74,7 @@ def test_only_actual_tariff_changes_with_unchanged_connection_can_skip_reload(tm
                 **configured.options,
                 "charging_network_tariff": {"module": "module_2", "regular_network": 0.1, "price_includes_network": True},
             }
-        assert not observer.apply_tariff_only_update()
+        assert not observer.apply_tariff_update()
         assert observer._tariff.module == "none"
         await hass.async_stop()
 
@@ -212,7 +210,7 @@ def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp
             configured.options = {**configured.options, "charging_network_tariff": {
                 "module": "module_2", "regular_network": 0.1, "price_includes_network": True,
             }}
-            assert observer.apply_tariff_only_update()
+            assert observer.apply_tariff_update()
             assert observer.last.result.cost == pytest.approx(3)
         finally:
             await observer.async_stop()
@@ -364,7 +362,7 @@ def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
                     await feed(observer, data(at + offset, energy, present=present, fresh=fresh))
             configured.options = {**configured.options, "charging_network_tariff": {
                 "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
-            assert observer.apply_tariff_only_update()
+            assert observer.apply_tariff_update()
             with patch(clock, return_value=at+160):
                 await feed(observer, data(at+160, 110))
             assert not observer.last.result.complete
@@ -432,7 +430,7 @@ def test_waiting_plugged_in_moves_the_running_cost_start_past_a_tariff_edit(tmp_
             configured.options = {**configured.options, "charging_network_tariff": {
                 "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
             with patch(clock, return_value=at+20):
-                assert observer.apply_tariff_only_update()
+                assert observer.apply_tariff_update()
             for offset, energy in ((30, 100), (40, 105)):
                 reading = data(at + offset, energy, present=energy > 100)
                 if energy == 100:

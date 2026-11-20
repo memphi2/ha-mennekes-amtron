@@ -34,6 +34,21 @@ def test_initial_soc_at_or_above_target_stops_immediately():
     assert goal.stop_requested
 
 
+def test_a_chosen_target_returns_after_the_cars_limit_dipped():
+    goal = configured()
+    goal.set_target(80, 50, 90)
+    assert goal.observe(50, 70)
+    assert goal.target_percent == 70
+    # Reached at the lower limit; the raised limit ends only the latch.
+    assert goal.observe(72, None)
+    assert goal.status == "reached"
+    assert goal.observe(72, 100)
+    assert (goal.target_percent, goal.maximum_percent, goal.status) == (80, 100, "active")
+    assert SocGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()
+    with pytest.raises(ValueError, match="inconsistent"):
+        SocGoal.restore({**goal.snapshot(), "target_percent": 90.0})
+
+
 def test_a_target_at_the_car_limit_follows_it_both_ways():
     goal = configured()
     goal.set_target(100, 0)
@@ -58,7 +73,9 @@ def test_a_target_below_the_car_limit_never_rises():
 
 def test_following_a_raised_limit_lifts_only_the_reached_latch():
     goal = configured()
-    goal.set_target(80, 50, 80)
+    # 100 is what the top of a scale sends: the car's limit, wherever it goes.
+    goal.set_target(100, 50, 80)
+    assert goal.target_percent == 80
     assert goal.observe(80)
     assert goal.status == "reached"
     assert goal.observe(82, 95)
@@ -72,7 +89,7 @@ def test_following_a_raised_limit_lifts_only_the_reached_latch():
 
 def test_a_raised_limit_below_the_charge_level_keeps_the_latch():
     goal = configured()
-    goal.set_target(80, 50, 80)
+    goal.set_target(100, 50, 80)
     assert goal.observe(85)
     assert goal.observe(90, 88)
     assert (goal.target_percent, goal.status) == (88, "reached")
@@ -127,7 +144,7 @@ def test_source_change_forgets_other_vehicle_and_disable_does_not_enable_a_goal(
     assert goal.configure_source("sensor.another|number.another")
     assert goal.snapshot() == {
         "source": "sensor.another|number.another", "target_percent": 0.0,
-        "maximum_percent": None, "status": "disabled",
+        "chosen_percent": 0.0, "maximum_percent": None, "status": "disabled",
     }
     assert goal.configure_source(None)
     assert not goal.observe(90, 80)
@@ -135,12 +152,14 @@ def test_source_change_forgets_other_vehicle_and_disable_does_not_enable_a_goal(
         goal.set_target(80)
 
 
-def test_setting_above_known_maximum_is_rejected():
+def test_a_value_above_the_known_maximum_is_kept_as_chosen_and_pressed_down():
     goal = configured()
     goal.observe(None, 80)
-    with pytest.raises(ValueError, match="exceeds"):
-        goal.set_target(81)
-    assert goal.status == "disabled"
+    assert goal.set_target(85, 80)
+    assert (goal.target_percent, goal.chosen_percent, goal.status) == (80, 85, "reached")
+    assert SocGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()
+    goal.observe(None, 95)
+    assert (goal.target_percent, goal.status) == (85, "active")
 
 
 @pytest.mark.parametrize("source", [1, False, "", "x" * 513])
@@ -182,3 +201,24 @@ def test_only_a_target_below_the_car_limit_pauses_when_reached():
     unknown.set_target(80, 50)
     assert unknown.observe(80)
     assert unknown.stop_requested
+
+
+def test_setting_the_chosen_value_again_keeps_it_under_a_pressing_limit():
+    goal = SocGoal()
+    goal.configure_source("car")
+    goal.set_target(70, 20, 90)
+    goal.observe(60, 60)
+    assert (goal.target_percent, goal.chosen_percent, goal.status) == (60, 70, "reached")
+    # What releasing a reach does: the chosen value, without a charge level.
+    goal.set_target(goal.chosen_percent, maximum=60)
+    assert (goal.target_percent, goal.chosen_percent, goal.status) == (60, 70, "active")
+    goal.observe(None, 90)
+    assert goal.target_percent == 70
+    # A value that happens to equal the limit is that value, not the limit:
+    # a release or a restore per car sets it and must not change its meaning.
+    goal.observe(None, 60)
+    goal.set_target(60)
+    assert (goal.target_percent, goal.chosen_percent) == (60, 60)
+    goal.observe(None, 90)
+    assert goal.target_percent == 60
+    assert SocGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()

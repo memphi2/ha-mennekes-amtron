@@ -74,7 +74,9 @@ Open **Charging**. Set an optional kWh limit, cost ceiling, time or vehicle
 percentage target on the left and save each change. The **cost ceiling** is an
 amount in EUR; it needs charging costs configured in Home Assistant, which
 reports the price to the app. It is carried by the kWh limit: saving a kWh
-value by hand ends it, and 0 EUR clears both. The right side shows the saved choices and the
+value by hand ends it, and 0 EUR clears both. Without a running amount the
+page names the price and when Home Assistant last reported it, alone or
+together with an amount. The right side shows the saved choices and the
 **Start guest charging** button. Unsaved edits must be saved or reloaded first.
 The same saved values appear in Home Assistant. Setting a limit does not start charging.
 

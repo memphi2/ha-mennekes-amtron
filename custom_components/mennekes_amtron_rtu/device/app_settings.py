@@ -124,6 +124,10 @@ async def serve_asset(request: web.Request, assets: Mapping[str, tuple[str, str]
     return web.Response(body=content, content_type=content_type, headers=headers)
 
 
+# Longer than the patience of the overview's read behind a running command.
+OVERVIEW_SECONDS = 5.0
+
+
 @dataclass(frozen=True, slots=True)
 class SetupConfig:
     """A live configuration interface with no Modbus connection or discovery."""
@@ -311,7 +315,7 @@ class AppSettings:
         if self._overview is None:
             raise SettingsError("overview_unavailable", 503)
         try:
-            async with asyncio.timeout(2):
+            async with asyncio.timeout(OVERVIEW_SECONDS):
                 snapshot = await self._overview()
         except TimeoutError as err:
             raise SettingsError("overview_unavailable", 503) from err

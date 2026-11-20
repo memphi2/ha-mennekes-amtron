@@ -112,7 +112,7 @@ def test_a_new_price_is_told_after_the_poll_once_a_minute(tmp_path, monkeypatch)
         cost.price = 0.50
         await observe(observer)
         assert control.calls[-1] == ("goal", 10, 0.30)
-        clock[0] += 61
+        clock[0] += 66
         await observe(observer, failed=True)
         cost.price = 0.3005
         await observe(observer)
@@ -132,11 +132,11 @@ def test_the_price_is_told_without_an_amount_so_the_app_can_arm_one(tmp_path, mo
         await observe(observer)
         assert control.calls == [("price", None, 0.30)]
         assert control.cost_price == 0.30
-        clock[0] += 61
+        clock[0] += 66
         await observe(observer)
         assert len(control.calls) == 1
         cost.price = None
-        clock[0] += 61
+        clock[0] += 66
         await observe(observer)
         assert len(control.calls) == 1
         # A service that would refuse it is not asked at every poll.
@@ -156,14 +156,14 @@ def test_a_lost_price_is_told_again_later(tmp_path, monkeypatch, caplog):
         await observer.async_set_target(10)
         cost.price = 0.50
         control.fail = HomeAssistantError("timeout")
-        clock[0] += 61
+        clock[0] += 66
         with caplog.at_level(logging.WARNING):
             await observe(observer)
         assert "Cost target: new price not passed on" in caplog.text
         control.fail = None
         await observe(observer)
         assert len(control.calls) == 2
-        clock[0] += 61
+        clock[0] += 66
         await observe(observer)
         assert control.calls[-1] == ("price", None, 0.50)
         await hass.async_stop(force=True)
@@ -181,9 +181,9 @@ def test_stopping_cancels_a_price_on_its_way(tmp_path, monkeypatch):
 
         control.async_set_cost_price = slow
         cost.price = 0.50
-        clock[0] += 61
+        clock[0] += 66
         await observer.async_observe(WallboxData({}))
-        clock[0] += 61
+        clock[0] += 66
         await observer.async_observe(WallboxData({}))
         task = observer._task
         await observer.async_stop()
@@ -208,4 +208,25 @@ def test_the_number_passes_the_amount_on_and_refuses_without_costs():
         with pytest.raises(ServiceValidationError):
             await number._set_cost_goal(SimpleNamespace(cost_goal=None), 1)
 
+    asyncio.run(run())
+
+
+def test_a_price_that_came_while_the_goal_was_stopped_is_told_again(tmp_path, monkeypatch):
+    async def run():
+        hass, control, cost, clock, observer = setup(tmp_path, monkeypatch)
+        await observer.async_set_target(10)
+        control.energy_goal.observe(None)
+        cost.price = 0.50
+        clock[0] += 66
+        await observe(observer)
+        # The service remembers it but a stopped goal keeps its own price.
+        assert control.calls[-1] == ("price", None, 0.50)
+        clock[0] += 66
+        await observe(observer)
+        assert len(control.calls) == 2
+        control.energy_goal.observe(100.0)
+        assert control.energy_goal.status == "active"
+        await observe(observer)
+        assert len(control.calls) == 3
+        await hass.async_stop(force=True)
     asyncio.run(run())

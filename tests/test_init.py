@@ -285,10 +285,11 @@ def test_reload_asks_home_assistant_to_reload(
 def test_tariff_only_option_update_does_not_restart_modbus() -> None:
     async def run() -> None:
         hass = FakeHass()
-        entry = FakeConfigEntry()
+        applied: list[bool] = []
+        entry = FakeConfigEntry(options={"charging_network_tariff": {"module": "module_2"}})
         entry.runtime_data = SimpleNamespace(
             client=SimpleNamespace(snapshot={}), plug_charge=None,
-            charging_cost=SimpleNamespace(apply_tariff_only_update=lambda: True),
+            charging_cost=SimpleNamespace(apply_tariff_update=lambda: applied.append(True) or True),
             entry_data=dict(entry.data), vehicle_base_options={},
             vehicle_selection={
                 "active_vehicle_profile": None, "vehicle_profile_selected_at": None,
@@ -297,6 +298,7 @@ def test_tariff_only_option_update_does_not_restart_modbus() -> None:
         )
         await async_reload_entry(hass, entry)
         assert hass.config_entries.reloaded == []
+        assert applied == [True]
 
     asyncio.run(run())
 

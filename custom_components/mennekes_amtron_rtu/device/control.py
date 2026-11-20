@@ -35,7 +35,6 @@ from .const import (
 )
 from .control_queue import CommandQueue
 from .control_types import (
-    OTHER_STOPS,
     STOPS,
     ControlOptions,
     PendingCommand,
@@ -184,6 +183,16 @@ class AmtronControl:
     def energy_goal_stop_requested(self) -> bool:
         """Every stop that fences starts: energy, vehicle percentage and guest time."""
         return self.goal_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()
+
+    @property
+    def guest_release_applied(self) -> bool:
+        """Whether the guest start in progress has already opened the release."""
+        return self._guest_release_applied
+
+    @property
+    def foreign_stop_requested(self) -> bool:
+        """A stop that is not the energy goal's own: percentage or guest."""
+        return self._soc_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()
 
     @property
     def release_stop_requested(self) -> bool:
@@ -400,6 +409,11 @@ class AmtronControl:
         async with self._current_lock:
             if not self.energy_goal_stop_requested:
                 return
+            if self.foreign_stop_requested and self.goal_controller is not None:
+                # Another limit stops the charge. A pause for a missing meter
+                # is no longer the energy goal's to end: lifting this limit
+                # later must not start a charge.
+                self.goal_controller.drop_recovery()
             self._require_write_access()
             confirmed = self._goal_pause_confirmed
             polled = self._state().fresh(CHARGING_CURRENT_EMS.key)
@@ -418,9 +432,10 @@ class AmtronControl:
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
                 return
-            if self._pending is not None and self._pending.action not in OTHER_STOPS:
-                # The stop replaces what waited for the current. A waiting lock
-                # or withdrawn release is another matter and stays.
+            if self._pending is not None and self._pending.action not in STOPS:
+                # The stop replaces a start that waited for the current. A
+                # waiting stop stays, a pause included: this stop's latch may
+                # be lifted before its own pause is written.
                 self._clear_pending(outcome="cancelled", reason=self._stop_reason())
             if self.is_paused is not False:
                 try:
@@ -581,7 +596,7 @@ class AmtronControl:
                 or current <= maximum + _CAP_TOLERANCE_A
             ):
                 return False
-            await self.queue.async_submit_locked(PendingCommand("set_current", maximum))
+            await self.queue.async_submit_locked(PendingCommand("set_current", maximum, keeps_setpoint=True))
             return True
 
     async def async_set_charging_current(
@@ -703,13 +718,16 @@ class AmtronControl:
         self._require_write_access()
         async with self._current_lock:
             gate = self._plug_charge.state
-            manual = gate.manual
+            manual = gate.manual_marks
             if gate.enabled:
                 if released and self.energy_goal_stop_requested:
                     raise self.stop_error()
                 # With Plug & Charge, a manual release opens the gate for the
-                # current or the next connection, for any car.
-                self._plug_charge.set_manual(released)
+                # current or the next connection, for any car. Withdrawing it
+                # closes the gate only with its own write: a gate closed
+                # while that still waits would switch inside the interval.
+                if released:
+                    self._plug_charge.set_manual(True)
             written = self._release_writes
             try:
                 await self.queue.async_submit_locked(PendingCommand(
@@ -719,7 +737,7 @@ class AmtronControl:
                 # A failure after the acknowledged write, e.g. of the refresh,
                 # must not make the gate close what the user just opened.
                 if self._release_writes == written:
-                    gate.manual = manual
+                    gate.manual_marks = manual
                 raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:
@@ -802,7 +820,9 @@ class AmtronControl:
                 raise validation_error(
                     "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
                 ) from err
-            remembered = self.charging_setpoint
+            # A planner's current is reasserted as it is: the chosen one is
+            # not the line's while a plan runs.
+            remembered = None if self.writes.line_planned else self.charging_setpoint
             paused = (
                 self.energy_goal_stop_requested or self.pause_requested is True
                 or 0 < current < CHARGING_CURRENT_MINIMUM

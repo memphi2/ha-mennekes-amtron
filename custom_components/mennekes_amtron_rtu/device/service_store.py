@@ -17,6 +17,8 @@ from .unplug_release import UnplugReleaseState
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
+# The intent is a few hundred bytes; anything far larger is not ours.
+_MAX_BYTES = 65536
 
 
 class IntentStore:
@@ -33,9 +35,12 @@ class IntentStore:
         block charging commands until the user acknowledges a safe reset.
         """
         try:
-            raw = self.path.read_bytes()
+            with self.path.open("rb") as file:
+                raw = file.read(_MAX_BYTES + 1)
         except FileNotFoundError:
             return True
+        if len(raw) > _MAX_BYTES:
+            return False
         try:
             self._apply(json.loads(raw), state)
         except (ValueError, TypeError, ArithmeticError, RecursionError):

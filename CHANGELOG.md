@@ -5,6 +5,108 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0b6 — 2026-11-20
+
+### Changed
+
+- The app's overview state no longer carries `configured`; `state` already
+  says `setup_required`. The Charging page state no longer carries the
+  unused `forecast` of the departure plan.
+- **Breaking:** the saved control state has new fields and the state of
+  0.10.0b5 is not read. After the update the service switches the charging
+  release off and blocks charging commands until the reset is confirmed
+  under **Settings → System → Repairs**; then set the targets again. See
+  [Saved charging settings could not be loaded](docs/troubleshooting.md#saved-charging-settings-could-not-be-loaded).
+- A reached energy or cost target ends when the car is unplugged: the target
+  is cleared and its pause ends, so the next car charges without the previous
+  limit. Before, the stop stayed until it was resumed by hand. This also
+  holds when the meter shows the target reached only after the unplug. A
+  pause set by hand ends with it; a stop by another limit stays.
+- The departure plan's charging current is the plan's only: a pause and
+  resume after the plan returns to the current chosen by hand. Before, the
+  plan's current replaced it. Lowering the plan's current to a new current
+  cap or reasserting it after wallbox error 200 does not replace it either.
+  After a restart of the service during a plan, a pause still takes the
+  current it finds.
+- A percentage target that a lower charge limit of the car pressed down
+  returns to the chosen value when the limit rises again. Before, it rose to
+  the limit itself. A target chosen at the limit still follows it. The
+  target remembered per car is the chosen value.
+
+### Added
+
+- App: without a running amount the **Charging** page names the price and
+  since when Home Assistant reported it; the departure plan shows its
+  planned start, or that it could not be saved.
+
+### Fixes
+
+- A guest start behind a waiting stop is refused before its first write.
+  Before, it opened the charging release and then failed at its current: the
+  release stayed open without a guest.
+- A charging current set behind a waiting lock or withdrawn release is
+  refused. Before, it was reported as done and never written.
+- A stop by a limit no longer cancels a pause that still waits.
+- Plug & Charge: a release withdrawn by hand closes the gate with its own
+  write, not earlier inside the state-change interval.
+- A guest start for a car that was unplugged a moment ago is refused instead
+  of reported as started.
+- A charge paused for a missing energy meter no longer resumes by itself
+  when a guest time limit or percentage target that stopped it meanwhile is
+  moved or cleared.
+- A refused guest start no longer turns a charging release that was
+  switched off by hand into a requested one.
+- Closing the release after an unplug, and an error recovery whose write
+  stayed unanswered, no longer drop a lock or pause that still waits.
+- Plug & Charge: a release given by hand to a connected car no longer passes
+  to the next car when that car was unplugged while the service was down. A
+  release given without a car still waits for the next plug-in.
+- A current above 32 A found in the wallbox, e.g. from another controller, is
+  no longer saved as the current to return to. Before, the next start
+  rejected the saved state and blocked charging until acknowledged.
+- The departure plan no longer ends a guest's pause after the guest unplugs.
+- A clock set back no longer ties a new charge level report of the car to an
+  old meter reading.
+- With a guest permission saved, the service starts also while the disk
+  refuses writes; a stop of the service can no longer hang on a save that
+  fails at that moment.
+- After a serial port was lost while the service started, the library's own
+  attempts to reopen it no longer go on beside the new connection.
+- A serial adapter that was gone is used again within seconds of its return.
+  Before, the wait doubled up to five minutes, with the wallbox on its
+  fallback current meanwhile.
+- A write no longer follows a serial port that was reopened in the short
+  quiet wait before it, without a new check of the wallbox's identity.
+- A negative reading of the energy meter is no longer published while it is
+  read again.
+- A weak line logs late heartbeat acknowledgements once per weak phase,
+  until five minutes passed without one, instead of each time.
+- Reconfiguring the connection to a separately hosted service no longer
+  fills the form with the stored access token, nor with one typed before a
+  failed attempt. Enter the token again there.
+- A tariff change, the Plug & Charge switch and a vehicle switch are applied
+  without a reload in any order, so the running cost estimate is kept.
+  Before, the second of them reloaded the entry.
+- Attributes of Total power, Session energy, Charging status, Wallbox
+  settings, Error, Authorization, Cable lock, Requested phases and the departure plan have
+  names in all five languages. Connection quality names its `heartbeat`
+  attribute instead of two counters it never carried.
+- App: a page read behind a long command ends after five seconds instead of
+  blocking the app's other pages. The Charging and Registers pages show "No
+  current response" until the command is done; the overview shows the last
+  state meanwhile.
+- App: the unused access to the host's udev database is gone.
+- Documentation: a guest charge follows the blueprints' current and pause
+  like any other charge; the fields of `set_charging_current` are listed in
+  the user guide.
+- Cost target: the app arms an amount at the price of the running amount,
+  also after a restart of the service, and a price that changed nothing no
+  longer delays the next one by a minute.
+- Cost target: a price that arrived while the target was stopped or its meter
+  was missing is applied once the target runs again. With less than one
+  0.1 kWh step of money left, a new price now leaves one step at that price
+  instead of being ignored.
+
 ## 0.10.0b5 — 2026-11-19
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/oliver7557)

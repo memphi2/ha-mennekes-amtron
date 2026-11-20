@@ -132,7 +132,7 @@ does not apply is left out.
 | `pending`, `pending_at` | The queued change (`pause`, `resume`, `set_current`, `single_phase`, `all_phases`, `enable_charging`, `disable_charging`, `unlock`, `lock`, or `none`) and when it runs. See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes). |
 | `energy_target` | Status of **Energy target**: `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. Absent when the wallbox has no lifetime energy counter. |
 | `cost_target` | Status of **Cost target**: `disabled`, `price_unknown` (the amount is armed but no current price is known, so the energy target last handed to the service stays), or the status of the energy target that carries it. Absent without charging costs. |
-| `vehicle_target` | Status of **Vehicle charge target**: `disabled`, `active` or `reached`. Reached stays latched until a new target or disabling. Absent without a vehicle charge-level source. |
+| `vehicle_target` | Status of **Vehicle charge target**: `disabled`, `active` or `reached`. Reached stays latched until a new target, disabling, or a raised charge limit of the car that lifts the target above the charge level. Absent without a vehicle charge-level source. |
 | `departure_plan` | Status of the [departure plan](departure-planning.md), when departure planning is enabled for the selected car. See [Plan states](#departure-plan-states). |
 | `planned_start` | When the plan starts charging for the next trip, or when it started. |
 | `estimated_finish`, `estimated_level_at_departure` | The plan's [forecast](departure-planning.md). |
@@ -213,7 +213,7 @@ These controls configure charging permission or maintenance.
 the service that talks to the wallbox switches **Charging release** off so
 the next car needs an explicit release. It also ends a manual **Charging
 paused**, so the wallbox no longer shows a pause without a car; a stop from a
-reached target stays. It is ignored while Virtual Plug & Charge is enabled,
+reached vehicle charge target or a missing energy meter stays. It is ignored while Virtual Plug & Charge is enabled,
 which already closes the release. With the app, the rule also applies while
 Home Assistant is not running.
 

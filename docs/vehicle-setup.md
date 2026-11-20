@@ -371,8 +371,8 @@ Only the chosen source's settings appear. Without a charge-limit source,
 you can choose a target up to **100%**. With it, the reported car limit becomes
 the maximum you can select. A falling car limit also lowers an existing target.
 A target at the car's limit (the slider at its maximum) follows
-every later change of that limit, up or down; a lower target never rises. A
-target lowered to a falling limit is at the limit and follows it from then on.
+every later change of that limit, up or down. A lower target that a falling
+limit pressed down returns to the chosen value when the limit allows it again.
 A raised limit can end a reached target, but it never resumes the stop pause:
 resume manually or plug in again. If this optional source is
 temporarily unavailable, the last valid maximum is kept. Before its first valid

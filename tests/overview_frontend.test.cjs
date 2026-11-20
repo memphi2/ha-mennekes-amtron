@@ -12,7 +12,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 const START = "2026-11-14T02:00:00+00:00", END = "2026-11-14T06:00:00+00:00";
 const operation = (changes = {}) => ({controller:"departure_plan", waiting:"until_planned_start",
   next:{event:"plan_start", at:START}, target:{kind:"level", value:80, deadline:END}, vehicle:"confirmed", ...changes});
-const overview = summary => ({schema:1, configured:true, available:true, state:"paused", reason:"pause_requested",
+const overview = summary => ({schema:1, available:true, state:"paused", reason:"pause_requested",
   read_only:false, heartbeat:"ok", pending:null, measurements:{power_w:0, session_kwh:1.5, current_limit_a:1},
   targets:{energy_kwh:0, soc_percent:80}, operation:summary, commands:[]});
 class Node {

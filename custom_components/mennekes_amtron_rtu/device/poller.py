@@ -181,16 +181,19 @@ class DevicePoller:
                     self._retry_later(block.name)
                 _LOGGER.debug("Block %s failed: %s", block.name, err)
             else:
-                read.update(result)
-                self._block_read_at[block.name] = self._monotonic()
-                if block.name in self._lost_blocks:
-                    self._lost_blocks.discard(block.name)
-                    _LOGGER.info("Connection: block %s readable again", block.name)
                 total = result.get("energy_total") if block.name == "statistics" else None
                 invalid_meter = block.name == "statistics" and (
                     isinstance(total, bool) or not isinstance(total, (int, float))
                     or not math.isfinite(total) or total < 0
                 )
+                if invalid_meter:
+                    # Read again soon, and not published meanwhile.
+                    result = {**result, "energy_total": None}
+                read.update(result)
+                self._block_read_at[block.name] = self._monotonic()
+                if block.name in self._lost_blocks:
+                    self._lost_blocks.discard(block.name)
+                    _LOGGER.info("Connection: block %s readable again", block.name)
                 if invalid_meter:
                     self._retry_later(block.name)
                 else:

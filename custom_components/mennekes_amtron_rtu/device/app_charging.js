@@ -46,6 +46,9 @@
     price_unknown:["No price yet: configure charging costs in Home Assistant.","Noch kein Preis: Ladekosten in Home Assistant einrichten.","Pas encore de prix : configurez les coûts de recharge dans Home Assistant.","Nog geen prijs: stel laadkosten in Home Assistant in.","Nessun prezzo: configurare i costi di ricarica in Home Assistant."],
     invalid_cost:["Enter 0 or 0.10–1000 EUR.","0 oder 0,10–1000 EUR eingeben.","Saisissez 0 ou 0,10–1000 EUR.","Voer 0 of 0,10–1000 EUR in.","Inserire 0 o 0,10–1000 EUR."],
     must_wait:["Not accepted now: a waiting stop or the wallbox write interval comes first. Try again later.","Gerade nicht angenommen: Ein wartender Stopp oder der Schreibabstand der Wallbox geht vor. Später erneut versuchen.","Non accepté pour l’instant : un arrêt en attente ou l’intervalle d’écriture passe d’abord. Réessayez plus tard.","Nu niet geaccepteerd: een wachtende stop of het schrijfinterval gaat voor. Probeer het later opnieuw.","Non accettato ora: prima un arresto in attesa o l’intervallo di scrittura. Riprovare più tardi."],
+    planned_start:["Planned start","Geplanter Start","Démarrage prévu","Geplande start","Avvio pianificato"],
+    plan_unsaved:["The departure plan could not be saved. Check the app log.","Der Abfahrtsplan konnte nicht gespeichert werden. App-Protokoll prüfen.","Le plan de départ n’a pas pu être enregistré. Vérifiez le journal.","Het vertrekplan kon niet worden opgeslagen. Controleer het logboek.","Impossibile salvare il piano di partenza. Controllare il registro."],
+    price_since:["reported by Home Assistant","von Home Assistant gemeldet","signalé par Home Assistant","gemeld door Home Assistant","comunicato da Home Assistant"],
     unknown:["Unknown state","Unbekannter Zustand","État inconnu","Onbekende status","Stato sconosciuto"],
     soc:["Vehicle charge level","Fahrzeug-Ladestand","Niveau de batterie","Accuniveau","Livello batteria"],
     soc_label:["Target charge level","Ziel-Ladestand","Niveau cible","Doelniveau","Livello obiettivo"],
@@ -92,7 +95,9 @@
   const euro=(v,digits=2)=>v.toLocaleString(langs[lang],{style:"currency",currency:"EUR",maximumFractionDigits:digits});
   function costText(){
     const c=state?.cost;if(c)return `${euro(c.amount)} · ${euro(c.spent)} ${t("cost_used")} · ${euro(c.price,4)}/kWh`;
-    return state?.cost_price===null?t("price_unknown"):t("disabled");
+    if(state?.cost_price===null)return t("price_unknown");
+    const at=state?.cost_price_at?new Date(state.cost_price_at):null;
+    return `${t("disabled")} · ${euro(state.cost_price,4)}/kWh`+(at&&Number.isFinite(at.getTime())?` (${t("price_since")} ${at.toLocaleString(langs[lang],{dateStyle:"short",timeStyle:"short"})})`:"");
   }
   function render(){
     el("notice").textContent=error||(!state?t("offline"):state.read_only?t("read_only"):state.guest_confirmation_required?t("confirm_guest"):t("ready"));
@@ -104,7 +109,9 @@
       if(key==="soc"&&info){input.max=String(info.maximum??100);if(info.maximum_required&&info.maximum===null)el(key+"_status").textContent=t("limit_missing");}
       if(key==="departure"){
         el("departure_clear").disabled=busy||!editable(key);
-        el("departure_summary").textContent="";
+        // Only a plan that waits for its start has one; a guest or an error holds it.
+        const start=info?.status==="paused_until_start"&&info.planned_start?new Date(info.planned_start):null;
+        el("departure_summary").textContent=info?.storage_error?t("plan_unsaved"):start&&Number.isFinite(start.getTime())?`${t("planned_start")}: ${start.toLocaleString(langs[lang])}`:"";
       }
     }
     el("guest_start").textContent=t(state?.guest_active?"guest_stop":"guest");
@@ -119,6 +126,7 @@
         ||!data.energy||!num(data.energy.target,1000)||typeof data.energy.status!=="string"
         ||typeof data.guest_confirmation_required!=="boolean"
         ||!(data.cost_price===null||typeof data.cost_price==="number"&&Number.isFinite(data.cost_price))
+        ||!(data.cost_price_at===null||typeof data.cost_price_at==="string")
         ||(data.cost!==null&&(!data.cost||!num(data.cost.amount,1000)||![data.cost.spent,data.cost.price].every(Number.isFinite)))
         ||!data.soc||typeof data.soc.configured!=="boolean"||!num(data.soc.target,100)
         ||!(data.soc.maximum===null||num(data.soc.maximum,100))
@@ -126,6 +134,8 @@
         ||typeof data.soc.status!=="string"
         ||(data.departure!==null&&(!data.departure||typeof data.departure.configured!=="boolean"
           ||typeof data.departure.revision!=="string"||typeof data.departure.status!=="string"
+          ||!(data.departure.planned_start===null||typeof data.departure.planned_start==="string")
+          ||typeof data.departure.storage_error!=="boolean"
           ||!(data.departure.deadline===null||typeof data.departure.deadline==="string"&&localDate(data.departure.deadline)))))throw new Error("invalid charging state");
   }
   function apply(data){

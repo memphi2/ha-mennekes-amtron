@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../custom_components/mennekes_amtron_rtu/device');
 const source=fs.readFileSync(path.join(root,'app_charging.js'),'utf8');
-const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,forecast:null,storage_error:false}});
+const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(page='targets',responses=[initial()],language='de'){
  const html=fs.readFileSync(path.join(root,'app_targets.html'),'utf8');
@@ -144,4 +144,34 @@ test('an own save keeps another unsaved field current instead of calling it chan
  assert.equal(h.elements.get('notice').textContent,'Saved');assert.equal(h.elements.get('energy_value').value,'20');
  await h.emit('energy_form','submit');
  assert.equal(JSON.parse(h.calls[2].body).revision,'r2');
+});
+test('the departure plan names its planned start, and a plan that could not be saved',async()=>{
+ const planned=initial();planned.departure.planned_start='2026-11-16T03:00:00.000Z';
+ let h=setup('departure',[planned],'en');await flush();
+ assert.match(h.elements.get('departure_summary').textContent,/^Planned start: .*2026/);
+ h=setup('departure',[initial()],'en');await flush();
+ assert.equal(h.elements.get('departure_summary').textContent,'');
+ const broken=initial();broken.departure.planned_start='soon';
+ h=setup('departure',[broken],'en');await flush();
+ assert.equal(h.elements.get('departure_summary').textContent,'');
+ broken.departure.storage_error=true;
+ h=setup('departure',[broken],'de');await flush();
+ assert.match(h.elements.get('departure_summary').textContent,/nicht gespeichert/);
+});
+test('without an amount the page names the price and since when Home Assistant reported it',async()=>{
+ let h=setup('targets',[initial()],'en');await flush();
+ assert.match(h.elements.get('cost_status').textContent,/^Disabled · €0\.30\/kWh \(reported by Home Assistant .*26.*\)$/);
+ const bare=initial();bare.cost_price_at=null;
+ h=setup('targets',[bare],'en');await flush();
+ assert.equal(h.elements.get('cost_status').textContent,'Disabled · €0.30/kWh');
+});
+test('a guest or a failed plan shows no planned start, and broken plan fields are refused',async()=>{
+ const guest=initial();guest.departure.planned_start='2026-11-16T03:00:00.000Z';guest.departure.status='guest_mode';
+ let h=setup('departure',[guest],'en');await flush();
+ assert.equal(h.elements.get('departure_summary').textContent,'');
+ for(const change of [{planned_start:12345},{storage_error:'false'}]){
+  const broken=initial();Object.assign(broken.departure,change);
+  h=setup('departure',[broken],'en');await flush();
+  assert.match(h.elements.get('notice').textContent,/No current response/);
+ }
 });

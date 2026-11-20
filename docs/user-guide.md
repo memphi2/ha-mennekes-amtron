@@ -151,7 +151,13 @@ meter causes a protective pause rather than a claim that the target was reached.
 
 A temporary meter outage can resume only a pause caused by that outage, with the
 same goal and no intervening manual command. A reset counter needs a new goal;
-a reached goal stays stopped. After an owner restart, resume explicitly.
+a reached goal stays stopped while the car is plugged in. After an owner
+restart, resume explicitly.
+
+A reached energy or cost target belongs to the charge that reached it. Once
+the wallbox confirms that the car was unplugged, the target is cleared and the
+pause ends, whoever set it, so the next car charges without the previous limit. A
+target that is not reached yet stays for the next plug-in.
 [Target troubleshooting](troubleshooting.md#targets-and-departure-planning).
 
 ## Cost target
@@ -240,3 +246,18 @@ owns the charging current.
 
 Use native entities for daily operation. For automations, see [actions and events](automations.md)
 and [app actions](app-from-home-assistant.md#automation-actions).
+
+`mennekes_amtron_rtu.set_charging_current` takes these fields:
+
+| Field | Meaning |
+|---|---|
+| `device_id` | The wallbox device, or a list of them. Required. |
+| `current` | The limit in ampere: 6 to 32, or 0 with `allow_unlimited`. A value above the wallbox's own maximum or the configured cap is lowered to it; 0 removes the limit, the cap included. Required. |
+| `allow_unlimited` | Must be `true` to send `current: 0`, which removes the limit. It is not a pause. |
+
+```yaml
+action: mennekes_amtron_rtu.set_charging_current
+data:
+  device_id: 0123456789abcdef0123456789abcdef
+  current: 10
+```

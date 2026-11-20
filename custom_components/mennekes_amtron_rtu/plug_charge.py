@@ -9,7 +9,6 @@ import logging
 import time
 from collections.abc import Mapping
 from contextlib import suppress
-from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -30,7 +29,6 @@ from .vehicle_profiles import (
     CONF_VIRTUAL_PLUG_CHARGE,
     active_profile,
     profiles,
-    without_selection,
 )
 from .vehicle_sources import PLUG_WINDOW
 
@@ -71,8 +69,8 @@ class PlugChargeObserver:
         self._coordinator = entry.runtime_data.coordinator
         self._evidence = vehicle_evidence(hass, entry)
         self._policy = plug_charge_policy(entry.options)
-        self._configured_options = deepcopy(dict(entry.options))
-        self._switch_applied = False
+        # What this observer's own switch last made the service apply.
+        self._applied_enabled: bool | None = None
         self._pending_enabled: bool | None = None
         self._session: str | None = None
         # Only a plug-in seen while running is new. After a restart, reconnect
@@ -144,15 +142,17 @@ class PlugChargeObserver:
         ]
         self._changed()
 
-    def options_applied(self) -> bool:
-        """Skip only the option notification for an already applied switch."""
-        return (
-            self._switch_applied
-            # A vehicle switch is applied at runtime and must not count as
-            # an unrelated settings change here.
-            and without_selection(self._configured_options) == without_selection(self._entry.options)
-            and self._entry.runtime_data.entry_data == dict(self._entry.data)
-        )
+    def switch_applied(self, enabled: object) -> bool:
+        """Whether the service already runs with this saved value of the switch."""
+        return self._applied_enabled is not None and enabled is self._applied_enabled
+
+    def switch_contradicted(self, enabled: object) -> bool:
+        """Whether the options were saved back against what this switch applied.
+
+        A save that undoes the switch before its own notification ran leaves
+        options and record equal, with the service still on the other value.
+        """
+        return self._applied_enabled is not None and bool(enabled) is not self._applied_enabled
 
     async def async_set_enabled(self, enabled: bool) -> None:
         """Apply and remember the gate without restarting its connection owner."""
@@ -180,9 +180,8 @@ class PlugChargeObserver:
             return
         self._pending_enabled = None
         # Merge into current options so an unrelated save during the command is
-        # preserved. Only our bound snapshot may skip the resulting reload.
-        self._configured_options[CONF_VIRTUAL_PLUG_CHARGE] = enabled
-        self._switch_applied = True
+        # preserved; the entry's listener then finds that change and reloads.
+        self._applied_enabled = enabled
         self._hass.config_entries.async_update_entry(
             self._entry, options={**self._entry.options, CONF_VIRTUAL_PLUG_CHARGE: enabled},
         )
@@ -358,7 +357,8 @@ class PlugChargeObserver:
 
         async def adopt() -> None:
             try:
-                await observer.async_set_target(limit, automatic=True, expected_choice=revision)
+                # 100: the car's limit, also when it changes while connected.
+                await observer.async_set_target(100.0, automatic=True, expected_choice=revision)
             except (HomeAssistantError, DeviceError, OSError):
                 self._target_retry_at = time.monotonic() + 5
                 _LOGGER.debug("Vehicle charge limit adoption deferred")

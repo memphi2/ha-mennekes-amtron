@@ -120,7 +120,6 @@ def overview_snapshot(
     events = CommandEvents.parse(raw.get("command_events"))
     return {
         "schema": 1,
-        "configured": configured,
         "available": available,
         "state": (
             "setup_required" if not configured else "service_starting" if not ready else

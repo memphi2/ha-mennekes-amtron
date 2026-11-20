@@ -56,6 +56,12 @@ class PlugChargeState:
     since: datetime | None = None
     last_absent_at: datetime | None = None
     unknown_since: datetime | None = None
+    # A manual release read from disk: its connection may have ended while
+    # the service was down, so it needs a car at the first answer.
+    restored_manual: bool = False
+    # The manual release was given to, or met, a connected car. The session
+    # itself is not saved, so this says after a restart whose release it was.
+    manual_connected: bool = False
 
     @property
     def blocked(self) -> bool:
@@ -103,6 +109,10 @@ class PlugChargeState:
 
     def observe(self, present: bool | None, *, observed_at: datetime | None = None) -> None:
         now = observed_at or datetime.now(UTC)
+        if present is not None:
+            if present is False and self.restored_manual:
+                self.manual = False
+            self.restored_manual = False
         if not self.enabled or present is False:
             if self.enabled and self.authorized:
                 _LOGGER.info("Plug & Charge: grant ended, vehicle unplugged")
@@ -128,25 +138,46 @@ class PlugChargeState:
         if self.session is None:
             self.session = secrets.token_hex(16)
             self.since = self.last_absent_at or now
+        self.manual_connected = self.manual
+
+    @property
+    def manual_marks(self) -> tuple[bool, bool, bool, str | None]:
+        """A release by hand with what is known about it, to take a refused one back."""
+        return self.manual, self.manual_connected, self.restored_manual, self.session
+
+    @manual_marks.setter
+    def manual_marks(self, marks: tuple[bool, bool, bool, str | None]) -> None:
+        if marks[3] != self.session:
+            # The connection changed while the command waited: what a poll
+            # decided about its release meanwhile stands. Only a release the
+            # refused command itself added goes: waiting opened nothing.
+            if not marks[0]:
+                self.manual = self.manual_connected = self.restored_manual = False
+            return
+        self.manual, self.manual_connected, self.restored_manual = marks[:3]
 
     def snapshot(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
 
     def durable(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold,
-                "manual": self.manual}
+                "manual": self.manual,
+                # Given for a connected car, not for the next plug-in.
+                "manual_connected": self.manual and self.manual_connected}
 
     @classmethod
     def restore(cls, raw: object) -> PlugChargeState:
         if (
             not isinstance(raw, dict)
-            or raw.keys() != {"enabled", "policy", "hold", "manual"}
+            or raw.keys() != {"enabled", "policy", "hold", "manual", "manual_connected"}
             or type(raw["hold"]) is not bool or type(raw["manual"]) is not bool
+            or type(raw["manual_connected"]) is not bool or (raw["manual_connected"] and not raw["manual"])
         ):
             raise ValueError("invalid saved Plug & Charge configuration")
         result = cls(hold=raw["hold"])
         result.configure(raw["enabled"], raw["policy"])
         result.manual = raw["manual"] and result.enabled
+        result.restored_manual = result.manual_connected = result.manual and raw["manual_connected"]
         return result
 
 
@@ -257,6 +288,9 @@ class PlugChargeController:
                 "the next plug-in" if self.state.session is None else "this connection",
             )
         self.state.manual = released and self.state.enabled
+        self.state.manual_connected = self.state.manual and self.state.session is not None
+        # Given now, it is not the one read from disk any more.
+        self.state.restored_manual = False
 
     def _check_request(self, session: str, deadline: datetime) -> None:
         if self._stopping or not self.state.enabled:

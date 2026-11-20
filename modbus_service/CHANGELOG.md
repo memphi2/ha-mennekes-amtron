@@ -1,5 +1,41 @@
 # Changes
 
+## 0.10.0b6
+
+- Integration and app must both be 0.10.0b6; update them together.
+
+- **Breaking:** the saved control state of 0.10.0b5 is not read: after the
+  update, confirm the reset in Home Assistant's Repairs and set the targets
+  again.
+- An unplug ends a reached energy or cost target and its pause.
+- The departure plan's current no longer replaces the current chosen by
+  hand as the one a resume returns to.
+- A percentage target pressed down by the car's limit returns to the chosen
+  value when the limit rises again.
+- A guest start behind a waiting stop is refused before its first write
+  instead of leaving the release open without a guest.
+- A current behind a waiting lock or withdrawn release is refused instead of
+  dropped; a stop by a limit keeps a pause that still waits; a release
+  withdrawn by hand under Plug & Charge keeps the state-change interval.
+- A missing-meter pause no longer resumes by itself after a guest time limit
+  was lifted; a guest start for a car that just left is refused.
+- Writes outside a command (release closed after an unplug, error recovery)
+  keep a waiting lock or pause.
+- A manual Plug & Charge release given to a connected car ends when the
+  first answer after a restart shows no car; a foreign current above 32 A is
+  not saved as the setpoint.
+- The departure plan leaves a guest's pause alone; the service starts with a refusing disk and a saved guest permission.
+- A returned serial adapter is reopened within seconds; a write does not
+  follow a port reopened just before it; a negative meter reading is not
+  published; late heartbeats are logged once per weak phase of the line.
+- A page read behind a long command ends after five seconds instead of
+  holding one of the two request slots; the overview shows the last state.
+- The app no longer asks for the host's udev database (`udev: true`).
+- A price that arrived while a cost ceiling was stopped is applied once it
+  runs again.
+- The Charging page names the reported price and its time, and the planned
+  start of the departure plan.
+
 ## 0.10.0b5
 
 - Integration and app must both be 0.10.0b5; update them together.

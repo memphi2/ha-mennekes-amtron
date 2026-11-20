@@ -213,6 +213,18 @@
         "state_attributes": {
           "heartbeat_lost": {
             "name": "Energy manager fallback active"
+          },
+          "code": {
+            "name": "Error code"
+          },
+          "category": {
+            "name": "Category"
+          },
+          "fallback": {
+            "name": "Fallback behaviour"
+          },
+          "fallback_current": {
+            "name": "Fallback current"
           }
         }
       },
@@ -257,6 +269,11 @@
         "state": {
           "all_available": "All available phases",
           "single_phase": "Single phase only"
+        },
+        "state_attributes": {
+          "switched": {
+            "name": "Phases the wallbox will use"
+          }
         }
       },
       "solar_charging_mode": {
@@ -288,6 +305,11 @@
           "authorized": "Authorized",
           "not_authorized": "Not authorized",
           "not_used": "Not used"
+        },
+        "state_attributes": {
+          "enabled": {
+            "name": "Authorization required"
+          }
         }
       },
       "cable_lock_status": {
@@ -297,6 +319,11 @@
           "locked": "Locked",
           "undetermined": "Undetermined",
           "unlocked": "Unlocked"
+        },
+        "state_attributes": {
+          "permanent": {
+            "name": "Permanent locking"
+          }
         }
       },
       "detected_ev_phases": {
@@ -312,10 +339,50 @@
         "name": "Total energy"
       },
       "power_total": {
-        "name": "Total power"
+        "name": "Total power",
+        "state_attributes": {
+          "current_l1": {
+            "name": "Current L1"
+          },
+          "current_l2": {
+            "name": "Current L2"
+          },
+          "current_l3": {
+            "name": "Current L3"
+          },
+          "voltage_l1": {
+            "name": "Voltage L1"
+          },
+          "voltage_l2": {
+            "name": "Voltage L2"
+          },
+          "voltage_l3": {
+            "name": "Voltage L3"
+          },
+          "power_l1": {
+            "name": "Power L1"
+          },
+          "power_l2": {
+            "name": "Power L2"
+          },
+          "power_l3": {
+            "name": "Power L3"
+          }
+        }
       },
       "session_energy": {
-        "name": "Session energy"
+        "name": "Session energy",
+        "state_attributes": {
+          "duration_minutes": {
+            "name": "Duration (minutes)"
+          },
+          "maximum_current": {
+            "name": "Maximum current of the session"
+          },
+          "sessions": {
+            "name": "Charging sessions in total"
+          }
+        }
       },
       "signaled_current": {
         "name": "Signaled current"
@@ -325,7 +392,38 @@
       },
       "wallbox_settings": {
         "name": "Wallbox settings",
-        "state_attributes": {}
+        "state_attributes": {
+          "max_current_house": {
+            "name": "Maximum current of the house connection"
+          },
+          "max_evse_current": {
+            "name": "Maximum current of the wallbox"
+          },
+          "phase_rotation": {
+            "name": "Phase rotation"
+          },
+          "grid_phases_connected": {
+            "name": "Connected grid phases"
+          },
+          "phase_options": {
+            "name": "Phase options"
+          },
+          "phase_switching_mode": {
+            "name": "Phase switching"
+          },
+          "phase_switching_pause_seconds": {
+            "name": "Pause for phase switching (seconds)"
+          },
+          "grid_imbalance_monitoring": {
+            "name": "Load imbalance monitoring"
+          },
+          "grid_imbalance_threshold": {
+            "name": "Load imbalance limit"
+          },
+          "solar_min_current": {
+            "name": "Minimum current for solar charging"
+          }
+        }
       },
       "charging_status": {
         "name": "Charging status",
@@ -348,6 +446,12 @@
         "state_attributes": {
           "downgraded_to": {
             "name": "Downgrade active"
+          },
+          "evse_state": {
+            "name": "Wallbox state"
+          },
+          "cp_state": {
+            "name": "Vehicle signal (CP)"
           }
         }
       },
@@ -358,11 +462,12 @@
           "degraded": "Communication errors detected"
         },
         "state_attributes": {
-          "failed_transactions": {
-            "name": "Failed transactions"
-          },
-          "retried_transactions": {
-            "name": "Retried transactions"
+          "heartbeat": {
+            "name": "Heartbeat",
+            "state": {
+              "ok": "OK",
+              "problem": "Problem"
+            }
           }
         }
       },
@@ -440,7 +545,7 @@
               "unavailable": "Wallbox unavailable",
               "departure_plan": "Departure planning",
               "direct": "Direct control",
-              "guest": "Guest order"
+              "guest": "Guest charging"
             }
           },
           "next_event": {
@@ -577,6 +682,15 @@
               "authorization_required": "Wallbox authorization enabled",
               "register_unavailable": "Register value unavailable"
             }
+          },
+          "planned_start": {
+            "name": "Planned start"
+          },
+          "estimated_finish": {
+            "name": "Estimated finish"
+          },
+          "estimated_level_at_departure": {
+            "name": "Estimated charge level at departure"
           }
         }
       }

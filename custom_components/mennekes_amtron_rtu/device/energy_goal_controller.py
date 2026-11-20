@@ -9,6 +9,7 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from copy import copy
+from datetime import UTC, datetime
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError, AmtronRateLimitedError
@@ -16,6 +17,7 @@ from .control import AmtronControl
 from .data import WallboxData
 from .energy_goal import (
     MAX_PRICE,
+    PRICE_INTERVAL_SECONDS,
     PRICE_TOLERANCE,
     CostPart,
     EnergyGoal,
@@ -32,9 +34,6 @@ from .persistence import (
 from .registers import ENERGY_TOTAL
 
 _LOGGER = logging.getLogger(__name__)
-# A price that wobbles every few seconds must not re-arm and save the
-# target every few seconds.
-PRICE_INTERVAL_SECONDS = 60.0
 
 
 class EnergyGoalController:
@@ -72,7 +71,8 @@ class EnergyGoalController:
         self._monotonic = monotonic
         self._priced_at = -math.inf
         # The last price Home Assistant reported, per kWh.
-        self.price: float | None = None
+        self._price: float | None = None
+        self.price_at: datetime | None = None
         control.goal_controller = self
         self.model.resume_on_recovery = False
 
@@ -129,9 +129,26 @@ class EnergyGoalController:
             cost = CostPart(value, 0.0, unit)
         except ValueError as err:
             raise validation_error("cost_goal_invalid") from err
+        if price is not None:
+            # A price that came with the amount is the newest one known, also
+            # when saving the amount then fails after it took effect.
+            self._price, self.price_at = unit, datetime.now(UTC)
+            self._notify_changed()
         await self.async_set_target(energy_for(cost.amount, cost.price), cost=cost)
         # The price came with the amount.
         self._priced_at = self._monotonic()
+
+    @property
+    def price(self) -> float | None:
+        """The last price learned: reported, or the one of the amount.
+
+        It is not saved. After a restart a restored amount still names its
+        price; Home Assistant tells a different one again.
+        """
+        if self._price is not None:
+            return self._price
+        cost = self.model.cost
+        return None if cost is None else cost.price
 
     async def async_set_price(self, price: object) -> None:
         """Remember a new price; a running amount books the energy so far.
@@ -146,7 +163,8 @@ class EnergyGoalController:
             raise validation_error("cost_goal_price_unknown")
         # Remembered for an amount armed later, also from the app; it is not
         # saved: after a restart Home Assistant tells it again.
-        self.price = unit
+        self._price = unit
+        self.price_at = datetime.now(UTC)
         self._notify_changed()
         async with self._control.energy_goal_guard:
             if self._stopping:
@@ -160,9 +178,10 @@ class EnergyGoalController:
             state = self._client.write_state
             pending = self._pending if self._pending_generation == state.energy_goal_generation else None
             newest = pending or self.model
-            self._priced_at = self._monotonic()
             if newest.stop_requested or not newest.reprice(unit):
+                # Nothing changed, so this opens no waiting minute either.
                 return
+            self._priced_at = self._monotonic()
             if pending is not None:
                 self.model.take_cost(pending)
             self._dirty = True
@@ -264,6 +283,18 @@ class EnergyGoalController:
                 raise
         self._control.cancel_goal_resume()
         self._notify_changed()
+
+    def drop_recovery(self) -> None:
+        """Another limit stopped the charge: the outage pause stays paused.
+
+        Nothing is saved or cancelled here; the stop that calls this runs at
+        every tick. The grant does not survive a restart anyway.
+        """
+        if self.model.resume_on_recovery or (self._pending is not None and self._pending.resume_on_recovery):
+            self.model.resume_on_recovery = False
+            if self._pending is not None:
+                self._pending.resume_on_recovery = False
+            self._dirty = True
 
     async def async_cancel_recovery_locked(self) -> None:
         """A deliberate command revokes permission to resume our outage pause."""

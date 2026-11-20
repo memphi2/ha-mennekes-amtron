@@ -277,8 +277,10 @@ class ModbusService:
         if control.charging_setpoint is None:
             current = self.data.get("charging_current_ems")
             if isinstance(current, (int, float)):
+                # A foreign controller may have written more than this
+                # wallbox is ever asked for; that is no limit to remember.
                 control.charging_setpoint = (
-                    float(current) if current == 0 or current >= 6 else 6.0
+                    min(float(current), 32.0) if current == 0 or current >= 6 else 6.0
                 )
         await self._save_intent()
         self.control = control
@@ -606,6 +608,7 @@ class ModbusService:
             self._phase = "closing the release after an unplug"
             async with self._command_lock:
                 await self.control.unplug_release.async_apply()
+                await self.control.unplug_release.async_end_reached_goal()
 
     async def _enforce_current_cap(self) -> None:
         """Never leave a confirmed charging current above a lowered cap."""
@@ -659,9 +662,12 @@ class ModbusService:
                         await asyncio.shield(saving)
                     except asyncio.CancelledError:
                         cancelled = True
-                saving.result()
+                    except Exception:  # noqa: BLE001 - raised from the task below
+                        break
                 if cancelled:
-                    raise asyncio.CancelledError
+                    # Cancellation outranks a save that failed meanwhile.
+                    raise asyncio.CancelledError from saving.exception()
+                saving.result()
 
     async def _control_updated(self) -> None:
         """Publish queue changes and persist commands executed by the worker."""
@@ -1009,6 +1015,14 @@ class ModbusService:
                             raise DeviceError("soc_goal_source_changed")
                         if value != 0 and self._soc_maximum_required and control.soc_goal.maximum_percent is None:
                             raise DeviceError("soc_goal_limit_unavailable")
+                        cap = control.soc_goal.maximum_percent
+                        if cap is not None and isinstance(value, (int, float)) and value > cap:
+                            # Typed into the app: said, not pressed down in silence.
+                            raise DeviceError("soc_goal_invalid")
+                        if cap is not None and value == cap:
+                            # The top of the app's scale: the car's limit,
+                            # wherever it goes.
+                            value = 100
                         reading = self._soc_reading
                         payload = {**payload, "source": control.soc_goal.source,
                             "maximum": control.soc_goal.maximum_percent,

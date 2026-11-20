@@ -119,7 +119,6 @@ def test_concurrent_configuration_save_is_preserved_and_still_reloads(monkeypatc
             await switch.async_turn_on()
             assert entry.options["virtual_plug_charge"]
             assert entry.options.get("current_limit") == (7 if change == "options" else None)
-            assert not runtime.plug_charge.options_applied()
             await integration.async_reload_entry(hass, entry)
             assert hass.config_entries.reloaded == [entry.entry_id]
         finally:
@@ -138,7 +137,7 @@ def test_failed_gate_change_is_not_saved_as_success(monkeypatch):
                 await switch.async_turn_on()
             assert "virtual_plug_charge" not in entry.options
             assert not switch.is_on
-            assert not runtime.plug_charge.options_applied()
+            assert not runtime.plug_charge.switch_applied(True)
         finally:
             await runtime.plug_charge.async_stop()
             await runtime.client.async_close()

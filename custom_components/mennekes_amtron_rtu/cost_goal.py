@@ -20,7 +20,12 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .device.client_errors import AmtronBusError
 from .device.data import WallboxData
-from .device.energy_goal import COST_GOAL_STEP, MAX_COST_GOAL, PRICE_TOLERANCE
+from .device.energy_goal import (
+    COST_GOAL_STEP,
+    MAX_COST_GOAL,
+    PRICE_INTERVAL_SECONDS,
+    PRICE_TOLERANCE,
+)
 from .device.notice import FailureNotice
 from .exceptions import service_validation_error
 
@@ -30,7 +35,9 @@ if TYPE_CHECKING:
 __all__ = ["COST_GOAL_STEP", "MAX_COST_GOAL", "CostGoalObserver"]
 
 _LOGGER = logging.getLogger(__name__)
-_RETRY_SECONDS: Final = 60.0
+# A little longer than the service's own minute between two prices, so that
+# the next one cannot arrive inside it and be dropped.
+_RETRY_SECONDS: Final = PRICE_INTERVAL_SECONDS + 5.0
 
 
 class CostGoalObserver:
@@ -89,7 +96,11 @@ class CostGoalObserver:
             # The service would refuse it at every poll.
             return
         price = self._price()
-        known = control.cost_price
+        # A running amount shows the price it really has: one that came while
+        # its goal was stopped is told again once the goal runs.
+        goal = control.energy_goal
+        running = goal.cost is not None and goal.status == "active"
+        known = goal.cost.price if running and goal.cost is not None else control.cost_price
         if (
             price is None
             or (known is not None and abs(price - known) < PRICE_TOLERANCE)

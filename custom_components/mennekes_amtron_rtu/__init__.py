@@ -43,6 +43,7 @@ from .charge_watch import ChargeWatch, loss_vehicle_options
 from .charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
+    CONF_CHARGING_NETWORK_TARIFF,
     COST_SOURCE_DISABLED,
 )
 from .coordinator import ServiceCoordinator
@@ -893,13 +894,32 @@ async def _async_reload_entry_locked(
     runtime = getattr(entry, "runtime_data", None)
     cost = runtime.charging_cost if runtime is not None else None
     if runtime is not None and not force:
+        # One record says which options run: ``vehicle_base_options``. What
+        # changed against it decides, not a copy each owner keeps for itself.
+        base = without_selection(entry.options)
+        applied = runtime.vehicle_base_options
+        changed = {key for key in base.keys() | applied.keys() if base.get(key) != applied.get(key)}
+        gate = runtime.plug_charge
         if (
-            runtime.plug_charge is not None and runtime.plug_charge.options_applied() is True
-        ) or (cost is not None and cost.apply_tariff_only_update()):
+            changed and changed <= {CONF_VIRTUAL_PLUG_CHARGE, CONF_CHARGING_NETWORK_TARIFF}
+            and runtime.entry_data == dict(entry.data)
+            and (
+                CONF_VIRTUAL_PLUG_CHARGE not in changed
+                or (gate is not None and gate.switch_applied(base.get(CONF_VIRTUAL_PLUG_CHARGE)))
+            )
+            and (
+                CONF_CHARGING_NETWORK_TARIFF not in changed
+                or (cost is not None and cost.apply_tariff_update())
+            )
+        ):
             # Applied in place. The same update may also have changed the
             # vehicle, which must still be switched, not silently skipped.
-            runtime.vehicle_base_options = without_selection(entry.options)
-        if await _async_switch_vehicle(hass, entry):
+            runtime.vehicle_base_options = base
+        contradicted = (
+            CONF_VIRTUAL_PLUG_CHARGE not in changed and gate is not None
+            and gate.switch_contradicted(base.get(CONF_VIRTUAL_PLUG_CHARGE))
+        )
+        if not contradicted and await _async_switch_vehicle(hass, entry):
             return
         # A reload that also selects another car keeps the previous car's trip.
         await _async_park_trip(hass, entry)

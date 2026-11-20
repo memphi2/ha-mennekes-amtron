@@ -67,6 +67,9 @@ class WritePath:
         # The stop whose reply did not come: its repeat is the same switch,
         # not a new one, and does not wait for the interval it started.
         self._unanswered_stop: tuple[int, int, float | None] | None = None
+        # The current on the line is a planner's, not one somebody chose. A
+        # flag and no value: the wallbox reads a current back as a float32.
+        self.line_planned = False
 
     async def async_current_evse_state(
         self, error_key: str, *, read: LockedRegisterReader | None = None,
@@ -165,10 +168,12 @@ class WritePath:
             )
         except (DeviceError, asyncio.CancelledError) as err:
             if self._control._uncertain(err):
-                self._control._clear_pending()
+                if not recovery:
+                    # Recovery is no command: what waits in the queue stays.
+                    self._control._clear_pending()
                 self._control._write_state.confirmed_current = None
                 if not paused:
-                    self._control.charging_setpoint = value
+                    self._remember(value, recovery)
                 if transition:
                     self._control._write_state.mode_change_at = self._control._monotonic()
                 if paused:
@@ -178,7 +183,7 @@ class WritePath:
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
         if not paused:
-            self._control.charging_setpoint = value
+            self._remember(value, recovery)
         else:
             self._remember_pause_setpoint(previous, preserve_setpoint)
         if transition:
@@ -199,18 +204,40 @@ class WritePath:
         if self._control._request_refresh is not None:
             await self._control._request_refresh()
 
+    def _remember(self, value: float, recovery: bool) -> None:
+        """Keep a current as the one a later resume returns to.
+
+        Only a current somebody chose: a planner's is its own for the time of
+        its plan and must not outlive it. Lowering a planner's line to the cap
+        or reasserting it after an error chooses nothing either.
+        """
+        active = self._control._active_command
+        if active is not None and active.owner is not None:
+            # Not saved: after a restart a pause takes the current it finds,
+            # as it does for one that another controller wrote.
+            self.line_planned = True
+        elif self.line_planned and (recovery or (active is not None and active.keeps_setpoint)):
+            return
+        else:
+            self._control.charging_setpoint = value
+            self.line_planned = False
+
     def _remember_pause_setpoint(
         self, previous: float | None, preserve_setpoint: bool
     ) -> None:
         """Retain the confirmed current even when the pause acknowledgement is lost."""
 
+        if self.line_planned and self._control.charging_setpoint is not None:
+            # The current on the line is a planner's; the chosen one stays.
+            return
         if (
             (not preserve_setpoint or self._control.charging_setpoint is None)
             and previous is not None
             and math.isfinite(previous)
             and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
         ):
-            self._control.charging_setpoint = float(previous)
+            # More than 32 A is a foreign controller's value, no limit to keep.
+            self._control.charging_setpoint = min(float(previous), 32.0)
 
     async def async_read_switch(self, spec: RegisterSpec, *, stopping: bool = False) -> int | None:
         """Recheck live state, but a failed read must not prevent a stop."""
@@ -254,9 +281,16 @@ class WritePath:
             self._control._release_writes += 1
             if value == 1:
                 self._control._plug_charge.release_written()
+            elif (active := self._control._active_command) is not None and active.action == "disable_charging":
+                # Withdrawn by hand: the gate closes with the acknowledged
+                # write, whatever the refresh after it does.
+                self._control._plug_charge.set_manual(False)
         if switched():
             self._control._write_state.mode_change_at = self._control._monotonic()
-        self._control._clear_pending()
+        if self._control._active_command is not None:
+            # A write outside a command, e.g. closing the release after an
+            # unplug, settles nothing that waits in the queue.
+            self._control._clear_pending()
         if self._control._request_refresh is not None:
             await self._control._request_refresh()
 
@@ -288,7 +322,7 @@ class WritePath:
                 CHARGING_RELEASE, int(released), changed=lambda: switches,
                 precondition=admit if released and current != 1 else None,
             )
-        except AmtronRateLimitedError:
+        except (AmtronRateLimitedError, TimedCommandCancelledError):
             # Nothing was sent; the request is not an intent yet.
             self._control.charging_release_requested = previous
             raise
@@ -440,7 +474,7 @@ class WritePath:
     async def _async_grant_release_for_start(self) -> None:
         """Keep release and resume in one queued command, under the same lock."""
         gate = self._control._plug_charge.state
-        manual, written = gate.manual, self._control._release_writes
+        manual, written = gate.manual_marks, self._control._release_writes
         if gate.enabled:
             self._control._plug_charge.set_manual(True)
         try:
@@ -448,7 +482,7 @@ class WritePath:
         except BaseException as err:
             refused = isinstance(err, (AmtronRateLimitedError, TimedCommandCancelledError))
             if self._control._release_writes == written and (refused or not self._control._command_write_started or not self._control._uncertain(err)):
-                gate.manual = manual
+                gate.manual_marks = manual
             raise
 
     async def async_write(

@@ -119,9 +119,12 @@ class _Observations:
         self.latest = _Observation(None, None)
 
     def add(self, observation: _Observation) -> None:
-        reached = self.model.status == "reached"
         self.model.observe(observation.soc, observation.maximum)
-        if not reached and self.model.status == "reached":
+        if self.model.status != "reached":
+            self.reached_soc = None
+        elif observation.soc is not None and observation.soc >= self.model.target_percent:
+            # Also when a raised limit ended the latch and this charge level
+            # reached the higher target at once.
             self.reached_soc = observation.soc
         if observation.maximum is not None:
             self.minimum = (
@@ -347,7 +350,8 @@ class VehicleSocObserver:
             return
         stopped = goal.stop_requested
         try:
-            await self.async_set_target(goal.target_percent, automatic=True)
+            # The chosen value again, which a pressing limit leaves in place.
+            await self.async_set_target(goal.chosen_percent, automatic=True)
             resume = getattr(self._control, "async_resume_charging", None)
             if stopped and resume is not None and getattr(self._control, "pause_requested", None) is True:
                 await resume()
@@ -370,9 +374,9 @@ class VehicleSocObserver:
                 remembered = self._memory.recall(self._memory_key)
             # A read-only owner refuses the command; nothing is restored then.
             if remembered and not self._stopping and goal.status == "disabled":
-                maximum = self.maximum or goal.maximum_percent
                 try:
-                    await self.async_set_target(min(remembered, maximum) if maximum else remembered, automatic=True)
+                    # As chosen: the car's limit presses it down by itself.
+                    await self.async_set_target(remembered, automatic=True)
                 except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
                     _LOGGER.debug("Remembered vehicle charge target not restored: %s", err)
         finally:
@@ -393,7 +397,7 @@ class VehicleSocObserver:
                     self._async_restore_target(), "amtron_vehicle_target", eager_start=False,
                 )
             return
-        if self._memory_key is not None and self._memory.remember(self._memory_key, goal.target_percent):
+        if self._memory_key is not None and self._memory.remember(self._memory_key, goal.chosen_percent):
             self._hass.async_create_task(self._memory.async_save(), eager_start=False)
 
     @callback
@@ -538,6 +542,11 @@ class VehicleSocObserver:
             previous = self._pending
             self._pending = None
             soc, maximum = self.latest_soc, self.maximum
+            limit = maximum if maximum is not None else self._control.soc_goal.maximum_percent
+            if not automatic and value > 0 and value == limit:
+                # Picked at the top of the scale: the car's limit, wherever
+                # it goes. Only a choice by hand means that.
+                value = 100.0
             self._previous_target_model = copy(self._control.soc_goal)
             self._previous_target_revision = getattr(self._control, "soc_goal_revision", None)
             original = self._previous_target_model.snapshot()

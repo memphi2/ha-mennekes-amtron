@@ -11,6 +11,7 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
     AmtronRateLimitedError,
 )
 from custom_components.mennekes_amtron_rtu.device.control import (
@@ -23,6 +24,7 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import 
 )
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
     DeviceValidationError,
 )
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
@@ -428,7 +430,9 @@ def test_service_persists_policy_but_new_process_requires_new_authorization(tmp_
             snap = service.snapshot()["control"]
             assert snap["plug_charge"]["session"]
             saved = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert saved == {"enabled": True, "policy": POLICY, "hold": True, "manual": False}
+            assert saved == {
+                "enabled": True, "policy": POLICY, "hold": True, "manual": False, "manual_connected": False,
+            }
             restored = WriteState()
             IntentStore(tmp_path / "intent.json", service.identity.serial_number).load(restored)
             assert restored.plug_charge.enabled
@@ -553,7 +557,7 @@ def test_service_accepts_only_current_session_authorization(tmp_path):
             result = await service.command({"command": "plug_charge_authorize", "session": session, "deadline": deadline().isoformat(), "expected_serial_number": serial})
             assert result["control"]["plug_charge"]["authorized"]
             stored = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert set(stored) == {"enabled", "policy", "hold", "manual"}
+            assert set(stored) == {"enabled", "policy", "hold", "manual", "manual_connected"}
             assert stored["hold"] is False
             for payload in (
                 {"command": "plug_charge_config", "value": 1},
@@ -825,3 +829,143 @@ def test_a_clock_set_back_does_not_stretch_the_unknown_grace():
     assert state.authorized
     state.observe(None, observed_at=back + timedelta(seconds=61))
     assert not state.authorized
+
+
+def test_a_release_whose_car_left_is_saved_as_none():
+    state = PlugChargeState()
+    state.configure(True, POLICY)
+    # In memory the mark of the connection outlives the release it marked.
+    state.manual, state.manual_connected = False, True
+    saved = state.durable()
+    assert (saved["manual"], saved["manual_connected"]) == (False, False)
+    assert not PlugChargeState.restore(saved).restored_manual
+    with pytest.raises(ValueError, match="invalid saved Plug & Charge"):
+        PlugChargeState.restore({**saved, "manual": True, "manual_connected": 1})
+
+
+def test_a_release_by_hand_knows_at_once_whether_a_car_is_connected(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        gate = service.control._plug_charge
+        await service.control.async_configure_plug_charge(True, policy=POLICY)
+        state = gate.state
+        state.session = "c" * 64
+        gate.set_manual(True)
+        # Saved by the command itself, before the next poll looks.
+        assert state.durable()["manual_connected"] is True
+        gate.set_manual(False)
+        state.session = None
+        gate.set_manual(True)
+        assert state.durable()["manual_connected"] is False
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_refused_release_keeps_what_was_known_about_the_restored_one(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        control = service.control
+        await control.async_configure_plug_charge(True, policy=POLICY)
+        state = control._plug_charge.state
+        # As read from disk: a connected car's release, the car still unknown.
+        state.session = None
+        state.manual = state.manual_connected = state.restored_manual = True
+
+        async def refuse(_command):
+            raise DeviceError("write_rate_limited")
+
+        control.queue.async_submit_locked = refuse
+        with pytest.raises(DeviceError):
+            await control.async_set_charging_release(True)
+        assert state.manual_marks == (True, True, True, None)
+        # The first answer shows no car: the release was that car's and ends.
+        state.observe(False)
+        assert not state.manual
+        await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("released", [False, True])
+def test_a_refused_release_does_not_bring_back_one_that_an_unplug_ended(tmp_path, released):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        control = service.control
+        serial = service.identity.serial_number
+        await control.async_configure_plug_charge(True, policy=POLICY)
+        transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+        transport.bank[R.CP_STATE.address] = int(CpState.B1)
+        await service.refresh()
+        state = control._plug_charge.state
+        clock[0] += 1000
+        await service.command({"command": "release", "value": True, "expected_serial_number": serial})
+        assert state.manual
+        clock[0] += 1000
+        real = control._client.async_write_register
+
+        async def lost(spec, value, **kwargs):
+            if spec == R.CHARGING_RELEASE:
+                # The car is pulled and a poll sees it while the command
+                # waits for the bus; then the command's write is lost.
+                transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
+                transport.bank[R.CP_STATE.address] = int(CpState.A1)
+                await service._poll()
+                raise AmtronConnectionError("timeout")
+            return await real(spec, value, **kwargs)
+
+        control._client.async_write_register = lost
+        if released:
+            transport.bank[R.CHARGING_RELEASE.address] = 0
+        with pytest.raises((DeviceError, AmtronConnectionError)):
+            await service.command({"command": "release", "value": released, "expected_serial_number": serial})
+        control._client.async_write_register = real
+        assert not state.manual
+        transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+        transport.bank[R.CP_STATE.address] = int(CpState.B1)
+        await service.refresh()
+        # The next car, any car, is not released by the one that left.
+        assert state.blocked
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_refused_release_for_the_next_car_is_gone_when_that_car_came_meanwhile(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        control = service.control
+        serial = service.identity.serial_number
+        await control.async_configure_plug_charge(True, policy=POLICY)
+        await service.refresh()
+        state = control._plug_charge.state
+        assert state.session is None
+        assert not state.manual
+        clock[0] += 1000
+        real = control._client.async_write_register
+
+        async def lost(spec, value, **kwargs):
+            if spec == R.CHARGING_RELEASE:
+                # A car is plugged in and a poll sees it while the command
+                # waits for the bus; then the command's write is lost.
+                transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+                transport.bank[R.CP_STATE.address] = int(CpState.B1)
+                await service._poll()
+                raise AmtronConnectionError("timeout")
+            return await real(spec, value, **kwargs)
+
+        control._client.async_write_register = lost
+        with pytest.raises((DeviceError, AmtronConnectionError)):
+            await service.command({"command": "release", "value": True, "expected_serial_number": serial})
+        control._client.async_write_register = real
+        # The command failed: it released nothing, also not this car.
+        assert state.session is not None
+        assert not state.manual
+        assert state.blocked
+        await service.stop()
+
+    asyncio.run(run())

@@ -93,11 +93,21 @@ def test_a_restored_target_is_capped_by_a_lower_vehicle_limit(tmp_path):
         try:
             first = await _observer(hass, control, coordinator, "sensor.first", memory)
             await first.async_set_target(85)
+            # A limit that presses the target down does not change what is
+            # remembered: the chosen value comes back with a higher limit.
+            hass.states.async_set("number.limit", "80", {"unit_of_measurement": "%"})
+            await hass.async_block_till_done()
+            assert control.soc_goal.target_percent == 80
+            assert list(memory._targets.targets.values()) == [85]
             await first.async_stop()
             control.soc_goal.configure_source(None)
-            hass.states.async_set("number.limit", "80", {"unit_of_measurement": "%"})
             first = await _observer(hass, control, coordinator, "sensor.first", memory)
-            assert control.soc_goal.target_percent == 80
+            assert (control.soc_goal.target_percent, control.soc_goal.chosen_percent) == (80, 85)
+            # Restoring under the pressing limit does not rewrite the memory.
+            assert list(memory._targets.targets.values()) == [85]
+            hass.states.async_set("number.limit", "95", {"unit_of_measurement": "%"})
+            await hass.async_block_till_done()
+            assert control.soc_goal.target_percent == 85
             await first.async_stop()
         finally:
             await hass.async_stop()
@@ -269,6 +279,90 @@ def test_a_start_with_an_unconfirmed_car_releases_a_reached_target(tmp_path):
             control.async_resume_charging.assert_awaited_once()
         finally:
             await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_a_release_keeps_a_chosen_value_that_the_limit_fell_onto(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.config_dir = str(tmp_path)
+        control, coordinator, binding = Control(), Coordinator(), Binding()
+        control.pause_requested = False
+        control.async_resume_charging = AsyncMock()
+        hass.states.async_set("sensor.first", "50", {"unit_of_measurement": "%"})
+        hass.states.async_set("number.limit", "90", {"unit_of_measurement": "%"})
+        memory = VehicleTargetMemory(hass, "entry", "serial")
+        observer = VehicleSocObserver(
+            hass, control, coordinator, "sensor.first", "number.limit", binding=binding, memory=memory,
+        )
+        try:
+            await observer.async_start()
+            await hass.async_block_till_done()
+            await observer.async_set_target(80)
+            hass.states.async_set("number.limit", "80", {"unit_of_measurement": "%"})
+            hass.states.async_set("sensor.first", "80", {"unit_of_measurement": "%"})
+            await hass.async_block_till_done()
+            # The binding rests: the reach is released by setting the target again.
+            binding.set(True)
+            await hass.async_block_till_done()
+            binding.set(False)
+            hass.states.async_set("number.limit", "100", {"unit_of_measurement": "%"})
+            await hass.async_block_till_done()
+            assert control.soc_goal.target_percent == 80
+            assert list(memory._targets.targets.values()) == [80]
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_a_restore_at_a_limit_equal_to_the_value_keeps_the_value(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.config_dir = str(tmp_path)
+        control, coordinator = Control(), Coordinator()
+        hass.states.async_set("sensor.first", "50", {"unit_of_measurement": "%"})
+        hass.states.async_set("number.limit", "90", {"unit_of_measurement": "%"})
+        memory = VehicleTargetMemory(hass, "entry", "serial")
+        try:
+            first = await _observer(hass, control, coordinator, "sensor.first", memory)
+            await first.async_set_target(80)
+            await first.async_stop()
+            control.soc_goal.configure_source(None)
+            hass.states.async_set("number.limit", "80", {"unit_of_measurement": "%"})
+            first = await _observer(hass, control, coordinator, "sensor.first", memory)
+            assert (control.soc_goal.target_percent, control.soc_goal.chosen_percent) == (80, 80)
+            assert list(memory._targets.targets.values()) == [80]
+            await first.async_stop()
+        finally:
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_only_a_value_picked_by_hand_at_the_top_follows_the_limit(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.config_dir = str(tmp_path)
+        control, coordinator = Control(), Coordinator()
+        hass.states.async_set("sensor.first", "50", {"unit_of_measurement": "%"})
+        hass.states.async_set("number.limit", "90", {"unit_of_measurement": "%"})
+        memory = VehicleTargetMemory(hass, "entry", "serial")
+        try:
+            first = await _observer(hass, control, coordinator, "sensor.first", memory)
+            await first.async_set_target(90)
+            assert (control.soc_goal.target_percent, control.soc_goal.chosen_percent) == (90, 100)
+            hass.states.async_set("number.limit", "95", {"unit_of_measurement": "%"})
+            await hass.async_block_till_done()
+            assert control.soc_goal.target_percent == 95
+            # The same number set by the integration itself is that number.
+            await first.async_set_target(95, automatic=True)
+            assert control.soc_goal.chosen_percent == 95
+            await first.async_stop()
+        finally:
             await hass.async_stop()
 
     asyncio.run(run())

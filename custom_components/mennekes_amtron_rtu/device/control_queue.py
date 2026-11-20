@@ -109,9 +109,11 @@ class CommandQueue:
             await self.async_cancel_pending()
         had_pending = self._control._pending is not None
         kept = self._outlasts(command)
-        if kept and command.action in ("single_phase", "all_phases"):
+        if kept and (command.action in ("single_phase", "all_phases") or command.grant_release):
+            # A command of several steps is refused before its first write.
             # A phase change waits for its own pause and would then take the
-            # stop's place; the stop goes first.
+            # stop's place; a guest start would open the release and then
+            # fail at its current. The stop goes first.
             raise AmtronRateLimitedError("state_change", max(
                 self._control._pending_due - self._control._monotonic(),
                 MIN_CURRENT_WRITE_INTERVAL_SECONDS,
@@ -124,14 +126,24 @@ class CommandQueue:
         except AmtronRateLimitedError as err:
             self._control._diagnostics.writes_rate_limited += 1
             self._control._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED)
-            if command.action in ("set_current", "resume") and command.owner is None:
-                self._control.charging_setpoint = command.value
+            remembered = command.action in ("set_current", "resume") and command.owner is None and not (
+                command.keeps_setpoint and self._control.writes.line_planned
+            )
             if kept:
-                if command.action == "set_current" and not self._starts(command):
-                    # The stop keeps its place; the current is remembered above.
+                pending = self._control._pending
+                if (
+                    remembered and command.action == "set_current" and not self._starts(command)
+                    and pending is not None and pending.action == "pause"
+                ):
+                    # The pause keeps its place; the resume after it uses the
+                    # remembered current. Behind a lock or a withdrawn
+                    # release nothing would ever write it.
+                    self._control.charging_setpoint = command.value
                     return
                 # It must not take the stop's place, nor pretend to be queued.
                 raise
+            if remembered:
+                self._control.charging_setpoint = command.value
             await self._async_queue(command, err.retry_after)
             return
         except (DeviceError, asyncio.CancelledError) as err:

@@ -47,7 +47,12 @@ def test_console_targets_auth_cas_and_vehicle_maximum(tmp_path, monkeypatch):
             assert (await refused.json())["error"] == "soc_goal_limit_unavailable"
             await service.command({"command": "soc_observation", "source": CAR, "soc": 40, "maximum": 75, "expected_serial_number": service.identity.serial_number})
             choice["revision"] = service.choice_revision
-            assert (await client.post("/api/charging", headers=headers, json=choice)).status != 200
+            above = await client.post("/api/charging", headers=headers, json=choice)
+            assert (above.status, (await above.json())["error"]) == (409, "soc_goal_invalid")
+            # The top of the scale is allowed and means the car's limit.
+            choice.update(value=75, revision=service.choice_revision)
+            assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
+            assert (service.control.soc_goal.target_percent, service.control.soc_goal.chosen_percent) == (75, 100)
             reading = service._soc_reading
             choice.update(value=70, revision=service.choice_revision)
             saved = await client.post("/api/charging", headers=headers, json=choice)
@@ -282,7 +287,8 @@ def test_console_arms_a_cost_ceiling_at_the_last_reported_price(tmp_path, monkey
             TestClient(TestServer(create_console_app(Console("supervisor-fixture", TOKEN, service=service)))) as client,
         ):
             state = await (await client.get("/api/charging", headers=HEADERS)).json()
-            assert (state["cost"], state["cost_price"], state["guest_confirmation_required"]) == (None, None, False)
+            assert (state["cost"], state["cost_price"], state["cost_price_at"]) == (None, None, None)
+            assert state["guest_confirmation_required"] is False
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
             choice = {"action": "cost", "value": 10, "revision": state["revision"], "confirm": True}
             refused = await client.post("/api/charging", headers=headers, json=choice)
@@ -293,6 +299,8 @@ def test_console_arms_a_cost_ceiling_at_the_last_reported_price(tmp_path, monkey
                 "expected_serial_number": service.identity.serial_number,
             })
             assert service.snapshot()["control"]["cost_price"] == 0.25
+            told = (await (await client.get("/api/charging", headers=HEADERS)).json())["cost_price_at"]
+            assert str(told).endswith("+00:00")
             saved = await client.post("/api/charging", headers=headers, json=choice)
             state = await saved.json()
             assert saved.status == 200
@@ -326,8 +334,8 @@ def test_console_names_a_command_that_must_wait_and_a_past_time(tmp_path, monkey
             limited = AmtronRateLimitedError("state_change", 5.0)
             for request, error, expected in (
                 (choice, limited, (409, "write_rate_limited")),
-                # A guest start may have written the release before it had to wait.
-                (guest, limited, (503, "charging_save_uncertain")),
+                # The queue refuses a guest start before its first write.
+                (guest, limited, (409, "write_rate_limited")),
                 (choice, validation_error("target_time_not_future"), (409, "target_time_not_future")),
             ):
                 async def refuse(_payload, error=error):
@@ -336,5 +344,43 @@ def test_console_names_a_command_that_must_wait_and_a_past_time(tmp_path, monkey
                 monkeypatch.setattr(service, "command", refuse)
                 refused = await client.post("/api/charging", headers=headers, json=request)
                 assert (refused.status, (await refused.json())["error"]) == expected
+
+    asyncio.run(body())
+
+
+def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_state(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device import (
+        console_http,
+        service_runtime,
+    )
+    from custom_components.mennekes_amtron_rtu.device.service_overview import (
+        service_overview,
+    )
+
+    # The overview's own limit must not end its patient read first.
+    assert app_settings.OVERVIEW_SECONDS > service_runtime._PATIENCE_SECONDS
+
+    async def body():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        monkeypatch.setattr(console_http, "_READ_SECONDS", 0.05)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            monkeypatch.setattr("custom_components.mennekes_amtron_rtu.device.service_runtime._PATIENCE_SECONDS", 0.05)
+            console = Console(
+                "supervisor-fixture", TOKEN, service=service, overview=lambda: service_overview(service),
+            )
+            async with TestClient(TestServer(create_console_app(console))) as client:
+                assert (await client.get("/api/overview", headers=HEADERS)).status == 200
+                await service._command_lock.acquire()
+                try:
+                    # A read that waited for the command would keep its request
+                    # slot after the page gave up; two of them blocked the app.
+                    for path in ("/api/charging", "/api/registers"):
+                        response = await client.get(path, headers=HEADERS)
+                        assert (response.status, await response.json()) == (503, {"error": "busy"})
+                    # The overview waits shortly and shows the last published state.
+                    assert (await client.get("/api/overview", headers=HEADERS)).status == 200
+                finally:
+                    service._command_lock.release()
+                assert (await client.get("/api/charging", headers=HEADERS)).status == 200
 
     asyncio.run(body())

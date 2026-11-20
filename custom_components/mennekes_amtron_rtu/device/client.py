@@ -159,6 +159,11 @@ def create_serial_client(
         # retries would resend it after one second, bypassing our write floor.
         # Only reads may retry, explicitly in _client_read.read_words.
         retries=0,
+        # The library reopens a lost port by itself and doubles its wait, by
+        # default up to five minutes. An adapter that is back must not leave
+        # the wallbox in its fallback current that long.
+        reconnect_delay=0.1,
+        reconnect_delay_max=5.0,
         trace_packet=trace_packet,
         trace_connect=trace_connect,
     )
@@ -343,6 +348,14 @@ class MennekesModbusClient:
         if client.connected:
             return
         self._connection_changed(False)
+        # The library may still try to reopen a port it lost. Left alone it
+        # would go on beside this connection and fail on the port's lock
+        # every few seconds for good.
+        context = getattr(client, "ctx", None)
+        reopening = getattr(context, "reconnect_task", None)
+        if context is not None and isinstance(reopening, asyncio.Task):
+            reopening.cancel()
+            context.reconnect_task = None
         try:
             connected = await client.connect()
         except WaveshareAuthenticationRejectedError as err:
@@ -629,13 +642,22 @@ class MennekesModbusClient:
                     )
                 # Refused here, nothing reaches the line and nothing is owed.
                 _client_write.validate_write(spec, value)
-                await self._quiet.ask(lambda: _client_write.write_register(
-                    client,
-                    spec=spec,
-                    value=value,
-                    device_id=self._config.device_id,
-                    trace=self.modbus_trace,
-                ))
+                checked = self._connection_generation
+
+                async def send() -> None:
+                    # The quiet wait before it can outlast the link the
+                    # identity was checked on.
+                    if checked != self._connection_generation or not client.connected:
+                        raise AmtronConnectionError("connection changed before the write")
+                    await _client_write.write_register(
+                        client,
+                        spec=spec,
+                        value=value,
+                        device_id=self._config.device_id,
+                        trace=self.modbus_trace,
+                    )
+
+                await self._quiet.ask(send)
             except (Exception, asyncio.CancelledError) as err:
                 error = err
                 # A definite rejection did not change the register. A missing

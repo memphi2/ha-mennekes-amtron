@@ -444,6 +444,11 @@ class DepartureController:
         except (OSError, ValueError) as err:
             self._storage_notice.failed("not saved; it continues in memory", type(err).__name__)
             self.storage_error = True
+            task = asyncio.current_task()
+            if task is not None and task.cancelling():
+                # The save failed while this task was being cancelled: it
+                # must not carry on as if only the save had failed.
+                raise asyncio.CancelledError from err
             return
         self._durable = decision
         self.storage_error = False
@@ -539,8 +544,23 @@ class DepartureController:
         if withdraw:
             self.inputs = None
             self._unbind()
-            self.plan_paused = self._pause_seen = False
+            self._hand_pause_to_guest(self.sample())
             await self._save()
+        return True
+
+    def _hand_pause_to_guest(self, s: DepartureSample) -> bool:
+        """Give the plan's pause up once the guest's start has ended it.
+
+        A pause from then on is the guest's, by hand or by its limits, and
+        the plan must not end it after the unplug. While the start still
+        waits, or never runs, the pause stays the plan's to end: a pause
+        left on the wallbox with no owner would keep the next car from
+        charging. The price is small: a guest pause that follows the start
+        before the plan looked is ended after the unplug, without a car.
+        """
+        if not self.plan_paused or s.pause_requested is not False:
+            return False
+        self.plan_paused = self._pause_seen = False
         return True
 
     async def set_inputs(self, inputs: DepartureInputs) -> None:
@@ -569,6 +589,11 @@ class DepartureController:
             self._trail_scope = sample.scope
         if sample.scope is None or sample.total_kwh is None or sample.meter_at is None:
             return
+        if self._trail and sample.meter_at < self._trail[-1][0]:
+            # The clock was set back. Readings stamped later than now would
+            # anchor a new car report to an old meter value; start again.
+            self._trail = []
+            self.anchor = None
         if not self._trail or (sample.meter_at > self._trail[-1][0] and sample.total_kwh != self._trail[-1][1]):
             self._trail.append((sample.meter_at, sample.total_kwh))
             if len(self._trail) > _TRAIL_LIMIT:
@@ -582,6 +607,8 @@ class DepartureController:
             if sample.guest_mode:
                 self._power_window.reset()
                 await self._cancel_command()
+                if self._hand_pause_to_guest(sample):
+                    await self._save()
                 self.status = "guest_mode"
                 return
             self._now = sample.now
@@ -914,6 +941,10 @@ class DepartureController:
                 _LOGGER.info("Departure plan: pause ended, the plan no longer applies to the car")
                 if self.sample().pause_requested is not False:
                     return
+        elif s.guest_mode and self.plan_paused:
+            # The guest's start may still wait: see _hand_pause_to_guest.
+            self._hand_pause_to_guest(s)
+            return
         self.plan_paused = self._pause_seen = False
 
     async def _wait(self, status: str, s: DepartureSample, *, keep_start: bool = False) -> None:

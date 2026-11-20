@@ -589,6 +589,7 @@ def test_a_pause_another_owner_holds_is_left_alone(tmp_path, owner):
         box.set(present=False, **{owner: True})
         await plan.tick()
         assert box.resumes == 0
+        # Its pause is not ended yet: the plan keeps it until it is.
         assert plan.plan_paused is (owner == "guest_mode")
     run(go())
 
@@ -1200,3 +1201,58 @@ def test_lower_car_limit_replans_after_two_minutes_of_measured_delivery(tmp_path
         assert plan.status == "unreachable"
         assert plan.forecast["level_at_departure"] < 80
     run(body())
+
+
+@pytest.mark.parametrize(("unknown", "handover"), [(False, True), (False, False), (True, True)])
+def test_a_withdrawn_plan_still_ends_its_pause_when_the_guest_start_never_ran(tmp_path, unknown, handover):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        assert plan.plan_paused
+        # The guest's start waits: the plan's pause is still on the wallbox.
+        box.set(guest_mode=True, pause_requested=None if unknown else True)
+        await plan.tick()
+        await plan.set_trip(None, None, withdraw=True, vehicle_handover=handover)
+        assert plan.plan_paused
+        box.set(guest_mode=False, present=False, pause_requested=True)
+        await plan.tick()
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (1, False)
+
+    run(go())
+
+
+def test_after_a_restart_a_guest_start_that_still_waits_leaves_the_pause_the_plans(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        box.plan = plan = box.controller()
+        await plan.initialize()
+        box.set(guest_mode=True)
+        await plan.tick()
+        assert plan.plan_paused
+        box.set(guest_mode=False, present=False)
+        await plan.tick()
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (1, False)
+
+    run(go())
+
+
+def test_a_pause_the_guests_start_ended_is_given_up_for_good(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        box.set(guest_mode=True, paused=False, pause_requested=False)
+        await plan.tick()
+        assert not plan.plan_paused
+        # Saved: a restart does not bring the pause back as the plan's.
+        box.plan = plan = box.controller()
+        await plan.initialize()
+        assert not plan.plan_paused
+        box.set(guest_mode=False, present=False, paused=True, pause_requested=True)
+        await plan.tick()
+        await plan.tick()
+        assert box.resumes == 0
+
+    run(go())

@@ -12,6 +12,9 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal import (
     EnergyGoal,
     energy_for,
 )
+from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import (
+    EnergyGoalController,
+)
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
 from tests.fakes import put
 from tests.test_energy_goal_controller import _runner, _settle, _snapshot
@@ -122,7 +125,7 @@ def test_a_price_follows_only_a_running_amount():
     asyncio.run(run())
 
 
-def test_less_than_a_step_left_keeps_the_target_in_force():
+def test_less_than_a_step_left_leaves_one_step_at_the_new_price():
     async def run():
         harness, control, runner, _saved, clock = await _cost_runner()
         await runner.async_set_cost_target(1, 0.30)
@@ -130,8 +133,10 @@ def test_less_than_a_step_left_keeps_the_target_in_force():
         await _settle(runner)
         clock[0] += 61
         await runner.async_set_price(0.50)
+        # 0.04 left buys no step at 0.50: one step from the 3.2 kWh so far.
         assert control.energy_goal.target_kwh == 3.3
-        assert control.energy_goal.cost.price == 0.30
+        assert control.energy_goal.cost.price == 0.50
+        assert control.energy_goal.cost.spent == pytest.approx(0.96)
         await runner.async_stop()
     asyncio.run(run())
 
@@ -265,3 +270,41 @@ def test_the_money_used_follows_the_polled_meter_between_prices():
     assert goal.reprice(0.50)
     goal.observe(112.0)
     assert goal.cost_spent == pytest.approx(4.0)
+
+
+def test_the_price_of_an_amount_is_the_newest_price_known():
+    async def run():
+        harness, control, runner, _saved, _clock = await _cost_runner()
+        await runner.async_set_price(0.30)
+        await runner.async_set_cost_target(10, 0.40)
+        # The app arms at 0.40, not at the price reported before the amount.
+        assert runner.price == 0.40
+        await runner.async_set_cost_target(15)
+        assert control.energy_goal.target_kwh == 37.5
+        await runner.async_stop()
+        # After a restart the restored amount still names its price.
+        again = EnergyGoalController(control, harness.client, runner._persist)
+        assert again.price == 0.40
+        await again.async_set_cost_target(20)
+        assert control.energy_goal.target_kwh == 50.0
+        await again.async_stop()
+    asyncio.run(run())
+
+
+def test_a_price_that_changes_nothing_opens_no_waiting_minute():
+    async def run():
+        harness, control, runner, _saved, clock = await _cost_runner()
+        await runner.async_set_cost_target(10, 0.30)
+        clock[0] += 61
+        runner.observe(_snapshot(harness, None))
+        await _settle(runner)
+        assert control.energy_goal.status == "meter_unavailable"
+        await runner.async_set_price(0.50)
+        assert control.energy_goal.cost.price == 0.30
+        runner.observe(_snapshot(harness, 100.0))
+        await _settle(runner)
+        clock[0] += 1
+        await runner.async_set_price(0.50)
+        assert control.energy_goal.cost.price == 0.50
+        await runner.async_stop()
+    asyncio.run(run())

@@ -154,16 +154,14 @@ class ChargingCostObserver:
         self._entry = entry
         self._configured_options = deepcopy(dict(entry.options))
 
-    def apply_tariff_only_update(self) -> bool:
-        """Change only the cost model without restarting the Modbus connection."""
+    def apply_tariff_update(self) -> bool:
+        """Take the entry's tariff without restarting the Modbus connection.
+
+        The entry's listener calls this when nothing but the tariff, or what
+        other owners applied in place, changed. False sends it to a reload.
+        """
         current = deepcopy(dict(self._entry.options))
-        # The shared entry listener also runs for credential and connection
-        # changes. Only an actual tariff-options delta may bypass a reload.
-        if current == self._configured_options or dict(self._entry.data) != self._configured_data:
-            return False
-        old_other = {key: value for key, value in self._configured_options.items() if key != CONF_CHARGING_NETWORK_TARIFF}
-        new_other = {key: value for key, value in current.items() if key != CONF_CHARGING_NETWORK_TARIFF}
-        if self._closed or old_other != new_other:
+        if self._closed or dict(self._entry.data) != self._configured_data:
             return False
         try:
             tariff = TariffConfig.parse(current.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))

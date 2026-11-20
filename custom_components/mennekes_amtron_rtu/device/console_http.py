@@ -27,6 +27,8 @@ CONSOLE_ASSETS = {
 
 # Refusals decided before the requested change, each with its own app hint.
 # Everything else, e.g. a lost write or storage error, stays uncertain.
+# Below the eight seconds after which the pages give up on a read.
+_READ_SECONDS = 5.0
 _REFUSALS = frozenset({
     "soc_goal_source_changed", "soc_goal_limit_unavailable", "read_only_mode",
     "guest_start_not_permitted", "guest_deadline_expired", "time_limit_reached",
@@ -125,8 +127,11 @@ class ServiceConsole(AppSettings):
         service = self.service
         if service is None:
             raise SettingsError("service_not_configured", 503)
-        async with asyncio.timeout(2):
-            state = await service.stable_snapshot()
+        try:
+            async with asyncio.timeout(_READ_SECONDS):
+                state = await service.stable_snapshot()
+        except TimeoutError as err:
+            raise SettingsError("busy", 503) from err
         data = service.register_monitor.snapshot(
             layout=service.identity.layout_version if service.control is not None else None,
             available=state["available"], scan_interval=service.config.scan_interval,
@@ -142,6 +147,7 @@ class ServiceConsole(AppSettings):
             raise SettingsError("service_not_configured", 503)
         departure = getattr(service, "departure", None)
         plan = departure.snapshot() if departure is not None and departure.ready else None
+        runner = control.goal_controller
         return {
             "schema": 1, "read_only": control.read_only,
             "revision": service.choice_revision,
@@ -153,7 +159,10 @@ class ServiceConsole(AppSettings):
             "cost": None if (cost := control.energy_goal.cost) is None else {
                 "amount": cost.amount, "spent": control.energy_goal.cost_spent, "price": cost.price,
             },
-            "cost_price": None if control.goal_controller is None else control.goal_controller.price,
+            "cost_price": None if runner is None else runner.price,
+            # When Home Assistant last reported the price, alone or with an
+            # amount.
+            "cost_price_at": None if runner is None or runner.price_at is None else runner.price_at.isoformat(),
             "guest_confirmation_required": service.guest.restore_pending,
             "soc": {
                 "configured": control.soc_goal.source is not None,
@@ -166,7 +175,7 @@ class ServiceConsole(AppSettings):
                 "revision": departure.choice_revision,
                 "configured": True,
                 "deadline": plan["trip"]["deadline"], "status": plan["status"],
-                "planned_start": plan["planned_start"], "forecast": plan["forecast"],
+                "planned_start": plan["planned_start"],
                 "storage_error": departure.storage_error,
             },
         }
@@ -175,7 +184,14 @@ class ServiceConsole(AppSettings):
         user = await self._authorize(request)
         if request.query:
             raise SettingsError("invalid_request")
-        await self._configured_service().stable_snapshot()
+        service = self._configured_service()
+        try:
+            # A read that waits for a long command holds one of the two
+            # request slots, also after the page gave up on it.
+            async with asyncio.timeout(_READ_SECONDS):
+                await service.stable_snapshot()
+        except TimeoutError as err:
+            raise SettingsError("busy", 503) from err
         return web.json_response({**self._choices(), "csrf": self._digest("csrf", user)})
 
     async def save_charging(self, request: web.Request) -> web.Response:
@@ -230,11 +246,9 @@ class ServiceConsole(AppSettings):
         except (ValueError, TypeError, OverflowError) as err:
             raise SettingsError("invalid_request") from err
         except AmtronRateLimitedError as err:
-            # Refused before anything was written: it has to wait itself. A
-            # guest start may already have written the release, so it stays
-            # uncertain.
-            if action == "guest":
-                raise SettingsError("charging_save_uncertain", 503) from err
+            # Refused before anything was written: it has to wait itself.
+            # That holds for a guest start, too; the queue refuses a command
+            # of several steps before its first write.
             raise SettingsError("write_rate_limited", 409) from err
         except (AmtronBusError, OSError) as err:
             # The wallbox or the disk failed after the command went out.

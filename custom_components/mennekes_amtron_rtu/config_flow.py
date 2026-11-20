@@ -560,7 +560,10 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect_service"
         if entry is not None and dict(entry.data) != expected_data:
             return self.async_abort(reason="connection_settings_changed")
-        defaults = user_input or (dict(entry.data) if entry is not None else {})
+        # No token goes back to the browser, neither the stored one nor one
+        # typed a moment ago; like the password of a LAN adapter.
+        shown = user_input or (entry.data if entry is not None else {})
+        defaults = {CONF_SERVER_URL: shown[CONF_SERVER_URL]} if shown.get(CONF_SERVER_URL) else {}
         return self.async_show_form(
             step_id="server",
             data_schema=self.add_suggested_values_to_schema(service_schema(), defaults),

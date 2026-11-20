@@ -85,7 +85,8 @@ class GuestLimits:
             self.restore_pending = False
         # Missing/mismatched evidence remains fenced until an explicit guest
         # start or confirmed unplug. Normal recovery must not open this gate.
-        await self._service._persist()
+        # A disk that refuses the save must not keep the service from starting.
+        await self._service._save_intent()
         self.ready = True
 
     def clear(self) -> None:
@@ -134,12 +135,14 @@ class GuestLimits:
             if deadline is not None and deadline <= sample.now:
                 raise DeviceError("guest_deadline_expired")
             previous = (self.scope, self.restore_pending, self._service.client.write_state.guest_permission)
-            accepted = False
+            accepted = cancelled = False
 
             def outcome(event: CommandEvent) -> None:
-                nonlocal accepted
+                nonlocal accepted, cancelled
                 if event.action in ("enable_charging", "resume") and event.outcome in ("executed", "uncertain"):
                     accepted = True
+                elif event.action == "resume" and event.outcome == "cancelled":
+                    cancelled = True
 
             unlisten = control.events.listen(outcome)
             self.scope = sample.scope
@@ -152,6 +155,12 @@ class GuestLimits:
                 departure_queued = control.pending_owner == "departure"
                 await control.async_cancel_timed_current("departure")
                 await control.async_start_guest_charging(current_cap=self._service.config.current_cap)
+                if (
+                    cancelled and not accepted and not control.pending_guest_start
+                    and not control.guest_release_applied
+                ):
+                    # The car left before the first write: nothing started.
+                    raise DeviceError("guest_start_not_permitted")
                 accepted = True  # Includes the complete deferred guest start.
             except BaseException as err:
                 # A refused command has no guest grant. An applied/uncertain
