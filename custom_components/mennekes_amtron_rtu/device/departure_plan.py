@@ -610,6 +610,9 @@ class DepartureController:
             if not self.ready or self._closing:
                 return
             sample = self.sample()
+            if self.plan_paused and self._pause_ends is None:
+                # The first look after a restart, whoever is at the wallbox.
+                self._pause_ends = sample.pause_ends
             if sample.guest_mode:
                 self._power_window.reset()
                 await self._cancel_command()

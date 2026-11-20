@@ -185,7 +185,9 @@ class WritePath:
                     self._remember_pause_setpoint(previous, preserve_setpoint)
             raise
         self._control._write_state.confirmed_current = value
-        if not paused and self._control.pause_requested is not False:
+        if not paused and self._control.pause_requested is True:
+            # Only a pause known to be on: a write while that is unknown, or
+            # before a pause that still waits, has ended none.
             self.pause_ends += 1
         self._control.pause_requested = paused
         if not paused:

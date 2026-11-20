@@ -282,3 +282,56 @@ def test_an_intent_file_far_too_large_counts_as_damaged(tmp_path):
     store = IntentStore(tmp_path / "intent.json", "serial")
     store.path.write_bytes(b" " * 70000)
     assert store.load(WriteState()) is False
+
+
+def test_a_current_written_before_the_plans_waiting_pause_ends_no_pause(tmp_path):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (s, transport, clock):
+            serial = s.identity.serial_number
+            # A new installation: whether a pause is on is not known yet.
+            assert s.control.pause_requested is None
+            await hand_over(s, hours=10)
+            # A switch a moment ago: the plan's pause has to wait.
+            s.control._write_state.mode_change_at = clock[0]
+            await s.departure.tick()
+            assert s.departure.plan_paused
+            clock[0] += 6
+            await s.command({"command": "set_current", "value": 10, "expected_serial_number": serial})
+            assert s.control.writes.pause_ends == 0
+            clock[0] += 1000
+            for _ in range(30):
+                s.control._pending_changed.set()
+                await asyncio.sleep(0.01)
+            await s.refresh()
+            await s.departure.tick()
+            assert s.departure.plan_paused
+            assert s.control.pause_requested is True
+            clock[0] += 5
+            with suppress(DeviceError):
+                await s.command(
+                    {
+                        "command": "guest_start",
+                        "expected_serial_number": serial,
+                        "expected_guest_revision": s.guest.revision,
+                    }
+                )
+            assert s.guest.mode
+            assert s.control.pending_action == "resume"
+            await s.departure.tick()
+            # The guest's start still waits: the pause stays the plan's.
+            assert s.departure.plan_paused
+            runtime.put(transport.bank, runtime.R.EVSE_STATE, 1)
+            runtime.put(transport.bank, runtime.R.CP_STATE, 10)
+            clock[0] += 1
+            await s.refresh()
+            for _ in range(20):
+                s.control._pending_changed.set()
+                await asyncio.sleep(0.01)
+            assert not s.guest.mode
+            clock[0] += 1000
+            await s.departure.tick()
+            await s.refresh()
+            await s.departure.tick()
+            assert s.control.pause_requested is not True
+
+    asyncio.run(run())
