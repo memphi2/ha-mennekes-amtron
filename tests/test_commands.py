@@ -75,6 +75,8 @@ def test_a_number_that_is_not_permitted_is_refused_by_name(tmp_path, payload, er
                 await service.command({**payload, "expected_serial_number": SERIAL})
             with pytest.raises(ValueError, match="must be a number"):
                 await service.command({**payload, "value": "7", "expected_serial_number": SERIAL})
+            with pytest.raises(ValueError, match="must be a number"):
+                await service.command({**payload, "value": 10**400, "expected_serial_number": SERIAL})
             assert not current_writes(transport)
         finally:
             await service.stop()

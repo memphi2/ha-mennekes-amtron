@@ -349,8 +349,10 @@ class PlugChargeController:
             try:
                 # The same write as a release by hand: it counts as a release
                 # and an unanswered one restarts the state-change interval.
+                # The command reads back afterwards: a poll that fails or
+                # outlasts the deadline must not close an acknowledged grant.
                 await self._control.writes.async_transition_write(
-                    CHARGING_RELEASE, 1, changed=switches, precondition=self._live_presence,
+                    CHARGING_RELEASE, 1, changed=switches, precondition=self._live_presence, refresh=False,
                 )
                 self._check_request(session, deadline)
                 self._control.events.record("executed", "enable_charging", source="plug_charge")

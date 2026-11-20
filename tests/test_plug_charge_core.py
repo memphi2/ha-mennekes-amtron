@@ -1016,3 +1016,17 @@ def test_a_refused_release_for_the_next_car_is_gone_when_that_car_came_meanwhile
         await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_failing_read_back_does_not_close_an_acknowledged_grant():
+    async def run():
+        h = Harness()
+        control = await armed(h)
+        control._request_refresh = AsyncMock(side_effect=OSError("offline"))
+        await authorize(control)
+        # The grant itself reads nothing back; the command does, afterwards.
+        control._request_refresh.assert_not_awaited()
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        assert control.plug_charge["authorized"]
+        await control.async_shutdown()
+    asyncio.run(run())

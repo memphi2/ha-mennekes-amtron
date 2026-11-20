@@ -257,8 +257,13 @@ class WritePath:
         self, spec: RegisterSpec, value: int, *, changed: bool | Callable[[], bool],
         min_interval: float = 0.0,
         precondition: WritePrecondition | None = None,
+        refresh: bool = True,
     ) -> None:
-        """Write a switch; ``changed`` may be decided by the write's precondition."""
+        """Write a switch; ``changed`` may be decided by the write's precondition.
+
+        Without ``refresh`` the caller reads the result back itself, after
+        it has settled what the acknowledged write means.
+        """
         def switched() -> bool:
             return changed() if callable(changed) else changed
 
@@ -291,7 +296,7 @@ class WritePath:
             # A write outside a command, e.g. closing the release after an
             # unplug, settles nothing that waits in the queue.
             self._control._clear_pending()
-        if self._control._request_refresh is not None:
+        if refresh and self._control._request_refresh is not None:
             await self._control._request_refresh()
 
     async def async_apply_release(self, released: bool) -> None:

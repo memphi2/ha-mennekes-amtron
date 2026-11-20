@@ -56,7 +56,10 @@ def _real(value: object) -> float:
     a wrong value is the caller's error with a name, not a malformed request."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("value must be a number")
-    return float(value)
+    try:
+        return float(value)
+    except OverflowError:
+        raise ValueError("value must be a number") from None
 
 
 async def _plug_charge_config(_service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
