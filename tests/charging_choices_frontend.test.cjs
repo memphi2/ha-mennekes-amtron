@@ -145,6 +145,18 @@ test('an own save keeps another unsaved field current instead of calling it chan
  await h.emit('energy_form','submit');
  assert.equal(JSON.parse(h.calls[2].body).revision,'r2');
 });
+test('an own save leaves a draft that was changed elsewhere changed',async()=>{
+ const elsewhere=initial();elsewhere.revision='r2';elsewhere.soc.target=60;
+ const saved=initial();saved.revision='r3';saved.soc.target=60;saved.energy.target=20;
+ const h=setup('targets',[initial(),elsewhere,saved,{error:'soc_goal_source_changed'}],'en');await flush();
+ h.elements.get('soc_value').value='75';await h.emit('soc_form','input');await h.poll();
+ assert.match(h.elements.get('notice').textContent,/changed elsewhere/);
+ h.elements.get('energy_value').value='20';await h.emit('energy_form','input');await h.emit('energy_form','submit');
+ assert.equal(JSON.parse(h.calls[2].body).revision,'r2');
+ assert.match(h.elements.get('notice').textContent,/changed elsewhere/);assert.equal(h.elements.get('soc_value').value,'75');
+ await h.emit('soc_form','submit');
+ assert.equal(JSON.parse(h.calls[3].body).revision,'r1');
+});
 test('the departure plan names its planned start, and a plan that could not be saved',async()=>{
  const planned=initial();planned.departure.planned_start='2026-11-16T03:00:00.000Z';
  let h=setup('departure',[planned],'en');await flush();
