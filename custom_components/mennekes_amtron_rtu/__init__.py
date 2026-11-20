@@ -56,6 +56,7 @@ from .coordinator import ServiceCoordinator
 from .cost_goal import CostGoalObserver
 from .cost_observer import ChargingCostObserver, LastChargingCost
 from .data import (
+    RELOAD_HANDOFFS,
     MennekesAmtronRuntimeData,
     RuntimeHandoff,
     WallboxData,
@@ -75,11 +76,11 @@ from .embedded import (
     mark_reloading,
 )
 from .entry_types import MennekesAmtronConfigEntry
-from .goal_store import (
-    ModelStore,
-)
 from .guest_charging import GuestCharging
 from .loss_store import LossStore, async_prune_profile_losses
+from .model_store import (
+    ModelStore,
+)
 from .network_tariff_year import (
     async_refresh_tariff_year,
     async_track_tariff_midnight,
@@ -190,7 +191,7 @@ async def async_setup_entry(
                 _LOGGER.warning("Charging loss: deleted vehicle storage not removed; cleanup retries on setup")
     remote = CONF_SERVER_URL in entry.data
     expected_serial = _entry_serial_binding(entry)
-    handoff: RuntimeHandoff | None = hass.data.get(f"{DOMAIN}_reload_clients", {}).get(entry.entry_id)
+    handoff = hass.data.get(RELOAD_HANDOFFS, {}).get(entry.entry_id)
     client: ServiceClient | None = None
     credentials_rejected: Callable[[], bool] | None = None
     host: EmbeddedService | None = None
@@ -773,7 +774,7 @@ async def async_unload_entry(
         return False
     retain_cost = runtime_data.retain_cost_on_unload
     if retain_cost:
-        handoff = hass.data[f"{DOMAIN}_reload_clients"][entry.entry_id]
+        handoff = hass.data[RELOAD_HANDOFFS][entry.entry_id]
         handoff.charging_cost = runtime_data.charging_cost
     # A reload that also selects another car must end the old car's plan
     # pause, like an in-place switch; a plain reload or shutdown keeps it.
@@ -882,7 +883,7 @@ async def _async_reload_entry_locked(
         runtime.retain_cost_on_unload = retain_cost
     if runtime is not None and retain_cost:
         handoff = RuntimeHandoff(identity=runtime.identity)
-        hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = handoff
+        hass.data.setdefault(RELOAD_HANDOFFS, {})[entry.entry_id] = handoff
     # The embedded service keeps its connection and heartbeat through this.
     mark_reloading(hass, entry.entry_id, True)
     try:
@@ -897,7 +898,7 @@ async def _async_reload_entry_locked(
             await async_release(hass, entry.entry_id)
         if runtime is not None and retain_cost:
             runtime.retain_cost_on_unload = False
-            unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
+            unused = hass.data.get(RELOAD_HANDOFFS, {}).pop(entry.entry_id, None)
             if unused is not None:
                 await unused.async_close()
 

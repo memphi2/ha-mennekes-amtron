@@ -9,7 +9,7 @@ from homeassistant.helpers.storage import STORAGE_DIR
 
 from .device.charge_loss import LossStatistics
 from .device.const import DOMAIN
-from .goal_store import ModelStore
+from .model_store import ModelStore
 
 _PROFILE_ID = re.compile(r"[0-9a-f]{32}")
 

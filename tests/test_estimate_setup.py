@@ -29,10 +29,10 @@ from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatist
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.embedded import state_directory
-from custom_components.mennekes_amtron_rtu.goal_store import (
+from custom_components.mennekes_amtron_rtu.loss_store import LossStore
+from custom_components.mennekes_amtron_rtu.model_store import (
     ModelStore,
 )
-from custom_components.mennekes_amtron_rtu.loss_store import LossStore
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass, heartbeat_running
 from tests.test_modbus_service import TOKEN, service_fixture

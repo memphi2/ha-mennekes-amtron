@@ -111,6 +111,16 @@ _LOGGER = logging.getLogger(__name__)
 RECONFIGURE_STEPS = ("reconfigure", "serial_reconfigure", "network_reconfigure")
 
 
+
+def _reloads_itself(entry: ConfigEntry) -> bool:
+    """Whether the entry's own update listener reloads it after a change.
+
+    It is registered by a setup that succeeded, so exactly a loaded entry has
+    it; a second reload from the flow would race it.
+    """
+    return entry.state is ConfigEntryState.LOADED
+
+
 class _ConnectionSettingsChangedError(Exception):
     """An entry was changed while a reconfiguration probe was running."""
 
@@ -314,7 +324,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             # verified for the old endpoint to the newly configured service.
             return self.async_abort(reason="connection_settings_changed")
         updates = {CONF_SERVER_TOKEN: token}
-        if entry.update_listeners:
+        if _reloads_itself(entry):
             changed = entry.data.get(CONF_SERVER_TOKEN) != token
             result = self.async_update_and_abort(entry, data_updates=updates)
             if not changed:
@@ -540,7 +550,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                         if dict(entry.data) != expected_data:
                             return self.async_abort(reason="connection_settings_changed")
                         self._abort_if_unique_id_mismatch()
-                        if not entry.update_listeners:
+                        if not _reloads_itself(entry):
                             return self.async_update_reload_and_abort(entry, data=data)
                         return self.async_update_and_abort(entry, data=data)
                     if identity.serial_number:
@@ -681,7 +691,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry: ConfigEntry, data: dict[str, Any]
     ) -> ConfigFlowResult:
         """Preserve IDs/options and let the existing listener reload exactly once."""
-        if entry.update_listeners:
+        if _reloads_itself(entry):
             return self.async_update_and_abort(
                 entry, data=data, reason="service_discovery_updated"
             )
@@ -1081,7 +1091,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 # The old client is unloaded. Publish the new entry data, but
                 # do not start its connection until adapter commit succeeds.
                 return self.async_update_and_abort(entry, data=data)
-            if not entry.update_listeners:
+            if not _reloads_itself(entry):
                 # An unloaded or failed setup has no listener to start it.
                 return self.async_update_reload_and_abort(entry, data=data)
             # The entry's update listener owns reloading, including options.

@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .device.timed_goal import TimedGoal
-from .goal_store import ModelStore
+from .model_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
 # More than the number of profiles a household configures; oldest drop first.

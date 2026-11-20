@@ -152,7 +152,7 @@ test("the four saved targets each have their row, and a restarted guest gets its
   assert.equal(put(h, "soc_target"), "Off");
   assert.match(put(h, "time_target"), /2026/);
   // One way to the page that changes them, not one per target.
-  assert.equal([...html.matchAll(/href="\.\/targets[^"]*"/g)].length, 1);
+  assert.equal([...html.matchAll(/href="\.\/charging[^"]*"/g)].length, 1);
   const none = overview(operation());
   const idle = setup("de", none); await flush();
   assert.deepEqual(["energy_target", "cost_target", "time_target"].map(id => put(idle, id)), ["Aus", "Aus", "Aus"]);

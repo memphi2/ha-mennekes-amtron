@@ -8,7 +8,7 @@ from typing import Any, Self
 
 from homeassistant.core import HomeAssistant
 
-from .goal_store import ModelStore
+from .model_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
 # More than the number of profiles a household configures; oldest drop first.

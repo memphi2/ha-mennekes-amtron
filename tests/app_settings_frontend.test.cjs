@@ -6,8 +6,8 @@ const path = require('node:path');
 const { test } = require('node:test');
 const vm = require('node:vm');
 const directory = path.join(__dirname, '../custom_components/mennekes_amtron_rtu/device');
-const html = readFileSync(path.join(directory, 'app_settings.html'), 'utf8');
-const source = readFileSync(path.join(directory, 'app_settings.js'), 'utf8');
+const html = readFileSync(path.join(directory, 'app_connection.html'), 'utf8');
+const source = readFileSync(path.join(directory, 'app_connection.js'), 'utf8');
 
 class Element {
   constructor() { this._value = ''; this.checked = false; this.disabled = false; this.hidden = false; this.required = false; this.textContent = ''; this.dataset = {}; this.listeners = {}; this.options = []; this.valid = true; this.children = []; this.attributes = {}; this.tabIndex = 0; }
@@ -81,7 +81,7 @@ async function harness(settings = baseSettings, language = 'en') {
     },
   });
   for (const element of elements.values()) element.onFocus = () => { context.document.activeElement = element; };
-  vm.runInContext(source, context, { filename: 'app_settings.js' });
+  vm.runInContext(source, context, { filename: 'app_connection.js' });
   await tick();
   return { el: id => elements.get(id), responses, calls, context, translated, timers, documentEvents, pageEvents, evaluate: code => vm.runInContext(code, context) };
 }

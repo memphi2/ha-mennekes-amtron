@@ -6,6 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.util.hass_dict import HassKey
+
+from .device.const import DOMAIN
 from .device.data import ConnectionState as ConnectionState
 from .device.data import DeviceIdentity as DeviceIdentity
 from .device.data import WallboxData as WallboxData
@@ -81,3 +84,7 @@ class RuntimeHandoff:
         cost, self.charging_cost = self.charging_cost, None
         if cost is not None:
             await cost.async_stop()
+
+
+# What a reload hands from the unloaded entry to its next setup, by entry ID.
+RELOAD_HANDOFFS: HassKey[dict[str, RuntimeHandoff]] = HassKey(f"{DOMAIN}_reload_clients")

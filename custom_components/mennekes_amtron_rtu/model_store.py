@@ -1,4 +1,11 @@
-"""Persist bounded direct-mode models on changes, outside Recorder."""
+"""Persist what Home Assistant's side remembers per wallbox, outside Recorder.
+
+Home Assistant's own ``Store`` is not used on purpose: it defers a save, does
+not report a failed one and moves an unreadable file aside. The charge-loss
+ledger and the parked trips need to know that a save is durable when it
+returns, or that it is not. The files keep the Store's envelope, name and
+directory, and are written with Home Assistant's atomic writer.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +22,7 @@ from .device.const import DOMAIN
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 
 
-class _GoalModel(Protocol):
+class _Model(Protocol):
     """The bounded durable state shared by independent models."""
 
     def snapshot(self) -> dict[str, Any]: ...
@@ -40,7 +47,7 @@ async def _finish_atomic(task: asyncio.Task[None]) -> None:
         raise
 
 
-class ModelStore[Goal: _GoalModel]:
+class ModelStore[Goal: _Model]:
     """Atomically persist one model, isolated by store key and wallbox identity."""
 
     def __init__(
@@ -66,8 +73,8 @@ class ModelStore[Goal: _GoalModel]:
             return goal
 
     def _validate_file(self) -> dict[str, Any] | None:
-        # HA's Store normally moves malformed JSON aside and starts empty.
-        # Losing an armed energy limit silently would permit unbounded charging.
+        # HA's Store moves malformed JSON aside and starts empty; here the
+        # caller learns that its saved state is gone.
         try:
             with self.path.open("rb") as stream:
                 raw = stream.read(32769)
@@ -134,9 +141,8 @@ class ModelStore[Goal: _GoalModel]:
 
     def _write(self, payload: dict[str, Any]) -> None:
         # Store.async_save can defer until FINAL_WRITE during shutdown and
-        # otherwise swallows write errors. A limit must be durable on return,
-        # including a stop latch found while HA is stopping. Keep HA's storage
-        # envelope but use its public atomic writer, off the event loop.
+        # otherwise swallows write errors. Keep HA's storage envelope but use
+        # its public atomic writer, off the event loop.
         envelope = {"version": 1, "minor_version": 1, "key": self._key, "data": payload}
         serialized = json.dumps(envelope, allow_nan=False, indent=2)
         self.path.parent.mkdir(parents=True, exist_ok=True)

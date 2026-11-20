@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .service_runtime import ModbusService
 
 CONSOLE_ASSETS = {
-    "/targets": ("app_targets.html", "text/html"),
+    "/charging": ("app_charging.html", "text/html"),
     "/app_charging.js": ("app_charging.js", "text/javascript"),
     "/registers": ("app_registers.html", "text/html"),
     "/runtime": ("app_runtime.html", "text/html"),

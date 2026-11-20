@@ -89,7 +89,7 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/log`, `/api/modbus-debug` | Live log, in RAM only |
 | `/registers`, `GET /api/registers` | Register page below the overview, from passive observations |
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
-| `/targets`, `/api/charging` | Targets and explicit guest start |
+| `/charging`, `/api/charging` | Targets and explicit guest start |
 
 Values saved on the **Runtime** page apply without a restart. Each previewed
 change names its `effect`: `next_cycle` for the polling intervals, `immediate`

@@ -19,8 +19,8 @@ from scripts import service_image as images
 
 
 @pytest.mark.parametrize("broken", [
-    None, "app_settings.html", "app_settings.js", "app_settings.css", "app_overview.html",
-    "app_overview.js", "app_log.js", "app_charging.js", "app_targets.html", "app_registers.js", "modified",
+    None, "app_connection.html", "app_connection.js", "app_settings.css", "app_overview.html",
+    "app_overview.js", "app_log.js", "app_charging.js", "app_charging.html", "app_registers.js", "modified",
     "unrouted",
 ])
 def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_changed_assets(
@@ -41,7 +41,7 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
         '    raise AssertionError("asset validation must not construct the settings API")\n'
     ))
     if broken == "modified":
-        (package / "app_settings.js").write_text("/* incomplete or wrong build */")
+        (package / "app_connection.js").write_text("/* incomplete or wrong build */")
     elif broken == "unrouted":
         # A source asset that no route serves must fail too.
         monkeypatch.setattr(images, "APP_ASSET_PATTERN", re.compile(r"app_\w+\.(?:html|js|css)|app_settings\.py"))

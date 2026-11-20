@@ -8,7 +8,7 @@ const source=fs.readFileSync(path.join(root,'app_charging.js'),'utf8');
 const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_currency:'EUR',cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(page='targets',responses=[initial()],language='de'){
- const html=fs.readFileSync(path.join(root,'app_targets.html'),'utf8');
+ const html=fs.readFileSync(path.join(root,'app_charging.html'),'utf8');
  const elements=new Map([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],{value:'',textContent:'',disabled:false,listeners:{},addEventListener(k,v){this.listeners[k]=v;},reportValidity(){return true;}}]));
  const timers=new Map(),calls=[],events={},docEvents={};let next=1,confirmed=true;
  const document={hidden:false,documentElement:{lang:language,classList:{add(){}}},querySelectorAll(){return [];},querySelector(){return {dataset:{chargingPage:page}};},getElementById(id){assert.ok(elements.has(id),id);return elements.get(id);},addEventListener(k,v){docEvents[k]=v;}};

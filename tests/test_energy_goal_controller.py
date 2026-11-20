@@ -34,8 +34,8 @@ from custom_components.mennekes_amtron_rtu.device.service_store import IntentSto
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests.fakes import put, raise_connection_error
 from tests.test_control import Harness
-from tests.test_goal_store import store_at
 from tests.test_modbus_service import current_writes, service_fixture
+from tests.test_model_store import store_at
 
 
 async def _runner(*, paused=False, read_only=False, persist=None, notify=None):

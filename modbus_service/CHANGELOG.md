@@ -12,6 +12,7 @@
 - One account of the plug-in decides for Plug & Charge, guest charging and the
   unplug rule whether a car is connected.
 - A command takes only its own fields; a field of another command is refused.
+- The Charging page is reached at `/charging` (before: `/targets`).
 
 ## 0.10.0b6
 

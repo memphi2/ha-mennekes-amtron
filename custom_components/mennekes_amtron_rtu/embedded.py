@@ -22,6 +22,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util.hass_dict import HassKey
 
 from .const import (
     CONF_CURRENT_LIMIT,
@@ -54,7 +55,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-_HOSTS = f"{DOMAIN}_embedded"
+_HOSTS: HassKey[dict[str, EmbeddedService]] = HassKey(f"{DOMAIN}_embedded")
 _RELOADING = f"{DOMAIN}_reloading"
 _DEFERRED = f"{DOMAIN}_deferred_release"
 _RESTARTS = f"{DOMAIN}_restarts"
@@ -259,8 +260,7 @@ def _hosts(hass: HomeAssistant) -> dict[str, EmbeddedService]:
                     _LOGGER.exception("Service: stop failed")
 
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_all)
-    hosts: dict[str, EmbeddedService] = hass.data[_HOSTS]
-    return hosts
+    return hass.data[_HOSTS]
 
 
 async def async_acquire(

@@ -437,11 +437,11 @@ def test_actual_socket_cannot_spoof_ingress_and_assets_use_selected_language(mon
             assert response.status == 200
             assert 'lang="de"' in await response.text()
             assert response.headers["X-Content-Type-Options"] == "nosniff"
-            for path in ("/app_settings.js", "/app_settings.css"):
+            for path in ("/app_connection.js", "/app_settings.css"):
                 assert (await client.get(path)).status == 200
             for response in (
                 await client.get("/server.py"),
-                await client.get("/app_settings.js", headers={"Sec-Fetch-Site": "cross-site"}),
+                await client.get("/app_connection.js", headers={"Sec-Fetch-Site": "cross-site"}),
                 await client.post("/"),
             ):
                 # A refusal carries the same headers as a page.

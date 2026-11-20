@@ -41,7 +41,7 @@ from .device.enums import EvseState
 from .device.notice import FailureNotice
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .entry_types import MennekesAmtronConfigEntry
-from .goal_store import ModelStore
+from .model_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60

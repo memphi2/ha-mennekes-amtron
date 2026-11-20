@@ -60,7 +60,7 @@ def test_console_read_only_route_and_packaged_resources(tmp_path, monkeypatch):
                     assert asset.status == 200
                     assert await asset.text()
                 # Every console page gets the browser language; scripts read it.
-                for path in ("/registers", "/runtime", "/targets"):
+                for path in ("/registers", "/runtime", "/charging"):
                     page = await client.get(path, headers={"Accept-Language": "fr-CH,fr;q=0.9,en;q=0.8"})
                     assert '<html lang="fr">' in await page.text()
                     fallback = await client.get(path, headers={"Accept-Language": "xx,<script>"})
