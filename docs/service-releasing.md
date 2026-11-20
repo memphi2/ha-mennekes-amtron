@@ -148,6 +148,9 @@ catalog version request is a stop condition, not permission to overwrite it.
 A genuine correction after publication needs a new version. A network failure,
 private first package or interrupted catalog update can be retried on the same
 approved source. Never delete/recreate tags to make a check pass.
+Right after the upload GitHub may list a new draft, or the digests of its
+assets, a little late; the publisher reads the draft again for about two
+minutes before it stops, and a stop names its reason in the job log.
 Use **Re-run failed jobs** to retain successful native build artifacts. If the
 image was already published and attested but catalog publication was interrupted,
 the retry can verify and reuse that exact image to finish the catalog update.

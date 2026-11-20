@@ -8,6 +8,7 @@ import json
 import re
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,12 @@ from release_check import (
 )
 from release_version import VERSION_PATTERN, is_prerelease
 
+# GitHub lists a new release, and the digests of its uploaded assets, only a
+# little after the upload has returned. Confirming the draft therefore reads it
+# again for up to about two minutes; nothing is written while it waits.
+CONFIRM_DELAYS = (5, 10, 15, 30, 60)
+sleep = time.sleep
+
 
 def find_release(repository: str, tag: str) -> dict[str, Any] | None:
     """Distinguish absence from failed authentication or API/network errors."""
@@ -30,6 +37,24 @@ def find_release(repository: str, tag: str) -> dict[str, Any] | None:
     if len(matches) > 1:
         raise ValueError("multiple releases for the tag")
     return matches[0] if matches else None
+
+
+def confirm(repository: str, tag: str, notes: str, directory: Path,
+            commit: str, version: str, files: dict[str, bytes]) -> bool:
+    """Read the release back and verify every asset; return whether it is a draft."""
+    release = find_release(repository, tag)
+    if release is None:
+        raise ValueError("draft creation was not confirmed")
+    draft = release.get("draft") is True
+    verify_release(release, tag, notes, draft=draft)
+    with tempfile.TemporaryDirectory(prefix="amtron-release-download-") as temporary:
+        run("gh", "release", "download", tag, "--repo", repository, "--dir", temporary,
+            *(arg for name in sorted(ASSETS) for arg in ("--pattern", name)))
+        downloaded = Path(temporary)
+        verify_assets(downloaded, release, repository, commit, version, files)
+        if any((downloaded / name).read_bytes() != (directory / name).read_bytes() for name in ASSETS):
+            raise ValueError("existing assets differ; refusing to replace them")
+    return draft
 
 
 def publish(repository: str, tag: str, directory: Path) -> None:
@@ -59,18 +84,15 @@ def publish(repository: str, tag: str, directory: Path) -> None:
                 "--verify-tag", "--title", tag, "--notes-file", str(notes_path),
                 *(("--prerelease", "--latest=false") if prerelease else ()),
                 *(str(directory / name) for name in sorted(ASSETS)))
-        release = find_release(repository, tag)
-    if release is None:
-        raise ValueError("draft creation was not confirmed")
-    draft = release.get("draft") is True
-    verify_release(release, tag, notes, draft=draft)
-    with tempfile.TemporaryDirectory(prefix="amtron-release-download-") as temporary:
-        run("gh", "release", "download", tag, "--repo", repository, "--dir", temporary,
-            *(arg for name in sorted(ASSETS) for arg in ("--pattern", name)))
-        downloaded = Path(temporary)
-        verify_assets(downloaded, release, repository, commit, version, files)
-        if any((downloaded / name).read_bytes() != (directory / name).read_bytes() for name in ASSETS):
-            raise ValueError("existing assets differ; refusing to replace them")
+    draft = False
+    for delay in (*CONFIRM_DELAYS, None):
+        try:
+            draft = confirm(repository, tag, notes, directory, commit, version, files)
+            break
+        except ValueError:
+            if delay is None:
+                raise
+            sleep(delay)
     if draft:
         # Recheck the tag after network operations, immediately before publishing.
         if remote_commit(repository, tag) != commit:
@@ -89,8 +111,14 @@ def main() -> int:
         parser.error("expected owner/repository and vX.Y.Z, vX.Y.ZbN or vX.Y.ZrcN tag")
     try:
         publish(args.repo, args.tag, args.directory)
-    except (OSError, ValueError, KeyError, TypeError):
-        sys.stderr.write("Release publication stopped: check source, access and asset integrity. Existing assets were not replaced.\n")
+    except (OSError, ValueError, KeyError, TypeError) as err:
+        # The reasons are this script's own texts; remote error bodies are
+        # never passed through (see release_check.run).
+        reason = str(err) if isinstance(err, ValueError) else type(err).__name__
+        sys.stderr.write(
+            f"Release publication stopped ({reason}): check source, access and asset integrity."
+            " Existing assets were not replaced.\n"
+        )
         return 1
     sys.stdout.write(f"Release {args.tag} verified; existing assets preserved.\n")
     return 0
