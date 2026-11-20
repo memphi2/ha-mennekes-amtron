@@ -5,18 +5,20 @@ from __future__ import annotations
 # This controller is the private release-gate component of AmtronControl.
 # ruff: noqa: SLF001
 import asyncio
+import hashlib
 import logging
 import re
 import secrets
 from contextlib import suppress
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .data import WallboxData
 from .decode import is_hex32
 from .errors import DeviceError, DeviceValidationError, validation_error
+from .plug_cycle import UNKNOWN_GRACE_SECONDS, PlugChange, PlugCycle
 from .registers import (
     AUTHORIZATION_ENABLED,
     CHARGING_RELEASE,
@@ -36,14 +38,13 @@ from .notice import FailureNotice
 
 _LOGGER = logging.getLogger(__name__)
 _POLICY = re.compile(r"(?:[0-9a-f]{64})?")
-# An unknown vehicle state is not an unplug. Brief read gaps and transient
-# EVSE/CP combinations keep the grant; a longer one withdraws it.
-UNKNOWN_GRACE = timedelta(seconds=60)
-
 
 @dataclass(slots=True)
 class PlugChargeState:
-    """Only gate configuration and an unapplied manual-release hold are durable."""
+    """Only gate configuration and an unapplied manual-release hold are durable.
+
+    The connection itself is the plug cycle's; this is what was granted for it.
+    """
 
     enabled: bool = False
     policy: str = ""
@@ -51,30 +52,31 @@ class PlugChargeState:
     # A manual release for the current or, without a car, the next plug-in.
     # It opens the gate for any car and ends with that connection.
     manual: bool = False
-    session: str | None = None
     authorized: bool = False
-    since: datetime | None = None
-    last_absent_at: datetime | None = None
-    unknown_since: datetime | None = None
     # A manual release read from disk: its connection may have ended while
     # the service was down, so it needs a car at the first answer.
     restored_manual: bool = False
-    # The manual release was given to, or met, a connected car. The session
-    # itself is not saved, so this says after a restart whose release it was.
+    # The manual release was given to, or met, a connected car. The cycle
+    # is not saved, so this says after a restart whose release it was.
     manual_connected: bool = False
+    # Renewed with the configuration: a grant asked for under the old one
+    # names a session that no longer exists.
+    binding: str = field(default_factory=lambda: secrets.token_hex(16))
 
     @property
     def blocked(self) -> bool:
         return not self.manual and (self.hold or (self.enabled and not self.authorized))
 
-    def invalidate(self) -> None:
-        if self.session is not None:
-            # The manually released connection has ended.
+    def session(self, cycle: PlugCycle) -> str | None:
+        """The connection under this configuration, which a grant is for; none while the gate is off."""
+        if not self.enabled or cycle.id is None:
+            return None
+        return hashlib.sha256(f"{cycle.id}|{self.binding}".encode()).hexdigest()[:32]
+
+    def invalidate(self, *, ended: bool = True) -> None:
+        """No grant is left; ``ended`` when the released connection is over too."""
+        if ended:
             self.manual = False
-        self.session = None
-        self.since = None
-        self.last_absent_at = None
-        self.unknown_since = None
         self.authorized = False
         self.hold |= self.enabled
 
@@ -91,24 +93,19 @@ class PlugChargeState:
         # An unknown state can hide a different car; a manual release was
         # given for the car that was plugged in.
         self.manual = False
-        self.unknown_since = None
         self.hold |= self.enabled
-
-    def suspect(self, now: datetime | None = None) -> None:
-        """Treat the vehicle state as unknown from now, e.g. after a reconnect."""
-        if self.session is not None and self.unknown_since is None:
-            self.unknown_since = now or datetime.now(UTC)
 
     def configure(self, enabled: bool, policy: str) -> None:
         if type(enabled) is not bool or not isinstance(policy, str) or _POLICY.fullmatch(policy) is None:
             raise ValueError("invalid Plug & Charge configuration")
         if (self.enabled, self.policy) != (enabled, policy):
             self.enabled, self.policy = enabled, policy
+            self.binding = secrets.token_hex(16)
             self.invalidate()
-            self.manual = False
 
-    def observe(self, present: bool | None, *, observed_at: datetime | None = None) -> None:
-        now = observed_at or datetime.now(UTC)
+    def follow(self, cycle: PlugCycle, change: PlugChange) -> None:
+        """React to what the plug cycle just took in."""
+        present = cycle.present
         if present is not None:
             if present is False and self.restored_manual:
                 self.manual = False
@@ -116,38 +113,27 @@ class PlugChargeState:
         if not self.enabled or present is False:
             if self.enabled and self.authorized:
                 _LOGGER.info("Plug & Charge: grant ended, vehicle unplugged")
-            self.invalidate()
-            if self.enabled:
-                self.last_absent_at = now
+            # A release for the next plug-in outlives polls without a car.
+            self.invalidate(ended=change.ended)
             return
         if present is None:
-            if self.session is None:
+            if cycle.id is None:
                 self.hold = True
-                return
-            if self.unknown_since is None or now < self.unknown_since:
-                # A clock set back starts the grace again instead of stretching it.
-                self.unknown_since = now
-            elif (self.authorized or self.manual) and now - self.unknown_since >= UNKNOWN_GRACE:
+            elif cycle.lapsed and (self.authorized or self.manual):
                 _LOGGER.warning(
-                    "Plug & Charge: grant withdrawn, vehicle state unknown for %.0f seconds",
-                    (now - self.unknown_since).total_seconds(),
+                    "Plug & Charge: grant withdrawn, vehicle state unknown for over %.0f seconds",
+                    UNKNOWN_GRACE_SECONDS,
                 )
                 self.revoke()
             return
-        self.unknown_since = None
-        if self.session is None:
-            self.session = secrets.token_hex(16)
-            self.since = self.last_absent_at or now
         self.manual_connected = self.manual
 
-    @property
-    def manual_marks(self) -> tuple[bool, bool, bool, str | None]:
+    def manual_marks(self, cycle: PlugCycle) -> tuple[bool, bool, bool, str | None]:
         """A release by hand with what is known about it, to take a refused one back."""
-        return self.manual, self.manual_connected, self.restored_manual, self.session
+        return self.manual, self.manual_connected, self.restored_manual, cycle.id
 
-    @manual_marks.setter
-    def manual_marks(self, marks: tuple[bool, bool, bool, str | None]) -> None:
-        if marks[3] != self.session:
+    def restore_manual(self, marks: tuple[bool, bool, bool, str | None], cycle: PlugCycle) -> None:
+        if marks[3] != cycle.id:
             # The connection changed while the command waited: what a poll
             # decided about its release meanwhile stands. Only a release the
             # refused command itself added goes: waiting opened nothing.
@@ -156,8 +142,13 @@ class PlugChargeState:
             return
         self.manual, self.manual_connected, self.restored_manual = marks[:3]
 
-    def snapshot(self) -> dict[str, Any]:
-        return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
+    def snapshot(self, cycle: PlugCycle) -> dict[str, Any]:
+        session = self.session(cycle)
+        since = cycle.since if session is not None else None
+        return {
+            "enabled": self.enabled, "policy": self.policy, "session": session,
+            "authorized": self.authorized, "since": since.isoformat() if since else None,
+        }
 
     def durable(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold,
@@ -195,17 +186,16 @@ class PlugChargeController:
     def state(self) -> PlugChargeState:
         return self._control.write_state.plug_charge
 
-    def observe(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
+    @property
+    def cycle(self) -> PlugCycle:
+        return self._control.write_state.plug_cycle
+
+    def follow(self, change: PlugChange, data: WallboxData | None) -> None:
+        """After the plug cycle took a poll, or None for one that failed."""
         if self._stopping:
             return
-        # Only values read in this poll decide: a held one is no evidence that
-        # the same car is still there.
-        present = None if data is None else vehicle_connected(
-            data.fresh(EVSE_STATE.key), data.fresh(CP_STATE.key),
-            cp_supported=self._control._identity.layout_version >= CP_STATE.min_layout,
-        )
-        self.state.observe(present, observed_at=observed_at)
-        if present is False:
+        self.state.follow(self.cycle, change)
+        if self.cycle.present is False:
             self._end_manual_stop()
         # Without a poll there is no bus to close the release on; the first
         # poll that answers does it.
@@ -285,17 +275,17 @@ class PlugChargeController:
         if released and self.state.enabled and not self.state.manual:
             _LOGGER.info(
                 "Plug & Charge: charging released by hand for %s",
-                "the next plug-in" if self.state.session is None else "this connection",
+                "the next plug-in" if self.cycle.id is None else "this connection",
             )
         self.state.manual = released and self.state.enabled
-        self.state.manual_connected = self.state.manual and self.state.session is not None
+        self.state.manual_connected = self.state.manual and self.cycle.id is not None
         # Given now, it is not the one read from disk any more.
         self.state.restored_manual = False
 
     def _check_request(self, session: str, deadline: datetime) -> None:
         if self._stopping or not self.state.enabled:
             raise validation_error("plug_charge_blocked")
-        if self.state.session != session:
+        if self.state.session(self.cycle) != session:
             raise validation_error("plug_charge_session_changed")
         if datetime.now(UTC) >= deadline:
             raise validation_error("plug_charge_authorization_expired")
@@ -318,7 +308,7 @@ class PlugChargeController:
         cp = await read(CP_STATE) if cp_supported else None
         present = vehicle_connected(evse, cp, cp_supported=cp_supported)
         if present is not True:
-            self.state.observe(present)
+            self.state.follow(self.cycle, self.cycle.observe(present, now=self._control.monotonic()))
             if present is False:
                 self._end_manual_stop()
             self._schedule_deny()
@@ -367,7 +357,7 @@ class PlugChargeController:
                 if switches:
                     self._control.write_state.mode_change_at = self._control._monotonic()
             except (DeviceError, AmtronBusError, OSError, asyncio.CancelledError) as err:
-                if not isinstance(err, DeviceValidationError) and self.state.session == session:
+                if not isinstance(err, DeviceValidationError) and self.state.session(self.cycle) == session:
                     self.state.revoke()
                 self._schedule_deny()
                 raise

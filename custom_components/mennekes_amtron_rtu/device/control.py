@@ -48,6 +48,7 @@ from .energy_goal import EnergyGoal
 from .enums import EvseState, RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError, validation_error
 from .plug_charge import PlugChargeController
+from .plug_cycle import PlugChange
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
@@ -384,10 +385,18 @@ class AmtronControl:
 
     @property
     def plug_charge(self) -> dict[str, object]:
-        return {**self._plug_charge.state.snapshot(), "manual": self._plug_charge.state.manual}
+        return {**self._plug_charge.state.snapshot(self.write_state.plug_cycle), "manual": self._plug_charge.state.manual}
 
-    def observe_plug_charge(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
-        self._plug_charge.observe(data, observed_at=observed_at)
+    def observe_plug(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
+        """Take one poll, or None for a failed one, into the plug cycle."""
+        self.follow_plug(
+            self.write_state.plug_cycle.read(data, self.layout_version, at=observed_at, now=self.monotonic()), data,
+        )
+
+    def follow_plug(self, change: PlugChange, data: WallboxData | None) -> None:
+        """Tell the rules that depend on the connection what the plug cycle took in."""
+        self._plug_charge.follow(change, data)
+        self.unplug_release.follow()
 
     async def async_sync_plug_charge(self) -> None:
         await self._plug_charge.async_sync()
@@ -718,7 +727,7 @@ class AmtronControl:
         self._require_write_access()
         async with self._current_lock:
             gate = self._plug_charge.state
-            manual = gate.manual_marks
+            manual = gate.manual_marks(self.write_state.plug_cycle)
             if gate.enabled:
                 if released and self.energy_goal_stop_requested:
                     raise self.stop_error()
@@ -737,7 +746,7 @@ class AmtronControl:
                 # A failure after the acknowledged write, e.g. of the refresh,
                 # must not make the gate close what the user just opened.
                 if self._release_writes == written:
-                    gate.manual_marks = manual
+                    gate.restore_manual(manual, self.write_state.plug_cycle)
                 raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:

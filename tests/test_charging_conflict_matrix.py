@@ -65,7 +65,7 @@ async def control_path(tmp_path, *, remote):
                 "evse_state": int(EvseState.EV_CONNECTED), "cp_state": int(CpState.B1),
                 "charging_release": 0, "charging_current_ems": 16.0,
             })
-            owner.observe_plug_charge(harness.snapshot)
+            owner.observe_plug(harness.snapshot)
         clock[0] += 301
         await control.async_pause_charging()
         clock[0] += 301

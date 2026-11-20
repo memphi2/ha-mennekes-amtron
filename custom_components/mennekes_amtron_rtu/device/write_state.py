@@ -12,6 +12,7 @@ from ._client_write import WriteRateLimiter
 from .energy_goal import EnergyGoal
 from .guest_permission import GuestPermission
 from .plug_charge import PlugChargeState
+from .plug_cycle import PlugCycle
 from .registers import CHARGING_CURRENT_EMS, REQUESTED_PHASES
 from .soc_goal import SocGoal
 from .unplug_release import UnplugReleaseState
@@ -36,8 +37,15 @@ class WriteState:
     soc_goal_generation: int = 0
     soc_goal: SocGoal = field(default_factory=SocGoal)
     guest_permission: GuestPermission | None = None
+    # The physical connection; never saved, a restart has to see it again.
+    plug_cycle: PlugCycle = field(default_factory=PlugCycle)
     plug_charge: PlugChargeState = field(default_factory=PlugChargeState)
     unplug_release: UnplugReleaseState = field(default_factory=UnplugReleaseState)
+
+    def forget_connection(self) -> None:
+        """A new, closed or reconfigured client proves nothing about the car that was there."""
+        self.plug_charge.invalidate(ended=self.plug_cycle.id is not None)
+        self.plug_cycle.forget()
 
     @classmethod
     def cold_start(cls, now: float) -> WriteState:

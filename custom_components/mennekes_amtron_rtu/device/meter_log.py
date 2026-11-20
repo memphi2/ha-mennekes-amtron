@@ -143,7 +143,11 @@ _KEYS = frozenset({
 
 
 class ChargeMeter:
-    """The meter log and the plug cycle the service saw from end to end.
+    """The meter log and the times of the plug-in the service measured from end to end.
+
+    Whether a car is there is the plug cycle's to say; this keeps, on the
+    wall clock and across restarts, when that began and ended, so the energy
+    in between can be read from the log.
 
     The service outlives a restart of Home Assistant, so what it measures
     here is whole where Home Assistant alone would have a gap. Home Assistant

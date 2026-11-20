@@ -7,7 +7,6 @@ import hashlib
 import json
 import logging
 import math
-import secrets
 import sys
 import time
 from collections.abc import Callable
@@ -22,6 +21,7 @@ from .charge_meter_store import ChargeMeterStore
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
 from .command_events import SOURCES, attributed, command_source
+from .connection_sample import connection_sample
 from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
 from .departure_plan import DepartureController
@@ -41,6 +41,7 @@ from .persistence import (
     StorageStateUnknownError,
     finish_goal_save,
 )
+from .plug_cycle import PlugChange
 from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
 from .register_monitor import RegisterMonitor
@@ -48,10 +49,10 @@ from .registers import ENERGY_TOTAL, ERROR_CODE, EVSE_STATE, REGISTERS_BY_KEY
 from .service_config import ServerConfig, integer, number
 from .service_store import IntentStore
 from .service_version import SERVICE_VERSION
+from .soc_choice import SocChoice
 from .soc_goal import SocGoal
 from .soc_goal_controller import SocGoalController
 from .soc_transactions import SocTransactions
-from .vehicle import snapshot_metered_vehicle_present
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
@@ -126,9 +127,7 @@ class ModbusService:
         self._published: tuple[float, dict[str, Any]] | None = None
         # A fresh boot changes the revision, so a client cannot mistake an old
         # cached command outcome for a goal restored after a service restart.
-        self._soc_goal_revision = secrets.token_hex(16)
-        self._soc_maximum_required: bool | None = None
-        self._soc_reading: tuple[str, float | None, float, str] | None = None
+        self.soc_choice = SocChoice(self)
         self.soc_transactions = SocTransactions(self)
         self._task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -266,7 +265,7 @@ class ModbusService:
         try:
             await control.async_sync_plug_charge()
             await self.refresh()
-            control.observe_plug_charge(self.data)
+            control.follow_plug(PlugChange(), self.data)
             await control.async_sync_plug_charge()
         except BaseException:
             await control.async_shutdown()
@@ -393,8 +392,7 @@ class ModbusService:
                 self.failure = err
                 if self.control is None:
                     self._startup_error = err
-                if self.control is not None:
-                    self.control.observe_plug_charge(None)
+                self._observe_plug(None)
                 unreadable = self._phase == "loading saved control intent" and not isinstance(err, AmtronBusError)
                 self._wallbox_notice.failed(
                     ("saved intent unreadable, check the file's owner and mode" if unreadable
@@ -426,13 +424,12 @@ class ModbusService:
             self._intent_notice.recovered("intent saved again")
 
     async def refresh(self) -> None:
-        polled = False
         try:
             await self._poll()
-            polled = True
         finally:
             try:
-                self.guest.after_poll(polled=polled)
+                self.soc_choice.follow()
+                self.guest.follow()
             finally:
                 if self.departure is not None:
                     self.departure.observe()
@@ -506,6 +503,14 @@ class ModbusService:
             return self.snapshot()
         return self._publish()
 
+    def _observe_plug(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
+        """One poll, or None for a failed one, for the plug cycle and the rules that follow it."""
+        if self.control is not None:
+            self.control.observe_plug(data, observed_at=observed_at)
+        else:
+            # The first poll of a control that is not in use yet.
+            self.client.write_state.plug_cycle.read(data, self.identity.layout_version, at=observed_at)
+
     async def _poll(self) -> None:
         async with self._poll_lock:
             self._phase = "polling the wallbox"
@@ -519,8 +524,7 @@ class ModbusService:
                 )
             except AmtronBusError:
                 self._success = False
-                if self.control is not None:
-                    self.control.observe_plug_charge(None)
+                self._observe_plug(None)
                 self._energy_sample = self._energy_sample_at = None
                 self.data.energy_observed_at = None
                 self.charge_meter.observe(wall_clock(), present=None)
@@ -553,15 +557,14 @@ class ModbusService:
                 self._energy_sample["observed_at"] if self._energy_sample is not None else None
             )
             sample = self._energy_sample if self.data.energy_read else None
+            self._observe_plug(self.data, observed_at=observed_at)
             self.charge_meter.observe(
                 (sample["observed_at"] if sample is not None else None) or wall_clock(),
-                present=snapshot_metered_vehicle_present(self.data.get, self.identity.layout_version),
+                present=self.client.write_state.plug_cycle.metered,
                 charging=self.data.get(EVSE_STATE.key) == EvseState.CHARGING,
                 reading=sample["value"] if sample is not None else None,
             )
             if self.control is not None:
-                self.control.observe_plug_charge(self.data, observed_at=observed_at)
-                self.control.unplug_release.observe(self.data)
                 self.control.observe_recovery(
                     self.data.fresh("error_code"), self.data.current_write_generation,
                 )
@@ -648,7 +651,7 @@ class ModbusService:
                     charging_release_requested=original.charging_release_requested,
                     energy_goal=EnergyGoal.restore(original.energy_goal.snapshot()),
                     soc_goal=SocGoal.restore(original.soc_goal.snapshot()),
-                    plug_charge=replace(original.plug_charge, session=None, authorized=False),
+                    plug_charge=replace(original.plug_charge, authorized=False),
                     unplug_release=replace(original.unplug_release),
                 )
                 saving = asyncio.create_task(asyncio.to_thread(self._store.save, state))
@@ -713,7 +716,7 @@ class ModbusService:
         }
         # Who controls the charge, why it waits and what comes next.
         result["control"]["operation"] = summarize(
-            available=result["available"] is True, present=self.guest.connection_sample().present,
+            available=result["available"] is True, present=connection_sample(self).present,
             control=result["control"], departure=result["control"]["departure"],
             # Shared energy, percentage and guest-time stops report a reached target.
             goal_stop=self.control is not None and self.control.energy_goal_stop_requested,
@@ -738,14 +741,14 @@ class ModbusService:
             "charge_meter": self.charge_meter.snapshot(),
             "command_events": control.events.snapshot() if control else None,
             "control": {
-                "plug_charge": self.client.write_state.plug_charge.snapshot(),
+                "plug_charge": self.client.write_state.plug_charge.snapshot(self.client.write_state.plug_cycle),
                 # Manual permission is distinct from automatic vehicle authorization.
                 "plug_charge_manual": self.client.write_state.plug_charge.manual,
                 "release_off_on_unplug": self.client.write_state.unplug_release.enabled,
                 "supports_energy_goal": control.supports_energy_goal if control else False,
                 "supports_soc_goal": control.supports_soc_goal if control else False,
-                "soc_goal_revision": self._soc_goal_revision,
-                "soc_maximum_required": self._soc_maximum_required,
+                "soc_goal_revision": self.soc_choice.revision,
+                "soc_maximum_required": self.soc_choice.maximum_required,
                 "soc_goal": control.soc_goal.snapshot() if control else None,
                 "energy_goal": control.energy_goal.snapshot() if control else None,
                 "cost_price": (
@@ -867,7 +870,7 @@ class ModbusService:
     def choice_revision(self) -> str:
         """Fence app edits against explicit selections, not changing telemetry."""
         state = self.client.write_state
-        raw = [self._soc_goal_revision, self._soc_maximum_required, state.energy_goal_generation]
+        raw = [self.soc_choice.revision, self.soc_choice.maximum_required, state.energy_goal_generation]
         return hashlib.sha256(json.dumps(raw).encode()).hexdigest()
 
     async def command(self, payload: dict[str, Any], *, _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None) -> dict[str, Any]:
@@ -927,7 +930,7 @@ class ModbusService:
                 raise DeviceError("soc_goal_source_changed")
             if "expected_soc_revision" in payload and (
                 command != "soc_observation"
-                or payload["expected_soc_revision"] != self._soc_goal_revision
+                or payload["expected_soc_revision"] != self.soc_choice.revision
             ):
                 raise DeviceError("soc_goal_source_changed")
             if command == "acknowledge_intent_reset":
@@ -954,7 +957,7 @@ class ModbusService:
                 return self.snapshot()
             if self._intent_rejected:
                 raise DeviceValidationError("read_only_mode")
-            initial_revision = self._soc_goal_revision
+            initial_revision = self.soc_choice.revision
             value = payload.get("value")
             try:
                 if command == "plug_charge_config":
@@ -997,67 +1000,9 @@ class ModbusService:
                     else:
                         await control.goal_controller.async_set_price(price)
                 elif command == "soc_source":
-                    source = payload.get("source")
-                    if source is not None and not isinstance(source, str):
-                        raise ValueError("source must be a string or null")
-                    maximum_required = payload.get("maximum_required")
-                    if maximum_required is not None and type(maximum_required) is not bool:
-                        raise ValueError("maximum_required must be boolean")
-                    before = control.soc_goal.snapshot()
-                    success = False
-                    try:
-                        await control.async_configure_soc(source)
-                        self._soc_maximum_required = maximum_required
-                        if before["source"] != source:
-                            self._soc_reading = None
-                        success = True
-                    finally:
-                        if success or control.soc_goal.snapshot() != before:
-                            self._soc_goal_revision = secrets.token_hex(16)
+                    await self.soc_choice.configure(control, payload)
                 elif command in ("soc_goal", "soc_observation", "soc_goal_choice"):
-                    if command == "soc_goal_choice":
-                        if "expected_choice_revision" not in payload or self._soc_maximum_required is None:
-                            raise DeviceError("soc_goal_source_changed")
-                        if value != 0 and self._soc_maximum_required and control.soc_goal.maximum_percent is None:
-                            raise DeviceError("soc_goal_limit_unavailable")
-                        cap = control.soc_goal.maximum_percent
-                        if cap is not None and isinstance(value, (int, float)) and value > cap:
-                            # Typed into the app: said, not pressed down in silence.
-                            raise DeviceError("soc_goal_invalid")
-                        if cap is not None and value == cap:
-                            # The top of the app's scale: the car's limit,
-                            # wherever it goes.
-                            value = 100
-                        reading = self._soc_reading
-                        payload = {**payload, "source": control.soc_goal.source,
-                            "maximum": control.soc_goal.maximum_percent,
-                            "soc": reading[1] if reading is not None and reading[0] == control.soc_goal.source and reading[3] == self.guest.soc_observation_scope() and time.monotonic() - reading[2] <= 900 else None}
-                    source = payload.get("source")
-                    if not isinstance(source, str):
-                        raise ValueError("source is required")
-                    soc = payload.get("soc")
-                    maximum = payload.get("maximum")
-                    if command in ("soc_goal", "soc_goal_choice"):
-                        before = control.soc_goal.snapshot()
-                        success = False
-                        try:
-                            await control.async_set_soc_goal(
-                                number(value, 0, 100), source=source,
-                                soc=None if soc is None else number(soc, 0, 100),
-                                maximum=None if maximum is None else number(maximum, 0, 100),
-                            )
-                            success = True
-                        finally:
-                            if success or control.soc_goal.snapshot() != before:
-                                self._soc_goal_revision = secrets.token_hex(16)
-                    else:
-                        await control.async_observe_soc(
-                            None if soc is None else number(soc, 0, 100),
-                            None if maximum is None else number(maximum, 0, 100), source=source,
-                        )
-                    if command != "soc_goal_choice":
-                        scope = self.guest.soc_observation_scope()
-                        self._soc_reading = None if scope is None else (source, None if soc is None else number(soc, 0, 100), time.monotonic(), scope)
+                    await self.soc_choice.apply(control, command, payload)
                 elif command == "resume":
                     await control.async_resume_charging(
                         current_cap=number(
@@ -1099,7 +1044,7 @@ class ModbusService:
                     raise
                 finally:
                     if _soc_outcome is not None:
-                        _soc_outcome(initial_revision, self._soc_goal_revision, failure)
+                        _soc_outcome(initial_revision, self.soc_choice.revision, failure)
             # Something was written during this command and a poll followed
             # the last write: the state to answer with is already read.
             read_back = written < self.diagnostics.writes_sent == self._read_back

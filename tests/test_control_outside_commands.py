@@ -10,6 +10,7 @@ from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
+from custom_components.mennekes_amtron_rtu.device.plug_cycle import PlugCycle
 from tests.fakes import raise_connection_error
 from tests.test_control import Harness
 from tests.test_modbus_service import service_fixture
@@ -177,14 +178,14 @@ def test_a_release_by_hand_for_the_next_plug_in_survives_a_restart():
     state.manual = True
     saved = state.durable()
     assert saved["manual_connected"] is False
-    restored = PlugChargeState.restore(saved)
-    restored.observe(False)
+    restored, cycle = PlugChargeState.restore(saved), PlugCycle()
+    restored.follow(cycle, cycle.observe(False))
     # Given without a car: it still waits for the next one.
     assert restored.manual
-    state.observe(True)
+    state.follow(cycle, cycle.observe(True))
     assert state.durable()["manual_connected"] is True
-    restored = PlugChargeState.restore(state.durable())
-    restored.observe(False)
+    restored, cycle = PlugChargeState.restore(state.durable()), PlugCycle()
+    restored.follow(cycle, cycle.observe(False))
     assert not restored.manual
     with pytest.raises(ValueError, match="Plug & Charge"):
         PlugChargeState.restore({**saved, "manual": False, "manual_connected": True})

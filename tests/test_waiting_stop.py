@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
+from custom_components.mennekes_amtron_rtu.device.plug_cycle import PlugCycle
 from tests.fakes import raise_connection_error
 from tests.test_control import Harness, R
 
@@ -114,13 +115,12 @@ def test_recovery_leaves_a_release_closed_that_nobody_decided():
 
 def test_a_manual_release_ends_with_a_long_unknown_vehicle_state():
     """Another car may have been plugged in meanwhile."""
-    start = datetime(2026, 1, 1, tzinfo=UTC)
-    state = PlugChargeState(enabled=True)
-    state.observe(True, observed_at=start)
+    state, cycle = PlugChargeState(enabled=True), PlugCycle()
+    state.follow(cycle, cycle.observe(True, now=0))
     state.manual, state.hold = True, False
     for step in range(1, 121):
-        state.observe(None, observed_at=start + timedelta(seconds=5 * step))
-    state.observe(True, observed_at=start + timedelta(seconds=700))
+        state.follow(cycle, cycle.observe(None, now=5 * step))
+    state.follow(cycle, cycle.observe(True, now=700))
     assert (state.manual, state.blocked) == (False, True)
 
 

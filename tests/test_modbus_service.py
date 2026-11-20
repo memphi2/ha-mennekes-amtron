@@ -488,7 +488,7 @@ def test_a_command_polls_the_wallbox_once_after_its_write(tmp_path):
 
             service._poll = carried
             polls = []
-            service.guest.after_poll = lambda *, polled: polls.append(polled)
+            service.guest.follow = lambda: polls.append(True)
             await service.command({"command": "set_current", "value": 12, "expected_serial_number": "ABC123456789"})
             assert polls == [True, True]
         finally:

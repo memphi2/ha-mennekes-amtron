@@ -4,22 +4,19 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
-from types import MappingProxyType
 
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.setup import async_setup_component
 
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
-from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
-from tests.test_modbus_service import TOKEN, current_writes, service_fixture
+from tests.test_modbus_service import current_writes, service_fixture
 from tests.test_service_reauth import add_entry, entity_ids
 
 SERIAL = "ABC123456789"

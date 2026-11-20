@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   unique ID made from its port or address; its endpoint only keeps it from
   being set up twice. Remove such an entry and set it up again. Entries of
   wallboxes with a serial number are unchanged.
+- One account of the plug-in decides for Plug & Charge, guest charging, the
+  unplug rule and the estimates whether a car is connected. Plug & Charge
+  counts a car's evidence from its real plug-in time, also when the gate was
+  switched on with the car already connected.
 - The app names its targets as Home Assistant does: energy target, cost
   target, vehicle charge target and target time. The Charging page sorts them
   into "for every charge", "own car only" and guest charging, each target has

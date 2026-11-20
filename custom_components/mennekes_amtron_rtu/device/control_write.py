@@ -474,7 +474,7 @@ class WritePath:
     async def _async_grant_release_for_start(self) -> None:
         """Keep release and resume in one queued command, under the same lock."""
         gate = self._control._plug_charge.state
-        manual, written = gate.manual_marks, self._control._release_writes
+        manual, written = gate.manual_marks(self._control.write_state.plug_cycle), self._control._release_writes
         if gate.enabled:
             self._control._plug_charge.set_manual(True)
         try:
@@ -482,7 +482,7 @@ class WritePath:
         except BaseException as err:
             refused = isinstance(err, (AmtronRateLimitedError, TimedCommandCancelledError))
             if self._control._release_writes == written and (refused or not self._control._command_write_started or not self._control._uncertain(err)):
-                gate.manual_marks = manual
+                gate.restore_manual(manual, self._control.write_state.plug_cycle)
             raise
 
     async def async_write(

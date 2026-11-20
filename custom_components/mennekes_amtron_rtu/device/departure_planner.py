@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from .command_events import attributed
+from .connection_sample import connection_sample
 from .control import AmtronControl
 from .departure_plan import (
     DEPARTURE_OWNER,
@@ -71,7 +72,7 @@ class DeparturePlanner:
         await self.controller.initialize()
 
     def _departure_sample(self) -> DepartureSample:
-        connection = self._service.guest.connection_sample()
+        connection = connection_sample(self._service)
         control = self._service.control
         energy = self._service._energy_sample
         stamp = energy.get("observed_at") if energy is not None and connection.total_kwh is not None else None

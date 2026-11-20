@@ -16,6 +16,9 @@ from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu import services
+from custom_components.mennekes_amtron_rtu.device.connection_sample import (
+    connection_sample,
+)
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.guest_charging import GuestCharging
@@ -178,7 +181,7 @@ def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypat
             assert service.guest_deadline == deadline
             await control.async_set_target_time(None)
             assert service.guest_deadline is None
-            service.guest.scope = service.guest.connection_sample().scope
+            service.guest.scope = connection_sample(service).scope
             client.apply_snapshot(service.snapshot())
             assert control.guest_active()
     asyncio.run(run())

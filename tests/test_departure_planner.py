@@ -11,6 +11,9 @@ from custom_components.mennekes_amtron_rtu.device import (
     departure_planner as departure_runtime,
 )
 from custom_components.mennekes_amtron_rtu.device import server
+from custom_components.mennekes_amtron_rtu.device.connection_sample import (
+    connection_sample,
+)
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureInputs,
 )
@@ -115,7 +118,7 @@ def test_the_snapshot_summarizes_who_controls_the_charge(departure_service):
                 "kind": "level", "value": 80.0, "deadline": s.departure.trip.deadline.isoformat(),
             }
             assert Operation.restore(summary).controller == "departure_plan"
-            s.guest.scope = s.guest.connection_sample().scope
+            s.guest.scope = connection_sample(s).scope
             assert s.snapshot()["control"]["operation"]["controller"] == "guest"
 
     asyncio.run(run())
