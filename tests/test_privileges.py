@@ -7,6 +7,8 @@ import errno
 import logging
 import struct
 
+import pytest
+
 from custom_components.mennekes_amtron_rtu.device import privileges, server
 
 
@@ -42,7 +44,15 @@ def test_all_capability_sets_are_emptied_and_none_can_be_gained(monkeypatch, cap
     assert not caplog.records
 
 
-def test_a_refused_drop_is_reported_and_the_service_still_starts(monkeypatch, caplog):
+@pytest.fixture
+def kept_errno():
+    """Leave errno to later tests as this test found it."""
+    previous = ctypes.get_errno()
+    yield
+    ctypes.set_errno(previous)
+
+
+def test_a_refused_drop_is_reported_and_the_service_still_starts(monkeypatch, caplog, kept_errno):
     caplog.set_level(logging.WARNING)
     # Left over from something before: it must not decide the error.
     ctypes.set_errno(errno.ENOENT)
