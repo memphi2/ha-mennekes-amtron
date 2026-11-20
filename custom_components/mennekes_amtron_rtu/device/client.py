@@ -301,7 +301,7 @@ class MennekesModbusClient:
             self.write_state.forget_connection()
         else:
             # A reconnect alone proves no unplug; the next reads decide.
-            self.write_state.plug_cycle.suspect()
+            self.write_state.plug_cycle.suspect(self._monotonic())
 
     async def _async_verify_identity(self, client: ModbusTransport) -> None:
         """Confirm the bound serial while holding the transaction lock."""
