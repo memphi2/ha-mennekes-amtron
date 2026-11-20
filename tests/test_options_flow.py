@@ -25,7 +25,7 @@ class Flow(MennekesAmtronOptionsFlow):
     def __init__(self, entry: FakeConfigEntry) -> None:
         super().__init__()
         self._entry = entry
-        self.hass = SimpleNamespace(config=SimpleNamespace(country="DE"))
+        self.hass = SimpleNamespace(config=SimpleNamespace(country="DE", currency="EUR"))
 
     @property
     def config_entry(self) -> Any:

@@ -38,11 +38,16 @@ _VNB_QUERY = """query($coordinates:String!,$filter:vnb_FilterInput){
 }"""
 
 
+def german_network_tariffs(config: Any) -> bool:
+    """The network price modules follow German rules and are priced in euros."""
+    return getattr(config, "country", None) == "DE" and getattr(config, "currency", None) == "EUR"
+
+
 async def async_lookup_home_tariff(hass: Any) -> dict[str, Any] | None:
     """Return verified form values, or None if a safe import is impossible."""
     config = hass.config
     if (
-        getattr(config, "country", None) != "DE"
+        not german_network_tariffs(config)
         or not -90 <= getattr(config, "latitude", float("nan")) <= 90
         or not -180 <= getattr(config, "longitude", float("nan")) <= 180
     ):

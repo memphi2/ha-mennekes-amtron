@@ -66,12 +66,12 @@ def windows(values=None):
     return {key: value for key, value in (NETWORK if values is None else values).items() if key in WINDOW_KEYS}
 
 
-def _flow(*, options=None, service=False, country="DE"):
+def _flow(*, options=None, service=False, country="DE", currency="EUR"):
     flow = Flow(FakeConfigEntry(
         options=options,
         data={"server_url": "http://service:8765"} if service else None,
     ))
-    flow.hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Paris", country=country, currency="EUR"))
+    flow.hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Paris", country=country, currency=currency))
     return flow
 
 
@@ -100,9 +100,10 @@ async def _save_three(flow, values=None):
     return await flow.async_step_cost_module3_prices(form["data_schema"](values))
 
 
-def test_network_module_is_hidden_outside_germany():
+@pytest.mark.parametrize(("country", "currency"), [("FR", "EUR"), ("DE", "USD")])
+def test_network_module_is_hidden_outside_germany_or_euros(country, currency):
     async def run():
-        flow = _flow(country="FR")
+        flow = _flow(country=country, currency=currency)
         await _choose_source(flow)
         form = await flow.async_step_cost_fixed()
         fields = {key.schema for key in form["data_schema"].schema}

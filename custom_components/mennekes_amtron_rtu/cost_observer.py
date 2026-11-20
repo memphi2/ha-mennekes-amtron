@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
@@ -42,6 +43,7 @@ from .device.notice import FailureNotice
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .entry_types import MennekesAmtronConfigEntry
 from .model_store import ModelStore
+from .network_tariff_lookup import german_network_tariffs
 
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60
@@ -91,7 +93,7 @@ class ChargingCostObserver:
         self._hass, self._entry = hass, entry
         self._entity = str(entry.options.get(CONF_CHARGING_PRICE_ENTITY, ""))
         self._fixed = entry.options.get(CONF_CHARGING_COST_SOURCE) == COST_SOURCE_FIXED
-        self._tariff = TariffConfig.parse(entry.options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
+        self._tariff = self._network_tariff(entry.options)
         self._configured_options = deepcopy(dict(entry.options))
         self._configured_data = dict(entry.data)
         self._identity = (
@@ -127,6 +129,12 @@ class ChargingCostObserver:
         self._storage_corrupt = False
         self._dirty = False
         self._retry_at = 0.0
+
+    def _network_tariff(self, options: Mapping[str, Any]) -> TariffConfig:
+        """A saved network tariff counts only where it was made for: Germany in euros."""
+        if not german_network_tariffs(self._hass.config):
+            return TariffConfig.parse({"module": "none"})
+        return TariffConfig.parse(options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
 
     def retain_for_reload(self, entry: MennekesAmtronConfigEntry) -> bool:
         """Keep observed prices and energy only across an unchanged live source.
@@ -165,7 +173,7 @@ class ChargingCostObserver:
         if self._closed or dict(self._entry.data) != self._configured_data:
             return False
         try:
-            tariff = TariffConfig.parse(current.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
+            tariff = self._network_tariff(current)
         except ValueError:
             return False
         if tariff != self._tariff:

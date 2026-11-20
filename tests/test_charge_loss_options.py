@@ -29,7 +29,7 @@ class Flow(BaseFlow):
             )
         )
         self.hass = SimpleNamespace(
-            data={dr.DATA_REGISTRY: registry}, config=SimpleNamespace(country="DE"),
+            data={dr.DATA_REGISTRY: registry}, config=SimpleNamespace(country="DE", currency="EUR"),
             config_entries=SimpleNamespace(async_entries=lambda domain: (
                 [SimpleNamespace(entry_id="account-entry")] if domain == "bavariandata" else []
             )),
