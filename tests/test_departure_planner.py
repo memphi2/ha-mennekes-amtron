@@ -273,7 +273,7 @@ def test_guest_start_invalidates_departure_writes_already_waiting_for_command_lo
             clock[0] += 1000
             await service.control.async_pause_charging()
             clock[0] += 1000
-            await service._command_lock.acquire()
+            await service.command_lock.acquire()
             guest = asyncio.create_task(service.command({
                 "command": "guest_start",
                 "expected_serial_number": service.identity.serial_number,
@@ -288,7 +288,7 @@ def test_guest_start_invalidates_departure_writes_already_waiting_for_command_lo
             await asyncio.sleep(0)
             assert not guest.done()
             assert not old_plan.done()
-            service._command_lock.release()
+            service.command_lock.release()
             await guest
             with pytest.raises(DeviceError, match="soc_goal_source_changed"):
                 await old_plan

@@ -102,7 +102,10 @@ class ServiceClient:
         self.on_update: Callable[[], None] | None = None
         self.on_auth_failed: Callable[[], None] | None = None
         self.on_auth_error: Callable[[bool], None] | None = None
-        self._snapshot_lock = asyncio.Lock()
+        # Held while a request is sent and its answer published, so a delayed
+        # poll cannot overwrite a newer answer. Callers that send several
+        # requests as one step hold it themselves.
+        self.publication = asyncio.Lock()
         # The service's departure plan from the last valid snapshot.
         self.departure: DepartureState | None = None
         # The service's summary of who controls the charge, None for a service without one.
@@ -208,7 +211,7 @@ class ServiceClient:
 
     async def update(self, *, consume_energy: bool = True) -> WallboxData:
         """Fetch the state; ``consume_energy`` off leaves the meter sample to the next poll."""
-        async with self._snapshot_lock:
+        async with self.publication:
             payload = await self.request("GET", "/v2/state")
             return self.apply_snapshot(payload, consume_energy=consume_energy)
 
@@ -509,7 +512,7 @@ class ServiceClient:
         try:
             # A delayed poll response must not overwrite the command's newer
             # intent/readback. Serialize request and publication together.
-            async with self._snapshot_lock:
+            async with self.publication:
                 # Permission may have changed while this command waited for a
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.

@@ -688,7 +688,7 @@ async def _assert_service_cancelled_store_wait(tmp_path, *, kind):
 
         async def save():
             started.set()
-            await service._persist()
+            await service.persist()
 
         controller._persist = save
         async with service._store_lock:

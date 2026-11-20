@@ -205,7 +205,7 @@ class ServiceControl:
         if self._soc_transaction is None:
             return "superseded"
         token, previous_revision = self._soc_transaction
-        async with self._client._snapshot_lock:  # noqa: SLF001 - shared publication fence
+        async with self._client.publication:
             result = await self._soc_transaction_request("/v2/soc-goal/resolve", {"token": token})
             outcome = self._apply_soc_transaction_result(result, previous_revision)
             if outcome == "unknown":
@@ -320,7 +320,7 @@ class ServiceControl:
             candidate.set_target(value, soc, maximum)
         except ValueError as err:
             raise DeviceValidationError("soc_goal_invalid") from err
-        async with self._client._snapshot_lock:  # noqa: SLF001 - shared publication fence
+        async with self._client.publication:
             previous_revision = self.soc_goal_revision
             reservation = await self._soc_transaction_request("/v2/soc-goal/reserve", {})
             token = reservation.get("token")

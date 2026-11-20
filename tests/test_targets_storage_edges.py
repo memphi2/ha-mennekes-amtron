@@ -93,7 +93,7 @@ def test_a_cancelled_intent_save_stays_cancelled_when_it_fails(tmp_path):
             reached = []
 
             async def poll_step():
-                await s._save_intent()
+                await s.save_intent()
                 reached.append("continued after save")
                 await asyncio.sleep(3600)
 

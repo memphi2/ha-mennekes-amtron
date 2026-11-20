@@ -59,7 +59,7 @@ class GuestLimits:
         # Missing/mismatched evidence remains fenced until an explicit guest
         # start or confirmed unplug. Normal recovery must not open this gate.
         # A disk that refuses the save must not keep the service from starting.
-        await self._service._save_intent()
+        await self._service.save_intent()
         self.ready = True
 
     def clear(self) -> None:
@@ -91,11 +91,11 @@ class GuestLimits:
         """The guest_start command."""
         if payload.keys() != COMMANDS["guest_start"].fields | ENVELOPE:
             raise ValueError("invalid guest command")
-        async with self._service._command_lock:
+        async with self._service.command_lock:
             if payload["expected_serial_number"] != self._service.identity.serial_number:
                 raise DeviceError("device_identity_changed")
             control = self._service.control
-            if control is None or self._service._stopping or not self._service._is_available():
+            if control is None or self._service.stopping or not self._service.is_available():
                 raise DeviceError("service_unavailable")
             if payload["expected_guest_revision"] != self.revision:
                 raise DeviceError("soc_goal_source_changed")
@@ -124,7 +124,7 @@ class GuestLimits:
             departure_queued = False
             try:
                 # Make the ownership fence durable before any charging write.
-                await self._service._persist()
+                await self._service.persist()
                 departure_queued = control.pending_owner == "departure"
                 await control.async_cancel_timed_current("departure")
                 await control.async_start_guest_charging(current_cap=self._service.config.current_cap)
@@ -150,20 +150,20 @@ class GuestLimits:
                 raise
             finally:
                 unlisten()
-                await self._service._persist()
+                await self._service.persist()
             await self._service.refresh()
-            return self._service._publish()
+            return self._service.publish()
 
     async def tick(self) -> None:
-        async with self._service._command_lock:
+        async with self._service.command_lock:
             control = self._service.control
-            if (control is None or not self.ready or self._service._stopping or not self._service._is_available()
+            if (control is None or not self.ready or self._service.stopping or not self._service.is_available()
                     or not (self.time_reached() or self.restore_pending)):
                 return
             try:
                 await control.async_pause_for_energy_goal()
             finally:
-                await self._service._persist()
+                await self._service.persist()
 
     async def loop(self) -> None:
         while True:

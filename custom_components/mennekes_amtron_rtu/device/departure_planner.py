@@ -70,7 +70,7 @@ class DeparturePlanner:
     def _departure_sample(self) -> DepartureSample:
         connection = connection_sample(self._service)
         control = self._service.control
-        energy = self._service._energy_sample
+        energy = self._service.energy_sample
         stamp = energy.get("observed_at") if energy is not None and connection.total_kwh is not None else None
         goal = control.soc_goal if control is not None else None
         return DepartureSample(
@@ -107,9 +107,9 @@ class DeparturePlanner:
         await self._departure_write(lambda control: control.async_resume_charging(current_cap=cap))
 
     async def _departure_write(self, write: Callable[[AmtronControl], Any]) -> None:
-        async with self._service._command_lock:
+        async with self._service.command_lock:
             control = self._service.control
-            if control is None or self._service._stopping or not self._service._is_available():
+            if control is None or self._service.stopping or not self._service.is_available():
                 raise DeviceError("service_unavailable")
             # The plan decided before awaiting this lock. A guest may have
             # taken over meanwhile, including a deliberately paused guest.
@@ -120,11 +120,11 @@ class DeparturePlanner:
             try:
                 await write(control)
             finally:
-                await self._service._persist()
+                await self._service.persist()
 
     async def _cancel_departure(self) -> None:
         # Queue bookkeeping only; it needs no bus and works in read-only mode.
-        async with self._service._command_lock:
+        async with self._service.command_lock:
             if self._service.control is not None:
                 await self._service.control.async_cancel_timed_current(DEPARTURE_OWNER)
 
@@ -156,7 +156,7 @@ class DeparturePlanner:
         if "expected_serial_number" not in payload:
             raise ValueError("expected_serial_number is required")
         departure = self.controller
-        if departure is None or self._service._stopping:
+        if departure is None or self._service.stopping:
             raise DeviceError("service_unavailable")
         if payload["expected_serial_number"] != self._service.identity.serial_number:
             raise DeviceError("device_identity_changed")
@@ -189,13 +189,13 @@ class DeparturePlanner:
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))
         if name == "departure_choice":
-            await self._service._persist()
-        if self._service._command_lock.locked():
+            await self._service.persist()
+        if self._service.command_lock.locked():
             # Another command still runs: a patient reader must not get the
             # state from before this plan change.
-            self._service._published = None
+            self._service.published = None
             return self._service.snapshot()
-        return self._service._publish()
+        return self._service.publish()
 
     async def shutdown(self) -> None:
         if self.controller is not None:

@@ -148,7 +148,7 @@ def test_service_rechecks_availability_before_executing_queue(tmp_path, failure)
             clock[0] += 6
             await service.control.async_resume_charging()
             if failure == "stopped":
-                service._stopping = True
+                service.stopping = True
             else:
                 service._success = False
             wake.set()

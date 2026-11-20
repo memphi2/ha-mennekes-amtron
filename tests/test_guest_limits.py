@@ -47,10 +47,10 @@ def test_stopping_and_malformed_guest_requests_never_write(tmp_path):
                 await service.command({**payload, "extra":True})
             with pytest.raises(ValueError, match="guest command"):
                 await service.command({key: value for key, value in payload.items() if key != "expected_guest_revision"})
-            service._stopping = True
+            service.stopping = True
             with pytest.raises(DeviceError, match="service_unavailable"):
                 await service.command(payload)
-            service._stopping = False
+            service.stopping = False
             assert not transport.writes
     asyncio.run(run())
 
@@ -70,7 +70,7 @@ def test_long_unknown_connection_discards_guest_permission(tmp_path, monkeypatch
             service.guest.scope = connection_sample(service).scope
             assert service.guest.scope is not None
             monkeypatch.setattr(ModbusService, "_poll", AsyncMock())
-            monkeypatch.setattr(service, "_is_available", lambda: False)
+            monkeypatch.setattr(service, "is_available", lambda: False)
             await service.refresh()
             assert service.guest.scope is not None
             cycle = service.client.write_state.plug_cycle

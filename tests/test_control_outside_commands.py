@@ -151,7 +151,7 @@ def test_a_manual_release_does_not_pass_to_the_next_car_over_a_restart(tmp_path)
         assert (
             transport.bank[R.CHARGING_RELEASE.address] == 1
         )
-        await service._save_intent()
+        await service.save_intent()
         await service.stop()
         bank = dict(transport.bank)
         # car A leaves while the service is down

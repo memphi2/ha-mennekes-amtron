@@ -41,4 +41,3 @@ def test_identity_defaults_to_the_oldest_layout() -> None:
 def test_write_diagnostics_start_at_zero() -> None:
     diagnostics = WriteDiagnostics()
     assert diagnostics.writes_sent == 0
-    assert diagnostics.last_error is None

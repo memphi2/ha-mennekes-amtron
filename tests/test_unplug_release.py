@@ -295,7 +295,7 @@ def test_a_refused_write_is_reported_once_and_retried_later(tmp_path, caplog):
 def test_an_unplug_during_a_restart_of_the_service_is_still_found(tmp_path):
     async def run():
         service, transport, _clock = await _rule(tmp_path)
-        await service._save_intent()
+        await service.save_intent()
         saved = json.loads((tmp_path / "intent.json").read_text())
         assert saved["unplug_release"] == {
             "enabled": True, "plugged": True, "owed": False, "goal_owed": None,

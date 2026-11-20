@@ -48,7 +48,6 @@ def test_a_failed_beat_is_counted_and_swallowed() -> None:
 
     asyncio.run(run())
     assert diagnostics.heartbeats_failed == 1
-    assert diagnostics.last_error
 
 
 def test_the_task_keeps_beating_while_the_poll_fails() -> None:

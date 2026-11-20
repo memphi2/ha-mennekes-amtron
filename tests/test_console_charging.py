@@ -116,10 +116,10 @@ def test_charging_console_rejects_malformed_and_unavailable_edits(tmp_path, monk
             service.control.startup_hold = True
             assert (await client.post("/api/charging", headers=headers, json=choice)).status == 409
             service.control.startup_hold = False
-            service._stopping = True
+            service.stopping = True
             departure = {**choice, "action": "departure", "value": None}
             assert (await client.post("/api/charging", headers=headers, json=departure)).status == 409
-            service._stopping = False
+            service.stopping = False
             control, service.control = service.control, None
             try:
                 assert (await client.get("/api/charging", headers=HEADERS)).status == 503
@@ -382,7 +382,7 @@ def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_sta
             )
             async with TestClient(TestServer(create_console_app(console))) as client:
                 assert (await client.get("/api/overview", headers=HEADERS)).status == 200
-                await service._command_lock.acquire()
+                await service.command_lock.acquire()
                 try:
                     # A read that waited for the command would keep its request
                     # slot after the page gave up; two of them blocked the app.
@@ -392,7 +392,7 @@ def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_sta
                     # The overview waits shortly and shows the last published state.
                     assert (await client.get("/api/overview", headers=HEADERS)).status == 200
                 finally:
-                    service._command_lock.release()
+                    service.command_lock.release()
                 assert (await client.get("/api/charging", headers=HEADERS)).status == 200
 
     asyncio.run(body())

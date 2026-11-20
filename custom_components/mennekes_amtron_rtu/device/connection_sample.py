@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-# This reader is a part of the one service.
-# ruff: noqa: SLF001
 import math
 import time
 from dataclasses import dataclass
@@ -41,17 +39,17 @@ def connection_sample(service: ModbusService) -> ConnectionSample:
     """Read the plug cycle, the meter and the applied current as they are now."""
     control = service.control
     cycle = service.client.write_state.plug_cycle
-    available = service._is_available() and not service._stopping
+    available = service.is_available() and not service.stopping
     present = cycle.present if available else None
     # Policy checks run before every write; read the sample, not a snapshot.
-    sample = service._energy_sample
+    sample = service.energy_sample
     now = datetime.now(UTC)
     total = sample.get("value") if isinstance(sample, dict) else None
     stamp = sample.get("observed_at") if isinstance(sample, dict) else None
     # Judged on the monotonic clock: a wall-clock step must not pause a
     # charge for a meter reading that is not old at all. The stamp itself
     # only has to be a plausible time.
-    age = time.monotonic() - service._energy_sample_at if service._energy_sample_at is not None else None
+    age = time.monotonic() - service.energy_sample_at if service.energy_sample_at is not None else None
     fresh = (
         available and isinstance(total, (int, float)) and not isinstance(total, bool)
         and math.isfinite(total) and total >= 0

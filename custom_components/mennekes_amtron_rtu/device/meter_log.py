@@ -58,10 +58,6 @@ class MeterLog:
         self._values: list[float] = []
 
     @property
-    def first_at(self) -> float | None:
-        return self._times[0] if self._times else None
-
-    @property
     def last_kwh(self) -> float | None:
         return self._values[-1] if self._values else None
 

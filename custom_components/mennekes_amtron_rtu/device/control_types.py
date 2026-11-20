@@ -57,7 +57,6 @@ class PendingCommand:
 # Commands that end a charge or close the wallbox; and those among them that
 # nothing written to the current can settle.
 STOPS = frozenset({"pause", "disable_charging", "lock"})
-OTHER_STOPS = STOPS - {"pause"}
 
 
 @dataclass(frozen=True, slots=True)

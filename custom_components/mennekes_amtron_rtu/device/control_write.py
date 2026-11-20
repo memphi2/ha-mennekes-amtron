@@ -533,7 +533,6 @@ class WritePath:
             self._control._diagnostics.writes_rejected += 1
             if spec != HEARTBEAT:
                 self._control._diagnostics.write_errors.add(spec.key)
-            self._control._diagnostics.last_error = str(err)
             if self._control._notify_write_error is not None:
                 self._control._notify_write_error()
             raise device_error(

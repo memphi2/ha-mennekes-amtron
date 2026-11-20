@@ -128,7 +128,6 @@ class HeartbeatTask:
                 self._diagnostics.timeline.record(EventType.HEARTBEAT_FAILED)
             self._failed = True
             self._diagnostics.heartbeats_failed += 1
-            self._diagnostics.last_error = str(err)
             _LOGGER.debug("Heartbeat write failed: %s", err)
             return False
         self._diagnostics.heartbeats_sent += 1
