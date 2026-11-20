@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 from .device.client_errors import AmtronBusError
 from .device.command_events import attributed
 from .device.const import DOMAIN
+from .device.departure_plan import PLAN_CHARGING, PLAN_DECIDING, PLAN_PAUSED
 from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
@@ -34,11 +35,6 @@ from .vehicle_sources import PLUG_WINDOW
 
 _LOGGER = logging.getLogger(__name__)
 
-# An armed departure plan owns the current. The grant waits until the plan has
-# applied its decision, so a release never starts a charge it must then stop.
-_PLAN_DECIDING = frozenset({"waiting_for_device", "queued", "write_pending"})
-_PLAN_CHARGING = frozenset({"charging", "finishing", "unreachable", "late"})
-_PLAN_PAUSED = "paused_until_start"
 
 
 def plug_charge_policy(options: Mapping[str, Any]) -> str:
@@ -307,15 +303,17 @@ class PlugChargeObserver:
         if timed is None or timed.goal.deadline is None or timed.goal.finished is not None:
             return None
         status = timed.status
-        return status if status in _PLAN_DECIDING | _PLAN_CHARGING | {_PLAN_PAUSED} else None
+        return status if status in PLAN_DECIDING | PLAN_CHARGING | {PLAN_PAUSED} else None
 
     def _plan_applied(self) -> bool:
+        """An armed plan owns the current: the grant waits until it has applied
+        its decision, so a release never starts a charge it must then stop."""
         plan = self._plan_status()
         if plan is None:
             return True
-        if plan == _PLAN_PAUSED:
+        if plan == PLAN_PAUSED:
             return self._control.pause_requested is True
-        return plan in _PLAN_CHARGING and self._control.pause_requested is not True
+        return plan in PLAN_CHARGING and self._control.pause_requested is not True
 
     def _pause_allows_grant(self) -> bool:
         """A permitted plug-in ends a manual pause, never an automatic one.

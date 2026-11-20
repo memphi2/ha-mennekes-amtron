@@ -74,6 +74,11 @@ DEPARTURE_STATES = (
     "paused_until_start", "minimum_level", "charging", "finishing", "unreachable", "late",
     "estimated_reached", "reached", "write_pending", "error",
 )
+# What a status of an armed plan means for the current: the plan still
+# decides, it lets the car charge, or it holds the car paused until its start.
+PLAN_DECIDING = frozenset({"waiting_for_device", "queued", "write_pending"})
+PLAN_CHARGING = frozenset({"minimum_level", "charging", "finishing", "unreachable", "late"})
+PLAN_PAUSED = "paused_until_start"
 Binding = Literal["confirmed", "unconfirmed", "unknown"]
 
 
