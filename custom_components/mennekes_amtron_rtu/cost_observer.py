@@ -9,7 +9,6 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
-from homeassistant.const import EVENT_CORE_CONFIG_UPDATE
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -123,7 +122,6 @@ class ChargingCostObserver:
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
         self._unsubscribe_report: CALLBACK_TYPE | None = None
-        self._unsubscribe_config: CALLBACK_TYPE | None = None
         self._expiry: CALLBACK_TYPE | None = None
         self._live_price: float | None = None
         self._closed = False
@@ -235,17 +233,9 @@ class ChargingCostObserver:
             _LOGGER.warning("Charging cost: storage cannot be read; optional cost estimates are unavailable")
         if self._fixed:
             self._accumulator.set_price(self._started_at, self._price())
-        self._unsubscribe_config = self._hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, self._config_changed)
         if not self._fixed and self._entity:
             self._unsubscribe = async_track_state_change_event(self._hass, [self._entity], self._price_changed)
             self._unsubscribe_report = async_track_state_report_event(self._hass, [self._entity], self._price_changed)
-            self._accept_price(self._hass.states.get(self._entity), time.time())
-
-    @callback
-    def _config_changed(self, _event: Event[Any]) -> None:
-        """Another country or currency judges the tariff and the price again."""
-        self.apply_tariff_update()
-        if not self._fixed and self._entity:
             self._accept_price(self._hass.states.get(self._entity), time.time())
 
     @callback
@@ -373,9 +363,6 @@ class ChargingCostObserver:
         if self._unsubscribe_report is not None:
             self._unsubscribe_report()
             self._unsubscribe_report = None
-        if self._unsubscribe_config is not None:
-            self._unsubscribe_config()
-            self._unsubscribe_config = None
         if self._expiry is not None:
             self._expiry()
             self._expiry = None

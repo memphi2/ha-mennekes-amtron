@@ -116,6 +116,11 @@ class FakeBus:
 
     def __init__(self) -> None:
         self.once: dict[str, list[Callable[[Any], Any]]] = {}
+        self.listeners: dict[str, list[Callable[[Any], Any]]] = {}
+
+    def async_listen(self, event_type: str, listener: Callable[[Any], Any]) -> Callable[[], None]:
+        self.listeners.setdefault(event_type, []).append(listener)
+        return lambda: self.listeners[event_type].remove(listener)
 
     def async_listen_once(self, event_type: str, listener: Callable[[Any], Any]) -> Callable[[], None]:
         self.once.setdefault(event_type, []).append(listener)
