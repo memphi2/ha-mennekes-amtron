@@ -25,6 +25,40 @@ from tests.test_timed_goal import NOW, setup_observer
 
 SCOPE = "a" * 64
 CAR = "profile:bmw:sensor.soc|"
+@pytest.mark.parametrize("taken", [True, False])
+def test_a_time_kept_only_for_a_guest_gives_way_to_the_parked_trip(tmp_path, monkeypatch, taken):
+    from custom_components.mennekes_amtron_rtu.vehicle_trips import VehicleTripMemory
+    from tests.ha_fakes import FakeHass
+
+    async def run():
+        observer, service, _hass = handover(monkeypatch)
+        storage = FakeHass(str(tmp_path))
+        observer._hass.config = storage.config
+        observer._hass.async_add_executor_job = asyncio.to_thread
+        observer._options["vehicle_profile_id"] = "car"
+        observer._resume = True
+        parked = TimedGoal()
+        parked.set(dt_util.utcnow() + timedelta(hours=8), "manual")
+        memory = VehicleTripMemory(observer._hass, "entry", "SERIAL")
+        await memory.async_swap("car", parked, None)
+        # The previous car's time, which the service kept for a guest.
+        left = TimedGoal()
+        left.set(NOW + timedelta(hours=3), "manual")
+        service.state = plan(left, withdrawn=True)
+        if not taken:
+            # A guest started meanwhile: the service keeps its time.
+            async def kept(deadline, source, **_kwargs):
+                service.trips.append((deadline, source, False))
+            service.async_set_departure_trip = kept
+        await observer._evaluate()
+        assert service.trips[0] == (parked.deadline, "manual", False)
+        # Only a trip the service took is used up.
+        assert (await memory.async_peek("car") is None) is taken
+        assert observer._resume is (not taken)
+
+    asyncio.run(run())
+
+
 REPORTED = NOW - timedelta(minutes=3)
 FORECAST = {
     "finish_at": (NOW + timedelta(hours=8)).isoformat(), "level_at_departure": 74,
@@ -35,7 +69,7 @@ FORECAST = {
 def plan(trip: TimedGoal | None = None, **changes) -> dict:
     return {
         "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
-        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "edit_revision": "a" * 32,
+        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "withdrawn": False, "edit_revision": "a" * 32,
         **changes,
     }
 

@@ -109,7 +109,7 @@ def plan_state(trip: TimedGoal | None = None, **changes: object) -> dict:
     return {
         "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
         "estimated_soc": None, "inputs": None, "scope": None, "confirmed": False, "forecast": None,
-        "editor": "ha", "selection_vehicle": None, "edit_revision": "a" * 32, **changes,
+        "editor": "ha", "selection_vehicle": None, "edit_revision": "a" * 32, "withdrawn": False, **changes,
     }
 
 

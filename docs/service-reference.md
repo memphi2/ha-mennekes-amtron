@@ -355,6 +355,7 @@ saved plan loads:
 | `trip` | `deadline` (ISO timestamp or `null`), `source` and `finished` (`reached`, `late` or `null`) |
 | `edit_revision` | Opaque persisted identifier changed by explicit trip edits, not by automatic completion; HA sends it with a time taken from a calendar or the car, so an edit made meanwhile is not overwritten |
 | `editor`, `selection_vehicle` | Last explicit editor (`ha` or `app`) and its vehicle binding; not public vehicle identity labels |
+| `withdrawn` | `true` while the time is only kept for a guest because its car was withdrawn; it ends with the guest unless a time is set meanwhile |
 | `status` | The plan's state, as shown by the `departure_plan` attribute of **Charging wait reason** |
 | `planned_start` | When charging starts or started for this trip, or `null` |
 | `estimated_soc` | The projected charge level in percent, or `null` |

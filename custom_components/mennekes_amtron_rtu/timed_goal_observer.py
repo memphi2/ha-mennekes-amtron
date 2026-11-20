@@ -365,8 +365,13 @@ class TimedGoalObserver:
             self._hass, self._entry.entry_id, self._runtime.identity.serial_number or "",
         )
         trip = await trips.async_peek(profile)
-        if trip is not None and self.goal.deadline is None:
+        remote = self._runtime.control.departure
+        # A time the service only kept for a guest is no other car's choice.
+        if trip is not None and (self.goal.deadline is None or (remote is not None and remote.withdrawn)):
             await self._runtime.control.async_set_departure_trip(trip.deadline, trip.source)
+            if self.goal.deadline != trip.deadline:
+                # Not taken, e.g. a guest started meanwhile: it stays parked.
+                return
         # Handed over, or no longer wanted: the service has the trip now.
         await trips.async_swap(None, None, profile)
         self._resume = False

@@ -63,7 +63,7 @@ _INPUT_KEYS = frozenset({
 })
 _PLAN_KEYS = frozenset({
     "trip", "inputs", "anchor", "session", "planned_start", "plan_paused", "estimated_stop",
-    "learned", "editor", "selection_vehicle", "edit_revision",
+    "learned", "editor", "selection_vehicle", "edit_revision", "withdrawn",
 })
 # Near a full battery the car tapers; that power says nothing about a charge.
 _TAPER_LEVEL = 90.0
@@ -187,7 +187,7 @@ class SocAnchor:
 _DIGEST = re.compile(r"[0-9a-f]{32}")
 _STATE_KEYS = frozenset({
     "trip", "status", "planned_start", "estimated_soc", "inputs", "scope", "confirmed",
-    "forecast", "editor", "selection_vehicle", "edit_revision",
+    "forecast", "editor", "selection_vehicle", "edit_revision", "withdrawn",
 })
 
 
@@ -243,6 +243,8 @@ class DepartureState:
     editor: str = "ha"
     selection_vehicle: str | None = None
     edit_revision: str = "0" * 32
+    # The car this time was set for is gone; only the guest still uses it.
+    withdrawn: bool = False
 
     def selection(self) -> dict[str, Any]:
         """Selection only, excluding changing forecast and meter readings."""
@@ -263,11 +265,13 @@ class DepartureState:
         _selection(raw["editor"], raw["selection_vehicle"])
         if not isinstance(raw["edit_revision"], str) or _DIGEST.fullmatch(raw["edit_revision"]) is None:
             raise ValueError("invalid departure edit revision")
+        if type(raw["withdrawn"]) is not bool:
+            raise ValueError("invalid departure plan state")
         return cls(
             TimedGoal.restore(raw["trip"]), status, None if start is None else instant(start),
             None if level is None else percentage(level), digest, scope, confirmed,
             None if raw["forecast"] is None else DepartureForecast.restore(raw["forecast"]),
-            raw["editor"], raw["selection_vehicle"], raw["edit_revision"],
+            raw["editor"], raw["selection_vehicle"], raw["edit_revision"], raw["withdrawn"],
         )
 
 
@@ -357,6 +361,9 @@ class DepartureController:
         self.editor = "ha"
         self.edit_revision = secrets.token_hex(16)
         self.selection_vehicle: str | None = None
+        # Withdrawn while a guest charged: the time stays for the guest and
+        # ends with it, unless someone sets a time meanwhile.
+        self.withdrawn = False
         self.trip = TimedGoal()
         self.inputs: DepartureInputs | None = None
         self.anchor: SocAnchor | None = None
@@ -383,9 +390,9 @@ class DepartureController:
                 if raw is not None:
                     self._restore(raw)
             except (OSError, ValueError, ArithmeticError, RecursionError) as err:
-                # Home Assistant hands the trip over again; nothing is
-                # planned until then. An oversized number is as damaged.
-                _LOGGER.warning("Departure plan: saved plan unavailable (%s); waiting for Home Assistant", type(err).__name__)
+                # Nothing is planned until a time is set again. An oversized
+                # number is as damaged.
+                _LOGGER.warning("Departure plan: saved plan unavailable (%s); starting without a target time", type(err).__name__)
                 self._reset()
             self._durable = self._decision()
             self.ready = True
@@ -403,12 +410,13 @@ class DepartureController:
         anchor = None if raw["anchor"] is None else SocAnchor.restore(raw["anchor"])
         session = None if raw["session"] is None else SessionMark.restore(raw["session"])
         start = None if raw["planned_start"] is None else instant(raw["planned_start"])
-        if type(raw["plan_paused"]) is not bool or type(raw["estimated_stop"]) is not bool:
+        if any(type(raw[key]) is not bool for key in ("plan_paused", "estimated_stop", "withdrawn")):
             raise ValueError("invalid departure plan flags")
         self.model = DepartureModel.restore(raw["learned"])
         self.trip, self.inputs, self.anchor, self._session = trip, inputs, anchor, session
         self.planned_start = start
         self.plan_paused, self.estimated_stop = raw["plan_paused"], raw["estimated_stop"]
+        self.withdrawn = raw["withdrawn"]
 
     def _state(self) -> dict[str, Any]:
         return {
@@ -421,6 +429,7 @@ class DepartureController:
             "planned_start": self._saved_start(),
             "plan_paused": self.plan_paused,
             "estimated_stop": self.estimated_stop,
+            "withdrawn": self.withdrawn,
             "learned": self.model.snapshot(),
         }
 
@@ -471,6 +480,7 @@ class DepartureController:
             "scope": self.scope,
             "confirmed": self.confirmed,
             "forecast": self.forecast,
+            "withdrawn": self.withdrawn,
         }
 
     @property
@@ -534,6 +544,7 @@ class DepartureController:
             self.editor = editor
             self.edit_revision = secrets.token_hex(16)
             self.selection_vehicle = None if withdraw else sample.vehicle
+            self.withdrawn = False
             if withdraw:
                 self.inputs = None
                 self._unbind()
@@ -553,6 +564,8 @@ class DepartureController:
             self.inputs = None
             self._unbind()
             self._hand_pause_to_guest(self.sample())
+            # The guest keeps the time; it ends with the guest.
+            self.withdrawn = self.trip.deadline is not None
             await self._save()
         return True
 
@@ -619,6 +632,14 @@ class DepartureController:
                     await self._save()
                 self.status = "guest_mode"
                 return
+            if self.withdrawn:
+                # The guest is gone, and nobody set a time since the car this
+                # one belonged to was withdrawn: no other car inherits it.
+                self.trip = TimedGoal()
+                self._reached_target = self.planned_start = None
+                self.estimated_stop = self.withdrawn = False
+                self.edit_revision = secrets.token_hex(16)
+                await self._save()
             self._now = sample.now
             self._observe(sample)
             self._at_full, self.forecast = False, None

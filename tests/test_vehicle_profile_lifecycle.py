@@ -323,6 +323,13 @@ def test_each_car_keeps_its_own_departure_across_switches(tmp_path):
                 # Each car gets its own departure back.
                 await choose("First car")
                 assert planned() == first
+                # Switching only the automatic selection keeps the same car's trip.
+                for automatic in (True, False):
+                    hass.config_entries.async_update_entry(
+                        entry, options={**entry.options, "vehicle_auto_selection": automatic},
+                    )
+                    await hass.async_block_till_done()
+                    assert planned() == first
                 await choose("none")
                 assert planned() == "no car"
                 await choose("Second car")

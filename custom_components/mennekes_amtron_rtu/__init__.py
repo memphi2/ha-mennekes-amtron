@@ -631,7 +631,13 @@ async def _async_switch_vehicle(
     runtime.vehicle_switching = True
     try:
         await _async_park_trip(hass, entry)
-        await _async_stop_vehicle(runtime, withdraw=True)
+        # The same car, e.g. only automatic selection switched: its trip and
+        # its plan's pause stay with it.
+        same_car = (
+            vehicle_options(entry.options).get(CONF_VEHICLE_PROFILE_ID) == runtime.vehicle_profile_id
+            and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True
+        )
+        await _async_stop_vehicle(runtime, withdraw=not same_car)
         auto = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
         if not auto and runtime.vehicle_detection is not None:
             runtime.vehicle_detection.stop()
