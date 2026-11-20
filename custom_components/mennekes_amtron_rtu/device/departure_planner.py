@@ -83,6 +83,7 @@ class DeparturePlanner:
             applied_a=connection.current_a, max_current_a=connection.current_cap,
             paused=control.is_paused if control is not None else None,
             pause_requested=control.pause_requested if control is not None else None,
+            pause_ends=control.writes.pause_ends if control is not None else 0,
             pending=connection.pending,
             read_only=control.read_only if control is not None else self._service.config.read_only,
             vehicle=goal.source if goal is not None else None,

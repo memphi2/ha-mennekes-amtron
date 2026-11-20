@@ -1201,3 +1201,42 @@ def test_lower_car_limit_replans_after_two_minutes_of_measured_delivery(tmp_path
         assert plan.status == "unreachable"
         assert plan.forecast["level_at_departure"] < 80
     run(body())
+
+
+@pytest.mark.parametrize(("unknown", "handover"), [(False, True), (False, False), (True, True)])
+def test_a_withdrawn_plan_still_ends_its_pause_when_the_guest_start_never_ran(tmp_path, unknown, handover):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        assert plan.plan_paused
+        # The guest's start waits: the plan's pause is still on the wallbox.
+        box.set(guest_mode=True, pause_requested=None if unknown else True)
+        await plan.tick()
+        await plan.set_trip(None, None, withdraw=True, vehicle_handover=handover)
+        assert plan.plan_paused
+        box.set(guest_mode=False, present=False, pause_requested=True)
+        await plan.tick()
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (1, False)
+
+    run(go())
+
+
+@pytest.mark.parametrize("withdraw", [False, True])
+def test_a_pause_that_followed_the_guests_start_unseen_is_the_guests(tmp_path, withdraw):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        # The start ran and a guest limit paused again before the plan looked.
+        box.set(guest_mode=True, paused=True, pause_requested=True, pause_ends=1)
+        if withdraw:
+            await plan.set_trip(None, None, withdraw=True, vehicle_handover=True)
+        else:
+            await plan.tick()
+        assert not plan.plan_paused
+        box.set(guest_mode=False, present=False)
+        await plan.tick()
+        await plan.tick()
+        assert box.resumes == 0
+
+    run(go())

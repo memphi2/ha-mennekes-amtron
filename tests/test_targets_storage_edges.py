@@ -15,7 +15,8 @@ from tests.test_departure_plan import NOW, Box, inputs
 from tests.test_departure_planner import hand_over
 
 
-def test_the_plan_does_not_end_a_guests_pause_after_the_unplug(tmp_path):
+@pytest.mark.parametrize("looked", [True, False])
+def test_the_plan_does_not_end_a_guests_pause_after_the_unplug(tmp_path, looked):
     async def run():
         async with runtime.guest_service(tmp_path) as (s, transport, clock):
             serial = s.identity.serial_number
@@ -33,8 +34,9 @@ def test_the_plan_does_not_end_a_guests_pause_after_the_unplug(tmp_path):
                 }
             )
             assert s.control.pause_requested is False
-            await s.departure.tick()
-            # the guest is paused by hand
+            if looked:
+                await s.departure.tick()
+            # the guest is paused by hand, also before the plan looked again
             clock[0] += 1000
             await s.command({"command": "pause", "expected_serial_number": serial})
             assert s.control.pause_requested is True

@@ -298,6 +298,8 @@ class DepartureSample:
     phases: int | None
     # A command of another owner is queued, e.g. one by hand.
     pending_foreign: bool = False
+    # How often a write ended a pause since the service started.
+    pause_ends: int = 0
 
 
 class DepartureController:
@@ -370,6 +372,9 @@ class DepartureController:
         self._command_current: float | None = None
         # Whether the wallbox showed the plan's pause as applied.
         self._pause_seen = False
+        # The count of ended pauses when the plan set its own; None until
+        # the first look after a restart.
+        self._pause_ends: int | None = None
 
     async def initialize(self) -> None:
         async with self._lock:
@@ -544,8 +549,24 @@ class DepartureController:
         if withdraw:
             self.inputs = None
             self._unbind()
-            self.plan_paused = self._pause_seen = False
+            self._hand_pause_to_guest(self.sample())
             await self._save()
+        return True
+
+    def _hand_pause_to_guest(self, s: DepartureSample) -> bool:
+        """Give the plan's pause up once the guest's start has ended it.
+
+        A pause from then on is the guest's, by hand or by its limits, and
+        the plan must not end it after the unplug. While the start still
+        waits, or never runs, the pause stays the plan's to end.
+        """
+        if not self.plan_paused:
+            return False
+        if self._pause_ends is None:
+            self._pause_ends = s.pause_ends
+        if s.pause_requested is not False and s.pause_ends == self._pause_ends:
+            return False
+        self.plan_paused = self._pause_seen = False
         return True
 
     async def set_inputs(self, inputs: DepartureInputs) -> None:
@@ -592,12 +613,7 @@ class DepartureController:
             if sample.guest_mode:
                 self._power_window.reset()
                 await self._cancel_command()
-                if self.plan_paused and sample.pause_requested is False:
-                    # The guest start has ended the plan's pause. A pause from
-                    # now on is the guest's, by hand or by its limits, and the
-                    # plan must not end it after the unplug. While the start
-                    # still waits, the pause stays the plan's to end.
-                    self.plan_paused = self._pause_seen = False
+                if self._hand_pause_to_guest(sample):
                     await self._save()
                 self.status = "guest_mode"
                 return
@@ -902,6 +918,7 @@ class DepartureController:
         self._command_current = current
         if current is None:
             self.plan_paused, self._pause_seen = True, False
+            self._pause_ends = self.sample().pause_ends
             # Saved first: after a restart in between, the plan still ends a
             # pause it set. A saved pause that never applied ends harmlessly.
             await self._save()
@@ -931,6 +948,10 @@ class DepartureController:
                 _LOGGER.info("Departure plan: pause ended, the plan no longer applies to the car")
                 if self.sample().pause_requested is not False:
                     return
+        elif s.guest_mode and self.plan_paused:
+            # The guest's start may still wait: see _hand_pause_to_guest.
+            self._hand_pause_to_guest(s)
+            return
         self.plan_paused = self._pause_seen = False
 
     async def _wait(self, status: str, s: DepartureSample, *, keep_start: bool = False) -> None:
