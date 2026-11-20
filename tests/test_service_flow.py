@@ -93,8 +93,10 @@ def test_service_form_validates_identity_credentials_and_backend(
                 reconfigure = scenario in ("reconfigure", "listeners")
                 flow.context = {"source": "reconfigure" if reconfigure else "user"}
                 flow.reconfigure_entry.data = {"port": "/dev/old"}
-                flow.reconfigure_entry.update_listeners = (
-                    [lambda: None] if scenario == "listeners" else []
+                # A loaded entry reloads itself after an update; an unloaded
+                # one is reloaded by the flow.
+                flow.reconfigure_entry.state = (
+                    ConfigEntryState.LOADED if scenario == "listeners" else ConfigEntryState.NOT_LOADED
                 )
                 result = await flow.async_step_server()
                 assert result["step_id"] == "server"
