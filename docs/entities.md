@@ -193,7 +193,9 @@ pause to stop manually. **Guest charging** (`binary_sensor.*_guest_charging`)
 is on while a guest charge is active.
 
 **Target time** is shared: for a guest it means “stop no later than”, and for
-a recognized vehicle it supplies the departure plan's deadline. Clear it with
+a recognized vehicle it supplies the departure plan's deadline. Its attribute
+`guest` says which one it is, and `vehicle` names the car's profile; the
+blueprints use them to act only for their own car. Clear it with
 `mennekes_amtron_rtu.clear_target_time`, targeting this datetime entity; the
 Mushroom example attaches this to holding the time card. Other targets remain
 unchanged. See the [dashboard and charging guide](app-from-home-assistant.md).

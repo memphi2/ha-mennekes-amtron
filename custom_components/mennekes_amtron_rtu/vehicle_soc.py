@@ -29,6 +29,7 @@ from homeassistant.helpers.event import (
 from .device.client_errors import AmtronBusError
 from .device.errors import DeviceError
 from .device.notice import FailureNotice
+from .device.soc_choice import READING_SECONDS
 from .device.soc_goal import SocGoal
 from .exceptions import service_validation_error
 from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
     from .vehicle_targets import VehicleTargetMemory
 
 _LOGGER = logging.getLogger(__name__)
+# An unchanged level is renewed in the service well before it forgets it.
+SOC_RENEW_SECONDS = READING_SECONDS / 3
 
 
 class SocControl(Protocol):
@@ -204,6 +207,9 @@ class VehicleSocObserver:
         self._target_model: SocGoal | None = None
         self._target_pending: _Observations | None = None
         self._last_sent: _Observation | None = None
+        # When the car's level last reached the service: the service counts
+        # it as known for READING_SECONDS only.
+        self._sent_at: float | None = None
         self._task: asyncio.Task[None] | None = None
         self._command_lock = asyncio.Lock()
         self._configured = False
@@ -268,7 +274,7 @@ class VehicleSocObserver:
                     value.soc_percent if self._use_vehicle_soc else observed_values.soc,
                     value.maximum_percent if self._use_vehicle_limit else observed_values.maximum,
                 )
-                self._queue_observation(observed_values)
+                self._queue_observation(observed_values, reported=True)
 
             self._unsubscribers.append(self._telemetry.subscribe(telemetry_changed))
         entities = []
@@ -289,7 +295,7 @@ class VehicleSocObserver:
                     if event.data["entity_id"] == self._soc_entity else
                     _Observation(observed_values.soc, vehicle_percentage(state, limit=True))
                 )
-                self._queue_observation(observed_values)
+                self._queue_observation(observed_values, reported=True)
 
             self._unsubscribers.extend((
                 async_track_state_change_event(self._hass, entities, observed),
@@ -405,14 +411,24 @@ class VehicleSocObserver:
         self._queue_observation(_Observation(self.latest_soc, self.maximum))
 
     @callback
-    def _queue_observation(self, observation: _Observation) -> None:
+    def _queue_observation(self, observation: _Observation, *, reported: bool = False) -> None:
+        """Queue what the car said; ``reported`` for a real report of the car.
+
+        An unchanged value is new information only as a sign of life: a real
+        report renews it in the service before the service forgets the level,
+        so a target chosen in the app meanwhile is judged on it. Nothing but a
+        report of the car renews it.
+        """
         if self._stopping or self._resting():
             return
         if self._target_model is not None:
             if self._target_pending is None:
                 self._target_pending = _Observations(self._target_model, self.source)
             self._target_pending.add(observation)
-        if self._pending is None and observation == self._last_sent:
+        if self._pending is None and observation == self._last_sent and not (
+            reported and self._sent_at is not None
+            and self._hass.loop.time() - self._sent_at >= SOC_RENEW_SECONDS
+        ):
             return
         if self._pending is None:
             model = (
@@ -500,6 +516,7 @@ class VehicleSocObserver:
                         self._notice.failed("cannot be updated", type(err).__name__)
                         return
                     self._last_sent = observations.latest
+                    self._sent_at = self._hass.loop.time()
                     self._notice.recovered("updated again")
         finally:
             self._inflight = None

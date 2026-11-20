@@ -324,9 +324,11 @@ detection sources before relying on them.
 
 Without Virtual Plug & Charge, an open charging release lets any car charge.
 Turn on **Switch off charging release when unplugged** under
-**Configuration** on the wallbox device page: after each confirmed disconnect,
-Home Assistant switches the release off, and you switch it on for the next
-charge. This runs in Home Assistant, so it is not enforced while HA is down.
+**Configure → Wallbox**: after each confirmed disconnect, the service that
+talks to the wallbox switches the release off, and you switch it on for the
+next charge. With the app it applies also while Home Assistant is not running;
+an unplug during an app restart is found when the app starts again. See
+[the option](entities.md#configuration).
 
 Switching **Charging release** on while Virtual Plug & Charge
 is enabled releases charging by hand, for any car, for the current connection.

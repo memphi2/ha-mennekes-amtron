@@ -63,6 +63,8 @@ _OWN_TRANSACTION: ContextVar[bool] = ContextVar("amtron_modbus_transaction", def
 # pymodbus replaces a message equal to the one before by "Repeating....",
 # once, so a second lost reply arrives under that text.
 _REPEATED = "Repeating...."
+# How often a guarded write waits out an unsure line and checks again.
+_GUARD_ROUNDS = 2
 _last_was_lost_reply = False
 
 
@@ -590,43 +592,55 @@ class MennekesModbusClient:
                 client = await self._async_transaction_client(verify_identity=verify_identity)
                 if before_write is not None:
                     before_write()
-                if precondition is not None:
-                    generation = self._connection_generation
+                generation = self._connection_generation
 
-                    async def read_locked(register: RegisterSpec) -> RegisterValue:
-                        nonlocal locked
-                        # Keep the ordinary-operation queue, but let a pending
-                        # priority heartbeat pass between Modbus transactions.
-                        # The final read remains locked through the write.
-                        self._lock.release()
-                        locked = False
-                        await asyncio.sleep(0)
-                        await self._lock.acquire()
-                        locked = True
-                        if (
-                            self._require_client() is not client
-                            or generation != self._connection_generation
-                            or not client.connected
-                        ):
-                            raise AmtronConnectionError("connection changed during write precondition")
-                        words = await self._async_read_transport(client, register.address, register.count)
-                        return decode_register(register, words)
-
-                    await precondition(read_locked)
+                async def read_locked(register: RegisterSpec) -> RegisterValue:
+                    nonlocal locked
+                    # Keep the ordinary-operation queue, but let a pending
+                    # priority heartbeat pass between Modbus transactions.
+                    # The final read remains locked through the write.
+                    self._lock.release()
+                    locked = False
+                    await asyncio.sleep(0)
+                    await self._lock.acquire()
+                    locked = True
                     if (
                         self._require_client() is not client
                         or generation != self._connection_generation
                         or not client.connected
                     ):
-                        # Never apply an observation made on a previous link to
-                        # a write after a transparent disconnect or reconnect.
                         raise AmtronConnectionError("connection changed during write precondition")
-                    # A priority operation may have run while the bus was free.
-                    self.check_write_interval(spec, min_interval=min_interval)
-                    # The precondition may await one or more live reads while
-                    # deadline or goal evidence changes in another task.
-                    if before_write is not None:
-                        before_write()
+                    words = await self._async_read_transport(client, register.address, register.count)
+                    return decode_register(register, words)
+
+                # The rule for every guarded write: what it was judged on is
+                # still true when it is sent. A line that must fall silent
+                # first (see bus_quiet) waits up to a second or more, so the
+                # wait comes before the live check, and a check whose reads
+                # left the line unsure again is repeated after the next wait.
+                # Nothing but the synchronous checks and the write follow.
+                for _ in range(_GUARD_ROUNDS):
+                    await self._quiet.settle()
+                    if precondition is not None:
+                        await precondition(read_locked)
+                    if not self._quiet.suspect:
+                        break
+                else:
+                    raise AmtronConnectionError("line not quiet after the write precondition")
+                if (
+                    self._require_client() is not client
+                    or generation != self._connection_generation
+                    or not client.connected
+                ):
+                    # Never apply an observation made on a previous link to
+                    # a write after a transparent disconnect or reconnect.
+                    raise AmtronConnectionError("connection changed during write precondition")
+                # A priority operation may have run while the bus was free.
+                self.check_write_interval(spec, min_interval=min_interval)
+                # Deadline or goal evidence changes in another task while the
+                # line falls silent or the precondition awaits live reads.
+                if before_write is not None:
+                    before_write()
             rejected = False
             error: BaseException | None = None
             self.write_trace.begin(

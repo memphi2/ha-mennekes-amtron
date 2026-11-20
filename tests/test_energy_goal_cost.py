@@ -308,3 +308,41 @@ def test_a_price_that_changes_nothing_opens_no_waiting_minute():
         assert control.energy_goal.cost.price == 0.50
         await runner.async_stop()
     asyncio.run(run())
+
+
+def test_the_money_used_at_the_end_counts_the_last_reading_and_survives_a_restart():
+    goal = EnergyGoal()
+    goal.set_target(33.3, 100.0)
+    goal.cost = CostPart(10.0, 0.0, 0.30)
+    goal.observe(130.0)
+    assert goal.cost_spent == pytest.approx(9.0)
+    # The reading that reaches the target is the one that counts.
+    assert goal.observe(133.4)
+    assert goal.status == "reached"
+    assert goal.cost_spent == pytest.approx(10.02)
+    # The money used is part of what is saved, not only of the running owner.
+    restored = EnergyGoal.restore(goal.snapshot())
+    assert restored.cost_spent == pytest.approx(10.02)
+    # A later reading changes nothing once the target is reached.
+    assert not goal.observe(140.0)
+    assert goal.cost_spent == pytest.approx(10.02)
+
+
+def test_a_reached_amount_is_saved_with_its_money_and_shown_after_a_restart():
+    async def run():
+        harness, control, runner, saved, _clock = await _cost_runner()
+        await runner.async_set_cost_target(3, 0.30)
+        assert control.energy_goal.target_kwh == 10.0
+        runner.observe(_snapshot(harness, 109.0))
+        await _settle(runner)
+        assert control.energy_goal.cost_spent == pytest.approx(2.7)
+        # The reading that reaches the target is saved with the money it used.
+        runner.observe(_snapshot(harness, 110.0))
+        await _settle(runner)
+        assert control.energy_goal.status == "reached"
+        assert control.energy_goal.cost_spent == pytest.approx(3.0)
+        assert saved[-1]["status"] == "reached"
+        # What a restarted service finds on disk shows the same money.
+        assert EnergyGoal.restore(saved[-1]).cost_spent == pytest.approx(3.0)
+        await runner.async_stop()
+    asyncio.run(run())

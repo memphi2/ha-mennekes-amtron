@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 from .connection_sample import connection_sample
 from .errors import DeviceError
@@ -15,7 +15,8 @@ if TYPE_CHECKING:
     from .service_runtime import ModbusService
 
 # A charge level Home Assistant reported counts for the app this long.
-_READING_SECONDS = 900.0
+# How long the app counts a reported charge level as known.
+READING_SECONDS: Final = 900.0
 
 
 class SocChoice:
@@ -81,7 +82,7 @@ class SocChoice:
             reading = self._reading
             known = (
                 reading is not None and reading[0] == control.soc_goal.source and reading[3] == self._scope()
-                and time.monotonic() - reading[2] <= _READING_SECONDS
+                and time.monotonic() - reading[2] <= READING_SECONDS
             )
             payload = {
                 **payload, "source": control.soc_goal.source, "maximum": control.soc_goal.maximum_percent,

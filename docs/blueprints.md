@@ -37,7 +37,8 @@ calendar supplies the departure time. It does not create a charge target.
    for example **Plan next trip**.
 3. Create an automation from **Plan the next trip from a calendar**. Select the
    calendar, the exact event title, the helper and, for **Target time**,
-   the wallbox's **Target time** entity. Titles are case-sensitive.
+   the wallbox's **Target time** entity. Titles are case-sensitive. With more
+   than one car, enter under **Vehicle** the name of the car's profile.
 4. Choose how far ahead to plan: the default is **12 hours**, adjustable up to
    **14 days**. Allow enough time for the energy your vehicle needs.
 5. Turn on **Plan next trip**. The automation selects the earliest matching
@@ -45,7 +46,9 @@ calendar supplies the departure time. It does not create a charge target.
 
 If no matching event is available yet, the helper stays on and the automation
 checks every 15 minutes and after a Home Assistant restart. An unavailable
-calendar produces no commands. Only this next trip is selected: recurring
+calendar produces no commands. While a guest charges, **Target time** is the
+guest's end time; the automation waits until the guest charge is over. With a
+**Vehicle** entered it also waits while another car is selected. Only this next trip is selected: recurring
 calendar events do not enable another plan automatically. An existing future
 **Target time** is preserved; cancel it before selecting a different trip.
 Calendar edits or deletions after selection do not change the copied time.
@@ -79,12 +82,14 @@ action only if your vehicle integration supplies one.
    previous value after restarting.
 2. Create an automation from **Precondition before the next trip**. Select the
    same wallbox departure entity, the helper and your vehicle's **start climate**
-   action or script. Use an explicit start action rather than a toggle.
+   action or script. Use an explicit start action rather than a toggle. With
+   more than one car, enter under **Vehicle** the name of the car's profile, so
+   another car's departure does not start this car's climate.
 3. Select the lead time; the default is **15 minutes**. Leave the automation
    enabled for climate on future trips, or disable it whenever climate is not
    wanted.
 
-The automation checks every minute. After a Home Assistant restart it catches
+The automation never runs for a guest's end time. The automation checks every minute. After a Home Assistant restart it catches
 up if the departure is still ahead and already inside the lead window. It
 records the selected departure in the helper **before** attempting your actions,
 using an unambiguous timestamp even when clocks change. Normal restarts do not

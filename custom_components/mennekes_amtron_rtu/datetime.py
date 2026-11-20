@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from homeassistant.components.datetime import DateTimeEntity, DateTimeEntityDescription
 from homeassistant.core import HomeAssistant
@@ -11,6 +12,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .entity import AmtronEntity, Projection
 from .entry_types import MennekesAmtronConfigEntry
+from .vehicle_profiles import profiles
 
 PARALLEL_UPDATES = 1
 
@@ -43,6 +45,14 @@ class AmtronTargetTime(AmtronEntity, DateTimeEntity):
     def native_value(self) -> datetime | None:
         plan = self.runtime.control.departure
         return plan.trip.deadline if plan is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        # Whose time it is, so an automation acts only for the car it serves.
+        if self.runtime.control.guest_active():
+            return {"guest": True}
+        profile = profiles(self._entry.options).get(self.runtime.vehicle_profile_id or "")
+        return {"guest": False, "vehicle": profile.name if profile is not None else None}
 
     async def _async_set(self, value: datetime | None) -> None:
         if (observer := self.runtime.departure_observer) is not None:

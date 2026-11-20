@@ -5,7 +5,7 @@
 For maintainers and technical investigations; normal setup starts with
 [Installation](installation.md).
 
-[Service](#one-service-runtime) · [Code layout](#shape) · [Design](#design-decisions) · [Data flow](#data-flow) · [Tests](#testing)
+[Service](#one-service-runtime) · [Code layout](#shape) · [Rules](#rules-every-change-keeps) · [Design](#design-decisions) · [Data flow](#data-flow) · [Tests](#testing)
 
 ## One service runtime
 
@@ -274,6 +274,20 @@ recorder_profile.py   read-only Recorder suggestions using registered IDs
 diagnostics.py        allowlist dump + raw register image
 repairs.py            + repair_issues.py
 ```
+
+## Rules every change keeps
+
+Most remaining risk sits where two owners meet and a fact checked before an
+`await` is used after it. These rules have one owner each; a change that
+needs another place for one of them changes the owner instead.
+
+| Rule | Owner | Combination tests |
+|---|---|---|
+| Whatever a write was judged on still holds when it is sent: after the last wait for the bus, for identity, for live reads or for a silent RTU line, only synchronous checks and the write follow. A live check whose reads left the line unsure is repeated after the next wait, at most twice, otherwise the command is refused. | `MennekesModbusClient._async_write_locked` in `device/client.py`; the synchronous checks in `WritePath._check_write_allowed` | `tests/test_client.py`, `tests/test_client_identity_guard.py`, `tests/test_charging_conflict_matrix.py` |
+| A waiting stop is replaced only by what undoes it: the same planner's newer decision, a start after a pause, or the switch that undoes a lock or a withdrawn release. Every other command, a different stop included, leaves it waiting. | `CommandQueue._outlasts` in `device/control_queue.py` | `tests/test_waiting_stop.py`, `tests/test_queue_combinations.py` |
+| Data about a car belongs to one plug-in: a release, a grant, a guest permission or a charge level counts only for the connection it was given for, and an unknown gap of over a minute ends that connection. | `PlugCycle` in `device/plug_cycle.py` (`scope`, `stamp`) | `tests/test_plug_cycle.py`, `tests/test_plug_charge_lifecycle.py`, `tests/test_console_charging.py` |
+| An unchanged value counts as confirmed again only when its source reported it again; a poll, a reconnect or a restart renews nothing. A real report renews an unchanged charge level in the app before the app forgets it. | `PlugCycle.observe` for the plug, `VehicleSocObserver._queue_observation` in `vehicle_soc.py` for the charge level | `tests/test_soc_goal_ha_lifecycle.py`, `tests/test_plug_cycle.py` |
+| A restart finds exactly what was decided: intents, latched stops, targets with their baseline and the money used, Plug & Charge and guest permissions, the unplug rule, the trip and the charge meter of the running plug-in. Ordinary progress is not saved; every transition that a restart must know is saved before it acts. | `IntentStore` in `device/service_store.py`, `EnergyGoal.snapshot`, `DepartureStore`, `ChargeMeterStore` | `tests/test_service_intent_reset.py`, `tests/test_energy_goal_cost.py`, `tests/test_charge_meter_store.py`, `tests/test_service_ha_restart.py` |
 
 ## Design decisions
 

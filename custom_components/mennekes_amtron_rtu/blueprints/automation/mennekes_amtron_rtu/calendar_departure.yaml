@@ -7,6 +7,7 @@ blueprint:
     do not automatically start another plan. Configure the vehicle's SoC
     target and battery capacity first. This automation sets a departure time,
     not a charge target, and preserves an already planned future departure.
+    It waits while a guest charges, whose end time the Target time then is.
   domain: automation
   homeassistant:
     min_version: "2026.9.0"
@@ -41,6 +42,15 @@ blueprint:
           filter:
             - integration: mennekes_amtron_rtu
               domain: datetime
+    vehicle_name:
+      name: Vehicle
+      description: >-
+        The name of the vehicle profile this automation serves. It runs only
+        while the Target time belongs to that car, never for a guest charge.
+        Leave empty when only one car charges here.
+      default: ""
+      selector:
+        text:
     planning_lead_hours:
       name: Plan up to this many hours ahead
       description: >-
@@ -65,6 +75,7 @@ variables:
   arm_entity: !input arm_next_trip
   departure_entity: !input departure_time
   lead_hours: !input planning_lead_hours
+  vehicle_name: !input vehicle_name
 
 triggers:
   - trigger: state
@@ -84,7 +95,10 @@ conditions:
       {{ states(calendar_entity) in ['on', 'off'] and event_title | trim != ''
          and states[departure_entity] is not none
          and states(departure_entity) != 'unavailable'
-         and as_timestamp(states(departure_entity), 0) <= as_timestamp(now()) }}
+         and as_timestamp(states(departure_entity), 0) <= as_timestamp(now())
+         and state_attr(departure_entity, 'guest') is false
+         and (vehicle_name | trim == ''
+              or state_attr(departure_entity, 'vehicle') == vehicle_name | trim) }}
 
 actions:
   - variables:
@@ -124,7 +138,10 @@ actions:
          and as_timestamp(selected_start, 0) > as_timestamp(now())
          and states[departure_entity] is not none
          and states(departure_entity) != 'unavailable'
-         and as_timestamp(states(departure_entity), 0) <= as_timestamp(now()) }}
+         and as_timestamp(states(departure_entity), 0) <= as_timestamp(now())
+         and state_attr(departure_entity, 'guest') is false
+         and (vehicle_name | trim == ''
+              or state_attr(departure_entity, 'vehicle') == vehicle_name | trim) }}
   - action: datetime.set_value
     target:
       entity_id: !input departure_time

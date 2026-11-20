@@ -21,6 +21,7 @@ from custom_components.mennekes_amtron_rtu.sensor import (
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from custom_components.mennekes_amtron_rtu.services import DEVICE_ACTIONS
 from tests.ha_fakes import build_runtime, collect
+from tests.test_vehicle_profile_runtime import A, catalog
 
 PLAN = ("departure_plan", "planned_start", "estimated_finish", "estimated_level_at_departure")
 
@@ -195,6 +196,14 @@ def test_the_time_entity_shows_the_guests_time_and_hands_edits_to_the_cars_obser
         entity = dates["departure_time"]
         assert entity.available
         assert entity.native_value == guest_time
+        # Automations see that the time is a guest's, not the car's departure.
+        assert entity.extra_state_attributes == {"guest": True}
+        control.guest_active = lambda: False
+        assert entity.extra_state_attributes == {"guest": False, "vehicle": None}
+        entry.options.update(catalog())
+        entry.runtime_data.vehicle_profile_id = A
+        assert entity.extra_state_attributes == {"guest": False, "vehicle": "First car"}
+        control.guest_active = lambda: True
         # The observer knows that a guest charges and sets the guest's time.
         await entity.async_set_value(guest_time)
         observer.async_set_deadline.assert_awaited_with(guest_time)
