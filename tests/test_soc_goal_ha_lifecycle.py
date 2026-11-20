@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -205,8 +206,8 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
 
 
 
-@pytest.mark.parametrize("reported", [True, False])
-def test_a_target_lowered_in_the_app_is_judged_on_the_cars_unchanged_report(tmp_path: Path, reported):
+@pytest.mark.parametrize("report", ["level", "limit", "none"])
+def test_a_target_lowered_in_the_app_is_judged_on_the_cars_unchanged_report(tmp_path: Path, report):
     async def run():
         transport = FakeModbusClient(device_bank(charging_current=8, evse_state=2))
         put(transport.bank, R.CP_STATE, 11)
@@ -216,24 +217,26 @@ def test_a_target_lowered_in_the_app_is_judged_on_the_cars_unchanged_report(tmp_
         ):
             hass = await _boot(tmp_path / "config")
             try:
-                hass.states.async_set(SOC, "80", {"unit_of_measurement": "%"})
+                # The car reported 80 % 16 minutes ago and its limit since.
+                hass.states.async_set(SOC, "80", {"unit_of_measurement": "%"}, timestamp=time.time() - 960)
+                hass.states.async_set(LIMIT, "90", {"unit_of_measurement": "%"})
                 entry = await _entry(hass)
-                await _options(hass, entry)
+                await _options(hass, entry, limit=True)
                 registry = er.async_get(hass)
                 waiting = registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_operation_waiting")
                 await settle(hass, entry)
                 service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
                 observer = entry.runtime_data.vehicle_soc
-                assert service.soc_choice._reading is not None
-                # 16 minutes later: the app forgot the level it was told, and
-                # Home Assistant told it no level since, as it stayed at 80 %.
-                source, soc, at, scope = service.soc_choice._reading
-                service.soc_choice._reading = (source, soc, at - 960, scope)
+                # The app was told the level with its age: already too old.
+                assert service.soc_choice._reading[1] == 80
                 observer._sent_at -= 960
-                if reported:
+                if report == "level":
                     # The car reports again, with the same 80 %.
                     hass.states.async_set(SOC, "80", {"unit_of_measurement": "%"})
-                    await hass.async_block_till_done()
+                elif report == "limit":
+                    # Only the limit is reported again; the level is no newer.
+                    hass.states.async_set(LIMIT, "90", {"unit_of_measurement": "%"})
+                await hass.async_block_till_done()
                 # Ordinary polls renew nothing.
                 await settle(hass, entry)
                 await service.command({
@@ -242,9 +245,10 @@ def test_a_target_lowered_in_the_app_is_judged_on_the_cars_unchanged_report(tmp_
                     "expected_serial_number": service.identity.serial_number,
                 })
                 await settle(hass, entry)
-                status = "reached" if reported else "active"
+                reached = report == "level"
+                status = "reached" if reached else "active"
                 assert service.control.soc_goal.status == status
-                assert service.control.energy_goal_stop_requested is reported
+                assert service.control.energy_goal_stop_requested is reached
                 assert vehicle_target(hass, waiting) == status
                 assert await hass.config_entries.async_unload(entry.entry_id)
             finally:

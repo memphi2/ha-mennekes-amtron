@@ -308,7 +308,7 @@ class ServiceControl:
     @ha_command
     async def async_set_soc_goal(
         self, value: float, *, source: str, soc: float | None = None,
-        maximum: float | None = None,
+        maximum: float | None = None, soc_age: float | None = None,
     ) -> None:
         if not self.supports_soc_goal:
             raise DeviceValidationError("soc_goal_not_supported")
@@ -330,7 +330,7 @@ class ServiceControl:
             self._soc_transaction_fenced = False
             result = await self._soc_transaction_request("/v2/soc-goal/commit", {
                 "token": token, "expected_serial_number": self._client.bound_serial,
-                "value": value, "source": source, "soc": soc, "maximum": maximum,
+                "value": value, "source": source, "soc": soc, "soc_age": soc_age, "maximum": maximum,
             })
             outcome = self._apply_soc_transaction_result(result, previous_revision)
             if outcome in ("rejected", "superseded"):
@@ -345,9 +345,9 @@ class ServiceControl:
     @ha_command
     async def async_observe_soc(
         self, soc: float | None, maximum: float | None = None, *, source: str,
-        expected_soc_revision: str | None = None,
+        expected_soc_revision: str | None = None, soc_age: float | None = None,
     ) -> None:
-        values: dict[str, Any] = {"source": source, "soc": soc, "maximum": maximum}
+        values: dict[str, Any] = {"source": source, "soc": soc, "soc_age": soc_age, "maximum": maximum}
         if expected_soc_revision is not None:
             values["expected_soc_revision"] = expected_soc_revision
         await self._soc_command("soc_observation", **values)

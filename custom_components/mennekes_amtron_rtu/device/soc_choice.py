@@ -14,9 +14,10 @@ if TYPE_CHECKING:
     from .control import AmtronControl
     from .service_runtime import ModbusService
 
-# A charge level Home Assistant reported counts for the app this long.
-# How long the app counts a reported charge level as known.
+# How long the app counts a charge level the car reported as known.
 READING_SECONDS: Final = 900.0
+# The oldest age a reported charge level may name.
+SOC_AGE_LIMIT: Final = 7 * 86400.0
 
 
 class SocChoice:
@@ -93,6 +94,9 @@ class SocChoice:
             raise ValueError("source is required")
         soc = None if payload.get("soc") is None else number(payload["soc"], 0, 100)
         maximum = None if payload.get("maximum") is None else number(payload["maximum"], 0, 100)
+        # Seconds since the car reported this level; a report of another value,
+        # such as its limit, does not make the level any newer.
+        age = 0.0 if payload.get("soc_age") is None else number(payload["soc_age"], 0, SOC_AGE_LIMIT)
         if command == "soc_observation":
             await control.async_observe_soc(soc, maximum, source=source)
         else:
@@ -106,4 +110,4 @@ class SocChoice:
                     self.revision = secrets.token_hex(16)
         if command != "soc_goal_choice":
             scope = self._scope()
-            self._reading = None if scope is None else (source, soc, time.monotonic(), scope)
+            self._reading = None if scope is None else (source, soc, time.monotonic() - age, scope)

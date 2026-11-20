@@ -55,11 +55,11 @@ class Control:
         self.maximum_required = maximum_required
         self.soc_goal.configure_source(source)
 
-    async def observe(self, soc, maximum, *, source):
+    async def observe(self, soc, maximum, *, source, soc_age=None):
         assert source == self.soc_goal.source
         self.soc_goal.observe(soc, maximum)
 
-    async def set_goal(self, value, *, source, soc, maximum):
+    async def set_goal(self, value, *, source, soc, maximum, soc_age=None):
         assert source == self.soc_goal.source
         self.soc_goal.set_target(value, soc, maximum)
 
@@ -159,7 +159,7 @@ def test_new_target_preserves_transient_threshold_while_command_is_in_flight(tmp
         observer = VehicleSocObserver(hass, control, coordinator, "sensor.car")
         started, release = asyncio.Event(), asyncio.Event()
 
-        async def slow_set(value, *, source, soc, maximum):
+        async def slow_set(value, *, source, soc, maximum, soc_age=None):
             started.set()
             await release.wait()
             await control.set_goal(value, source=source, soc=soc, maximum=maximum)
@@ -195,7 +195,7 @@ def test_failed_target_keeps_threshold_evidence_for_previous_goal(tmp_path):
         observer = VehicleSocObserver(hass, control, coordinator, "sensor.car")
         started, release = asyncio.Event(), asyncio.Event()
 
-        async def failing_set(value, *, source, soc, maximum):
+        async def failing_set(value, *, source, soc, maximum, soc_age=None):
             original = control.soc_goal
             control.soc_goal = copy(original)
             await control.set_goal(value, source=source, soc=soc, maximum=maximum)
@@ -236,7 +236,7 @@ def test_uncertain_committed_target_keeps_its_transient_threshold(tmp_path):
         observer = VehicleSocObserver(hass, control, coordinator, "sensor.car")
         started, release = asyncio.Event(), asyncio.Event()
 
-        async def uncertain_set(value, *, source, soc, maximum):
+        async def uncertain_set(value, *, source, soc, maximum, soc_age=None):
             await control.set_goal(value, source=source, soc=soc, maximum=maximum)
             started.set()
             await release.wait()
@@ -378,7 +378,7 @@ def test_pending_observations_account_for_an_inflight_cap_reduction(tmp_path):
             await observer.async_set_target(80)
             started, release = asyncio.Event(), asyncio.Event()
 
-            async def blocked(soc, maximum, *, source):
+            async def blocked(soc, maximum, *, source, soc_age=None):
                 started.set()
                 await release.wait()
                 await control.observe(soc, maximum, source=source)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from datetime import datetime
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -120,17 +121,22 @@ class BavarianTelemetrySource(BavarianVehicleBinding):
             for state, binding in zip(states, bindings, strict=True)
         ]
         soc = states[0]
-        reported = soc.last_changed if soc is not None and values[0] is not None else None
-        return VehicleTelemetry(*values, soc_reported_at=reported)
+        if soc is None or values[0] is None:
+            return VehicleTelemetry(*values)
+        return VehicleTelemetry(*values, soc_reported_at=soc.last_changed, soc_last_reported=soc.last_reported)
 
     def subscribe(self, on_change: Callable[[VehicleTelemetry], None]) -> CALLBACK_TYPE:
         """Each consumer owns bounded listeners and its own chronological cache."""
         bindings = self._bindings()
         values: list[float | None] = []
+        # When the charge level was last reported; a report of another value
+        # leaves it alone.
+        soc_reported: datetime | None = None
         state_unsubs: list[CALLBACK_TYPE] = []
 
         @callback
         def observe(event: Event[EventStateChangedData] | Event[EventStateReportedData]) -> None:
+            nonlocal soc_reported
             if not self.available:
                 on_change(VehicleTelemetry())
                 return
@@ -138,16 +144,21 @@ class BavarianTelemetrySource(BavarianVehicleBinding):
             for index, binding in enumerate(bindings):
                 if current_bindings[index] != binding:
                     values[index] = None
+                    if index == 0:
+                        soc_reported = None
                     continue
                 if binding is not None and event.data["entity_id"] == binding[0]:
                     # Other fields retain their preceding event values. Reading
                     # global state here would lose a queued 85 -> 50 transition.
-                    values[index] = _value(event.data["new_state"], binding[1])
-            on_change(VehicleTelemetry(*values))
+                    state = event.data["new_state"]
+                    values[index] = _value(state, binding[1])
+                    if index == 0:
+                        soc_reported = state.last_reported if state is not None and values[0] is not None else None
+            on_change(VehicleTelemetry(*values, soc_last_reported=soc_reported))
 
         @callback
         def bind() -> None:
-            nonlocal bindings, values
+            nonlocal bindings, values, soc_reported
             for unsub in state_unsubs:
                 unsub()
             state_unsubs.clear()
@@ -156,6 +167,8 @@ class BavarianTelemetrySource(BavarianVehicleBinding):
                 _value(self._hass.states.get(binding[0]), binding[1]) if binding is not None else None
                 for binding in bindings
             ]
+            soc = self._hass.states.get(bindings[0][0]) if bindings[0] is not None else None
+            soc_reported = soc.last_reported if soc is not None and values[0] is not None else None
             entity_ids = [binding[0] for binding in bindings if binding is not None]
             if entity_ids:
                 state_unsubs.extend((
@@ -173,7 +186,7 @@ class BavarianTelemetrySource(BavarianVehicleBinding):
                 or any(binding is not None and binding[0] in (entity_id, event.data.get("old_entity_id")) for binding in bindings)
             ):
                 bind()
-                on_change(VehicleTelemetry(*values))
+                on_change(VehicleTelemetry(*values, soc_last_reported=soc_reported))
 
         bind()
         registry_unsubs = (

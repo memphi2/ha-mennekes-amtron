@@ -258,7 +258,7 @@ added to `intent.json` and is cancelled on service restart.
 
 ## Commands and API boundary
 
-Snapshots report `api_version: 3`, and authenticated endpoints use `/v2/`.
+Snapshots report `api_version: 4`, and authenticated endpoints use `/v2/`.
 The integration checks the API version and the snapshot's `service_version`.
 An unsupported API or a too old service produces the compatibility error; a
 malformed version or snapshot produces the data-validation error. Neither

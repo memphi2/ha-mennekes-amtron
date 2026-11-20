@@ -22,7 +22,7 @@ SOURCE = "sensor.car|"
 def _target(service, token, value=80):
     return {
         "token": token, "expected_serial_number": service.identity.serial_number,
-        "source": SOURCE, "value": value, "soc": 50, "maximum": None,
+        "source": SOURCE, "value": value, "soc": 50, "soc_age": 0, "maximum": None,
     }
 
 

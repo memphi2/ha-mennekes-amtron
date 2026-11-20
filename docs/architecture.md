@@ -67,7 +67,7 @@ projection of that state: each platform is a table of descriptions
 entity shows, when it exists and when it is available. HA restore values cannot
 overwrite service intent, and HA decides nothing about the wallbox.
 
-The HTTP client checks API 3 and a minimum service version reported in every
+The HTTP client checks API 4 and a minimum service version reported in every
 snapshot. A release that changes no service input reuses the published app, so
 updating HA does not restart the app or interrupt its heartbeat. Service
 changes have their own version and publication decision; see

@@ -63,6 +63,19 @@ def test_console_targets_auth_cas_and_vehicle_maximum(tmp_path, monkeypatch):
             assert service.control.soc_goal.source == CAR
             for bad in [{**choice, "source": "foreign"}, {**choice, "confirm": False}, {**choice, "action": "write_register"}]:
                 assert (await client.post("/api/charging", headers=headers, json=bad)).status == 400
+            # A level the car reported 16 minutes ago is no longer known to the app.
+            observation = {"command": "soc_observation", "source": CAR, "soc": 40, "maximum": 75, "expected_serial_number": service.identity.serial_number}
+            await service.command({**observation, "soc_age": 960})
+            choice.update(value=30, revision=service.choice_revision)
+            assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
+            assert service.control.soc_goal.status == "active"
+            await service.command({**observation, "soc_age": 5})
+            choice.update(value=35, revision=service.choice_revision)
+            assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
+            assert service.control.soc_goal.status == "reached"
+            for age in (-1, True, "5", 8 * 86400):
+                with pytest.raises(ValueError, match="allowed range"):
+                    await service.command({**observation, "soc_age": age})
     asyncio.run(body())
 
 
