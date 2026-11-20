@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the line to fall silent: a stop that arrived during that wait of up to about
   a second no longer lets the write out.
 - A vehicle charge target lowered in the app is reached also when the car
-  keeps reporting the same level: Home Assistant tells the unchanged level
-  again whenever the target changes elsewhere.
+  keeps reporting the same level: a new report of the car with an unchanged
+  level renews it in the app at least every five minutes, so the app still
+  knows it. Ordinary polls renew nothing, and a level the car stopped
+  reporting is not made current again.
 - The climate and calendar blueprints act only for their own car: they never
   run while a guest charges, whose end time **Target time** then is, and with
   a **Vehicle** entered not while another car is selected. **Target time**

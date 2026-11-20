@@ -6,6 +6,7 @@ import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
@@ -15,7 +16,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
     CONF_VEHICLE_SOC_ENTITY,
 )
-from tests.fakes import FakeModbusClient, device_bank
+from tests.fakes import FakeModbusClient, device_bank, put
 from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_modbus_service import current_writes
@@ -203,46 +204,48 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
     asyncio.run(asyncio.wait_for(run(), timeout=75))
 
 
-def test_a_target_lowered_in_the_app_is_judged_with_the_unchanged_level(tmp_path: Path):
+
+@pytest.mark.parametrize("reported", [True, False])
+def test_a_target_lowered_in_the_app_is_judged_on_the_cars_unchanged_report(tmp_path: Path, reported):
     async def run():
-        transport = FakeModbusClient(device_bank(charging_current=8))
+        transport = FakeModbusClient(device_bank(charging_current=8, evse_state=2))
+        put(transport.bank, R.CP_STATE, 11)
         with patch(
             "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=transport,
         ):
             hass = await _boot(tmp_path / "config")
             try:
-                hass.states.async_set(SOC, "65", {"unit_of_measurement": "%"})
+                hass.states.async_set(SOC, "80", {"unit_of_measurement": "%"})
                 entry = await _entry(hass)
                 await _options(hass, entry)
                 registry = er.async_get(hass)
                 waiting = registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_operation_waiting")
                 await settle(hass, entry)
                 service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
-                # The app has no recent level of its own (no car seen, or too
-                # old), and the car keeps reporting the same 65 %.
-                service.soc_choice._reading = None
-                forget_current_write(hass, entry)
+                observer = entry.runtime_data.vehicle_soc
+                assert service.soc_choice._reading is not None
+                # 16 minutes later: the app forgot the level it was told, and
+                # Home Assistant told it no level since, as it stayed at 80 %.
+                source, soc, at, scope = service.soc_choice._reading
+                service.soc_choice._reading = (source, soc, at - 960, scope)
+                observer._sent_at -= 960
+                if reported:
+                    # The car reports again, with the same 80 %.
+                    hass.states.async_set(SOC, "80", {"unit_of_measurement": "%"})
+                    await hass.async_block_till_done()
+                # Ordinary polls renew nothing.
+                await settle(hass, entry)
                 await service.command({
-                    "command": "soc_goal_choice", "value": 60,
+                    "command": "soc_goal_choice", "value": 70,
                     "expected_choice_revision": service.choice_revision,
                     "expected_serial_number": service.identity.serial_number,
                 })
-                assert service.control.soc_goal.status == "active"
-                forget_current_write(hass, entry)
                 await settle(hass, entry)
-                forget_current_write(hass, entry)
-                await settle(hass, entry)
-                assert vehicle_target(hass, waiting) == "reached"
-                # The service asks for the stop and pauses the charge.
-                assert service.control.energy_goal_stop_requested
-                for _ in range(20):
-                    if current_writes(transport)[-1:] == [1]:
-                        break
-                    forget_current_write(hass, entry)
-                    await settle(hass, entry)
-                    await asyncio.sleep(0.05)
-                assert current_writes(transport)[-1:] == [1]
+                status = "reached" if reported else "active"
+                assert service.control.soc_goal.status == status
+                assert service.control.energy_goal_stop_requested is reported
+                assert vehicle_target(hass, waiting) == status
                 assert await hass.config_entries.async_unload(entry.entry_id)
             finally:
                 await hass.async_stop()
