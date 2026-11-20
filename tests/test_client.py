@@ -580,6 +580,7 @@ def test_a_write_refused_before_it_is_sent_leaves_the_line_unsuspected() -> None
     asyncio.run(run())
 
 
+
 @pytest.mark.parametrize("guarded", ["before_write", "precondition"])
 def test_a_guard_is_judged_after_the_line_fell_silent(guarded) -> None:
     from custom_components.mennekes_amtron_rtu.device.bus_quiet import BusQuiet
@@ -612,5 +613,44 @@ def test_a_guard_is_judged_after_the_line_fell_silent(guarded) -> None:
         stopped.clear()
         await client.async_write_register(R.CHARGING_RELEASE, 1, before_write=guard)
         assert transport.writes == [(R.CHARGING_RELEASE.address, [1])]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("settles", [True, False])
+def test_a_live_check_that_left_the_line_unsure_is_made_again(settles) -> None:
+    from custom_components.mennekes_amtron_rtu.device.bus_quiet import BusQuiet
+
+    transport = FakeModbusClient(device_bank())
+
+    async def run() -> None:
+        client = _client(transport)
+        await client.async_connect()
+        client._quiet = BusQuiet(quiet=0.05)
+        loop = asyncio.get_running_loop()
+        states: list[str] = []
+        wallbox = ["idle"]
+
+        async def require_idle(read) -> None:
+            await read(R.EVSE_STATE)
+            states.append(wallbox[0])
+            if wallbox[0] != "idle":
+                raise RuntimeError("restart requires idle")
+            if not states[1:] or not settles:
+                # The read needed a retry: an answer may still be on its way,
+                # and while the line falls silent the wallbox starts charging.
+                client._quiet.unanswered()
+                if settles:
+                    loop.call_later(0.02, wallbox.__setitem__, 0, "charging")
+
+        if settles:
+            with pytest.raises(RuntimeError, match="requires idle"):
+                await client.async_write_register(R.SYSTEM_RESTART, 0xBB, precondition=require_idle)
+            assert states == ["idle", "charging"]
+        else:
+            with pytest.raises(AmtronConnectionError, match="not quiet"):
+                await client.async_write_register(R.SYSTEM_RESTART, 0xBB, precondition=require_idle)
+            assert states == ["idle", "idle"]
+        assert transport.writes == []
 
     asyncio.run(run())

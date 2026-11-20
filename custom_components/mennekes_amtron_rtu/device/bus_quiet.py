@@ -44,6 +44,11 @@ class BusQuiet:
             self._received_at = self._monotonic()
         return data
 
+    @property
+    def suspect(self) -> bool:
+        """Whether the next request would have to wait for silence first."""
+        return self._enabled and self._suspect_since is not None
+
     def unanswered(self) -> None:
         """A request timed out or was answered with something else."""
         self._suspect_since = self._monotonic()
