@@ -107,8 +107,11 @@ def test_charging_console_rejects_malformed_and_unavailable_edits(tmp_path, monk
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
             assert (await client.get("/api/charging?force=1", headers=HEADERS)).status == 400
             choice = {"action": "energy", "value": 10, "revision": state["revision"], "confirm": True}
-            for patch in [{"revision": 12}, {"value": -1}, {"value": True}, {"value": {}}, {"action": []}, {"action": "departure", "value": "bad-date"}]:
+            for patch in [{"revision": 12}, {"value": True}, {"value": {}}, {"action": []}, {"action": "departure", "value": "bad-date"}]:
                 assert (await client.post("/api/charging", headers=headers, json=choice | patch)).status == 400
+            # A number that is not a permitted target is a refusal with a name.
+            response = await client.post("/api/charging", headers=headers, json=choice | {"value": -1})
+            assert (response.status, (await response.json())["error"]) == (409, "energy_goal_invalid")
             assert (await client.post("/api/charging?force=1", headers=headers, json=choice)).status == 400
             service.control.startup_hold = True
             assert (await client.post("/api/charging", headers=headers, json=choice)).status == 409

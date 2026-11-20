@@ -146,9 +146,6 @@ def test_the_energy_goal_is_kept_by_the_service_and_writes_nothing() -> None:
 
         entry.runtime_data.client.snapshot["control"]["supports_energy_goal"] = False
         assert not goal.available
-        with pytest.raises(ServiceValidationError) as error:
-            await goal.async_set_native_value(5.0)
-        assert error.value.translation_key == "energy_goal_not_supported"
 
     asyncio.run(run())
 

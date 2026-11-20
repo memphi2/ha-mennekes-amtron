@@ -268,12 +268,18 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("cap", [None, True, 5, 33, float("nan"), float("inf")])
-def test_service_rejects_invalid_resume_caps_before_any_write(tmp_path, cap):
+@pytest.mark.parametrize(("cap", "error", "match"), [
+    # No number at all is a malformed request; a number that is no permitted
+    # cap is the caller's error with a name.
+    (None, ValueError, "must be a number"), (True, ValueError, "must be a number"),
+    (5, DeviceValidationError, "charging_current_invalid"),
+    (float("nan"), DeviceValidationError, "charging_current_invalid"),
+])
+def test_service_rejects_invalid_resume_caps_before_any_write(tmp_path, cap, error, match):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)
         try:
-            with pytest.raises(ValueError, match="numeric value"):
+            with pytest.raises(error, match=match):
                 await service.command({"command": "resume", "current_cap": cap, "expected_serial_number": "ABC123456789"})
             assert not current_writes(transport)
         finally:
@@ -459,7 +465,7 @@ def test_service_origin_is_validated_scoped_and_recorded(tmp_path):
             assert (event["source"], event["requested_value"]) == ("app", 10)
             assert command_source.get() == "unknown"
             with pytest.raises(ValueError, match="expected_serial_number"):
-                await service.command({"origin": "app"})
+                await service.command({"origin": "app", "command": "pause"})
             assert command_source.get() == "unknown"
         finally:
             await service.stop()

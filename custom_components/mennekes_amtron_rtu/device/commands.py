@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from .enums import RequestedPhases, SolarChargingMode
 from .errors import validation_error
-from .service_config import integer, number
+from .service_config import integer
 
 if TYPE_CHECKING:
     from .control import AmtronControl
@@ -51,6 +51,14 @@ def _fields(*names: str) -> frozenset[str]:
     return frozenset(names)
 
 
+def _real(value: object) -> float:
+    """A number at all. Whether it is a permitted one, the controller says:
+    a wrong value is the caller's error with a name, not a malformed request."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("value must be a number")
+    return float(value)
+
+
 async def _plug_charge_config(_service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
     enabled, policy = payload.get("value"), payload.get("policy", "")
     if type(enabled) is not bool or not isinstance(policy, str):
@@ -78,7 +86,7 @@ async def _set_current(_service: ModbusService, control: AmtronControl, payload:
     unlimited = payload.get("allow_unlimited", False)
     if not isinstance(unlimited, bool):
         raise ValueError("allow_unlimited must be boolean")
-    await control.async_set_charging_current(number(payload.get("value"), 0, 32), allow_unlimited=unlimited)
+    await control.async_set_charging_current(_real(payload.get("value")), allow_unlimited=unlimited)
 
 
 async def _pause(_service: ModbusService, control: AmtronControl, _payload: dict[str, Any]) -> None:
@@ -86,7 +94,7 @@ async def _pause(_service: ModbusService, control: AmtronControl, _payload: dict
 
 
 async def _energy_goal(_service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
-    await control.async_set_energy_goal(number(payload.get("value"), 0, 1000))
+    await control.async_set_energy_goal(_real(payload.get("value")))
 
 
 async def _cost(_service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
@@ -97,7 +105,7 @@ async def _cost(_service: ModbusService, control: AmtronControl, payload: dict[s
     price = payload.get("price")
     control.goal_controller.note_currency(payload.get("currency"))
     if payload["command"] == "cost_goal":
-        await control.goal_controller.async_set_cost_target(number(payload.get("value"), 0, 1000), price)
+        await control.goal_controller.async_set_cost_target(_real(payload.get("value")), price)
     else:
         await control.goal_controller.async_set_price(price)
 
@@ -112,7 +120,7 @@ async def _soc(service: ModbusService, control: AmtronControl, payload: dict[str
 
 async def _resume(service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
     await control.async_resume_charging(
-        current_cap=number(payload.get("current_cap", service.config.current_cap), 6, 32),
+        current_cap=_real(payload.get("current_cap", service.config.current_cap)),
     )
 
 

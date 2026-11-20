@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   stays as changed afterwards, and a service that lost its saved plan has no
   trip until one is set again. A time taken from a calendar or the car is
   refused when the trip was edited while that answer was awaited.
+- **Breaking (service API):** a number that is not a permitted value is
+  refused with the error's name (for example `energy_goal_invalid`) instead of
+  as an invalid request; a current above the maximum is capped.
 - **Breaking (service API):** a command takes only its own fields. A field
   that belongs to another command, which was ignored before, is refused.
 - Plug & Charge treats the plan's charge to the minimum level as a plan
