@@ -25,13 +25,16 @@
           <div><dt data-overview="limit">Current limit</dt><dd id="current_limit"></dd></div>
         </dl>
       </section>
-      <section class="card" aria-labelledby="choose_title">
-        <h2 id="choose_title" data-overview="choose">Plan your charging</h2>
-        <nav class="charging-choices" aria-labelledby="choose_title">
-          <a href="./targets"><span class="choice-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span><strong data-overview="targets_link">Charge target</strong><small data-overview="target_help">Limit energy or battery level without starting.</small></span><span aria-hidden="true">›</span></a>
-          <a href="./targets#departure_form"><span class="choice-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg></span><span><strong data-overview="departure_link">Target time</strong><small data-overview="departure_help">Vehicle departure or guest stop time.</small></span><span aria-hidden="true">›</span></a>
-          <a href="./targets#guest_start"><span class="choice-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3 5 14h6l-1 7 9-11h-6z"/></svg></span><span><strong data-overview="guest_link">Guest charging</strong><small data-overview="guest_help">Start now; optional energy and target-time limits apply.</small></span><span aria-hidden="true">›</span></a>
-        </nav>
+      <section class="card" aria-labelledby="targets_title">
+        <h2 id="targets_title" data-overview="targets_title">Charge targets</h2>
+        <dl class="values">
+          <div><dt data-overview="energy_target">Energy target</dt><dd id="energy_target"></dd></div>
+          <div><dt data-overview="cost_target">Cost target</dt><dd id="cost_target"></dd></div>
+          <div><dt data-overview="soc_target">Vehicle charge target</dt><dd id="soc_target"></dd></div>
+          <div><dt data-overview="time_target">Target time</dt><dd id="time_target"></dd></div>
+        </dl>
+        <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress.</p>
+        <p><a href="./targets" data-overview="targets_link">Change targets or start guest charging</a></p>
       </section>
       <section id="operation" class="card" aria-labelledby="operation_title" hidden>
         <h2 id="operation_title" data-overview="op_title">Current charging plan</h2>
@@ -45,13 +48,7 @@
         <p id="op_advice" class="hint"></p>
       </section>
       <details class="card wide">
-        <summary data-overview="limits_details">Saved limits and queued actions</summary>
-        <dl class="values">
-          <div><dt data-overview="energy_target">Energy target</dt><dd id="energy_target"></dd></div>
-          <div><dt data-overview="soc_target">Battery target</dt><dd id="soc_target"></dd></div>
-        </dl>
-        <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress.</p>
-        <h3 id="next_title" data-overview="next">Next queued action</h3>
+        <summary id="next_title" data-overview="next">Next queued action</summary>
         <p id="next_action"></p><p id="next_due" class="hint"></p>
         <p data-overview="guard_hint" class="hint">A queued action is not a confirmed write.</p>
       </details>

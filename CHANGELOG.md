@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- The app names its targets as Home Assistant does: energy target, cost
+  target, vehicle charge target and target time. The Charging page sorts them
+  into "for every charge", "own car only" and guest charging, each target has
+  its own Save and Clear, and the guest card lists what ends a guest charge.
+  While a guest holds the wallbox, the vehicle charge target says that it does
+  not apply.
+- The overview shows the four saved targets in one card with one link to the
+  Charging page, instead of three links to the same page. Its state carries
+  the target time as `targets.time`; the Charging page state carries
+  `guest_mode`.
+- The release publication reads a new draft again for about two minutes before
+  it stops, and names the reason when it does.
+
 ## 0.10.0b6 — 2026-11-20
 
 ### Changed

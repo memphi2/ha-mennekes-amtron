@@ -14,7 +14,7 @@ const operation = (changes = {}) => ({controller:"departure_plan", waiting:"unti
   next:{event:"plan_start", at:START}, target:{kind:"level", value:80, deadline:END}, vehicle:"confirmed", ...changes});
 const overview = summary => ({schema:1, available:true, state:"paused", reason:"pause_requested",
   read_only:false, heartbeat:"ok", pending:null, measurements:{power_w:0, session_kwh:1.5, current_limit_a:1},
-  targets:{energy_kwh:0, soc_percent:80}, operation:summary, commands:[]});
+  targets:{energy_kwh:0, soc_percent:80, cost_eur:null, time:null}, operation:summary, commands:[]});
 class Node {
   constructor() { this.textContent = ""; this.hidden = false; this.children = []; }
   set innerHTML(_value) { throw new Error("HTML insertion prohibited"); }
@@ -143,10 +143,18 @@ test("successful target stops do not claim that their command was prevented", as
   }
 });
 
-test("an energy target names its cost ceiling, and a restarted guest gets its own advice", async () => {
+test("the four saved targets each have their row, and a restarted guest gets its own advice", async () => {
   const data = overview(operation({waiting:"vehicle_unconfirmed"}));
-  data.targets = {energy_kwh:33.3, soc_percent:0, cost_eur:10}; data.guest_confirmation_required = true;
-  const h = setup("en", data); await flush();
-  assert.equal(put(h, "energy_target"), "33.3 kWh · €10.00");
+  data.targets = {energy_kwh:33.3, soc_percent:0, cost_eur:10, time:END}; data.guest_confirmation_required = true;
+  let h = setup("en", data); await flush();
+  assert.equal(put(h, "energy_target"), "33.3 kWh");
+  assert.equal(put(h, "cost_target"), "€10.00");
+  assert.equal(put(h, "soc_target"), "Off");
+  assert.match(put(h, "time_target"), /2026/);
+  // One way to the page that changes them, not one per target.
+  assert.equal([...html.matchAll(/href="\.\/targets[^"]*"/g)].length, 1);
+  const none = overview(operation());
+  const idle = setup("de", none); await flush();
+  assert.deepEqual(["energy_target", "cost_target", "time_target"].map(id => put(idle, id)), ["Aus", "Aus", "Aus"]);
   assert.match(put(h, "op_advice"), /Start it again under Charging/);
 });

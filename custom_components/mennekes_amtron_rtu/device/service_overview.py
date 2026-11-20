@@ -144,6 +144,8 @@ def overview_snapshot(
             "soc_percent": _number(soc.get("target_percent")),
             # The amount of money an energy target stands for, if any.
             "cost_eur": _number(_mapping(energy.get("cost")).get("amount")),
+            # The shared target time: a car's departure, a guest's end.
+            "time": _instant(_mapping(_mapping(control.get("departure")).get("trip")).get("deadline")),
         },
         # A guest that ran before a restart needs a new explicit start.
         "guest_confirmation_required": control.get("guest_confirmation_required") is True,

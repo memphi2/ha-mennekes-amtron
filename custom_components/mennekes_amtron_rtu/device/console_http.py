@@ -153,6 +153,8 @@ class ServiceConsole(AppSettings):
             "revision": service.choice_revision,
             "guest_revision": service.guest.revision,
             "guest_active": service.guest.active,
+            # Also a paused guest: the car's own targets do not apply to it.
+            "guest_mode": service.guest.mode,
             "energy": {"target": control.energy_goal.target_kwh, "status": control.energy_goal.status},
             # An amount of money carried by the energy target, and the last
             # price Home Assistant reported (none without charging costs).

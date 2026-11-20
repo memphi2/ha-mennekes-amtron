@@ -1,5 +1,12 @@
 # Changes
 
+## Unreleased
+
+- The Charging page sorts the targets by whom they apply to: for every
+  charge, own car only, guest charging. Names match Home Assistant, every
+  target has Save and Clear, and the guest card lists what ends a guest charge.
+- The overview shows the saved targets in one card with one link to Charging.
+
 ## 0.10.0b6
 
 - Integration and app must both be 0.10.0b6; update them together.

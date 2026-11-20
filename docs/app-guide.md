@@ -10,7 +10,7 @@ by the service app; a direct integration connection has no app web interface.
 |---|---|
 | See whether the car is charging and why it waits | **Overview** |
 | Check what changed the current or stopped charging | **Overview → Recent command results** |
-| Change kWh/cost/time/percentage limits or start a guest | **Charging** |
+| Set or clear the energy, cost, time or vehicle charge target, or start a guest | **Charging** |
 | Set up USB or LAN | **Settings → Connection** |
 | Change the current cap, polling or waiting interval | **Settings → Runtime** |
 | Investigate a problem | **Diagnostics → Registers** or **Log** |
@@ -37,7 +37,9 @@ visible and shows:
   **0 A means unlimited**, not paused
 - whether writes are enabled and whether the heartbeat is confirmed
 - the **next queued action** and its earliest time; queued does not mean done
-- the saved energy and battery targets; they are limits, not progress
+- **Charge targets**: the saved energy, cost and vehicle charge target and the
+  target time, with one link to the page that changes them; they are targets,
+  not progress
 - up to 32 recent command results since the app started, newest first
 
 If the app cannot be reached, the page hides old values instead of showing them
@@ -68,43 +70,53 @@ a vehicle.
 *German interface with simulated example values. The app also supports English,
 French, Italian and Dutch.*
 
-## Charge target
+## Charge targets
 
-Open **Charging**. Set an optional kWh limit, cost ceiling, time or vehicle
-percentage target on the left and save each change. The **cost ceiling** is an
-amount in EUR; it needs charging costs configured in Home Assistant, which
-reports the price to the app. It is carried by the kWh limit: saving a kWh
-value by hand ends it, and 0 EUR clears both. Without a running amount the
-page names the price and when Home Assistant last reported it, alone or
-together with an amount. The right side shows the saved choices and the
-**Start guest charging** button. Unsaved edits must be saved or reloaded first.
-The same saved values appear in Home Assistant. Setting a limit does not start charging.
+Open **Charging**. The page names every target as Home Assistant does and
+sorts them by whom they apply to:
 
-![Charging page with shared limits and the guest-start button](images/charging-de.png)
+- **For every charge** (your own car and guests): the **energy target** in kWh,
+  the **cost target** in EUR and the **target time**.
+- **Own car only**: the **vehicle charge target** in percent. It never applies
+  to a guest.
+- **Guest charging**: the start button, and below it what ends a guest charge
+  with the values saved right now.
+
+Every target has its own **Save** and **Clear**, and shows its saved value and
+state beside its name. Unsaved input is not used; a guest start waits until it
+is saved or reloaded. The same values appear in Home Assistant. A target never
+starts a charge.
+
+The **cost target** needs charging costs configured in Home Assistant, which
+reports the price to the app. It sets the energy target: saving an energy
+target by hand ends it, and clearing it clears both. Without an amount the page
+names the price and when Home Assistant last reported it.
+
+![Charging page with the targets for every charge, the own car's target and guest charging](images/charging-de.png)
 
 *German interface with simulated example values.*
 
-## Plan departure
+## Target time
 
-Intelligent vehicle planning is configured in Home Assistant, as before. It uses
-SoC, battery capacity and the selected next trip. The app shows the shared time
-and current plan status without a separate planning page.
-See [planning](departure-planning.md). A time used for a guest is instead a
-stop time: guest charging does not wait until a planned start.
+The target time means two things, and the page says which one applies. For your
+own car it is the departure: the plan charges to the vehicle charge target by
+then; it is set up in Home Assistant and uses the charge level and battery
+capacity. See [planning](departure-planning.md). For a guest it is the end of
+the charge: guest charging does not wait for a planned start.
 
 ## Guest charging
 
 Press **Start guest charging** to start now. It lifts a manual pause and grants
 permission for this connection, including when virtual Plug & Charge is enabled.
-It respects the shared kWh limit and time, whichever is reached first. Unset limits
-do not add hidden defaults. The saved vehicle percentage target is ignored for
-the guest and remains unchanged. Locks, faults and electrical limits still apply.
+The energy target, the cost target and the target time end the charge,
+whichever comes first; the card lists them, or says that none is set. The
+vehicle charge target stays saved, shows **does not apply to the guest**
+meanwhile, and is not used. Locks, faults and electrical limits still apply.
 For example, set **10 kWh** and **07:30 tomorrow**, save both, then start.
-The car starts as soon as the write guards allow and stops at whichever limit
-is reached first.
 
-The same button changes to **Pause guest charging** while active. Use it, the ordinary HA pause switch, or unplug to stop. There is no separate guest
-draft, duration or current editor. See [charging details](app-from-home-assistant.md).
+The same button changes to **Pause guest charging** while active. Use it, the
+ordinary HA pause switch, or unplug to stop; guest charging ends with the
+unplug. See [charging details](app-from-home-assistant.md).
 
 ## Registers
 

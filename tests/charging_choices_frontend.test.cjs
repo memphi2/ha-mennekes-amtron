@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../custom_components/mennekes_amtron_rtu/device');
 const source=fs.readFileSync(path.join(root,'app_charging.js'),'utf8');
-const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
+const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(page='targets',responses=[initial()],language='de'){
  const html=fs.readFileSync(path.join(root,'app_targets.html'),'utf8');
@@ -93,7 +93,7 @@ test('unsaved limits do not block pausing an active guest',async()=>{
  assert.equal(h.elements.get('energy_value').value,'25');
 });
 test('a definite refusal names the fix; anything else stays uncertain',async()=>{
- for(const [code,text] of [['guest_start_not_permitted',/Fahrzeug anstecken/],['guest_deadline_expired',/Zielzeitpunkt ist vorbei/],['energy_goal_stop_active',/Ladegrenze ist bereits erreicht/],['charging_save_uncertain',/nicht bestätigt/],['toString',/nicht bestätigt/]]){
+ for(const [code,text] of [['guest_start_not_permitted',/Fahrzeug anstecken/],['guest_deadline_expired',/Zielzeitpunkt ist vorbei/],['energy_goal_stop_active',/Ladeziel ist bereits erreicht/],['charging_save_uncertain',/nicht bestätigt/],['toString',/nicht bestätigt/]]){
   const h=setup('targets',[initial(),{error:code}]);await flush();await h.emit('guest_start','click');
   assert.match(h.elements.get('notice').textContent,text,code);
  }
@@ -115,7 +115,7 @@ test('a cost ceiling is saved in euros and shown with what it used',async()=>{
  assert.deepEqual(JSON.parse(h.calls[1].body),{action:'cost',value:10,revision:'r1',confirm:true});
  assert.equal(h.elements.get('cost_value').value,'10');
  assert.match(h.elements.get('cost_status').textContent,/€10\.00 · €1\.50 used · €0\.2874\/kWh/);
- assert.match(h.elements.get('energy_status').textContent,/from the cost ceiling/);
+ assert.match(h.elements.get('energy_status').textContent,/from the cost target/);
 });
 test('without a price the cost ceiling waits for Home Assistant',async()=>{
  const state=initial();state.cost_price=null;
@@ -148,7 +148,7 @@ test('an own save keeps another unsaved field current instead of calling it chan
 test('the departure plan names its planned start, and a plan that could not be saved',async()=>{
  const planned=initial();planned.departure.planned_start='2026-11-16T03:00:00.000Z';
  let h=setup('departure',[planned],'en');await flush();
- assert.match(h.elements.get('departure_summary').textContent,/^Planned start: .*2026/);
+ assert.match(h.elements.get('departure_summary').textContent,/^Planned start: .*26/);
  h=setup('departure',[initial()],'en');await flush();
  assert.equal(h.elements.get('departure_summary').textContent,'');
  const broken=initial();broken.departure.planned_start='soon';
@@ -174,4 +174,40 @@ test('a guest or a failed plan shows no planned start, and broken plan fields ar
   h=setup('departure',[broken],'en');await flush();
   assert.match(h.elements.get('notice').textContent,/No current response/);
  }
+});
+
+test('every target is cleared with its own button, and only a set one',async()=>{
+ const cost=initial();cost.cost={amount:10,spent:0,price:0.3};
+ for(const [key,body] of [['energy',{action:'energy',value:0,revision:'r1'}],['cost',{action:'cost',value:0,revision:'r1'}],['soc',{action:'soc',value:0,revision:'r1'}],['departure',{action:'departure',value:null,revision:'d1'}]]){
+  const h=setup('targets',[cost,initial()]);await flush();
+  assert.equal(h.elements.get(key+'_clear').disabled,false,key);
+  await h.emit(key+'_clear','click');
+  assert.deepEqual(JSON.parse(h.calls[1].body),{...body,confirm:true});
+ }
+ const empty=initial();empty.energy.target=0;empty.soc.target=0;empty.departure.deadline=null;
+ const h=setup('targets',[empty]);await flush();
+ for(const key of ['energy','cost','soc','departure'])assert.equal(h.elements.get(key+'_clear').disabled,true,key);
+});
+test('the guest card names what ends a guest charge, and the vehicle target is not part of it',async()=>{
+ let h=setup('targets',[initial()]);await flush();
+ assert.match(h.elements.get('guest_summary').textContent,/^Endet bei: 10 kWh · 16\.11\.26, /);
+ assert.doesNotMatch(h.elements.get('guest_summary').textContent,/80/);
+ assert.equal(h.elements.get('guest_status').textContent,'');
+ assert.equal(h.elements.get('soc_status').textContent,'80 % · Aktiv');
+ const cost=initial();cost.cost={amount:10,spent:0,price:0.3};cost.energy.target=33.3;cost.departure=null;
+ h=setup('targets',[cost]);await flush();
+ assert.match(h.elements.get('guest_summary').textContent,/^Endet bei: 10,00\s€ \(33\.3 kWh\)$/);
+ const open=initial();open.energy.target=0;open.departure.deadline=null;
+ h=setup('targets',[open]);await flush();
+ assert.match(h.elements.get('guest_summary').textContent,/^Kein Ziel gesetzt/);
+});
+test('while a guest holds the wallbox the vehicle target says that it does not apply',async()=>{
+ const guest={...initial(),guest_active:true,guest_mode:true};guest.departure.status='guest_mode';
+ let h=setup('targets',[guest]);await flush();
+ assert.equal(h.elements.get('guest_status').textContent,'Gastladen läuft');
+ assert.equal(h.elements.get('soc_status').textContent,'80 % · gilt nicht für den Gast');
+ assert.match(h.elements.get('departure_status').textContent,/Beendet das Gastladen$/);
+ h=setup('targets',[{...guest,guest_active:false}]);await flush();
+ assert.equal(h.elements.get('guest_status').textContent,'Gastladen ist pausiert');
+ assert.equal(h.elements.get('guest_start').textContent,'Gastladen starten');
 });
