@@ -86,7 +86,7 @@ def test_the_users_pause_behind_the_plans_waiting_pause_is_refused_aloud():
         harness, control = await charging()
         control.soc_goal.status, control.soc_goal.target_percent = "active", 80
         harness.client.write_state.mode_change_at = harness.clock[0]
-        await control.async_set_timed_current(
+        await control.async_set_departure_current(
             None, deadline=datetime.now(UTC) + timedelta(hours=1), owner="departure",
         )
         harness.clock[0] += 10
@@ -143,7 +143,7 @@ def test_a_withdrawn_manual_release_waits_for_its_own_write():
                 "charging_release": bank[R.CHARGING_RELEASE.address], "charging_current_ems": 16.0,
             })
 
-        control.observe_plug_charge(data())
+        control.observe_plug(data())
         harness.clock[0] += 1000
         await control.async_set_charging_release(True)
         bank[R.EVSE_STATE.address] = int(EvseState.CHARGING)
@@ -158,7 +158,7 @@ def test_a_withdrawn_manual_release_waits_for_its_own_write():
         control._sleep = sleep
         await control.async_set_charging_release(False)
         assert control.pending_action == "disable_charging"
-        control.observe_plug_charge(data())
+        control.observe_plug(data())
         await asyncio.sleep(0.05)
         # The gate does not close inside the interval what the queue makes wait.
         assert harness.written(R.CHARGING_RELEASE)[before:] == []

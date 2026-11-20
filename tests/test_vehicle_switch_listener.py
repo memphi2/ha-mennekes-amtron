@@ -22,7 +22,7 @@ def _owners(hass):
     options = {"charging_cost_source": "fixed", "charging_price": 0.3, "virtual_plug_charge": False}
     runtime = SimpleNamespace(
         identity=SimpleNamespace(serial_number="123", layout_version=0x0103),
-        client=SimpleNamespace(snapshot={}), entry_data={},
+        client=SimpleNamespace(snapshot={}), entry_data={}, vehicle_profile_id=None,
         vehicle_base_options=without_selection(options),
         vehicle_selection=dict.fromkeys(
             ("active_vehicle_profile", "vehicle_profile_selected_at", "vehicle_auto_selection"),
@@ -143,7 +143,7 @@ def test_a_cancelled_switch_reloads_only_a_running_entry(monkeypatch, state, sto
         options = {"active_vehicle_profile": "b" * 32}
         runtime = SimpleNamespace(
             client=SimpleNamespace(snapshot={}), entry_data={}, vehicle_base_options=without_selection(options),
-            vehicle_selection={"previous": True},
+            vehicle_selection={"previous": True}, vehicle_profile_id=None,
             coordinator=SimpleNamespace(retry_soc_goal=None), vehicle_switching=False,
         )
         entry = SimpleNamespace(
@@ -188,11 +188,11 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
             vehicle_detection=None, vehicle_binding=None,
             charge_watch_unsubscribe=None,
             plug_charge=None, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
-            cost_goal=None, timed_goal=timed, vehicle_soc=None,
+            cost_goal=None, departure_observer=timed, vehicle_soc=None,
             client=SimpleNamespace(async_close=AsyncMock()),
         )
         options = {**detection_catalog(), "active_vehicle_profile": selected}
-        options["vehicle_profiles"]["a" * 32]["options"]["timed_goal_enabled"] = planning
+        options["vehicle_profiles"]["a" * 32]["options"]["departure_enabled"] = planning
         entry = SimpleNamespace(entry_id="entry", options=options, runtime_data=runtime, disabled_by=None)
         handoff = SimpleNamespace()
         hass = SimpleNamespace(

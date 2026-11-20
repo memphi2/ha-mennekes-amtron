@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
+from custom_components.mennekes_amtron_rtu.device.plug_cycle import PlugCycle
 from tests.fakes import raise_connection_error
 from tests.test_control import Harness, R
 
@@ -114,13 +115,12 @@ def test_recovery_leaves_a_release_closed_that_nobody_decided():
 
 def test_a_manual_release_ends_with_a_long_unknown_vehicle_state():
     """Another car may have been plugged in meanwhile."""
-    start = datetime(2026, 1, 1, tzinfo=UTC)
-    state = PlugChargeState(enabled=True)
-    state.observe(True, observed_at=start)
+    state, cycle = PlugChargeState(enabled=True), PlugCycle()
+    state.follow(cycle, cycle.observe(True, now=0))
     state.manual, state.hold = True, False
     for step in range(1, 121):
-        state.observe(None, observed_at=start + timedelta(seconds=5 * step))
-    state.observe(True, observed_at=start + timedelta(seconds=700))
+        state.follow(cycle, cycle.observe(None, now=5 * step))
+    state.follow(cycle, cycle.observe(True, now=700))
     assert (state.manual, state.blocked) == (False, True)
 
 
@@ -188,10 +188,10 @@ def test_a_newer_decision_of_the_same_owner_replaces_its_waiting_pause():
         control.soc_goal.target_percent = 80
         _rate_limited(h)
         deadline = datetime.now(UTC) + timedelta(hours=1)
-        await control.async_set_timed_current(None, deadline=deadline, owner="departure")
+        await control.async_set_departure_current(None, deadline=deadline, owner="departure")
         assert control.pending_action == "pause"
         h.clock[0] += 10
-        await control.async_set_timed_current(10, deadline=deadline, owner="departure")
+        await control.async_set_departure_current(10, deadline=deadline, owner="departure")
         assert control.pending_action != "pause"
         await control.async_shutdown()
 
@@ -291,7 +291,7 @@ def test_a_planners_waiting_pause_outlasts_a_manual_current_with_a_goal_controll
         control.soc_goal.target_percent = 80
         _rate_limited(h)
         deadline = datetime.now(UTC) + timedelta(hours=1)
-        await control.async_set_timed_current(None, deadline=deadline, owner="departure")
+        await control.async_set_departure_current(None, deadline=deadline, owner="departure")
         h.clock[0] += 10
         await control.async_set_charging_current(10)
         assert currents(h) == [10.0]

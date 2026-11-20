@@ -395,7 +395,7 @@ def _entity_keys() -> dict[str, set[str]]:
     }
     # Entities that are built on their own instead of from a table.
     keys["select"].add("active_vehicle")
-    keys["datetime"] = {"timed_departure"}
+    keys["datetime"] = {"departure_time"}
     keys["event"] = {"activity"}
     return keys
 

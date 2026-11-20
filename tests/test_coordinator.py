@@ -612,7 +612,7 @@ def test_the_coordinator_shows_the_services_identity_and_state() -> None:
     ("service_auth_failed", ConfigEntryAuthFailed, "service_auth_failed"),
     ("service_identity_changed", UpdateFailed, "device_identity_changed"),
     ("service_version_mismatch", UpdateFailed, "service_version_mismatch"),
-    ("service_not_ready", UpdateFailed, None),
+    ("service_not_ready", UpdateFailed, "connection_unavailable"),
 ])
 def test_each_service_failure_has_its_own_reason(reason, error, key) -> None:
     async def run() -> None:
@@ -635,8 +635,11 @@ def test_each_service_failure_has_its_own_reason(reason, error, key) -> None:
 def test_a_lost_service_fails_the_update_without_an_estimate_observer() -> None:
     async def run() -> None:
         coordinator = _service_coordinator(_Client(AmtronConnectionError("lost")))
-        with pytest.raises(UpdateFailed, match="lost"):
+        with pytest.raises(UpdateFailed) as failed:
             await coordinator._async_update_data()
+        # Translated; the cause stays readable in the message.
+        assert failed.value.translation_key == "connection_unavailable"
+        assert failed.value.translation_placeholders == {"error": "lost"}
 
     asyncio.run(run())
 

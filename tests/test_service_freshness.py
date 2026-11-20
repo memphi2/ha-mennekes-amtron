@@ -110,7 +110,7 @@ def test_command_rechecks_freshness_after_waiting_for_another_command(tmp_path):
                 return await super().acquire()
 
         lock = ObservedLock()
-        service._command_lock = lock
+        service.command_lock = lock
         await lock.acquire()
         pending = None
         try:

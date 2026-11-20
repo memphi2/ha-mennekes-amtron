@@ -63,11 +63,11 @@ _CSP = (
 )
 _ASSETS = {
     "/": ("app_overview.html", "text/html"),
-    "/connection": ("app_settings.html", "text/html"),
+    "/connection": ("app_connection.html", "text/html"),
     "/log": ("app_log.html", "text/html"),
     "/app_overview.js": ("app_overview.js", "text/javascript"),
     "/app_log.js": ("app_log.js", "text/javascript"),
-    "/app_settings.js": ("app_settings.js", "text/javascript"),
+    "/app_connection.js": ("app_connection.js", "text/javascript"),
     "/app_settings.css": ("app_settings.css", "text/css"),
 }
 

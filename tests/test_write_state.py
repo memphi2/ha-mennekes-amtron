@@ -9,17 +9,17 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 
 from custom_components import mennekes_amtron_rtu as integration
+from custom_components.mennekes_amtron_rtu.const import (
+    CONF_SCAN_INTERVAL_SECONDS,
+    CONTROL_MODE_MASTER,
+)
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronRateLimitedError,
 )
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONF_SCAN_INTERVAL_SECONDS,
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import RequestedPhases
 from custom_components.mennekes_amtron_rtu.embedded import state_directory

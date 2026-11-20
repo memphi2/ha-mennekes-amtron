@@ -8,11 +8,9 @@ from unittest.mock import patch
 
 from homeassistant.helpers import entity_registry as er
 
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
     CONF_VEHICLE_SOC_ENTITY,

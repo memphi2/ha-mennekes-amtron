@@ -200,7 +200,7 @@ def service_with(control, *, read_only=False):
     service.config = Mock(read_only=read_only, cap_from_wallbox=False)
     service._cap_retry_at = 0.0
     service._cap_notice = FailureNotice(runtime._LOGGER, "Control")
-    service._command_lock = asyncio.Lock()
+    service.command_lock = asyncio.Lock()
     return service
 
 
@@ -241,7 +241,7 @@ def test_the_polling_loop_checks_the_cap_after_recovery(tmp_path, monkeypatch):
         service, _transport = await console_fixture(tmp_path)
         calls = []
         try:
-            for name in ("refresh", "_recover", "_enforce_current_cap", "_persist"):
+            for name in ("refresh", "_recover", "_enforce_current_cap", "persist"):
                 monkeypatch.setattr(service, name, AsyncMock(side_effect=lambda *_a, name=name, **_k: calls.append(name)))
 
             async def stop(_delay):
@@ -253,5 +253,5 @@ def test_the_polling_loop_checks_the_cap_after_recovery(tmp_path, monkeypatch):
         finally:
             monkeypatch.undo()
             await service.stop()
-        assert calls == ["refresh", "_recover", "_enforce_current_cap", "_persist"]
+        assert calls == ["refresh", "_recover", "_enforce_current_cap", "persist"]
     asyncio.run(run())

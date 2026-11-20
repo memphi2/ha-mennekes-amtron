@@ -40,8 +40,8 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
     cost_source_schema,
     cost_windows_schema,
 )
+from custom_components.mennekes_amtron_rtu.const import CONF_CURRENT_LIMIT
 from custom_components.mennekes_amtron_rtu.device.charging_cost import TariffConfig
-from custom_components.mennekes_amtron_rtu.device.const import CONF_CURRENT_LIMIT
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_options_flow import Flow
 
@@ -71,7 +71,7 @@ def _flow(*, options=None, service=False, country="DE"):
         options=options,
         data={"server_url": "http://service:8765"} if service else None,
     ))
-    flow.hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Paris", country=country))
+    flow.hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Paris", country=country, currency="EUR"))
     return flow
 
 
@@ -433,7 +433,7 @@ def test_cost_steps_cannot_skip_required_prior_steps(step_name):
 
 
 def test_cost_schema_has_no_invented_tariff_prices_or_windows():
-    schema = cost_network_schema({}, module=NETWORK_MODULE_3)
+    schema = cost_network_schema({}, module=NETWORK_MODULE_3, currency="EUR")
     periods = cost_windows_schema({})
     markers = {marker.schema: marker for form in (schema, periods) for marker in form.schema}
     for key in (CONF_REGULAR_NETWORK, CONF_HIGH_NETWORK, CONF_LOW_NETWORK, CONF_HIGH_PERIODS, CONF_LOW_PERIODS, CONF_TARIFF_YEAR):
@@ -446,11 +446,11 @@ def test_cost_schema_has_no_invented_tariff_prices_or_windows():
     for form in (schema, periods):
         with pytest.raises(probatio.Invalid, match="required key"):
             form({})
-    price = cost_source_schema({}, source=COST_SOURCE_FIXED)
+    price = cost_source_schema({}, source=COST_SOURCE_FIXED, currency="EUR")
     assert price({CONF_CHARGING_PRICE: -0.25})[CONF_CHARGING_PRICE] == -0.25
     with pytest.raises(probatio.Invalid):
         price({CONF_CHARGING_PRICE: -1001})
-    sensor = cost_source_schema({}, source=COST_SOURCE_SENSOR)
+    sensor = cost_source_schema({}, source=COST_SOURCE_SENSOR, currency="EUR")
     assert next(iter(sensor.schema.values())).config["filter"] == [{"domain": ["sensor"]}]
 
 

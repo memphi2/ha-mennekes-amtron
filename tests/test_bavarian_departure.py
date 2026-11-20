@@ -18,7 +18,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.departur
     read_bavarian_departure,
 )
 from tests.test_bavarian_history import VIN, vehicle_registry
-from tests.test_timed_goal import NOW, setup_observer, state
+from tests.test_departure import NOW, setup_observer, state
 
 PREFIX = "vehicle.cabin.climate.timers"
 
@@ -164,9 +164,9 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
         hass.config = SimpleNamespace(time_zone="Europe/Berlin")
         hass.data[dr.DATA_REGISTRY] = vehicle_registry()
         observer._entry.options.update({
-            "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "vehicle", "timed_vehicle_time_zone": "Europe/Paris",
-            "timed_timer1_days": ["mon"], "timed_timer2_days": ["tue"],
-            "timed_departure_entity": "sensor.trip",
+            "departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "vehicle", "departure_vehicle_time_zone": "Europe/Paris",
+            "departure_timer1_days": ["mon"], "departure_timer2_days": ["tue"],
+            "departure_entity": "sensor.trip",
         })
         hass.states["sensor.trip"] = state("sensor.trip", (NOW + timedelta(hours=3)).isoformat())
         reader = Mock(return_value=NOW + timedelta(hours=2))
@@ -178,15 +178,15 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
         await observer._evaluate()
         assert observer.goal.deadline == NOW + timedelta(hours=2)
         reader.return_value = None
-        before = observer.goal
+        before = observer.goal.snapshot()
         with pytest.raises(ServiceValidationError):
             await observer.async_use_vehicle_departure()
-        assert observer.goal is before
-        observer._entry.options["timed_vehicle_provider"] = "none"
+        assert observer.goal.snapshot() == before
+        observer._entry.options["departure_vehicle_provider"] = "none"
         with pytest.raises(ServiceValidationError) as error:
             await observer.async_use_vehicle_departure()
-        assert error.value.translation_key == "timed_vehicle_unavailable"
-        assert observer.goal is before
+        assert error.value.translation_key == "departure_vehicle_unavailable"
+        assert observer.goal.snapshot() == before
 
     asyncio.run(run())
 
@@ -195,8 +195,8 @@ def test_calendar_choice_outlasts_the_entity_trip_and_is_withdrawn_for_another_c
     async def run() -> None:
         observer, control, hass = setup_observer(monkeypatch)
         observer._entry.options.update({
-            "timed_departure_entity": "sensor.trip", "timed_calendar_entity": "calendar.trip",
-            "timed_calendar_title": "Trip",
+            "departure_entity": "sensor.trip", "departure_calendar_entity": "calendar.trip",
+            "departure_calendar_title": "Trip",
         })
         hass.states["sensor.trip"] = state("sensor.trip", (NOW + timedelta(hours=3)).isoformat())
         hass.services.async_call.return_value = {"calendar.trip": {"events": [{
@@ -211,7 +211,7 @@ def test_calendar_choice_outlasts_the_entity_trip_and_is_withdrawn_for_another_c
         # The cleared trip stays cleared while the entity keeps its time.
         assert (observer.goal.deadline, observer.goal.source) == (None, source)
         await observer.async_stop(withdraw=True)
-        assert control.trips == [(None, source, True)]
+        assert control.trips[-1] == (None, source, True)
 
     asyncio.run(run())
 

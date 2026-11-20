@@ -40,7 +40,7 @@ async def add_entry(hass, url, *, expected_serial="ABC123456789"):
     assert result["type"] == "create_entry", result
     await hass.async_block_till_done()
     entry = hass.config_entries.async_entries(DOMAIN)[0]
-    assert entry.unique_id == (expected_serial or f"{DOMAIN}_{url.rstrip('/')}")
+    assert entry.unique_id == expected_serial
     hass.config_entries.async_update_entry(
         entry, options={"current_limit": 10, "scan_interval_seconds": 300}
     )

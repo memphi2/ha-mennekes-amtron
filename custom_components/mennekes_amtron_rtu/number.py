@@ -17,15 +17,11 @@ from homeassistant.components.number import (
 )
 from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent, UnitOfEnergy
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import CHARGING_CURRENT_DECIMALS, CHARGING_CURRENT_STEP
 from .cost_goal import COST_GOAL_STEP, MAX_COST_GOAL
-from .device.const import (
-    CHARGING_CURRENT_DECIMALS,
-    CHARGING_CURRENT_MINIMUM,
-    CHARGING_CURRENT_STEP,
-    CHARGING_CURRENT_UNLIMITED,
-)
+from .device.const import CHARGING_CURRENT_MINIMUM, CHARGING_CURRENT_UNLIMITED
 from .device.energy_goal import ENERGY_GOAL_STEP_KWH, MAX_ENERGY_GOAL_KWH
 from .device.registers import CHARGING_CURRENT_EMS, ENERGY_TOTAL
 from .entity import AmtronEntity, Projection, Runtime, wanted
@@ -101,7 +97,7 @@ NUMBERS: tuple[AmtronNumberDescription, ...] = (
     # An amount of money, carried by the energy target above.
     AmtronNumberDescription(
         key="cost_goal", capability=ENERGY_TOTAL.key, register="evse_state", writes=True,
-        device_class=NumberDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        device_class=NumberDeviceClass.MONETARY,
         native_min_value=0.0, native_max_value=MAX_COST_GOAL,
         native_step=COST_GOAL_STEP, mode=NumberMode.BOX,
         exists=lambda runtime: runtime.cost_goal is not None,
@@ -114,7 +110,7 @@ NUMBERS: tuple[AmtronNumberDescription, ...] = (
     ),
     AmtronNumberDescription(
         key="soc_goal", writes=True, feature=lambda features: SOC in features,
-        native_unit_of_measurement=PERCENTAGE, native_min_value=0.0, native_step=1.0,
+        device_class=NumberDeviceClass.BATTERY, native_unit_of_measurement=PERCENTAGE, native_min_value=0.0, native_step=1.0,
         mode=NumberMode.SLIDER,
         ready=lambda runtime: (
             runtime.control.supports_soc_goal
@@ -129,7 +125,7 @@ NUMBERS: tuple[AmtronNumberDescription, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     async_add_entities(AmtronNumber(entry, description) for description in wanted(entry, NUMBERS))
 
@@ -143,6 +139,13 @@ class AmtronNumber(AmtronEntity, NumberEntity):
         if maximum is not None:
             return maximum(self.runtime)
         return self.entity_description.native_max_value or 100.0
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        # Money is in Home Assistant's currency, as the price it reports.
+        if self.entity_description.device_class is NumberDeviceClass.MONETARY:
+            return self.hass.config.currency
+        return self.entity_description.native_unit_of_measurement
 
     @property
     def native_value(self) -> float | None:

@@ -19,6 +19,15 @@ from custom_components.mennekes_amtron_rtu import (
     embedded,
     repairs,
 )
+from custom_components.mennekes_amtron_rtu.const import (
+    CONF_CONTROL_MODE,
+    CONF_CURRENT_LIMIT,
+    CONF_DEVICE_ID,
+    CONF_PORT,
+    CONF_SCAN_INTERVAL_SECONDS,
+    CONTROL_MODE_MASTER,
+    SERVICE_SET_CHARGING_CURRENT,
+)
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
@@ -28,16 +37,7 @@ from custom_components.mennekes_amtron_rtu.device.connection import (
     NetworkConfig,
     SerialConfig,
 )
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONF_CONTROL_MODE,
-    CONF_CURRENT_LIMIT,
-    CONF_DEVICE_ID,
-    CONF_PORT,
-    CONF_SCAN_INTERVAL_SECONDS,
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-    SERVICE_SET_CHARGING_CURRENT,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.embedded import embedded_config
 from custom_components.mennekes_amtron_rtu.entry_connection import (
     connection_config,

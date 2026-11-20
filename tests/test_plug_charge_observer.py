@@ -72,7 +72,7 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True
 
     control.async_authorize_plug_charge = AsyncMock(side_effect=authorize)
     entry = SimpleNamespace(options=options, runtime_data=SimpleNamespace(
-        control=control, coordinator=coordinator, timed_goal=None, vehicle_soc=None,
+        control=control, coordinator=coordinator, departure_observer=None, vehicle_soc=None,
         vehicle_profile_id=selected,
     ))
 
@@ -353,7 +353,7 @@ def test_policy_tracks_permissions_and_identity_without_binding_cosmetic_or_sele
     modified = deepcopy(options)
     modified["vehicle_profiles"][A]["name"] = "Renamed"
     modified["active_vehicle_profile"] = B
-    modified["vehicle_profiles"][A]["options"]["timed_capacity_kwh"] = 80
+    modified["vehicle_profiles"][A]["options"]["departure_capacity_kwh"] = 80
     assert m.plug_charge_policy(modified) == original
     for key, value in (("provider", "bavariandata"), ("device_id", "other"), ("identity", "new")):
         changed = deepcopy(options)
@@ -368,7 +368,7 @@ def test_policy_tracks_permissions_and_identity_without_binding_cosmetic_or_sele
 
 
 def arm_plan(h, status):
-    h.entry.runtime_data.timed_goal = SimpleNamespace(status=status, goal=SimpleNamespace(
+    h.entry.runtime_data.departure_observer = SimpleNamespace(status=status, goal=SimpleNamespace(
         deadline=dt_util.utcnow() + timedelta(hours=8), finished=None,
     ))
 
@@ -443,7 +443,7 @@ def test_unknown_pause_readback_defers_the_grant(tmp_path, monkeypatch):
 def test_a_finished_departure_plan_does_not_keep_the_pause(tmp_path, monkeypatch):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
-            h.entry.runtime_data.timed_goal = SimpleNamespace(status="reached", goal=SimpleNamespace(
+            h.entry.runtime_data.departure_observer = SimpleNamespace(status="reached", goal=SimpleNamespace(
                 deadline=dt_util.utcnow(), finished="reached",
             ))
             await plug_in_paused(h)
@@ -456,6 +456,7 @@ def test_a_finished_departure_plan_does_not_keep_the_pause(tmp_path, monkeypatch
     ({"plan": "queued"}, "departure_plan"),
     ({"plan": "charging"}, "departure_plan"),
     ({"plan": "paused_until_start", "paused": False}, "departure_plan"),
+    ({"plan": "minimum_level"}, "departure_plan"),
     ({"pending": "pause"}, "pause_requested"),
     ({"pending": "set_current"}, "pause_requested"),
     ({"goal_stop": True}, "energy_goal_stop"),
@@ -496,7 +497,7 @@ def test_a_failed_resume_defers_the_grant(tmp_path, monkeypatch):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize(("plan", "paused"), [("paused_until_start", True), ("finishing", False), ("late", False)])
+@pytest.mark.parametrize(("plan", "paused"), [("paused_until_start", True), ("minimum_level", False), ("finishing", False), ("late", False)])
 def test_an_applied_departure_plan_keeps_the_current_and_is_released(tmp_path, monkeypatch, plan, paused):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:

@@ -8,11 +8,9 @@ from unittest.mock import patch
 
 from homeassistant.helpers import entity_registry as er
 
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot

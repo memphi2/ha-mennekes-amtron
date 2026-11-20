@@ -6,6 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.util.hass_dict import HassKey
+
+from .device.const import DOMAIN
 from .device.data import ConnectionState as ConnectionState
 from .device.data import DeviceIdentity as DeviceIdentity
 from .device.data import WallboxData as WallboxData
@@ -18,11 +21,11 @@ if TYPE_CHECKING:
     from .coordinator import ServiceCoordinator
     from .cost_goal import CostGoalObserver
     from .cost_observer import ChargingCostObserver
+    from .departure_observer import DepartureObserver
     from .guest_charging import GuestCharging
     from .plug_charge import PlugChargeObserver
     from .service_client import ServiceClient
     from .service_control import ServiceControl, ServiceHeartbeat
-    from .timed_goal_observer import TimedGoalObserver
     from .vehicle_binding import VehicleBinding
     from .vehicle_detection import VehicleDetectionObserver, VehicleEvidence
     from .vehicle_soc import VehicleSocObserver
@@ -60,7 +63,7 @@ class MennekesAmtronRuntimeData:
     vehicle_binding: VehicleBinding | None = None
     vehicle_evidence: VehicleEvidence | None = None
     plug_charge: PlugChargeObserver | None = None
-    timed_goal: TimedGoalObserver | None = None
+    departure_observer: DepartureObserver | None = None
     charge_loss: ChargeLossObserver | None = None
     charging_cost: ChargingCostObserver | None = None
     cost_goal: CostGoalObserver | None = None
@@ -81,3 +84,7 @@ class RuntimeHandoff:
         cost, self.charging_cost = self.charging_cost, None
         if cost is not None:
             await cost.async_stop()
+
+
+# What a reload hands from the unloaded entry to its next setup, by entry ID.
+RELOAD_HANDOFFS: HassKey[dict[str, RuntimeHandoff]] = HassKey(f"{DOMAIN}_reload_clients")

@@ -89,7 +89,6 @@ class WriteDiagnostics:
     write_errors: set[str] = field(default_factory=set)
     writes_rate_limited: int = 0
     recoveries: int = 0
-    last_error: str | None = None
     timeline: EventTimeline = field(default_factory=EventTimeline)
 
 

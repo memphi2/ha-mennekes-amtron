@@ -19,7 +19,7 @@ from tests.test_control import Harness as ControlHarness
 from tests.test_modbus_service import current_writes
 from tests.test_modbus_service import service_fixture as base_service_fixture
 
-OWNER = "timed:entry:one-trip"
+OWNER = "departure:entry:one-trip"
 SOC_SOURCE = "sensor.car_soc"
 
 
@@ -49,7 +49,7 @@ def test_expired_trip_never_writes_or_remembers_its_current() -> None:
         harness = Harness()
         control = await harness.connect()
         control.charging_setpoint = 12
-        await control.async_set_timed_current(6, deadline=datetime.now(UTC) - timedelta(seconds=1), owner=OWNER)
+        await control.async_set_departure_current(6, deadline=datetime.now(UTC) - timedelta(seconds=1), owner=OWNER)
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
         assert control.charging_setpoint == 12
         assert control.pending_action is None
@@ -61,11 +61,11 @@ def test_expired_trip_never_writes_or_remembers_its_current() -> None:
 
 
 @pytest.mark.parametrize("value", [None, 6.0])
-def test_timed_current_uses_normal_limits_and_pause_rules(value: float | None) -> None:
+def test_departure_current_uses_normal_limits_and_pause_rules(value: float | None) -> None:
     async def run() -> None:
         harness = Harness()
         control = await harness.connect()
-        await control.async_set_timed_current(value, deadline=future(), owner=OWNER)
+        await control.async_set_departure_current(value, deadline=future(), owner=OWNER)
         assert control.pause_requested is (value is None)
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
 
@@ -73,24 +73,24 @@ def test_timed_current_uses_normal_limits_and_pause_rules(value: float | None) -
 
 
 @pytest.mark.parametrize("value", [True, 0, 1, float("nan"), float("inf"), "6"])
-def test_invalid_timed_current_cannot_bypass_current_validation(value) -> None:
+def test_invalid_departure_current_cannot_bypass_current_validation(value) -> None:
     async def run() -> None:
         harness = Harness()
         control = await harness.connect()
         with pytest.raises(DeviceValidationError):
-            await control.async_set_timed_current(value, deadline=future(), owner=OWNER)
+            await control.async_set_departure_current(value, deadline=future(), owner=OWNER)
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize(("owner", "deadline"), [("", future()), ("x" * 129, future()), (None, future()), (OWNER, future().replace(tzinfo=None)), (OWNER, None)])
-def test_timed_owner_and_deadline_are_validated(owner, deadline) -> None:
+def test_departure_owner_and_deadline_are_validated(owner, deadline) -> None:
     async def run() -> None:
         harness = Harness()
         control = await harness.connect()
-        with pytest.raises(ValueError, match="timed command"):
-            await control.async_set_timed_current(6, deadline=deadline, owner=owner)
+        with pytest.raises(ValueError, match="departure command"):
+            await control.async_set_departure_current(6, deadline=deadline, owner=owner)
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
 
     asyncio.run(run())
@@ -105,7 +105,7 @@ def test_expiry_cancels_deferred_resume_without_a_running_ha(monkeypatch) -> Non
         deadline = future()
         try:
             await control.async_pause_charging()
-            await control.async_set_timed_current(6, deadline=deadline, owner=OWNER)
+            await control.async_set_departure_current(6, deadline=deadline, owner=OWNER)
             assert control.pending_action == "set_current"
             assert control.charging_setpoint == 16
 
@@ -128,7 +128,7 @@ def test_expiry_cancels_deferred_resume_without_a_running_ha(monkeypatch) -> Non
     asyncio.run(run())
 
 
-def test_timed_cancel_and_submit_preserve_manual_commands() -> None:
+def test_departure_cancel_and_submit_preserve_manual_commands() -> None:
     async def run() -> None:
         harness = Harness()
         control = await harness.connect()
@@ -136,17 +136,17 @@ def test_timed_cancel_and_submit_preserve_manual_commands() -> None:
         control._sleep = lambda _delay: release.wait()
         try:
             await control.async_pause_charging()
-            await control.async_set_timed_current(6, deadline=future(), owner=OWNER)
-            await control.async_cancel_timed_current("another-owner")
+            await control.async_set_departure_current(6, deadline=future(), owner=OWNER)
+            await control.async_cancel_departure_current("another-owner")
             assert control.pending_action == "set_current"
             control._options = ControlOptions(read_only=True)
-            await control.async_cancel_timed_current(OWNER)
+            await control.async_cancel_departure_current(OWNER)
             assert control.pending_action is None
             control._options = ControlOptions(read_only=False)
             await control.async_set_charging_current(10)
             assert control.pending_action == "set_current"
-            await control.async_set_timed_current(None, deadline=future(), owner=OWNER)
-            await control.async_cancel_timed_current(OWNER)
+            await control.async_set_departure_current(None, deadline=future(), owner=OWNER)
+            await control.async_cancel_departure_current(OWNER)
             assert control._pending.value == 10
             assert control._pending.owner is None
         finally:
@@ -171,7 +171,7 @@ def test_expiry_after_waiting_for_physical_identity_never_sends(monkeypatch) -> 
             return client
 
         harness.client._async_transaction_client = delayed_identity
-        writing = asyncio.create_task(control.async_set_timed_current(6, deadline=deadline, owner=OWNER))
+        writing = asyncio.create_task(control.async_set_departure_current(6, deadline=deadline, owner=OWNER))
         try:
             await asyncio.wait_for(started.wait(), 2)
 
@@ -195,16 +195,16 @@ def test_expiry_after_waiting_for_physical_identity_never_sends(monkeypatch) -> 
 
 
 @pytest.mark.parametrize("finish", ["cancel", "expire"])
-def test_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkeypatch, finish) -> None:
+def test_departure_queue_and_readonly_cancellation_roundtrip(tmp_path, monkeypatch, finish) -> None:
     async def run() -> None:
         service, transport, _clock = await service_fixture(tmp_path)
         release = asyncio.Event()
         try:
             await service.heartbeat.async_stop()
             service.control._sleep = lambda _delay: release.wait()
-            await service.control.async_set_timed_current(None, deadline=future(), owner=OWNER)
+            await service.control.async_set_departure_current(None, deadline=future(), owner=OWNER)
             deadline = future()
-            await service.control.async_set_timed_current(6, deadline=deadline, owner=OWNER)
+            await service.control.async_set_departure_current(6, deadline=deadline, owner=OWNER)
             assert service.control.pending_action == "set_current"
             assert current_writes(transport) == [1]
             if finish == "cancel":
@@ -212,7 +212,7 @@ def test_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkeypatch, 
                 # writes were disabled and the wallbox went away.
                 service.control._options = ControlOptions(read_only=True)
                 service.connection.available = False
-                await service.control.async_cancel_timed_current(OWNER)
+                await service.control.async_cancel_departure_current(OWNER)
             else:
                 # Nothing outside the service runs: only the service itself can
                 # expire a pending resume when its trip's deadline passes.
@@ -237,8 +237,8 @@ def test_timed_queue_and_readonly_cancellation_roundtrip(tmp_path, monkeypatch, 
 @pytest.mark.parametrize(
     "payload",
     [
-        {"command": "timed_current", "value": 6},
-        {"command": "cancel_timed_current"},
+        {"command": "departure_current", "value": 6},
+        {"command": "cancel_departure_current"},
     ],
 )
 def test_service_rejects_commands_it_no_longer_has(tmp_path, payload) -> None:
@@ -259,11 +259,11 @@ def test_service_rejects_commands_it_no_longer_has(tmp_path, payload) -> None:
     asyncio.run(run())
 
 
-def test_service_timed_current_is_capped_to_the_device_maximum(tmp_path) -> None:
+def test_service_departure_current_is_capped_to_the_device_maximum(tmp_path) -> None:
     async def run() -> None:
         service, transport, _clock = await service_fixture(tmp_path)
         try:
-            await service.control.async_set_timed_current(32, deadline=future(), owner=OWNER)
+            await service.control.async_set_departure_current(32, deadline=future(), owner=OWNER)
             assert current_writes(transport) == [16]
         finally:
             await service.stop()
@@ -272,7 +272,7 @@ def test_service_timed_current_is_capped_to_the_device_maximum(tmp_path) -> None
 
 
 @pytest.mark.parametrize("target_state", ["disabled", "reached"])
-def test_inactive_target_refuses_timed_current_without_changing_wallbox(target_state):
+def test_inactive_target_refuses_departure_current_without_changing_wallbox(target_state):
     async def run():
         harness = Harness(values={"charging_current_ems": 1})
         control = await harness.connect()
@@ -281,7 +281,7 @@ def test_inactive_target_refuses_timed_current_without_changing_wallbox(target_s
         else:
             control.soc_goal.observe(80)
         previous_intent = control.write_state.command_intent_generation
-        await control.async_set_timed_current(6, deadline=future(), owner=OWNER)
+        await control.async_set_departure_current(6, deadline=future(), owner=OWNER)
         assert control.is_paused is True
         assert control.pending_action is None
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
@@ -301,7 +301,7 @@ def test_disabled_target_invalidates_deferred_command_without_observer():
         control._sleep = lambda _delay: release.wait()
         try:
             await control.async_pause_charging()
-            await control.async_set_timed_current(6, deadline=future(), owner=OWNER)
+            await control.async_set_departure_current(6, deadline=future(), owner=OWNER)
             task = control._flush_task
             assert control.pending_action == "set_current"
             control.soc_goal.set_target(0)
@@ -333,7 +333,7 @@ def test_target_is_rechecked_after_waiting_for_physical_identity(target_state):
             return client
 
         harness.client._async_transaction_client = delayed_identity
-        writing = asyncio.create_task(control.async_set_timed_current(6, deadline=future(), owner=OWNER))
+        writing = asyncio.create_task(control.async_set_departure_current(6, deadline=future(), owner=OWNER))
         try:
             await asyncio.wait_for(started.wait(), 2)
             if target_state == "disabled":
@@ -353,8 +353,8 @@ def test_target_is_rechecked_after_waiting_for_physical_identity(target_state):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("pending_owner", ["timed", "manual"])
-def test_service_target_disable_cancels_only_timed_resume_without_ha(tmp_path, pending_owner):
+@pytest.mark.parametrize("pending_owner", ["departure", "manual"])
+def test_service_target_disable_cancels_only_departure_resume_without_ha(tmp_path, pending_owner):
     async def run():
         service, transport, clock = await service_fixture(tmp_path)
         release = asyncio.Event()
@@ -363,20 +363,20 @@ def test_service_target_disable_cancels_only_timed_resume_without_ha(tmp_path, p
             service.control._sleep = lambda _delay: release.wait()
             binding = {"expected_serial_number": service.identity.serial_number}
             await service.command({"command": "pause", **binding})
-            if pending_owner == "timed":
-                await service.control.async_set_timed_current(6, deadline=future(), owner=OWNER)
+            if pending_owner == "departure":
+                await service.control.async_set_departure_current(6, deadline=future(), owner=OWNER)
             else:
                 await service.command({"command": "set_current", "value": 6, **binding})
             task = service.control._flush_task
             assert service.control.pending_action == "set_current"
             await service.command({"command": "soc_goal", "value": 0, "source": SOC_SOURCE, **binding})
             assert service.control.soc_goal.status == "disabled"
-            assert service.control.pending_action == (None if pending_owner == "timed" else "set_current")
+            assert service.control.pending_action == (None if pending_owner == "departure" else "set_current")
             # No HA observer or client is running to cancel the old plan.
             clock[0] += 300
             release.set()
             await asyncio.wait_for(task, 2)
-            assert current_writes(transport) == ([1] if pending_owner == "timed" else [1, 6])
+            assert current_writes(transport) == ([1] if pending_owner == "departure" else [1, 6])
             assert service.control.pending_action is None
         finally:
             release.set()

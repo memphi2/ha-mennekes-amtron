@@ -7,12 +7,12 @@ from datetime import UTC, timedelta, timezone
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.device.timed_goal import (
-    TimedGoal,
+from custom_components.mennekes_amtron_rtu.departure_observer import departure_time
+from custom_components.mennekes_amtron_rtu.device.departure_trip import (
+    DepartureTrip,
     matches_departure_source,
 )
-from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
-from tests.test_timed_goal import NOW, setup_observer, state
+from tests.test_departure import NOW, setup_observer, state
 
 ENTITY = "sensor.departure"
 FUTURE = NOW + timedelta(hours=8)
@@ -54,7 +54,7 @@ def test_naive_candidate_cannot_match_and_source_ingest_canonicalizes_utc():
 def test_equivalent_timestamp_preserves_cancel_manual_or_completed_trip_after_restore(monkeypatch, selection, legacy):
     async def run():
         observer, _control, hass = setup_observer(monkeypatch)
-        observer._entry.options["timed_departure_entity"] = ENTITY
+        observer._entry.options["departure_entity"] = ENTITY
         hass.states[ENTITY] = state(ENTITY, FUTURE.isoformat())
         await observer._evaluate()
         chosen = NOW + timedelta(hours=5)
@@ -62,20 +62,21 @@ def test_equivalent_timestamp_preserves_cancel_manual_or_completed_trip_after_re
             await observer.async_set_deadline(None)
         elif selection == "manual":
             await observer.async_set_deadline(chosen)
-        else:
-            observer.goal.finish("reached")
         persisted = observer.goal.snapshot()
+        if selection == "reached":
+            persisted["finished"] = "reached"
         if legacy:
             persisted["source"] = f"entity:{ENTITY}:{LOCAL.isoformat()}"
-        observer.goal = TimedGoal.restore(persisted)
+        # As the service keeps it.
+        _control.state = {**_control.state, "trip": DepartureTrip.restore(persisted).snapshot()}
         before = observer.goal.snapshot()
-        observer._store.saved.clear()
+        _control.trips.clear()
         # A changed value must not be mistaken for a new departure when only
         # its offset representation changed.
         hass.states[ENTITY] = state(ENTITY, LOCAL.isoformat())
         await observer._evaluate()
         assert observer.goal.snapshot() == before
-        assert observer._store.saved == []
+        assert _control.trips == []
 
         # An actually later trip from this same source is still accepted.
         later = FUTURE + timedelta(hours=1)
@@ -84,6 +85,6 @@ def test_equivalent_timestamp_preserves_cancel_manual_or_completed_trip_after_re
         assert observer.goal.deadline == later
         assert observer.goal.finished is None
         assert observer.goal.source == f"entity:{ENTITY}:{later.isoformat()}"
-        assert len(observer._store.saved) == 1
+        assert len(_control.trips) == 1
 
     asyncio.run(run())

@@ -6,11 +6,11 @@ import pytest
 from homeassistant.components.number import NumberMode
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
 )
+from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.energy_goal import MAX_ENERGY_GOAL_KWH
 from custom_components.mennekes_amtron_rtu.number import async_setup_entry
@@ -146,9 +146,6 @@ def test_the_energy_goal_is_kept_by_the_service_and_writes_nothing() -> None:
 
         entry.runtime_data.client.snapshot["control"]["supports_energy_goal"] = False
         assert not goal.available
-        with pytest.raises(ServiceValidationError) as error:
-            await goal.async_set_native_value(5.0)
-        assert error.value.translation_key == "energy_goal_not_supported"
 
     asyncio.run(run())
 

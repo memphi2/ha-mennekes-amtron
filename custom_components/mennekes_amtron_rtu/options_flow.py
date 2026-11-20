@@ -23,8 +23,7 @@ from .config_schemas import (
     vehicle_soc_schema,
     vehicle_source_schema,
 )
-from .device.capabilities import phase_switch_is_supported
-from .device.const import (
+from .const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
@@ -34,23 +33,24 @@ from .device.const import (
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
 )
-from .service_client import CONF_SERVER_URL
-from .timed_goal_const import (
-    CONF_TIMED_CALENDAR_ENTITY,
-    CONF_TIMED_CALENDAR_TITLE,
-    CONF_TIMED_CAPACITY_ENTITY,
-    CONF_TIMED_CAPACITY_KWH,
-    CONF_TIMED_DEPARTURE_ENTITY,
-    CONF_TIMED_GOAL_ENABLED,
-    CONF_TIMED_GOAL_RESET_PENDING,
-    CONF_TIMED_MINIMUM_SOC,
-    CONF_TIMED_TIMER1_DAYS,
-    CONF_TIMED_TIMER2_DAYS,
-    CONF_TIMED_VEHICLE_TIME_ZONE,
-    TIMED_WEEKDAYS,
+from .departure_const import (
+    CONF_DEPARTURE_CALENDAR_ENTITY,
+    CONF_DEPARTURE_CALENDAR_TITLE,
+    CONF_DEPARTURE_CAPACITY_ENTITY,
+    CONF_DEPARTURE_CAPACITY_KWH,
+    CONF_DEPARTURE_ENABLED,
+    CONF_DEPARTURE_ENTITY,
+    CONF_DEPARTURE_MINIMUM_SOC,
+    CONF_DEPARTURE_RESET_PENDING,
+    CONF_DEPARTURE_TIMER1_DAYS,
+    CONF_DEPARTURE_TIMER2_DAYS,
+    CONF_DEPARTURE_VEHICLE_TIME_ZONE,
+    DEPARTURE_WEEKDAYS,
 )
+from .device.capabilities import phase_switch_is_supported
+from .service_client import CONF_SERVER_URL
 from .vehicle_profiles import (
-    CONF_TIMED_USE_VEHICLE_CAPACITY,
+    CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
     CONF_VEHICLE_DEVICE,
     CONF_VEHICLE_LIMIT_USE_PROFILE,
     CONF_VEHICLE_PROVIDER,
@@ -69,8 +69,8 @@ from .vehicle_sources import (
     provider_selection,
 )
 from .vehicle_sources.const import (
-    CONF_TIMED_VEHICLE_DEVICE,
-    CONF_TIMED_VEHICLE_PROVIDER,
+    CONF_DEPARTURE_VEHICLE_DEVICE,
+    CONF_DEPARTURE_VEHICLE_PROVIDER,
     PROVIDER_BAVARIANDATA,
     PROVIDER_NONE,
 )
@@ -87,26 +87,26 @@ WALLBOX_KEYS = {
 VEHICLE_KEYS = {
     CONF_VEHICLE_SOC_ENTITY,
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
-    CONF_TIMED_GOAL_ENABLED,
-    CONF_TIMED_GOAL_RESET_PENDING,
+    CONF_DEPARTURE_ENABLED,
+    CONF_DEPARTURE_RESET_PENDING,
     CONF_VEHICLE_SOC_USE_PROFILE,
     CONF_VEHICLE_LIMIT_USE_PROFILE,
 }
 DEPARTURE_KEYS = {
-    CONF_TIMED_GOAL_ENABLED,
-    CONF_TIMED_GOAL_RESET_PENDING,
-    CONF_TIMED_CAPACITY_ENTITY,
-    CONF_TIMED_CAPACITY_KWH,
-    CONF_TIMED_CALENDAR_ENTITY,
-    CONF_TIMED_CALENDAR_TITLE,
-    CONF_TIMED_DEPARTURE_ENTITY,
-    CONF_TIMED_MINIMUM_SOC,
-    CONF_TIMED_VEHICLE_PROVIDER,
-    CONF_TIMED_VEHICLE_DEVICE,
-    CONF_TIMED_VEHICLE_TIME_ZONE,
-    CONF_TIMED_TIMER1_DAYS,
-    CONF_TIMED_TIMER2_DAYS,
-    CONF_TIMED_USE_VEHICLE_CAPACITY,
+    CONF_DEPARTURE_ENABLED,
+    CONF_DEPARTURE_RESET_PENDING,
+    CONF_DEPARTURE_CAPACITY_ENTITY,
+    CONF_DEPARTURE_CAPACITY_KWH,
+    CONF_DEPARTURE_CALENDAR_ENTITY,
+    CONF_DEPARTURE_CALENDAR_TITLE,
+    CONF_DEPARTURE_ENTITY,
+    CONF_DEPARTURE_MINIMUM_SOC,
+    CONF_DEPARTURE_VEHICLE_PROVIDER,
+    CONF_DEPARTURE_VEHICLE_DEVICE,
+    CONF_DEPARTURE_VEHICLE_TIME_ZONE,
+    CONF_DEPARTURE_TIMER1_DAYS,
+    CONF_DEPARTURE_TIMER2_DAYS,
+    CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
 }
 
 
@@ -287,8 +287,8 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         if (draft := self._section("vehicle")) is None:
             return await self.async_step_init()
         draft.clear({CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_USE_PROFILE, CONF_VEHICLE_LIMIT_USE_PROFILE})
-        draft.values[CONF_TIMED_GOAL_ENABLED] = False
-        draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
+        draft.values[CONF_DEPARTURE_ENABLED] = False
+        draft.values[CONF_DEPARTURE_RESET_PENDING] = True
         return await self._finish_section()
 
     async def async_step_vehicle_soc(
@@ -361,11 +361,11 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         if not vehicle_soc_is_configured(self._target_options()):
             return await self.async_step_departure_requires_vehicle()
         choices = ["departure_configure"]
-        if draft.values.get(CONF_TIMED_GOAL_ENABLED) is True:
+        if draft.values.get(CONF_DEPARTURE_ENABLED) is True:
             choices.append("departure_disable")
-        kwh = draft.values.get(CONF_TIMED_CAPACITY_KWH)
+        kwh = draft.values.get(CONF_DEPARTURE_CAPACITY_KWH)
         departure = [
-            draft.values.get(key) for key in (CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_DEPARTURE_ENTITY)
+            draft.values.get(key) for key in (CONF_DEPARTURE_CALENDAR_ENTITY, CONF_DEPARTURE_ENTITY)
         ]
         if provider_selection(draft.values, "departure").provider_id != PROVIDER_NONE:
             departure.append(self._car_entities(draft.values).get("departure") or PROVIDER_BAVARIANDATA)
@@ -376,8 +376,8 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 "departure_entity": ", ".join(item for item in departure if item) or "—",
                 "capacity_entity": (
                     self._car_entities(draft.values).get("capacity")
-                    if draft.values.get(CONF_TIMED_USE_VEHICLE_CAPACITY) is True
-                    else draft.values.get(CONF_TIMED_CAPACITY_ENTITY)
+                    if draft.values.get(CONF_DEPARTURE_USE_VEHICLE_CAPACITY) is True
+                    else draft.values.get(CONF_DEPARTURE_CAPACITY_ENTITY)
                     or (f"{kwh} kWh" if kwh is not None else None)
                 ) or "—",
             },
@@ -399,8 +399,8 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     ) -> ConfigFlowResult:
         if (draft := self._section("departure")) is None:
             return await self.async_step_init()
-        draft.values[CONF_TIMED_GOAL_ENABLED] = False
-        draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
+        draft.values[CONF_DEPARTURE_ENABLED] = False
+        draft.values[CONF_DEPARTURE_RESET_PENDING] = True
         return await self._finish_section()
 
     async def async_step_departure_configure(
@@ -430,35 +430,35 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                     )
                     if user_input.get(key) is True
                 ]
-                minimum = self._details.pop(CONF_TIMED_MINIMUM_SOC, 0)
+                minimum = self._details.pop(CONF_DEPARTURE_MINIMUM_SOC, 0)
                 if minimum:
-                    draft.values[CONF_TIMED_MINIMUM_SOC] = minimum
+                    draft.values[CONF_DEPARTURE_MINIMUM_SOC] = minimum
                 else:
-                    draft.clear({CONF_TIMED_MINIMUM_SOC})
+                    draft.clear({CONF_DEPARTURE_MINIMUM_SOC})
                 if user_input.get("use_calendar") is not True:
-                    draft.clear({CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE})
+                    draft.clear({CONF_DEPARTURE_CALENDAR_ENTITY, CONF_DEPARTURE_CALENDAR_TITLE})
                 if user_input.get("use_departure_entity") is not True:
-                    draft.clear({CONF_TIMED_DEPARTURE_ENTITY})
+                    draft.clear({CONF_DEPARTURE_ENTITY})
                 if user_input.get("use_vehicle_timer") is not True:
                     draft.clear(
                         {
-                            CONF_TIMED_VEHICLE_DEVICE,
-                            CONF_TIMED_VEHICLE_TIME_ZONE,
-                            CONF_TIMED_TIMER1_DAYS,
-                            CONF_TIMED_TIMER2_DAYS,
+                            CONF_DEPARTURE_VEHICLE_DEVICE,
+                            CONF_DEPARTURE_VEHICLE_TIME_ZONE,
+                            CONF_DEPARTURE_TIMER1_DAYS,
+                            CONF_DEPARTURE_TIMER2_DAYS,
                         }
                     )
-                    draft.values[CONF_TIMED_VEHICLE_PROVIDER] = PROVIDER_NONE
-                draft.values[CONF_TIMED_GOAL_ENABLED] = True
+                    draft.values[CONF_DEPARTURE_VEHICLE_PROVIDER] = PROVIDER_NONE
+                draft.values[CONF_DEPARTURE_ENABLED] = True
                 if source == "profile":
-                    draft.clear({CONF_TIMED_CAPACITY_ENTITY, CONF_TIMED_CAPACITY_KWH})
-                    draft.values[CONF_TIMED_USE_VEHICLE_CAPACITY] = True
+                    draft.clear({CONF_DEPARTURE_CAPACITY_ENTITY, CONF_DEPARTURE_CAPACITY_KWH})
+                    draft.values[CONF_DEPARTURE_USE_VEHICLE_CAPACITY] = True
                     return await self._next_departure()
-                draft.clear({CONF_TIMED_USE_VEHICLE_CAPACITY})
+                draft.clear({CONF_DEPARTURE_USE_VEHICLE_CAPACITY})
                 if source == "fixed":
-                    draft.clear({CONF_TIMED_CAPACITY_ENTITY})
+                    draft.clear({CONF_DEPARTURE_CAPACITY_ENTITY})
                     return await self.async_step_departure_capacity_fixed()
-                draft.clear({CONF_TIMED_CAPACITY_KWH})
+                draft.clear({CONF_DEPARTURE_CAPACITY_KWH})
                 return await self.async_step_departure_capacity_entity()
         selection = provider_selection(draft.values, "departure")
         return self.async_show_form(
@@ -499,13 +499,13 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             "capacity_source"
         ) != ("entity" if entity else "fixed"):
             return await self.async_step_init()
-        key = CONF_TIMED_CAPACITY_ENTITY if entity else CONF_TIMED_CAPACITY_KWH
+        key = CONF_DEPARTURE_CAPACITY_ENTITY if entity else CONF_DEPARTURE_CAPACITY_KWH
         errors = {}
         if user_input is not None:
-            errors = _timed_errors(user_input)
+            errors = _departure_errors(user_input)
             if not user_input.get(key):
                 errors[key] = (
-                    "timed_source_invalid" if entity else "timed_capacity_invalid"
+                    "departure_source_invalid" if entity else "departure_capacity_invalid"
                 )
             if not errors:
                 draft.values[key] = user_input[key]
@@ -552,16 +552,16 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             return await self.async_step_init()
         calendar = step == "departure_calendar"
         keys = (
-            (CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE)
+            (CONF_DEPARTURE_CALENDAR_ENTITY, CONF_DEPARTURE_CALENDAR_TITLE)
             if calendar
-            else (CONF_TIMED_DEPARTURE_ENTITY,)
+            else (CONF_DEPARTURE_ENTITY,)
         )
         errors = {}
         if user_input is not None:
-            errors = _timed_errors(user_input)
+            errors = _departure_errors(user_input)
             for key in keys:
                 if not user_input.get(key):
-                    errors[key] = "timed_source_invalid"
+                    errors[key] = "departure_source_invalid"
             if not errors:
                 draft.values.update({key: user_input[key] for key in keys})
                 return await self._next_departure()
@@ -587,7 +587,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             return await self.async_step_departure_vehicle_details()
         return await self._async_vehicle_provider_step(
             values=draft.values, capability="departure",
-            key=CONF_TIMED_VEHICLE_PROVIDER, step_id="departure_vehicle",
+            key=CONF_DEPARTURE_VEHICLE_PROVIDER, step_id="departure_vehicle",
             user_input=user_input, next_step=self.async_step_departure_vehicle_details,
         )
 
@@ -607,30 +607,30 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         )
         errors = {}
         if user_input is not None:
-            device = draft.values.get(CONF_VEHICLE_DEVICE) if profile else user_input.get(CONF_TIMED_VEHICLE_DEVICE)
+            device = draft.values.get(CONF_VEHICLE_DEVICE) if profile else user_input.get(CONF_DEPARTURE_VEHICLE_DEVICE)
             if not provider_device_is_valid(self.hass, provider.id, device):
-                errors[CONF_TIMED_VEHICLE_DEVICE] = "vehicle_device_invalid"
+                errors[CONF_DEPARTURE_VEHICLE_DEVICE] = "vehicle_device_invalid"
             errors.update(_timer_errors(user_input))
             if not errors:
                 draft.clear(
                     {
-                        CONF_TIMED_VEHICLE_TIME_ZONE,
-                        CONF_TIMED_TIMER1_DAYS,
-                        CONF_TIMED_TIMER2_DAYS,
-                        CONF_TIMED_VEHICLE_DEVICE,
+                        CONF_DEPARTURE_VEHICLE_TIME_ZONE,
+                        CONF_DEPARTURE_TIMER1_DAYS,
+                        CONF_DEPARTURE_TIMER2_DAYS,
+                        CONF_DEPARTURE_VEHICLE_DEVICE,
                     }
                 )
                 draft.values.update(
                     {
-                        CONF_TIMED_VEHICLE_PROVIDER: "profile" if profile else provider.id,
+                        CONF_DEPARTURE_VEHICLE_PROVIDER: "profile" if profile else provider.id,
                     }
                 )
                 if not profile:
-                    draft.values[CONF_TIMED_VEHICLE_DEVICE] = device
+                    draft.values[CONF_DEPARTURE_VEHICLE_DEVICE] = device
                 for key in (
-                    CONF_TIMED_VEHICLE_TIME_ZONE,
-                    CONF_TIMED_TIMER1_DAYS,
-                    CONF_TIMED_TIMER2_DAYS,
+                    CONF_DEPARTURE_VEHICLE_TIME_ZONE,
+                    CONF_DEPARTURE_TIMER1_DAYS,
+                    CONF_DEPARTURE_TIMER2_DAYS,
                 ):
                     if user_input.get(key):
                         draft.values[key] = user_input[key]
@@ -638,7 +638,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         current = (
             {
                 **draft.values,
-                CONF_TIMED_VEHICLE_DEVICE: self._details["suggested_device"],
+                CONF_DEPARTURE_VEHICLE_DEVICE: self._details["suggested_device"],
             }
             if user_input is None
             else user_input
@@ -648,7 +648,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             description_placeholders=self._vehicle_placeholders(),
             data_schema=vehicle_device_schema(
                 current,
-                key=CONF_TIMED_VEHICLE_DEVICE,
+                key=CONF_DEPARTURE_VEHICLE_DEVICE,
                 integration=provider.integration_domain,
                 timer_options=provider.id == PROVIDER_BAVARIANDATA,
                 include_device=not profile,
@@ -661,7 +661,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         """Recheck the vehicle requirement immediately before committing."""
         if (
             (draft := self._section("departure")) is not None
-            and draft.values.get(CONF_TIMED_GOAL_ENABLED) is True
+            and draft.values.get(CONF_DEPARTURE_ENABLED) is True
             and not vehicle_soc_is_configured(self._target_options())
         ):
             return self._options_changed()
@@ -715,24 +715,24 @@ def _vehicle_errors(values: dict[str, Any]) -> dict[str, str]:
 
 def _timer_errors(values: dict[str, Any]) -> dict[str, str]:
     errors = {}
-    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+    for key in (CONF_DEPARTURE_TIMER1_DAYS, CONF_DEPARTURE_TIMER2_DAYS):
         days = values.get(key, [])
-        if not isinstance(days, list) or any(day not in TIMED_WEEKDAYS for day in days):
-            errors[key] = "timed_weekdays_invalid"
-    if zone := values.get(CONF_TIMED_VEHICLE_TIME_ZONE):
+        if not isinstance(days, list) or any(day not in DEPARTURE_WEEKDAYS for day in days):
+            errors[key] = "departure_weekdays_invalid"
+    if zone := values.get(CONF_DEPARTURE_VEHICLE_TIME_ZONE):
         try:
             ZoneInfo(zone)
         except ValueError, TypeError, ZoneInfoNotFoundError:
-            errors[CONF_TIMED_VEHICLE_TIME_ZONE] = "timed_timezone_invalid"
+            errors[CONF_DEPARTURE_VEHICLE_TIME_ZONE] = "departure_timezone_invalid"
     return errors
 
 
-def _timed_errors(values: dict[str, Any]) -> dict[str, str]:
+def _departure_errors(values: dict[str, Any]) -> dict[str, str]:
     errors = {}
     for key, domains in (
-        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
-        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
-        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
+        (CONF_DEPARTURE_CAPACITY_ENTITY, ("sensor",)),
+        (CONF_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
+        (CONF_DEPARTURE_CALENDAR_ENTITY, ("calendar",)),
     ):
         value = values.get(key)
         if value and (
@@ -740,23 +740,23 @@ def _timed_errors(values: dict[str, Any]) -> dict[str, str]:
             or not valid_entity_id(value)
             or value.split(".", 1)[0] not in domains
         ):
-            errors[key] = "timed_source_invalid"
-    if values.get(CONF_TIMED_CALENDAR_TITLE) and not values.get(
-        CONF_TIMED_CALENDAR_ENTITY
+            errors[key] = "departure_source_invalid"
+    if values.get(CONF_DEPARTURE_CALENDAR_TITLE) and not values.get(
+        CONF_DEPARTURE_CALENDAR_ENTITY
     ):
-        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_required"
+        errors[CONF_DEPARTURE_CALENDAR_TITLE] = "departure_calendar_required"
     if (
-        values.get(CONF_TIMED_CALENDAR_ENTITY)
-        and not str(values.get(CONF_TIMED_CALENDAR_TITLE, "")).strip()
+        values.get(CONF_DEPARTURE_CALENDAR_ENTITY)
+        and not str(values.get(CONF_DEPARTURE_CALENDAR_TITLE, "")).strip()
     ):
-        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_title_required"
-    capacity = values.get(CONF_TIMED_CAPACITY_KWH)
+        errors[CONF_DEPARTURE_CALENDAR_TITLE] = "departure_calendar_title_required"
+    capacity = values.get(CONF_DEPARTURE_CAPACITY_KWH)
     if capacity is not None and (
         isinstance(capacity, bool)
         or not isinstance(capacity, (int, float))
         or not 1 <= capacity <= 250
     ):
-        errors[CONF_TIMED_CAPACITY_KWH] = "timed_capacity_invalid"
+        errors[CONF_DEPARTURE_CAPACITY_KWH] = "departure_capacity_invalid"
     return errors
 
 

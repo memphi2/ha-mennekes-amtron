@@ -28,6 +28,7 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceValidationError,
 )
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
+from custom_components.mennekes_amtron_rtu.device.plug_cycle import PlugCycle
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests.test_control import Harness
@@ -37,7 +38,7 @@ POLICY = "a" * 64
 
 
 def unplugged(control):
-    control.observe_plug_charge(WallboxData(values={
+    control.observe_plug(WallboxData(values={
         "evse_state": int(EvseState.IDLE), "cp_state": int(CpState.A1), "charging_release": 1,
     }))
 
@@ -50,7 +51,7 @@ def present(harness, connected=True):
     }
     for spec in (R.EVSE_STATE, R.CP_STATE):
         harness.transport.bank[spec.address] = values[spec.key]
-    harness.control.observe_plug_charge(WallboxData(values=values))
+    harness.control.observe_plug(WallboxData(values=values))
 
 
 async def armed(harness):
@@ -69,40 +70,51 @@ async def authorize(control):
     await control.async_authorize_plug_charge(control.plug_charge["session"], deadline=deadline())
 
 
+def see(state, cycle, present, **when):
+    """One piece of evidence for the plug cycle and the grant that follows it."""
+    state.follow(cycle, cycle.observe(present, **when))
+
+
 def test_cycle_and_policy_bindings_have_no_durable_grants():
-    state = PlugChargeState()
+    state, cycle = PlugChargeState(), PlugCycle()
     state.configure(True, POLICY)
     before_absence = datetime.now(UTC)
-    state.observe(False, observed_at=before_absence)
-    absent_at = state.last_absent_at
-    state.observe(True)
-    token = state.session
+    see(state, cycle, False, at=before_absence)
+    see(state, cycle, True)
+    token = state.session(cycle)
     assert len(token) == 32
-    assert before_absence == state.since == absent_at
+    assert before_absence == cycle.since
     state.authorized, state.hold = True, False
-    state.observe(True)
+    see(state, cycle, True)
     state.configure(True, POLICY)
-    assert state.session == token
+    assert state.session(cycle) == token
     assert state.authorized
     restored = PlugChargeState.restore(state.durable())
     assert restored.enabled
     assert restored.blocked
-    assert restored.session is None
-    assert restored.since is None
+    assert restored.snapshot(PlugCycle())["session"] is None
+    assert restored.snapshot(PlugCycle())["since"] is None
+    # Another policy ends the grant; the connection is still the same one.
     state.configure(True, "b" * 64)
-    assert state.session is None
-    assert state.last_absent_at is None
     assert state.blocked
-    state.observe(True)
-    assert state.session != token
+    assert not state.authorized
+    assert state.session(cycle) not in (None, token)
+    token = state.session(cycle)
     # An unknown state is no unplug: the connection and its start remain.
-    token, since = state.session, state.since
-    state.observe(None)
-    assert (state.session, state.since) == (token, since)
-    assert state.unknown_since is not None
+    since = cycle.since
+    see(state, cycle, None)
+    assert (state.session(cycle), cycle.since) == (token, since)
+    # Only a confirmed unplug ends it; the next plug-in is another one.
+    see(state, cycle, False)
+    assert state.session(cycle) is None
+    see(state, cycle, True)
+    assert state.session(cycle) not in (None, token)
     state.configure(False, "")
     assert state.blocked
     assert not state.enabled
+    # Without the gate there is no session to grant.
+    assert state.snapshot(cycle)["session"] is None
+    assert state.snapshot(cycle)["since"] is None
     with pytest.raises(ValueError, match="saved"):
         PlugChargeState.restore({**state.durable(), "authorized": True})
 
@@ -120,8 +132,11 @@ def test_gate_closes_without_changing_manual_intent_and_grants_only_release():
         assert h.written(R.CHARGING_RELEASE) == [[0]]
         assert control.charging_release_requested is None
         assert control.pause_requested is None
+        releases = control._release_writes
         await authorize(control)
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        # The grant is a release like one by hand to everything that counts them.
+        assert control._release_writes == releases + 1
         assert control.plug_charge["authorized"]
         assert not control.plug_charge["manual"]
         assert h.written(R.CHARGING_CURRENT_EMS) == []
@@ -171,7 +186,7 @@ def test_a_release_switched_off_by_hand_stops_only_this_connection():
         assert control.charging_release_requested is False
         assert h.written(R.CHARGING_RELEASE)[-1] == [0]
         # Unknown readings are no unplug and keep the stop.
-        control.observe_plug_charge(None)
+        control.observe_plug(None)
         assert control.charging_release_requested is False
         # The unplug ends it: the next recognized plug-in can be granted.
         h.transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
@@ -214,7 +229,7 @@ def test_a_manual_release_without_a_car_waits_for_the_next_plug_in():
         assert h.written(R.CHARGING_RELEASE)[-1] == [1]
         # Repeated empty polls and an unknown state keep it armed.
         unplugged(control)
-        control.observe_plug_charge(None)
+        control.observe_plug(None)
         await asyncio.sleep(0)
         assert control.plug_charge["manual"]
         assert h.written(R.CHARGING_RELEASE)[-1] == [1]
@@ -243,7 +258,6 @@ def test_a_manual_release_survives_a_restart_and_ends_with_the_gate():
     with pytest.raises(ValueError, match="saved"):
         PlugChargeState.restore({**state.durable(), "manual": 1})
     # A long unknown state or switching the gate off withdraws it.
-    state.observe(True)
     state.revoke()
     assert not state.manual
     state.manual = True
@@ -437,8 +451,9 @@ def test_service_persists_policy_but_new_process_requires_new_authorization(tmp_
             IntentStore(tmp_path / "intent.json", service.identity.serial_number).load(restored)
             assert restored.plug_charge.enabled
             assert restored.plug_charge.blocked
-            assert restored.plug_charge.session is None
-            assert restored.plug_charge.since is None
+            # The connection is never saved: a restart has to see it again.
+            assert restored.plug_cycle.id is None
+            assert restored.plug_charge.snapshot(restored.plug_cycle)["since"] is None
         finally:
             await service.stop()
         restarted, transport, _clock = await service_fixture(tmp_path)
@@ -519,7 +534,7 @@ def test_late_deny_task_does_not_close_a_newly_authorized_cycle():
     async def run():
         h = Harness()
         c = await armed(h)
-        c.observe_plug_charge(None)  # A deny worker exists but has not run yet.
+        c.observe_plug(None)  # A deny worker exists but has not run yet.
         present(h)
         await authorize(c)
         await asyncio.sleep(0)
@@ -587,9 +602,11 @@ def test_denial_retries_without_repeated_logs_and_stops_on_unload(caplog):
         await c._plug_charge._task
         assert h.transport.bank[R.CHARGING_RELEASE.address] == 0
         await c.async_shutdown()
+        unplugged(c)
         snapshot = c.plug_charge
         present(h)
-        assert c.plug_charge == snapshot
+        # The stopped gate grants and denies nothing any more.
+        assert {**c.plug_charge, "session": None, "since": None} == snapshot
     asyncio.run(run())
 
 
@@ -656,7 +673,7 @@ def test_control_handoff_preserves_session_only_while_transport_continues(link_l
         old = await h.connect()
         await old.async_configure_plug_charge(True, policy=POLICY)
         absent_at = datetime.now(UTC) - timedelta(seconds=2)
-        old.observe_plug_charge(WallboxData(values={"evse_state": int(EvseState.IDLE), "cp_state": int(CpState.A1), "charging_release": 0}), observed_at=absent_at)
+        old.observe_plug(WallboxData(values={"evse_state": int(EvseState.IDLE), "cp_state": int(CpState.A1), "charging_release": 0}), observed_at=absent_at)
         present(h)
         if granted:
             await authorize(old)
@@ -758,31 +775,59 @@ def test_manual_gate_release_keeps_a_waiting_lock_but_ends_goal_recovery():
     asyncio.run(run())
 
 
+def test_a_car_seen_again_only_after_the_grace_loses_its_grant_and_gets_a_fresh_one(caplog):
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        token = c.plug_charge["session"]
+        await authorize(c)
+        # One failed poll, and the next one answers only minutes later.
+        c.observe_plug(None)
+        h.clock[0] += 300
+        present(h)
+        await c._plug_charge._task
+        assert "vehicle state unknown for over 60 seconds" in caplog.text
+        assert not c.plug_charge["authorized"]
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1], [0]]
+        assert c.plug_charge["session"] == token
+        # A grant on evidence read in its own command gets the whole grace.
+        c.observe_plug(None)
+        h.clock[0] += 59
+        await authorize(c)
+        h.clock[0] += 59
+        c.observe_plug(None)
+        assert c.plug_charge["authorized"]
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
 def test_unknown_vehicle_state_keeps_the_grant_until_the_grace_ends(caplog):
     async def run():
         h = Harness()
         c = await armed(h)
         token = c.plug_charge["session"]
         await authorize(c)
-        start = datetime.now(UTC)
         # A failed poll or a transient EVSE/CP combination is no unplug.
-        c.observe_plug_charge(None, observed_at=start)
-        c.observe_plug_charge(WallboxData(values={
+        c.observe_plug(None)
+        h.clock[0] += 30
+        c.observe_plug(WallboxData(values={
             "evse_state": int(EvseState.IDLE), "cp_state": int(CpState.B1), "charging_release": 1,
-        }), observed_at=start + timedelta(seconds=30))
+        }))
         assert c.plug_charge["authorized"]
         present(h)
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
         # A longer gap withdraws the grant but keeps the connection and its start.
-        c.observe_plug_charge(None, observed_at=start + timedelta(seconds=100))
+        h.clock[0] += 70
+        c.observe_plug(None)
         # A held status is no fresh evidence either; the poll that answers
         # closes the release.
-        c.observe_plug_charge(WallboxData(
+        h.clock[0] += 61
+        c.observe_plug(WallboxData(
             values={"evse_state": int(EvseState.EV_CONNECTED), "cp_state": int(CpState.B1), "charging_release": 1},
             held=frozenset({"evse_state", "cp_state"}),
-        ), observed_at=start + timedelta(seconds=161))
+        ))
         await c._plug_charge._task
-        assert "vehicle state unknown for 61 seconds" in caplog.text
+        assert "vehicle state unknown for over 60 seconds" in caplog.text
         assert not c.plug_charge["authorized"]
         assert h.written(R.CHARGING_RELEASE) == [[0], [1], [0]]
         present(h)
@@ -801,34 +846,61 @@ def test_unknown_vehicle_state_keeps_the_grant_until_the_grace_ends(caplog):
 
 
 def test_a_reconnect_only_suspects_and_a_closed_client_forgets():
-    state = PlugChargeState()
+    write_state = WriteState()
+    state, cycle = write_state.plug_charge, write_state.plug_cycle
     state.configure(True, POLICY)
-    state.suspect()
-    assert state.unknown_since is None
-    state.observe(True)
+    cycle.suspect(now=0)
+    see(state, cycle, None, now=100)
+    assert not cycle.lapsed  # Nothing was connected: nothing to doubt.
+    see(state, cycle, True, now=100)
     state.authorized = True
-    state.suspect()
-    first = state.unknown_since
-    state.suspect()
-    assert state.unknown_since == first
-    state.observe(True)
-    assert state.unknown_since is None
+    token = cycle.id
+    # The doubt counts from the reconnect, and only once.
+    cycle.suspect(now=100)
+    cycle.suspect(now=150)
+    see(state, cycle, None, now=159)
     assert state.authorized
-
-
-def test_a_clock_set_back_does_not_stretch_the_unknown_grace():
-    state = PlugChargeState()
-    state.configure(True, POLICY)
-    start = datetime(2026, 11, 19, 12, tzinfo=UTC)
-    state.observe(True, observed_at=start)
-    state.authorized = True
-    state.observe(None, observed_at=start + timedelta(seconds=5))
-    # The clock is set back an hour while the vehicle state stays unknown.
-    back = start - timedelta(hours=1)
-    state.observe(None, observed_at=back)
+    see(state, cycle, True, now=159)
+    see(state, cycle, None, now=300)
     assert state.authorized
-    state.observe(None, observed_at=back + timedelta(seconds=61))
+    cycle.suspect(now=300)
+    see(state, cycle, None, now=360)
+    assert cycle.lapsed
     assert not state.authorized
+    assert cycle.id == token
+    # A closed or new client may reach another connection: nothing is left.
+    see(state, cycle, True, now=361)
+    state.authorized, state.manual = True, True
+    write_state.forget_connection()
+    assert (cycle.id, cycle.present, state.authorized, state.manual) == (None, None, False, False)
+    # A release given for the next plug-in was no connection's and stays.
+    state.manual = True
+    write_state.forget_connection()
+    assert state.manual
+
+
+def test_only_a_lasting_unknown_state_withdraws_the_grant_and_changes_the_scope():
+    state, cycle = PlugChargeState(), PlugCycle()
+    state.configure(True, POLICY)
+    see(state, cycle, True, now=0)
+    state.authorized = True
+    scope = cycle.scope
+    see(state, cycle, None, now=5)
+    see(state, cycle, None, now=64)
+    assert state.authorized
+    assert cycle.scope == scope
+    see(state, cycle, None, now=65)
+    assert not state.authorized
+    # Nobody can tell whether the same car is still there.
+    assert cycle.scope is None
+    see(state, cycle, True, now=70)
+    assert cycle.scope not in (None, scope)
+    # A release by hand given meanwhile was for a car nobody saw.
+    see(state, cycle, None, now=80)
+    see(state, cycle, None, now=141)
+    state.manual = True
+    see(state, cycle, None, now=142)
+    assert not state.manual
 
 
 def test_a_release_whose_car_left_is_saved_as_none():
@@ -850,12 +922,12 @@ def test_a_release_by_hand_knows_at_once_whether_a_car_is_connected(tmp_path):
         gate = service.control._plug_charge
         await service.control.async_configure_plug_charge(True, policy=POLICY)
         state = gate.state
-        state.session = "c" * 64
+        gate.cycle.observe(True)
         gate.set_manual(True)
         # Saved by the command itself, before the next poll looks.
         assert state.durable()["manual_connected"] is True
         gate.set_manual(False)
-        state.session = None
+        gate.cycle.observe(False)
         gate.set_manual(True)
         assert state.durable()["manual_connected"] is False
         await service.stop()
@@ -871,7 +943,8 @@ def test_a_refused_release_keeps_what_was_known_about_the_restored_one(tmp_path)
         await control.async_configure_plug_charge(True, policy=POLICY)
         state = control._plug_charge.state
         # As read from disk: a connected car's release, the car still unknown.
-        state.session = None
+        cycle = control.write_state.plug_cycle
+        cycle.forget()
         state.manual = state.manual_connected = state.restored_manual = True
 
         async def refuse(_command):
@@ -880,9 +953,9 @@ def test_a_refused_release_keeps_what_was_known_about_the_restored_one(tmp_path)
         control.queue.async_submit_locked = refuse
         with pytest.raises(DeviceError):
             await control.async_set_charging_release(True)
-        assert state.manual_marks == (True, True, True, None)
+        assert state.manual_marks(cycle) == (True, True, True, cycle.stamp)
         # The first answer shows no car: the release was that car's and ends.
-        state.observe(False)
+        see(state, cycle, False)
         assert not state.manual
         await service.stop()
 
@@ -943,7 +1016,7 @@ def test_a_refused_release_for_the_next_car_is_gone_when_that_car_came_meanwhile
         await control.async_configure_plug_charge(True, policy=POLICY)
         await service.refresh()
         state = control._plug_charge.state
-        assert state.session is None
+        assert control.write_state.plug_cycle.id is None
         assert not state.manual
         clock[0] += 1000
         real = control._client.async_write_register
@@ -963,9 +1036,42 @@ def test_a_refused_release_for_the_next_car_is_gone_when_that_car_came_meanwhile
             await service.command({"command": "release", "value": True, "expected_serial_number": serial})
         control._client.async_write_register = real
         # The command failed: it released nothing, also not this car.
-        assert state.session is not None
+        assert control.write_state.plug_cycle.id is not None
         assert not state.manual
         assert state.blocked
         await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_failing_read_back_does_not_close_an_acknowledged_grant():
+    async def run():
+        h = Harness()
+        control = await armed(h)
+        control._request_refresh = AsyncMock(side_effect=OSError("offline"))
+        await authorize(control)
+        # The grant itself reads nothing back; the command does, afterwards.
+        control._request_refresh.assert_not_awaited()
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        assert control.plug_charge["authorized"]
+        await control.async_shutdown()
+    asyncio.run(run())
+
+
+def test_a_refused_command_cannot_put_back_a_release_that_lapsed_meanwhile():
+    state, cycle = PlugChargeState(), PlugCycle()
+    state.configure(True, POLICY)
+    see(state, cycle, True, now=0)
+    state.manual = state.manual_connected = True
+    # A second command takes the marks and waits; the state stays unknown.
+    marks = state.manual_marks(cycle)
+    see(state, cycle, None, now=10)
+    see(state, cycle, None, now=70)
+    assert not state.manual
+    # Refused afterwards, it restores nothing: the connection is no longer
+    # surely the one the release was given for.
+    state.restore_manual(marks, cycle)
+    assert not state.manual
+    see(state, cycle, True, now=80)
+    state.restore_manual(marks, cycle)
+    assert not state.manual

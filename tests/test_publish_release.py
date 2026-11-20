@@ -53,6 +53,7 @@ def setup_publication(
         return b""
 
     monkeypatch.setattr(publisher, "run", run)
+    monkeypatch.setattr(publisher, "sleep", lambda delay: calls.append(("sleep", delay)))
     monkeypatch.setattr(publisher, "remote_commit", lambda *_: "a" * 40)
     monkeypatch.setattr(publisher, "source_files", lambda _: files)
     return publisher, local, release, calls
@@ -111,6 +112,9 @@ def test_corrupt_download_leaves_draft_unpublished(monkeypatch, tmp_path):
         publisher.publish("owner/repo", "v0.2.3", local)
     assert release["draft"]
     assert not any(call[:3] == ("gh", "release", "edit") for call in calls)
+    # A lasting difference is read again, never written, then refused.
+    assert [call[1] for call in calls if call[0] == "sleep"] == list(publisher.CONFIRM_DELAYS)
+    assert sum(call[:3] == ("gh", "release", "create") for call in calls) == 1
 
 
 def test_api_failure_does_not_mean_release_absent(monkeypatch, tmp_path):
@@ -196,3 +200,39 @@ def test_changed_but_self_consistent_public_assets_are_not_replaced(
         )
         for call in calls
     )
+
+
+@pytest.mark.parametrize("late", ["listing", "digest"])
+def test_a_new_draft_that_github_shows_late_is_read_again_and_published(monkeypatch, tmp_path, late):
+    publisher, local, release, calls = setup_publication(monkeypatch, tmp_path)
+    real = publisher.run
+    reads = []
+
+    def run(*args):
+        result = real(*args)
+        if args[:2] == ("gh", "api") and any(call[:3] == ("gh", "release", "create") for call in calls):
+            reads.append(1)
+            if len(reads) <= 2:
+                # Right after the upload GitHub may list no release yet, or
+                # its assets without their digests.
+                if late == "listing":
+                    return b"[[]]"
+                return json.dumps([[{**release, "assets": [
+                    {key: value for key, value in asset.items() if key != "digest"}
+                    for asset in release["assets"]
+                ]}]]).encode()
+        return result
+
+    monkeypatch.setattr(publisher, "run", run)
+    publisher.publish("owner/repo", "v0.2.3", local)
+    assert release["draft"] is False
+    assert [call[1] for call in calls if call[0] == "sleep"] == list(publisher.CONFIRM_DELAYS[:2])
+    assert sum(call[:3] == ("gh", "release", "create") for call in calls) == 1
+
+
+def test_a_stopped_publication_names_its_reason(monkeypatch, tmp_path, capsys):
+    publisher, _local, _release, _calls = setup_publication(monkeypatch, tmp_path, corrupt=True)
+    monkeypatch.setattr("sys.argv", ["publish_release.py", "--repo", "owner/repo", "--tag", "v0.2.3",
+                                     "--directory", str(tmp_path / "local")])
+    assert publisher.main() == 1
+    assert "(download differs from GitHub asset size/digest)" in capsys.readouterr().err

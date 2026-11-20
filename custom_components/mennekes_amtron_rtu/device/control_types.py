@@ -32,7 +32,7 @@ class PhaseWaitError(Exception):
         self.preserve_deadline = preserve_deadline
 
 
-class TimedCommandCancelledError(Exception):
+class DepartureCommandCancelledError(Exception):
     """The trip or its charge target no longer authorizes a pending command."""
 
     def __init__(self, reason: str) -> None:
@@ -57,7 +57,6 @@ class PendingCommand:
 # Commands that end a charge or close the wallbox; and those among them that
 # nothing written to the current can settle.
 STOPS = frozenset({"pause", "disable_charging", "lock"})
-OTHER_STOPS = STOPS - {"pause"}
 
 
 @dataclass(frozen=True, slots=True)

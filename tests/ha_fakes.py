@@ -16,18 +16,18 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 
+from custom_components.mennekes_amtron_rtu.const import (
+    CONF_CONTROL_MODE,
+    CONF_PORT,
+    CONF_SERIAL_NUMBER,
+    CONTROL_MODE_MASTER,
+)
 from custom_components.mennekes_amtron_rtu.coordinator import ServiceCoordinator
 from custom_components.mennekes_amtron_rtu.data import MennekesAmtronRuntimeData
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
-)
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONF_CONTROL_MODE,
-    CONF_PORT,
-    CONF_SERIAL_NUMBER,
-    CONTROL_MODE_MASTER,
 )
 from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
@@ -56,7 +56,7 @@ class FakeConfigEntries:
 
         return self.entries.get(entry_id)
 
-    def async_entries(self, domain: str | None = None) -> list[Any]:
+    def async_entries(self, domain: str | None = None, *_include: bool) -> list[Any]:
         """Return the registered entries of one integration."""
 
         return [entry for entry in self.entries.values() if domain in (None, entry.domain)]
@@ -132,7 +132,7 @@ class FakeHass:
     def __init__(self, config_dir: str | None = None) -> None:
         self.config_dir = config_dir or tempfile.mkdtemp(prefix="mennekes-hass-")
         self.config = SimpleNamespace(
-            config_dir=self.config_dir,
+            config_dir=self.config_dir, currency="EUR",
             components=set(),
             language="en",
             path=lambda *parts: str(Path(self.config_dir, *parts)),

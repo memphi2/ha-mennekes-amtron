@@ -19,7 +19,7 @@ from .config_schemas import (
 )
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
-    CONF_TIMED_USE_VEHICLE_CAPACITY,
+    CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_DEVICE,
     CONF_VEHICLE_LIMIT_USE_PROFILE,
@@ -372,7 +372,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 self.hass.states.get(limit), limit=True,
             ) is not None
         if "capacity" in capabilities:
-            options[CONF_TIMED_USE_VEHICLE_CAPACITY] = True
+            options[CONF_DEPARTURE_USE_VEHICLE_CAPACITY] = True
         if "charge_history" in capabilities:
             options[CONF_CHARGE_LOSS_SOURCE] = LOSS_SOURCE_VEHICLE_HISTORY
             options[CONF_LOSS_VEHICLE_PROVIDER] = "profile"

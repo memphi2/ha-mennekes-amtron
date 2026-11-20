@@ -606,7 +606,6 @@ def test_a_bus_failure_becomes_a_translated_error_and_is_counted() -> None:
 
     asyncio.run(run())
     assert harness.diagnostics.writes_rejected == 1
-    assert harness.diagnostics.last_error
 
 
 async def _sequence(*awaitables: object) -> None:

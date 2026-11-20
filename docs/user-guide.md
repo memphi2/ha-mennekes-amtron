@@ -13,7 +13,7 @@ app also provide German, French, Dutch and Italian labels.
 | Charge normally | Choose a current, enable **Charging release** and turn **Charging paused** off. |
 | Stop for now | Turn **Charging paused** on; wait for confirmation. |
 | Add 12 kWh and stop | Set **Energy target** to 12; start or resume separately. |
-| Charge a visitor's car | Optionally set kWh/time, then press **Start guest charging**. |
+| Charge a visitor's car | Optionally set an energy target, cost target or target time, then press **Start guest charging**. |
 | Stop your car at 80% | Set up its optional battery source, then set **Vehicle charge target** to 80. |
 | Have your car ready for a trip | Enable [vehicle planning](departure-planning.md), choose a percentage and one departure time. |
 
@@ -37,33 +37,36 @@ An enabled departure plan can lift a manual pause. To keep a planned vehicle
 stopped, clear its departure time first, then pause. A paused guest is excluded
 from vehicle planning until unplugging.
 
-## Shared limits and target time
+## Shared targets and target time
 
 | Setting | Guest | Selected vehicle |
 |---|---|---|
-| **Energy target** | Additional wallbox kWh from when the positive target was saved | Same energy ceiling |
-| **Target time** | Stop at this time; start is immediate | With planning enabled: be ready for the next trip |
+| **Energy target** | Additional wallbox kWh from when the positive target was saved | Same |
+| **Cost target** | An amount in Home Assistant's currency from when it was saved; it sets the energy target | Same |
+| **Target time** | Ends the charge at this time; start is immediate | With planning enabled: be ready for the next trip |
 | **Vehicle charge target** | Ignored; its saved value remains | Stop at the reported battery percentage |
 
 Energy and cost values are estimates from an uncalibrated meter reading (no
 MID or Eichrecht conformity) and must not be used to bill others.
 
-For guests, the **first reached kWh or time limit** stops charging. With neither
-set, no automatic limit is added. Set a kWh or percentage target to **0** to disable
-it. Clear the time separately; in the Mushroom example, hold the time chip.
+For guests, whichever of energy target, cost target and target time is reached
+first ends the charge. With none set, no automatic limit is added. Set the
+energy, cost or vehicle charge target to **0** to disable it. Clear the time separately; in the Mushroom example, hold the time chip.
 
 Saving a positive kWh value starts a fresh baseline. Guest start uses that
 baseline, including energy already delivered since it was set. It does not
 restart the counter. Change or disable an already reached goal before resuming.
-Vehicle-profile changes cannot replace an active guest's time limit; edit it
-explicitly in HA or the app.
+Vehicle-profile changes cannot replace an active guest's target time; edit it
+explicitly in HA or the app. There is one target time, and the wallbox service
+keeps it: a time changed while a guest charges stays as changed afterwards, and
+a time can only be set while the service is reachable.
 
 ## Guest charging
 
 **Requires write access.** No vehicle profile is needed.
 
 1. Plug in the car.
-2. Optionally set **Energy target** and/or a future **Target time**. In the app,
+2. Optionally set **Energy target**, **Cost target** and/or a future **Target time**. In the app,
    save each changed field before starting.
 3. Press **Start guest charging**. This requests release and start together,
    lifts a manual pause and grants this plug-in permission even with virtual
@@ -224,11 +227,11 @@ Selecting a profile manually is not recognition. A fresh recognized plug-in may
 lift a previous pause; locks and reached limits still apply.
 [Permission rules](vehicle-setup.md#optional-virtual-plug--charge).
 
-## Optional vehicle percentage target
+## Optional vehicle charge target
 
 Choose the car's battery percentage source, then set its target. The car's own
 reported maximum is a separate optional source. A missing SoC leaves charging
-unchanged; it does not invent a battery reading. [Set up percentage limits](vehicle-setup.md#optional-vehicle-percentage-target).
+unchanged; it does not invent a battery reading. [Set up percentage limits](vehicle-setup.md#optional-vehicle-charge-target).
 
 ## Charge for the next departure
 

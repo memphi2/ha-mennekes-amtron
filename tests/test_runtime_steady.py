@@ -14,12 +14,12 @@ from unittest.mock import patch
 
 import pytest
 
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
     DOMAIN,
     HEARTBEAT_DEADLINE_SECONDS,
 )

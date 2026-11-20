@@ -92,7 +92,7 @@ def test_invalid_detector_cannot_leave_a_profile_eligible_for_automatic_selectio
     raw = profile_options()
     raw["vehicle_profiles"][A]["detection"] = detection
     assert profiles(raw) == {}
-    assert vehicle_options(raw)["timed_goal_enabled"] is False
+    assert vehicle_options(raw)["departure_enabled"] is False
 
 
 def test_manual_profile_cannot_claim_an_automatic_provider_source():
@@ -139,7 +139,7 @@ def test_each_manual_signal_pair_is_saved_only_to_its_profile_without_enabling_a
         assert profiles(saved)[A] == profiles(original)[A]
         assert saved["active_vehicle_profile"] == A
         assert "vehicle_auto_selection" not in saved
-        assert "timed_goal_reset_pending" not in saved
+        assert "departure_reset_pending" not in saved
         assert entry.options == original
 
     asyncio.run(run())
@@ -458,6 +458,6 @@ def test_profile_rename_preserves_detection_but_changed_identity_discards_old_ca
             )
         )["data"]
         assert profiles(changed)[A].detection is None
-        assert changed["timed_goal_reset_pending"] is True
+        assert changed["departure_reset_pending"] is True
 
     asyncio.run(run())

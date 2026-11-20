@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .device.registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
 from .entity import AmtronEntity, Projection, Runtime, wanted
@@ -84,7 +84,7 @@ SWITCHES: tuple[AmtronSwitchDescription, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     async_add_entities(AmtronSwitch(entry, description) for description in wanted(entry, SWITCHES))
 

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.data_entry_flow import AbortFlow
 
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu._flow_connect import async_test_connection
@@ -15,12 +17,7 @@ from custom_components.mennekes_amtron_rtu.config_flow import (
     _entry_title,
     _serial_config,
 )
-from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
-from custom_components.mennekes_amtron_rtu.device.client_errors import (
-    AmtronBusError,
-    AmtronConnectionError,
-)
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_DEVICE_ID,
@@ -30,6 +27,11 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_SEARCH,
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
+)
+from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronBusError,
+    AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.options_flow import MennekesAmtronOptionsFlow
@@ -134,9 +136,11 @@ def test_every_offered_frame_round_trips() -> None:
 
 
 def test_the_offered_frames_are_the_ones_the_device_documents() -> None:
+    from custom_components.mennekes_amtron_rtu.const import (
+        SUPPORTED_PARITY_STOPBITS,
+    )
     from custom_components.mennekes_amtron_rtu.device.const import (
         SUPPORTED_FRAMES,
-        SUPPORTED_PARITY_STOPBITS,
         frame_parts,
     )
 
@@ -177,7 +181,7 @@ def test_a_good_connection_creates_the_entry(monkeypatch: pytest.MonkeyPatch) ->
     asyncio.run(run())
 
 
-def test_a_device_without_a_serial_number_falls_back_to_the_port(
+def test_a_device_without_a_serial_number_has_no_unique_id_and_is_set_up_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def run() -> None:
@@ -185,8 +189,15 @@ def test_a_device_without_a_serial_number_falls_back_to_the_port(
         flow = Flow(FakeHass())
         result = await flow.async_step_serial(dict(USER_INPUT))
         assert CONF_SERIAL_NUMBER not in result["data"]
-        assert flow.set_unique_id == "mennekes_amtron_rtu_/dev/fake"
+        assert flow.set_unique_id is None
         assert result["data"][CONF_PORT] == "/dev/fake"
+        # The same port and address a second time is refused by its endpoint.
+        flow.hass.config_entries.entries["one"] = SimpleNamespace(
+            entry_id="one", domain="mennekes_amtron_rtu", data=result["data"], options={}, source="user",
+        )
+        again = Flow(flow.hass)
+        with pytest.raises(AbortFlow, match="already_configured"):
+            await again.async_step_serial(dict(USER_INPUT))
 
     asyncio.run(run())
 

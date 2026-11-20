@@ -127,7 +127,7 @@ def test_identity_is_checked_after_waiting_for_the_service_command_lock(tmp_path
                 return await super().acquire()
 
         lock = ObservedLock()
-        service._command_lock = lock
+        service.command_lock = lock
         await lock.acquire()
         pending = None
         try:

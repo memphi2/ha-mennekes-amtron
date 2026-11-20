@@ -29,8 +29,8 @@ from tests.test_energy_goal_controller import (
     _settle,
     _snapshot,
 )
-from tests.test_goal_store import soc_store, store_at
 from tests.test_modbus_service import current_writes, service_fixture
+from tests.test_model_store import soc_store, store_at
 
 SOURCE = "sensor.car_soc|number.car_limit"
 

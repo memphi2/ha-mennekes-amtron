@@ -46,22 +46,28 @@ from .charging_cost_const import (
     CONF_CHARGING_NETWORK_TARIFF,
     COST_SOURCE_DISABLED,
 )
-from .coordinator import ServiceCoordinator
-from .cost_goal import CostGoalObserver
-from .cost_observer import ChargingCostObserver, LastChargingCost
-from .data import (
-    MennekesAmtronRuntimeData,
-    RuntimeHandoff,
-    WallboxData,
-)
-from .device.client_errors import AmtronBusError, AmtronIdentityError
-from .device.const import (
+from .const import (
     CONF_RELEASE_OFF_ON_UNPLUG,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SERIAL_NUMBER,
     DEFAULT_SCAN_INTERVAL_SECONDS,
-    DOMAIN,
 )
+from .coordinator import ServiceCoordinator
+from .cost_goal import CostGoalObserver
+from .cost_observer import ChargingCostObserver, LastChargingCost
+from .data import (
+    RELOAD_HANDOFFS,
+    MennekesAmtronRuntimeData,
+    RuntimeHandoff,
+    WallboxData,
+)
+from .departure_const import (
+    CONF_DEPARTURE_RESET_PENDING,
+    departure_is_enabled,
+)
+from .departure_observer import DepartureObserver
+from .device.client_errors import AmtronBusError, AmtronIdentityError
+from .device.const import DOMAIN
 from .device.errors import DeviceError
 from .device.notice import FailureNotice
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError
@@ -75,13 +81,11 @@ from .embedded import (
     mark_reloading,
 )
 from .entry_types import MennekesAmtronConfigEntry
-from .goal_store import (
-    DepartureIntent,
-    ModelStore,
-    TimedGoalStore,
-)
 from .guest_charging import GuestCharging
 from .loss_store import LossStore, async_prune_profile_losses
+from .model_store import (
+    ModelStore,
+)
 from .network_tariff_year import (
     async_refresh_tariff_year,
     async_track_tariff_midnight,
@@ -100,12 +104,6 @@ from .service_control import ServiceControl, ServiceHeartbeat
 from .service_errors import ServiceConnectionError
 from .service_transport import HttpTransport, ServiceTransport
 from .services import async_setup_services
-from .timed_goal_const import (
-    CONF_TIMED_GOAL_ENABLED,
-    CONF_TIMED_GOAL_RESET_PENDING,
-    timed_goal_is_enabled,
-)
-from .timed_goal_observer import TimedGoalObserver
 from .vehicle_binding import VehicleBinding, VehicleBindingStore
 from .vehicle_detection import (
     VehicleDetectionObserver,
@@ -174,7 +172,6 @@ async def async_setup_entry(
     # A failed optional cleanup leaves wallbox control available but cannot
     # restore the old trip, even if the feature has since been re-enabled.
     prepare_vehicle_selection(hass, entry)
-    timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
     options = vehicle_options(entry.options)
 
     def validate_vehicle_selection() -> None:
@@ -194,7 +191,7 @@ async def async_setup_entry(
                 _LOGGER.warning("Charging loss: deleted vehicle storage not removed; cleanup retries on setup")
     remote = CONF_SERVER_URL in entry.data
     expected_serial = _entry_serial_binding(entry)
-    handoff: RuntimeHandoff | None = hass.data.get(f"{DOMAIN}_reload_clients", {}).get(entry.entry_id)
+    handoff = hass.data.get(RELOAD_HANDOFFS, {}).get(entry.entry_id)
     client: ServiceClient | None = None
     credentials_rejected: Callable[[], bool] | None = None
     host: EmbeddedService | None = None
@@ -256,7 +253,10 @@ async def async_setup_entry(
                 translation_domain=DOMAIN, translation_key="service_version_mismatch"
             ) from err
         if isinstance(err, (AmtronBusError, DeviceError, OSError, TimeoutError, ValueError)):
-            raise ConfigEntryNotReady(str(err)) from err
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="connection_unavailable",
+                translation_placeholders={"error": str(err)},
+            ) from err
         raise
 
     coordinator = ServiceCoordinator(
@@ -339,8 +339,8 @@ async def async_setup_entry(
                 _raise_optional_setup_error(client, err, "plug_charge_unavailable")
         if entry.runtime_data.controls and not _service_intent_rejected(client):
             entry.runtime_data.plug_charge = PlugChargeObserver(hass, entry)
-        await _async_resume_trip(hass, entry, timed_reset_complete)
-        await _async_cancel_old_trip(hass, entry, timed_reset_complete)
+        await _async_retain_trips(hass, entry)
+        await _async_cancel_old_trip(hass, entry)
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
         if _estimates_enabled(entry):
             if cost_enabled:
@@ -417,7 +417,7 @@ async def async_setup_entry(
             # Before the car's rules start: they rest for an unconfirmed car.
             entry.runtime_data.vehicle_binding = VehicleBinding(hass, entry)
             await entry.runtime_data.vehicle_binding.async_start()
-        await _async_start_vehicle(hass, entry, options, timed_reset_complete, validate_vehicle_selection)
+        await _async_start_vehicle(hass, entry, options, validate_vehicle_selection)
         platforms = tuple(_entry_platforms(entry))
         await hass.config_entries.async_forward_entry_setups(
             entry, platforms
@@ -481,78 +481,57 @@ def _trip_memory(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> Vehic
 async def _async_park_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     """Remember the selected car's open trip before another car is selected."""
     runtime = entry.runtime_data
-    if runtime.vehicle_profile_id is None or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
+    if runtime.vehicle_profile_id is None or entry.options.get(CONF_DEPARTURE_RESET_PENDING) is not True:
         return
     # A deleted profile's trip is dropped rather than kept for no car.
+    # While a guest charges, the one target time is the guest's.
     trip = (
-        runtime.timed_goal.goal
-        if runtime.timed_goal is not None and runtime.vehicle_profile_id in profiles(entry.options)
+        runtime.departure_observer.goal
+        if runtime.departure_observer is not None and runtime.vehicle_profile_id in profiles(entry.options)
+        and not runtime.control.guest_active()
         else None
     )
     await _trip_memory(hass, entry).async_swap(runtime.vehicle_profile_id, trip, None)
 
 
-async def _async_resume_trip(
-    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, timed_reset_complete: bool,
-) -> None:
-    """Give a newly selected car back its own open trip, or none at all."""
+async def _async_retain_trips(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
+    """Drop the parked trips of cars that no longer plan departures.
+
+    Any car can be edited without selecting it. A car whose planning was
+    switched off loses its parked trip, so re-enabling never revives it. The
+    selected car's observer gives its parked trip back to the service.
+    """
     if _service_intent_rejected(entry.runtime_data.client):
         return
-    # Any car can be edited without selecting it. A car whose planning was
-    # switched off loses its parked trip, so re-enabling never revives it.
     await _trip_memory(hass, entry).async_retain({
         key for key in profiles(entry.options)
         if vehicle_soc_is_configured(each := profile_options(entry.options, key))
-        and timed_goal_is_enabled(each)
+        and departure_is_enabled(each)
     })
-    options = vehicle_options(entry.options)
-    selected = options.get(CONF_VEHICLE_PROFILE_ID)
-    if (
-        not timed_reset_complete or selected is None
-        or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True
-        or not vehicle_soc_is_configured(options) or not timed_goal_is_enabled(options)
-    ):
-        return
-    identity = entry.runtime_data.identity.serial_number or ""
-    trip = await _trip_memory(hass, entry).async_swap(None, None, selected)
-    if trip is None:
-        return
-    try:
-        await TimedGoalStore(hass, entry.entry_id, identity).async_save(DepartureIntent(trip, pending=True))
-    except OSError as err:
-        _LOGGER.warning("Departure plan: vehicle departure not resumed (%s)", err)
 
 
-async def _async_cancel_old_trip(
-    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, timed_reset_complete: bool,
-) -> None:
+async def _async_cancel_old_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     """Withdraw a disabled or replaced trip's current before a car starts."""
     runtime = entry.runtime_data
-    if _service_intent_rejected(runtime.client):
+    if _service_intent_rejected(runtime.client) or CONF_DEPARTURE_RESET_PENDING not in entry.options:
         return
-    if (
-        vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
-        or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
-        or not timed_reset_complete
-    ) and timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
-        if entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True:
-            try:
-                # An unload that could not reach the service left it planning
-                # the old trip; withdrawing it also ends that plan's pause.
-                await runtime.control.async_set_departure_trip(None, None, withdraw=True)
-            except (AmtronBusError, HomeAssistantError) as err:
-                _raise_optional_setup_error(runtime.client, err, "timed_goal_unavailable")
-        stored_options = dict(entry.options)
-        stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
-        # Complete both halves of the reset before consuming its
-        # authority. A failed reconnect must still cancel the old
-        # service queue on the next attempt, even after re-enabling.
-        hass.config_entries.async_update_entry(entry, options=stored_options)
+    if entry.options.get(CONF_DEPARTURE_RESET_PENDING) is True:
+        try:
+            # The service still plans the old trip, e.g. after an unload that
+            # could not reach it; withdrawing it also ends that plan's pause.
+            await runtime.control.async_set_departure_trip(None, None, withdraw=True)
+        except (AmtronBusError, HomeAssistantError) as err:
+            _raise_optional_setup_error(runtime.client, err, "departure_unavailable")
+    stored_options = dict(entry.options)
+    stored_options.pop(CONF_DEPARTURE_RESET_PENDING)
+    # Only a withdrawn trip uses up the authority to withdraw it: a failed
+    # reconnect must still cancel the old plan on the next attempt.
+    hass.config_entries.async_update_entry(entry, options=stored_options)
 
 
 async def _async_start_vehicle(
     hass: HomeAssistant, entry: MennekesAmtronConfigEntry, options: dict[str, Any],
-    timed_reset_complete: bool, validate_vehicle_selection: Callable[[], None],
+    validate_vehicle_selection: Callable[[], None],
 ) -> None:
     """Start the observers that belong to the selected vehicle."""
     runtime = entry.runtime_data
@@ -587,20 +566,17 @@ async def _async_start_vehicle(
         except (AmtronBusError, HomeAssistantError, OSError) as err:
             _raise_optional_setup_error(client, err, "soc_goal_unavailable")
     validate_vehicle_selection()
-    if (
-        timed_reset_complete and vehicle_soc_is_configured(options)
-        and timed_goal_is_enabled(options)
-    ):
-        timed = TimedGoalObserver(hass, entry)
-        runtime.timed_goal = timed
+    if vehicle_soc_is_configured(options) and departure_is_enabled(options):
+        plan = DepartureObserver(hass, entry)
+        runtime.departure_observer = plan
         try:
-            await timed.async_start()
+            await plan.async_start()
         except (OSError, ValueError) as err:
             raise ConfigEntryNotReady(
-                translation_domain=DOMAIN, translation_key="timed_goal_state_invalid"
+                translation_domain=DOMAIN, translation_key="departure_state_invalid"
             ) from err
         except (AmtronBusError, HomeAssistantError) as err:
-            _raise_optional_setup_error(client, err, "timed_goal_unavailable")
+            _raise_optional_setup_error(client, err, "departure_unavailable")
     runtime.vehicle_profile_id = options.get(CONF_VEHICLE_PROFILE_ID)
 
 
@@ -612,11 +588,11 @@ async def _async_stop_vehicle(
     ``withdraw`` ends the car's plan pause when another car takes over.
     """
     runtime.vehicle_profile_id = None
-    timed, soc, loss = runtime.timed_goal, runtime.vehicle_soc, runtime.charge_loss
-    runtime.timed_goal = runtime.vehicle_soc = runtime.charge_loss = None
+    observer, soc, loss = runtime.departure_observer, runtime.vehicle_soc, runtime.charge_loss
+    runtime.departure_observer = runtime.vehicle_soc = runtime.charge_loss = None
     runtime.vehicle_telemetry = None
-    if timed is not None:
-        await timed.async_stop(withdraw=withdraw)
+    if observer is not None:
+        await observer.async_stop(withdraw=withdraw)
     for owner in (soc, loss):
         if owner is not None:
             await owner.async_stop()
@@ -627,7 +603,7 @@ def _remember_vehicle(entry: MennekesAmtronConfigEntry) -> None:
     runtime = entry.runtime_data
     runtime.vehicle_base_options = without_selection(entry.options)
     runtime.vehicle_selection = {
-        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_TIMED_GOAL_RESET_PENDING
+        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_DEPARTURE_RESET_PENDING
     }
 
 
@@ -647,28 +623,33 @@ async def _async_switch_vehicle(
     ):
         return False
     selection = {
-        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_TIMED_GOAL_RESET_PENDING
+        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_DEPARTURE_RESET_PENDING
     }
-    if selection == runtime.vehicle_selection and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
+    if selection == runtime.vehicle_selection and entry.options.get(CONF_DEPARTURE_RESET_PENDING) is not True:
         return True
     # Like at setup, a poll during the switch must not retry the previous
     # car's stop before the new car's source has been bound or cleared.
     runtime.vehicle_switching = True
     try:
         await _async_park_trip(hass, entry)
-        await _async_stop_vehicle(runtime, withdraw=True)
+        # The same car, e.g. only automatic selection switched: its trip and
+        # its plan's pause stay with it.
+        same_car = (
+            vehicle_options(entry.options).get(CONF_VEHICLE_PROFILE_ID) == runtime.vehicle_profile_id
+            and entry.options.get(CONF_DEPARTURE_RESET_PENDING) is not True
+        )
+        await _async_stop_vehicle(runtime, withdraw=not same_car)
         auto = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
         if not auto and runtime.vehicle_detection is not None:
             runtime.vehicle_detection.stop()
             runtime.vehicle_detection = None
-        timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
-        await _async_resume_trip(hass, entry, timed_reset_complete)
-        await _async_cancel_old_trip(hass, entry, timed_reset_complete)
+        await _async_retain_trips(hass, entry)
+        await _async_cancel_old_trip(hass, entry)
         options = vehicle_options(entry.options)
         if runtime.vehicle_binding is not None:
             # Its rest state still judges the previous car until the next poll.
             runtime.vehicle_binding.refresh()
-        await _async_start_vehicle(hass, entry, options, timed_reset_complete, lambda: None)
+        await _async_start_vehicle(hass, entry, options, lambda: None)
         if auto and runtime.vehicle_detection is None:
             runtime.vehicle_detection = VehicleDetectionObserver(hass, entry)
             runtime.vehicle_detection.start()
@@ -774,36 +755,10 @@ def _raise_optional_setup_error(
     ) from err
 
 
-async def _async_reset_disabled_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> bool:
-    """Remove the saved trip; retain reset authority until queues are cancelled."""
-    if (
-        vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is not False
-        and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True
-    ):
-        return True
-    try:
-        await TimedGoalStore(hass, entry.entry_id, "").async_remove()
-    except OSError:
-        # Keep this authority in the entry, rather than only in process memory.
-        # Re-enabling after a restart still requires removal of the old trip.
-        if entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
-            hass.config_entries.async_update_entry(
-                entry, options={**entry.options, CONF_TIMED_GOAL_RESET_PENDING: True},
-            )
-        _LOGGER.warning("Departure plan: stays disabled because its old trip could not be cleared")
-        return False
-    return True
-
-
 def _entry_serial_binding(entry: MennekesAmtronConfigEntry) -> str | None:
-    """Return a known serial, retaining old endpoint-only entry identities."""
+    """The serial number this entry was set up for, if the wallbox has one."""
     serial = entry.data.get(CONF_SERIAL_NUMBER)
-    if isinstance(serial, str) and serial:
-        return serial
-    unique_id = getattr(entry, "unique_id", None)
-    if isinstance(unique_id, str) and unique_id and not unique_id.startswith(f"{DOMAIN}_"):
-        return unique_id
-    return None
+    return serial if isinstance(serial, str) and serial else None
 
 
 async def async_unload_entry(
@@ -819,7 +774,7 @@ async def async_unload_entry(
         return False
     retain_cost = runtime_data.retain_cost_on_unload
     if retain_cost:
-        handoff = hass.data[f"{DOMAIN}_reload_clients"][entry.entry_id]
+        handoff = hass.data[RELOAD_HANDOFFS][entry.entry_id]
         handoff.charging_cost = runtime_data.charging_cost
     # A reload that also selects another car must end the old car's plan
     # pause, like an in-place switch; a plain reload or shutdown keeps it.
@@ -829,8 +784,8 @@ async def async_unload_entry(
     # So does switching the car's departure planning off: the app would
     # otherwise keep planning a trip that Home Assistant no longer shows.
     withdraw = withdraw or (
-        runtime_data.timed_goal is not None
-        and not (vehicle_soc_is_configured(options) and timed_goal_is_enabled(options))
+        runtime_data.departure_observer is not None
+        and not (vehicle_soc_is_configured(options) and departure_is_enabled(options))
     )
     try:
         await _async_stop_runtime(runtime_data, retain_cost=retain_cost, withdraw_plan=withdraw)
@@ -865,8 +820,8 @@ async def _async_stop_runtime(
         await runtime.charging_cost.async_stop()
     if runtime.cost_goal is not None:
         await runtime.cost_goal.async_stop()
-    if runtime.timed_goal is not None:
-        await runtime.timed_goal.async_stop(withdraw=withdraw_plan)
+    if runtime.departure_observer is not None:
+        await runtime.departure_observer.async_stop(withdraw=withdraw_plan)
     if runtime.vehicle_soc is not None:
         await runtime.vehicle_soc.async_stop()
     await runtime.client.async_close()
@@ -928,7 +883,7 @@ async def _async_reload_entry_locked(
         runtime.retain_cost_on_unload = retain_cost
     if runtime is not None and retain_cost:
         handoff = RuntimeHandoff(identity=runtime.identity)
-        hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = handoff
+        hass.data.setdefault(RELOAD_HANDOFFS, {})[entry.entry_id] = handoff
     # The embedded service keeps its connection and heartbeat through this.
     mark_reloading(hass, entry.entry_id, True)
     try:
@@ -943,7 +898,7 @@ async def _async_reload_entry_locked(
             await async_release(hass, entry.entry_id)
         if runtime is not None and retain_cost:
             runtime.retain_cost_on_unload = False
-            unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
+            unused = hass.data.get(RELOAD_HANDOFFS, {}).pop(entry.entry_id, None)
             if unused is not None:
                 await unused.async_close()
 
@@ -956,7 +911,6 @@ async def async_remove_entry(
     hass.data.get(f"{DOMAIN}_reload_locks", {}).pop(entry.entry_id, None)
     await async_forget(hass, entry.entry_id)
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
-    await TimedGoalStore(hass, entry.entry_id, "").async_remove()
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
     await VehicleBindingStore(hass, entry.entry_id, "").async_remove()

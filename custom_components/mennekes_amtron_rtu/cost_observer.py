@@ -41,23 +41,24 @@ from .device.enums import EvseState
 from .device.notice import FailureNotice
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .entry_types import MennekesAmtronConfigEntry
-from .goal_store import ModelStore
+from .model_store import ModelStore
 
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60
 _NOTHING = CostResult(0.0, 0.0, 0.0, True)
-_PRICE_UNITS = {"EUR/kWh": 1.0, "€/kWh": 1.0, "ct/kWh": 0.01, "EUR/MWh": 0.001, "€/MWh": 0.001}
+_EURO_UNITS = {"€/kWh": 1.0, "ct/kWh": 0.01, "€/MWh": 0.001}
 _RETAINED_OPTIONS = (
     CONF_CHARGING_COST_SOURCE, CONF_CHARGING_PRICE, CONF_CHARGING_PRICE_ENTITY,
     CONF_CHARGING_NETWORK_TARIFF,
 )
 
 
-def electricity_price(state: State | None) -> float | None:
-    """Normalize explicit euro prices, including legitimate negative prices."""
+def electricity_price(state: State | None, currency: str) -> float | None:
+    """A price per kWh in Home Assistant's currency; negative prices are legitimate."""
     if state is None or state.attributes.get("restored") is True:
         return None
-    factor = _PRICE_UNITS.get(str(state.attributes.get("unit_of_measurement")))
+    units = {f"{currency}/kWh": 1.0, f"{currency}/MWh": 0.001, **(_EURO_UNITS if currency == "EUR" else {})}
+    factor = units.get(str(state.attributes.get("unit_of_measurement")))
     if factor is None:
         return None
     try:
@@ -238,7 +239,7 @@ class ChargingCostObserver:
         if self._expiry is not None:
             self._expiry()
             self._expiry = None
-        price = electricity_price(state)
+        price = electricity_price(state, self._hass.config.currency)
         valid_until = state.last_reported.timestamp() + PRICE_VALID_SECONDS if state is not None else at
         if not at <= valid_until:
             price = None

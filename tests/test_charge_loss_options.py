@@ -157,8 +157,8 @@ def test_loss_provider_and_device_validation(invalid):
 @pytest.mark.parametrize(
     "options",
     [
-        {"timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car"},
-        {"charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "own", "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "other"},
+        {"departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "car"},
+        {"charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "own", "departure_vehicle_provider": "bavariandata", "departure_vehicle_device": "other"},
     ],
 )
 def test_loss_reuses_other_source_only_when_own_selection_absent(options):

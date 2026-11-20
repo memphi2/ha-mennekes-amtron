@@ -21,7 +21,7 @@ from .device.const import CHARGING_CURRENT_MINIMUM
 from .device.control_types import pause_state
 from .device.decode import is_hex32
 from .device.departure_plan import DepartureInputs, DepartureState
-from .device.energy_goal import MAX_COST_GOAL, MIN_COST_GOAL, EnergyGoal
+from .device.energy_goal import EnergyGoal
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
 from .device.operation import Operation
@@ -205,7 +205,7 @@ class ServiceControl:
         if self._soc_transaction is None:
             return "superseded"
         token, previous_revision = self._soc_transaction
-        async with self._client._snapshot_lock:  # noqa: SLF001 - shared publication fence
+        async with self._client.publication:
             result = await self._soc_transaction_request("/v2/soc-goal/resolve", {"token": token})
             outcome = self._apply_soc_transaction_result(result, previous_revision)
             if outcome == "unknown":
@@ -248,25 +248,16 @@ class ServiceControl:
 
     @ha_command
     async def async_set_energy_goal(self, value: float) -> None:
-        if not self.supports_energy_goal:
-            raise DeviceValidationError("energy_goal_not_supported")
-        candidate = EnergyGoal()
-        try:
-            candidate.set_target(value, 0)
-        except ValueError as err:
-            raise DeviceValidationError("energy_goal_invalid") from err
         await self._command("energy_goal", value=value)
 
     @ha_command
-    async def async_set_cost_goal(self, amount: float, price: float | None) -> None:
+    async def async_set_cost_goal(self, amount: float, price: float | None, currency: str) -> None:
         """Arm an amount of money; the service carries it as its energy target."""
-        if not self.supports_energy_goal:
-            raise DeviceValidationError("energy_goal_not_supported")
-        if not math.isfinite(amount) or not (amount == 0 or MIN_COST_GOAL <= amount <= MAX_COST_GOAL):
-            raise DeviceValidationError("cost_goal_invalid")
+        # The service checks the amount; only Home Assistant knows that it has
+        # no price to arm it with.
         if amount and price is None:
             raise DeviceValidationError("cost_goal_price_unknown")
-        await self._command("cost_goal", value=amount, price=price)
+        await self._command("cost_goal", value=amount, price=price, currency=currency)
 
     @property
     def cost_price(self) -> float | None:
@@ -276,10 +267,16 @@ class ServiceControl:
             return None
         return float(price)
 
+    @property
+    def cost_currency(self) -> str | None:
+        """The currency the service was told with the price."""
+        currency = self._control.get("cost_currency")
+        return currency if isinstance(currency, str) else None
+
     @ha_command
-    async def async_set_cost_price(self, price: float) -> None:
-        """Tell the service the price that applies now."""
-        await self._command("cost_price", price=price)
+    async def async_set_cost_price(self, price: float, currency: str) -> None:
+        """Tell the service the price that applies now, and its currency."""
+        await self._command("cost_price", price=price, currency=currency)
 
     @property
     def supports_soc_goal(self) -> bool:
@@ -323,7 +320,7 @@ class ServiceControl:
             candidate.set_target(value, soc, maximum)
         except ValueError as err:
             raise DeviceValidationError("soc_goal_invalid") from err
-        async with self._client._snapshot_lock:  # noqa: SLF001 - shared publication fence
+        async with self._client.publication:
             previous_revision = self.soc_goal_revision
             reservation = await self._soc_transaction_request("/v2/soc-goal/reserve", {})
             token = reservation.get("token")
@@ -468,17 +465,8 @@ class ServiceControl:
     async def async_set_charging_current(
         self, value: float, *, allow_unlimited: bool = False
     ) -> None:
-        # The service answers a negative current as a malformed request, which
-        # would read as an unreachable service instead of a wrong value.
-        if not math.isfinite(value) or value < 0:
-            raise DeviceValidationError(
-                "charging_current_invalid", {"value": str(value), "minimum": "6"}
-            )
-        await self._command(
-            "set_current",
-            value=min(value, self.max_charging_current),
-            allow_unlimited=allow_unlimited,
-        )
+        # The service checks the value and caps it at the wallbox's maximum.
+        await self._command("set_current", value=value, allow_unlimited=allow_unlimited)
 
     @ha_command
     async def async_pause_charging(self) -> None:
@@ -486,15 +474,10 @@ class ServiceControl:
 
     @ha_command
     async def async_resume_charging(self, *, current_cap: float | None = None) -> None:
-        maximum = self.max_charging_current
-        if current_cap is not None:
-            if not math.isfinite(current_cap) or current_cap < CHARGING_CURRENT_MINIMUM:
-                raise DeviceValidationError(
-                    "charging_current_invalid",
-                    {"value": str(current_cap), "minimum": str(CHARGING_CURRENT_MINIMUM)},
-                )
-            maximum = min(current_cap, maximum)
-        await self._command("resume", current_cap=maximum)
+        if current_cap is None:
+            await self._command("resume")
+        else:
+            await self._command("resume", current_cap=current_cap)
 
     @ha_command
     async def async_set_charging_release(self, released: bool) -> None:

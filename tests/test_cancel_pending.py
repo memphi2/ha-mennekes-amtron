@@ -176,7 +176,7 @@ def test_service_cancel_is_allowed_when_only_the_wallbox_is_unavailable(tmp_path
             assert outcomes(control.events)[-1] == ("cancelled", "set_current", "user_cancelled")
             await service.command(payload)
             assert len([e for e in outcomes(control.events) if e[0] == "cancelled"]) == 1
-            service._stopping = True
+            service.stopping = True
             with pytest.raises(DeviceError, match="service_unavailable"):
                 await service.command(payload)
         finally:

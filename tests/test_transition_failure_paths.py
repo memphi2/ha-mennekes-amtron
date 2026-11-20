@@ -46,8 +46,8 @@ def test_deferred_stop_is_durable_before_a_failing_refresh(
             service.control._write_state.mode_change_at = clock[0]
             service.control._sleep = wait
             await service.command({
-                "command": command, "value": False,
-                "expected_serial_number": service.identity.serial_number,
+                "command": command, "expected_serial_number": service.identity.serial_number,
+                **({} if command == "pause" else {"value": False}),
             })
             worker = service.control._flush_task
             assert worker is not None

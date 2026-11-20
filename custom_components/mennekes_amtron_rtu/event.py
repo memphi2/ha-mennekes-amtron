@@ -10,11 +10,11 @@ from dataclasses import dataclass
 
 from homeassistant.components.event import EventEntity, EventEntityDescription
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import CHARGING_CURRENT_DECIMALS
 from .data import WallboxData
 from .device.command_events import ACTIONS, CONTROL_ACTIONS, CommandEvent
-from .device.const import CHARGING_CURRENT_DECIMALS
 from .device.registers import CHARGING_CURRENT_EMS, CP_STATE
 from .device.wallbox_events import EVENT_TYPES as WALLBOX_EVENT_TYPES
 from .device.wallbox_events import WallboxChanges
@@ -53,7 +53,7 @@ class _Description(Projection, EventEntityDescription):
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     async_add_entities([AmtronActivity(entry, _Description(key="activity"))])
 

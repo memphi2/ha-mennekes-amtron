@@ -177,7 +177,7 @@ def test_definite_invalid_target_is_rejected_but_unknown_storage_is_not(tmp_path
 def test_final_save_failure_never_reports_an_uncertain_goal_rejected(tmp_path, original_unknown):
     async def run():
         service = await _ready(tmp_path)
-        persist, goal_persist = service._persist, service.soc_goal._persist
+        persist, goal_persist = service.persist, service.soc_goal._persist
 
         async def fail_final_save():
             raise OSError("final save failed")
@@ -186,7 +186,7 @@ def test_final_save_failure_never_reports_an_uncertain_goal_rejected(tmp_path, o
             raise StorageStateUnknownError("readback failed")
 
         try:
-            service._persist = fail_final_save
+            service.persist = fail_final_save
             if original_unknown:
                 # The explicit zero candidate has the same snapshot as before.
                 # A later ordinary save error must not mask the first unknown
@@ -199,7 +199,7 @@ def test_final_save_failure_never_reports_an_uncertain_goal_rejected(tmp_path, o
             assert result["outcome"] == "unknown"
             assert service.control.soc_goal.target_percent == (0 if original_unknown else 80)
         finally:
-            service._persist, service.soc_goal._persist = persist, goal_persist
+            service.persist, service.soc_goal._persist = persist, goal_persist
             await service.stop()
 
     asyncio.run(run())

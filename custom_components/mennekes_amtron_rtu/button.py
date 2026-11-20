@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .device.registers import ERROR_CODE, SYSTEM_RESTART
 from .entity import AmtronEntity, Projection, Runtime, wanted
@@ -58,7 +58,7 @@ BUTTONS: tuple[AmtronButtonDescription, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MennekesAmtronConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     async_add_entities(AmtronButton(entry, description) for description in wanted(entry, BUTTONS))
 

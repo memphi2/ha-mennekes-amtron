@@ -11,10 +11,8 @@ from homeassistant.const import EVENT_LOGBOOK_ENTRY, EVENT_STATE_CHANGED, STATE_
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
 

@@ -144,7 +144,10 @@ class ServiceCoordinator(DataUpdateCoordinator[WallboxData]):
                 raise UpdateFailed(
                     translation_domain=DOMAIN, translation_key="service_version_mismatch"
                 ) from err
-            raise UpdateFailed(str(err)) from err
+            raise UpdateFailed(
+                translation_domain=DOMAIN, translation_key="connection_unavailable",
+                translation_placeholders={"error": str(err)},
+            ) from err
         if self.observe_estimates is not None:
             await self.observe_estimates(data)
         self._follow_pending(data.pending_change_until)

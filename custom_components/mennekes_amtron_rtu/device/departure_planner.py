@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from .command_events import attributed
+from .commands import COMMANDS
+from .connection_sample import connection_sample
 from .control import AmtronControl
 from .departure_plan import (
     DEPARTURE_OWNER,
@@ -28,11 +30,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _TICK_SECONDS = 5.0
-DEPARTURE_COMMANDS = {
-    "departure_choice": frozenset({"command", "deadline", "revision", "expected_serial_number"}),
-    "departure_trip": frozenset({"command", "deadline", "source", "withdraw", "expected_serial_number", "expected_selection"}),
-    "departure_inputs": frozenset({"command", "value", "expected_serial_number"}),
-}
 
 
 class DeparturePlanner:
@@ -71,9 +68,9 @@ class DeparturePlanner:
         await self.controller.initialize()
 
     def _departure_sample(self) -> DepartureSample:
-        connection = self._service.guest.connection_sample()
+        connection = connection_sample(self._service)
         control = self._service.control
-        energy = self._service._energy_sample
+        energy = self._service.energy_sample
         stamp = energy.get("observed_at") if energy is not None and connection.total_kwh is not None else None
         goal = control.soc_goal if control is not None else None
         return DepartureSample(
@@ -101,7 +98,7 @@ class DeparturePlanner:
 
     async def _apply_departure(self, value: float | None, deadline: datetime) -> None:
         await self._departure_write(
-            lambda control: control.async_set_timed_current(value, deadline=deadline, owner=DEPARTURE_OWNER),
+            lambda control: control.async_set_departure_current(value, deadline=deadline, owner=DEPARTURE_OWNER),
         )
 
     @attributed("departure_plan")
@@ -110,9 +107,9 @@ class DeparturePlanner:
         await self._departure_write(lambda control: control.async_resume_charging(current_cap=cap))
 
     async def _departure_write(self, write: Callable[[AmtronControl], Any]) -> None:
-        async with self._service._command_lock:
+        async with self._service.command_lock:
             control = self._service.control
-            if control is None or self._service._stopping or not self._service._is_available():
+            if control is None or self._service.stopping or not self._service.is_available():
                 raise DeviceError("service_unavailable")
             # The plan decided before awaiting this lock. A guest may have
             # taken over meanwhile, including a deliberately paused guest.
@@ -123,13 +120,13 @@ class DeparturePlanner:
             try:
                 await write(control)
             finally:
-                await self._service._persist()
+                await self._service.persist()
 
     async def _cancel_departure(self) -> None:
         # Queue bookkeeping only; it needs no bus and works in read-only mode.
-        async with self._service._command_lock:
+        async with self._service.command_lock:
             if self._service.control is not None:
-                await self._service.control.async_cancel_timed_current(DEPARTURE_OWNER)
+                await self._service.control.async_cancel_departure_current(DEPARTURE_OWNER)
 
     async def loop(self) -> None:
         while True:
@@ -152,14 +149,14 @@ class DeparturePlanner:
                 await asyncio.wait_for(departure.wake.wait(), _TICK_SECONDS)
 
     async def command(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """One of DEPARTURE_COMMANDS."""
+        """A departure command: plan data only, taken without the wallbox."""
         name = payload["command"]
-        if payload.keys() - DEPARTURE_COMMANDS[name]:
+        if COMMANDS[name].refuses(payload):
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
             raise ValueError("expected_serial_number is required")
         departure = self.controller
-        if departure is None or self._service._stopping:
+        if departure is None or self._service.stopping:
             raise DeviceError("service_unavailable")
         if payload["expected_serial_number"] != self._service.identity.serial_number:
             raise DeviceError("device_identity_changed")
@@ -192,13 +189,13 @@ class DeparturePlanner:
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))
         if name == "departure_choice":
-            await self._service._persist()
-        if self._service._command_lock.locked():
+            await self._service.persist()
+        if self._service.command_lock.locked():
             # Another command still runs: a patient reader must not get the
             # state from before this plan change.
-            self._service._published = None
+            self._service.published = None
             return self._service.snapshot()
-        return self._service._publish()
+        return self._service.publish()
 
     async def shutdown(self) -> None:
         if self.controller is not None:

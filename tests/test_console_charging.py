@@ -53,11 +53,11 @@ def test_console_targets_auth_cas_and_vehicle_maximum(tmp_path, monkeypatch):
             choice.update(value=75, revision=service.choice_revision)
             assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
             assert (service.control.soc_goal.target_percent, service.control.soc_goal.chosen_percent) == (75, 100)
-            reading = service._soc_reading
+            reading = service.soc_choice._reading
             choice.update(value=70, revision=service.choice_revision)
             saved = await client.post("/api/charging", headers=headers, json=choice)
             assert saved.status == 200
-            assert service._soc_reading == reading  # An app edit cannot refresh old vehicle telemetry.
+            assert service.soc_choice._reading == reading  # An app edit cannot refresh old vehicle telemetry.
             assert service.control.soc_goal.target_percent == 70
             assert service.control.soc_goal.maximum_percent == 75
             assert service.control.soc_goal.source == CAR
@@ -107,16 +107,19 @@ def test_charging_console_rejects_malformed_and_unavailable_edits(tmp_path, monk
             headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
             assert (await client.get("/api/charging?force=1", headers=HEADERS)).status == 400
             choice = {"action": "energy", "value": 10, "revision": state["revision"], "confirm": True}
-            for patch in [{"revision": 12}, {"value": -1}, {"value": True}, {"value": {}}, {"action": []}, {"action": "departure", "value": "bad-date"}]:
+            for patch in [{"revision": 12}, {"value": True}, {"value": {}}, {"action": []}, {"action": "departure", "value": "bad-date"}]:
                 assert (await client.post("/api/charging", headers=headers, json=choice | patch)).status == 400
+            # A number that is not a permitted target is a refusal with a name.
+            response = await client.post("/api/charging", headers=headers, json=choice | {"value": -1})
+            assert (response.status, (await response.json())["error"]) == (409, "energy_goal_invalid")
             assert (await client.post("/api/charging?force=1", headers=headers, json=choice)).status == 400
             service.control.startup_hold = True
             assert (await client.post("/api/charging", headers=headers, json=choice)).status == 409
             service.control.startup_hold = False
-            service._stopping = True
+            service.stopping = True
             departure = {**choice, "action": "departure", "value": None}
             assert (await client.post("/api/charging", headers=headers, json=departure)).status == 409
-            service._stopping = False
+            service.stopping = False
             control, service.control = service.control, None
             try:
                 assert (await client.get("/api/charging", headers=HEADERS)).status == 503
@@ -160,19 +163,19 @@ def test_app_soc_choice_uses_only_the_current_plug_in(tmp_path, monkeypatch, rep
                 return await service.command({"expected_serial_number": serial, **payload})
             await command(command="soc_source", source=CAR, maximum_required=False)
             await command(command="soc_goal", source=CAR, value=90, soc=80, maximum=None)
-            reading = service._soc_reading
+            reading = service.soc_choice._reading
             assert reading is not None
             if replug:
                 put(transport.bank, registers.EVSE_STATE, 1)
                 put(transport.bank, registers.CP_STATE, 10)
                 await service.refresh()
-                assert service._soc_reading is None
+                assert service.soc_choice._reading is None
                 put(transport.bank, registers.EVSE_STATE, 2)
                 put(transport.bank, registers.CP_STATE, 11)
                 await service.refresh()
-                assert service.guest.soc_observation_scope() != reading[3]
+                assert service.soc_choice._scope() not in (None, reading[3])
                 # Even a retained old value cannot pass the scope check.
-                service._soc_reading = reading
+                service.soc_choice._reading = reading
             await command(command="soc_goal_choice", value=70, expected_choice_revision=service.choice_revision)
             assert service.control.soc_goal.status == ("active" if replug else "reached")
     asyncio.run(body())
@@ -295,10 +298,19 @@ def test_console_arms_a_cost_ceiling_at_the_last_reported_price(tmp_path, monkey
             assert (refused.status, (await refused.json())["error"]) == (409, "cost_goal_price_unknown")
             # Home Assistant reports the price; the app needs no price of its own.
             await service.command({
-                "command": "cost_price", "price": 0.25,
+                "command": "cost_price", "price": 0.25, "currency": "CHF",
                 "expected_serial_number": service.identity.serial_number,
             })
             assert service.snapshot()["control"]["cost_price"] == 0.25
+            # The currency comes with the price and reaches the page.
+            assert service.snapshot()["control"]["cost_currency"] == "CHF"
+            assert (await (await client.get("/api/charging", headers=HEADERS)).json())["cost_currency"] == "CHF"
+            for wrong in ("chf", "EURO", 7):
+                with pytest.raises(ValueError, match="three-letter"):
+                    await service.command({
+                        "command": "cost_price", "price": 0.25, "currency": wrong,
+                        "expected_serial_number": service.identity.serial_number,
+                    })
             told = (await (await client.get("/api/charging", headers=HEADERS)).json())["cost_price_at"]
             assert str(told).endswith("+00:00")
             saved = await client.post("/api/charging", headers=headers, json=choice)
@@ -370,7 +382,7 @@ def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_sta
             )
             async with TestClient(TestServer(create_console_app(console))) as client:
                 assert (await client.get("/api/overview", headers=HEADERS)).status == 200
-                await service._command_lock.acquire()
+                await service.command_lock.acquire()
                 try:
                     # A read that waited for the command would keep its request
                     # slot after the page gave up; two of them blocked the app.
@@ -380,7 +392,7 @@ def test_app_reads_behind_a_long_command_end_and_the_overview_shows_the_last_sta
                     # The overview waits shortly and shows the last published state.
                     assert (await client.get("/api/overview", headers=HEADERS)).status == 200
                 finally:
-                    service._command_lock.release()
+                    service.command_lock.release()
                 assert (await client.get("/api/charging", headers=HEADERS)).status == 200
 
     asyncio.run(body())

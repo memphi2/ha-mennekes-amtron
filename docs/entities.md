@@ -125,7 +125,7 @@ does not apply is left out.
 
 | Attribute | Meaning |
 |---|---|
-| `controller` | Who decides: `guest` (guest charging with the shared kWh and time limits), `departure_plan` (a [departure](departure-planning.md) is set and not finished), `direct` (your switches, numbers, targets and automations apply) or `unavailable` (no current reading). |
+| `controller` | Who decides: `guest` (guest charging, ended by the energy target, cost target or target time), `departure_plan` (a [departure](departure-planning.md) is set and not finished), `direct` (your switches, numbers, targets and automations apply) or `unavailable` (no current reading). |
 | `next_event`, `next_at` | What the service expects next and when: `none`, `queued_command` (a queued change runs), `plan_start` (the planned charge starts), `target_reached` (the plan's forecast end) or `departure` (the target time). No countdown is recorded. |
 | `vehicle` | The car's state: `unknown`, `none`, `connected` or `confirmed` (the plan has confirmed it is the selected car). |
 | `target`, `target_value`, `target_deadline` | What is charged towards: `level` (percent) or `energy` (kWh), its value and its time. |
@@ -178,17 +178,17 @@ does not send a charging command.
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | `all_available` or `single_phase`. A change while charging first pauses; resume separately after the waiting interval. The `switched` attribute is the wallbox's answer: the phases it will use when it next closes the relay. |
 | `select.*_solar_display_mode` | Solar display mode | always | The solar charging mode shown on the wallbox display and its solar LEDs. The energy manager runs the solar algorithm itself; the wallbox needs DIP 7 on for the mode to have any effect. Takes effect at once, without the state-change interval. |
 | `number.*_energy_target` | Energy target | lifetime energy counter | Additional kWh from the time you set it, in 0.1 kWh steps, up to 1000. Setting a positive value never starts or resumes charging. Zero disables the target without resuming. Its status is the `energy_target` attribute of **Charging wait reason**. |
-| `number.*_cost_target` | Cost target | lifetime energy counter and configured charging costs | An amount in EUR from the time you set it, in steps of 0.10, up to 1000. The service keeps the amount with the **Energy target** that carries it and re-arms the rest at each new price that Home Assistant tells it, so it stops the charge itself. Setting **Energy target** by hand ends the cost target. An estimate like the charging costs, not for billing. Zero disables it together with its energy target. Its status is the `cost_target` attribute of **Charging wait reason**. |
+| `number.*_cost_target` | Cost target | lifetime energy counter and configured charging costs | An amount in Home Assistant's currency from the time you set it, in steps of 0.10, up to 1000. The service keeps the amount with the **Energy target** that carries it and re-arms the rest at each new price that Home Assistant tells it, so it stops the charge itself. Setting **Energy target** by hand ends the cost target. An estimate like the charging costs, not for billing. Zero disables it together with its energy target. Its status is the `cost_target` attribute of **Charging wait reason**. |
 | `number.*_vehicle_charge_target` | Vehicle charge target | configured vehicle charge-level source | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. Its status is the `vehicle_target` attribute of **Charging wait reason**. |
-| `datetime.*_target_time` | Target time | always | One shared dated target: guest stop time or the selected car's next departure. A departure plan may resume a pause to meet this time; the ordinary percentage target alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
+| `datetime.*_target_time` | Target time | always | One shared time: the end of a guest charge, or the selected car's next departure. A departure plan may resume a pause to meet this time; the vehicle charge target alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
 | `button.*_cancel_pending_change` | Cancel pending change | always | Removes the queued action without a wallbox write. Already executed preparation, such as a phase-change pause, remains. Available only while an action is pending. |
-| `select.*_active_vehicle` | Active vehicle | vehicle profiles configured | Choose a car or no vehicle manually; either choice disables automatic selection. With detection sources configured, Automatic selection uses cable and home signals. Switching clears the previous percentage target and departure plan without resuming; settings and loss averages remain separate. |
+| `select.*_active_vehicle` | Active vehicle | vehicle profiles configured | Choose a car or no vehicle manually; either choice disables automatic selection. With detection sources configured, Automatic selection uses cable and home signals. Switching clears the previous vehicle charge target and departure plan without resuming; settings and loss averages remain separate. |
 
 ## Guest charging and shared time
 
 **Start guest charging** (`button.*_start_guest_charging`) starts the
-connected guest immediately, using the ordinary kWh target and the shared
-target time, if set. The first limit reached stops charging. Use the normal
+connected guest immediately. The energy target, cost target and target time,
+if set, end the charge, whichever comes first. Use the normal
 pause to stop manually. **Guest charging** (`binary_sensor.*_guest_charging`)
 is on while a guest charge is active.
 
@@ -381,8 +381,8 @@ wallbox is set up.
 |---|---|---|---|---|
 | `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | vehicle profile with an energy source | Last matched charge; unknown when the newest completed charge cannot be matched. The `association` attribute says how it was matched (`history`, `changed_value` or `manual`). |
 | `sensor.*_average_estimated_charging_loss` | Average estimated charging loss | % | vehicle profile with an energy source | Energy-weighted average of accepted matches; `sample_count` counts accepted charges. |
-| `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | EUR | fixed or dynamic price configured; enable the entity | Disabled by default to reduce Recorder writes. Running cost estimate: 0.00 from the plug-in, 0.00 again after the unplug. An incomplete observation shows the priced part with `complete` false. |
-| `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | EUR | fixed or dynamic price configured | Taken over from the current charge whenever charging stops and at the unplug; retained across restarts. |
+| `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | HA currency | fixed or dynamic price configured; enable the entity | Disabled by default to reduce Recorder writes. Running cost estimate: 0.00 from the plug-in, 0.00 again after the unplug. An incomplete observation shows the priced part with `complete` false. |
+| `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | HA currency | fixed or dynamic price configured | Taken over from the current charge whenever charging stops and at the unplug; retained across restarts. |
 
 All estimates require layout v01.02 or newer. They have no state class and
 create no long-term statistics. Losses update per match; costs are rounded to

@@ -36,15 +36,7 @@ from .config_schemas import (
     service_schema,
     user_schema,
 )
-from .data import DeviceIdentity
-from .device.client import SerialConfig
-from .device.client_errors import AmtronBusError, AmtronConnectionError
-from .device.connection import (
-    ConnectionConfig,
-    NetworkConfig,
-    validate_tcp_auth_password,
-)
-from .device.const import (
+from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_CONFIGURE_GATEWAY,
@@ -62,17 +54,27 @@ from .device.const import (
     CONF_TCP_PORT,
     CONNECTION_RTU_OVER_TCP,
     CONNECTION_SERIAL,
+    DEFAULT_FRAME,
+    DEFAULT_NAME,
+    DEFAULT_TCP_PORT,
+    SEARCH_FULL,
+    SEARCH_OFF,
+)
+from .data import DeviceIdentity
+from .device.client import SerialConfig
+from .device.client_errors import AmtronBusError, AmtronConnectionError
+from .device.connection import (
+    ConnectionConfig,
+    NetworkConfig,
+    validate_tcp_auth_password,
+)
+from .device.const import (
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
-    DEFAULT_FRAME,
-    DEFAULT_NAME,
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
-    DEFAULT_TCP_PORT,
     DOMAIN,
-    SEARCH_FULL,
-    SEARCH_OFF,
     SUPPORTED_FRAMES,
     frame_display,
     frame_label,
@@ -107,6 +109,16 @@ from .supervisor_discovery import async_app_discoveries
 _LOGGER = logging.getLogger(__name__)
 
 RECONFIGURE_STEPS = ("reconfigure", "serial_reconfigure", "network_reconfigure")
+
+
+
+def _reloads_itself(entry: ConfigEntry) -> bool:
+    """Whether the entry's own update listener reloads it after a change.
+
+    It is registered by a setup that succeeded, so exactly a loaded entry has
+    it; a second reload from the flow would race it.
+    """
+    return entry.state is ConfigEntryState.LOADED
 
 
 class _ConnectionSettingsChangedError(Exception):
@@ -248,7 +260,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             await self._async_free_bus(entry, loaded)
             try:
                 identity = await async_test_connection(config)
-                await self.async_set_unique_id(identity.serial_number or f"{DOMAIN}_{config.port}_{config.device_id}")
+                # A wallbox without a serial register has no unique ID at all.
+                await self.async_set_unique_id(identity.serial_number or None)
                 self._abort_if_unique_id_mismatch()
                 if dict(entry.data) != original_data:
                     # The actor changing this entry owns its next setup.
@@ -297,8 +310,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             try:
                 await client.async_connect()
-                unique_id = client.identity.serial_number or f"{DOMAIN}_{url}"
-                await self.async_set_unique_id(unique_id)
+                await self.async_set_unique_id(client.identity.serial_number or None)
                 self._abort_if_unique_id_mismatch()
             finally:
                 await client.async_close()
@@ -312,7 +324,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             # verified for the old endpoint to the newly configured service.
             return self.async_abort(reason="connection_settings_changed")
         updates = {CONF_SERVER_TOKEN: token}
-        if entry.update_listeners:
+        if _reloads_itself(entry):
             changed = entry.data.get(CONF_SERVER_TOKEN) != token
             result = self.async_update_and_abort(entry, data_updates=updates)
             if not changed:
@@ -528,15 +540,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                     if entry is not None and dict(entry.data) != expected_data:
                         return self.async_abort(reason="connection_settings_changed")
                     identity = client.identity
-                    if identity.serial_number:
-                        unique_id = identity.serial_number
-                    elif entry is not None:
-                        return self.async_abort(
-                            reason="service_migration_requires_serial"
-                        )
-                    else:
-                        unique_id = f"{DOMAIN}_{url}"
-                    await self.async_set_unique_id(unique_id)
+                    # Only a serial number identifies a wallbox; an address
+                    # can change and is no unique ID.
+                    await self.async_set_unique_id(identity.serial_number or None)
                     data = {CONF_SERVER_URL: url, CONF_SERVER_TOKEN: token}
                     if identity.serial_number:
                         data[CONF_SERIAL_NUMBER] = identity.serial_number
@@ -544,10 +550,13 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                         if dict(entry.data) != expected_data:
                             return self.async_abort(reason="connection_settings_changed")
                         self._abort_if_unique_id_mismatch()
-                        if not entry.update_listeners:
+                        if not _reloads_itself(entry):
                             return self.async_update_reload_and_abort(entry, data=data)
                         return self.async_update_and_abort(entry, data=data)
-                    self._abort_if_unique_id_configured()
+                    if identity.serial_number:
+                        self._abort_if_unique_id_configured()
+                    else:
+                        self._async_abort_entries_match({CONF_SERVER_URL: url})
                     return self.async_create_entry(
                         title=DEFAULT_NAME, data=data
                     )
@@ -682,7 +691,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry: ConfigEntry, data: dict[str, Any]
     ) -> ConfigFlowResult:
         """Preserve IDs/options and let the existing listener reload exactly once."""
-        if entry.update_listeners:
+        if _reloads_itself(entry):
             return self.async_update_and_abort(
                 entry, data=data, reason="service_discovery_updated"
             )
@@ -1069,16 +1078,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         if identity.serial_number:
             data[CONF_SERIAL_NUMBER] = identity.serial_number
-            await self.async_set_unique_id(identity.serial_number)
-        else:
-            # Older firmware has no serial register. A network gateway may
-            # expose several unit IDs; distinguish those endpoints as well.
-            suffix = (
-                f"{config.port}_{config.device_id}"
-                if isinstance(config, NetworkConfig)
-                else config.port
-            )
-            await self.async_set_unique_id(f"{DOMAIN}_{suffix}")
+        # Older firmware has no serial register: such an entry has no unique
+        # ID, and its endpoint only keeps it from being set up twice.
+        await self.async_set_unique_id(identity.serial_number or None)
 
         if step_id in RECONFIGURE_STEPS:
             entry = self._get_reconfigure_entry()
@@ -1089,14 +1091,20 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 # The old client is unloaded. Publish the new entry data, but
                 # do not start its connection until adapter commit succeeds.
                 return self.async_update_and_abort(entry, data=data)
-            if not entry.update_listeners:
+            if not _reloads_itself(entry):
                 # An unloaded or failed setup has no listener to start it.
                 return self.async_update_reload_and_abort(entry, data=data)
             # The entry's update listener owns reloading, including options.
             # A second reload here races it and is rejected from HA 2026.12.
             return self.async_update_and_abort(entry, data=data)
 
-        self._abort_if_unique_id_configured()
+        if identity.serial_number:
+            self._abort_if_unique_id_configured()
+        else:
+            # A network gateway may expose several unit IDs at one address.
+            self._async_abort_entries_match({
+                key: data[key] for key in (CONF_HOST, CONF_TCP_PORT, CONF_PORT, CONF_DEVICE_ID) if key in data
+            })
         return self.async_create_entry(title=_entry_title(identity), data=data)
 
     def _suggested_values(

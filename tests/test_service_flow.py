@@ -67,7 +67,6 @@ def test_ha_rejects_incompatible_entry_schema_without_placeholder_migration(
         "no_serial",
         "reconfigure",
         "listeners",
-        "migration_no_serial",
         "bad_token",
         "bad_url",
         "server_down",
@@ -80,7 +79,7 @@ def test_service_form_validates_identity_credentials_and_backend(
         service, transport, _clock = await service_fixture(
             tmp_path, read_only=scenario == "read_only"
         )
-        if scenario in ("no_serial", "migration_no_serial"):
+        if scenario == "no_serial":
             service.identity.serial_number = None
         try:
             async with (
@@ -91,15 +90,13 @@ def test_service_form_validates_identity_credentials_and_backend(
                     config_flow, "async_get_clientsession", lambda _hass: session
                 )
                 flow = Flow(FakeHass())
-                reconfigure = scenario in (
-                    "reconfigure",
-                    "listeners",
-                    "migration_no_serial",
-                )
+                reconfigure = scenario in ("reconfigure", "listeners")
                 flow.context = {"source": "reconfigure" if reconfigure else "user"}
                 flow.reconfigure_entry.data = {"port": "/dev/old"}
-                flow.reconfigure_entry.update_listeners = (
-                    [lambda: None] if scenario == "listeners" else []
+                # A loaded entry reloads itself after an update; an unloaded
+                # one is reloaded by the flow.
+                flow.reconfigure_entry.state = (
+                    ConfigEntryState.LOADED if scenario == "listeners" else ConfigEntryState.NOT_LOADED
                 )
                 result = await flow.async_step_server()
                 assert result["step_id"] == "server"
@@ -116,8 +113,6 @@ def test_service_form_validates_identity_credentials_and_backend(
                 result = await flow.async_step_server(values)
                 if scenario in ("bad_token", "bad_url", "server_down"):
                     assert result["errors"] == {"base": "cannot_connect_service"}
-                elif scenario == "migration_no_serial":
-                    assert result["reason"] == "service_migration_requires_serial"
                 elif reconfigure:
                     assert result["type"] == "abort"
                     assert "port" not in flow.updates

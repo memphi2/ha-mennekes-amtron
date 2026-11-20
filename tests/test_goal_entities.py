@@ -87,17 +87,18 @@ def test_remote_capabilities_and_quality_change_snapshots_but_old_formats_are_re
             assert wrapper.supports_energy_goal
             await wrapper.async_set_energy_goal(12)
             remote.execute.assert_awaited_once_with("energy_goal", value=12)
-            await wrapper.async_set_cost_goal(10, 0.30)
-            remote.execute.assert_awaited_with("cost_goal", value=10, price=0.30)
-            await wrapper.async_set_cost_goal(0, None)
-            remote.execute.assert_awaited_with("cost_goal", value=0, price=None)
-            await wrapper.async_set_cost_price(0.5)
-            remote.execute.assert_awaited_with("cost_price", price=0.5)
-            for amount, price in ((float("nan"), 0.3), (0.05, 0.3), (10, None)):
-                with pytest.raises(ServiceValidationError):
-                    await wrapper.async_set_cost_goal(amount, price)
+            await wrapper.async_set_cost_goal(10, 0.30, "EUR")
+            remote.execute.assert_awaited_with("cost_goal", value=10, price=0.30, currency="EUR")
+            await wrapper.async_set_cost_goal(0, None, "EUR")
+            remote.execute.assert_awaited_with("cost_goal", value=0, price=None, currency="EUR")
+            await wrapper.async_set_cost_price(0.5, "CHF")
+            remote.execute.assert_awaited_with("cost_price", price=0.5, currency="CHF")
+            # Only Home Assistant knows that it has no price; the service
+            # judges every value.
+            remote.execute.reset_mock()
             with pytest.raises(ServiceValidationError):
-                await wrapper.async_set_energy_goal(float("nan"))
+                await wrapper.async_set_cost_goal(10, None, "EUR")
+            remote.execute.assert_not_awaited()
             changed = deepcopy(service.snapshot())
             changed["control"]["energy_goal"] = {
                 "target_kwh": 12.0, "baseline_kwh": 1200.0, "status": "active",
@@ -120,8 +121,6 @@ def test_remote_capabilities_and_quality_change_snapshots_but_old_formats_are_re
             unsupported["control"]["supports_energy_goal"] = False
             remote.apply_snapshot(unsupported)
             assert not wrapper.supports_energy_goal
-            with pytest.raises(ServiceValidationError):
-                await wrapper.async_set_energy_goal(12)
         await service.stop()
 
     asyncio.run(run())

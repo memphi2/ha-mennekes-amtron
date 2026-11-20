@@ -179,7 +179,7 @@ def test_without_a_trip_or_car_nothing_is_planned(tmp_path):
         assert (plan.status, plan.snapshot()) == ("disabled", {
             "trip": {"deadline": None, "source": None, "finished": None}, "status": "disabled",
             "planned_start": None, "estimated_soc": None, "inputs": None, "scope": SCOPE,
-            "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "edit_revision": plan.edit_revision,
+            "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "edit_revision": plan.edit_revision, "withdrawn": False,
         })
         await plan.set_trip(NOW + timedelta(hours=2), "manual")
         await plan.tick()
@@ -1119,7 +1119,7 @@ def test_stale_ha_selection_cannot_overwrite_a_new_app_trip(tmp_path):
 
 
 @pytest.mark.parametrize(("change", "error"), [
-    ({"read_only": True}, "service_unavailable"),
+    ({"read_only": True}, "read_only_mode"),
 ])
 def test_app_trip_requires_a_writable_selected_vehicle(tmp_path, change, error):
     async def body():
@@ -1218,6 +1218,35 @@ def test_a_withdrawn_plan_still_ends_its_pause_when_the_guest_start_never_ran(tm
         await plan.tick()
         await plan.tick()
         assert (box.resumes, plan.plan_paused) == (1, False)
+
+    run(go())
+
+
+@pytest.mark.parametrize("edited", [False, True])
+def test_a_time_withdrawn_during_a_guest_ends_with_the_guest_unless_set_since(tmp_path, edited):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        kept = plan.trip.deadline
+        box.set(guest_mode=True)
+        await plan.tick()
+        # Another car is selected: the guest keeps the time meanwhile.
+        await plan.set_trip(None, None, withdraw=True, vehicle_handover=True)
+        assert (plan.trip.deadline, plan.withdrawn, plan.snapshot()["withdrawn"]) == (kept, True, True)
+        # The mark survives a restart of the service.
+        box.plan = plan = box.controller()
+        await plan.initialize()
+        assert plan.withdrawn
+        if edited:
+            await plan.set_trip(kept + timedelta(hours=1), None)
+            assert not plan.withdrawn
+        revision = plan.edit_revision
+        box.set(guest_mode=False)
+        await plan.tick()
+        # No other car inherits a time nobody set for it.
+        assert plan.trip.deadline == (kept + timedelta(hours=1) if edited else None)
+        assert not plan.withdrawn
+        assert (plan.edit_revision != revision) is (not edited)
 
     run(go())
 

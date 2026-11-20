@@ -51,13 +51,6 @@ def metered_vehicle_present(
     return vehicle_connected(evse, cp, cp_supported=cp_supported)
 
 
-def snapshot_metered_vehicle_present(
-    get: Callable[[str], RegisterValue], layout_version: int,
-) -> bool | None:
-    """Metering presence from one snapshot's ``get``, on this register layout."""
-    return metered_vehicle_present(get, cp_supported=layout_version >= CP_STATE.min_layout)
-
-
 def snapshot_vehicle_connected(
     get: Callable[[str], RegisterValue], layout_version: int,
 ) -> bool | None:

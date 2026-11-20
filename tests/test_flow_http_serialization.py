@@ -47,7 +47,7 @@ def _schema(name):
         return options_schema({}, max_current=16)
     if name == "advanced":
         return advanced_schema({}, phase_switch=True)
-    return cost_network_schema({}, module=name)
+    return cost_network_schema({}, module=name, currency="EUR")
 
 
 @pytest.mark.parametrize("name", [
@@ -99,16 +99,16 @@ def test_serializable_selectors_keep_whole_ui_numbers_and_reject_fractions(name,
     ("departure_capacity_entity", departure_capacity_schema({}, entity=True)),
     ("departure_calendar", departure_calendar_schema({})),
     ("departure_entity", departure_entity_schema({})),
-    ("departure_vehicle", vehicle_provider_schema("timed_vehicle_provider", "none", ["bavariandata"])),
-    ("departure_vehicle_details", vehicle_device_schema({}, key="timed_vehicle_device", integration="bavariandata", timer_options=True)),
+    ("departure_vehicle", vehicle_provider_schema("departure_vehicle_provider", "none", ["bavariandata"])),
+    ("departure_vehicle_details", vehicle_device_schema({}, key="departure_vehicle_device", integration="bavariandata", timer_options=True)),
     ("loss_vehicle", vehicle_provider_schema("charge_loss_vehicle_provider", "none", ["bavariandata"])),
     ("loss_vehicle_details", vehicle_device_schema({}, key="charge_loss_vehicle_device", integration="bavariandata")),
     ("loss_sensor", loss_sensor_schema({})),
     ("costs", cost_kind_schema({})),
-    ("cost_fixed", cost_source_schema({}, source="fixed")),
-    ("cost_sensor", cost_source_schema({}, source="sensor")),
+    ("cost_fixed", cost_source_schema({}, source="fixed", currency="EUR")),
+    ("cost_sensor", cost_source_schema({}, source="sensor", currency="EUR")),
     ("cost_network", cost_module_schema({})),
-    ("cost_module3_prices", cost_module_three_schema({})),
+    ("cost_module3_prices", cost_module_three_schema({}, currency="EUR")),
 ])
 def test_optional_forms_serialize_with_translated_field_labels(step, schema):
     assert_options_http({"type": FlowResultType.FORM, "step_id": step, "data_schema": schema})

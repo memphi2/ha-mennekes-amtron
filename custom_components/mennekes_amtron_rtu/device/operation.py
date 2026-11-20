@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from .departure_plan import PLAN_CHARGING
+
 CONTROLLERS = (
     "unavailable", "guest", "departure_plan", "direct",
 )
@@ -42,8 +44,9 @@ _PLAN_WAITS = {
     "queued": "command_pending",
     "write_pending": "command_pending",
 }
+# A planned start to show, and a forecast of the running charge to show.
 _PLAN_STARTS = frozenset({"paused_until_start", "minimum_level"})
-_PLAN_CHARGES = frozenset({"charging", "finishing", "unreachable", "late"})
+_PLAN_CHARGES = PLAN_CHARGING - {"minimum_level"}
 _KEYS = frozenset({"controller", "waiting", "next", "target", "vehicle"})
 
 

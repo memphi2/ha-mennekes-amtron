@@ -15,17 +15,17 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from ._flow_serial import port_category
-from .data import MennekesAmtronRuntimeData
-from .device.capabilities import supported_blocks, supported_register_keys
-from .device.client_errors import AmtronBusError
-from .device.connection import NetworkConfig
-from .device.const import (
+from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_DEVICE_ID,
     CONF_PARITY,
     CONF_STOPBITS,
 )
+from .data import MennekesAmtronRuntimeData
+from .device.capabilities import supported_blocks, supported_register_keys
+from .device.client_errors import AmtronBusError
+from .device.connection import NetworkConfig
 from .device.registers import REGISTERS_BY_KEY, layout_label
 from .device.runtime_events import sanitize_events
 from .device.write_trace import sanitize_snapshot

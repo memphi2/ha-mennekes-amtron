@@ -5,6 +5,68 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0b7 — 2026-11-20
+
+### Changed
+
+- **Breaking:** money is in Home Assistant's currency instead of fixed euros:
+  the cost target, both cost sensors and the price fields use it, a price
+  sensor must name that currency per kWh or MWh, and Home Assistant tells the
+  app the currency with the price. The app's overview state carries
+  `targets.cost` and `targets.cost_currency` instead of `cost_eur`.
+- **Breaking:** a wallbox without a serial-number register no longer gets a
+  unique ID made from its port or address; its endpoint only keeps it from
+  being set up twice. Remove such an entry and set it up again. Entries of
+  wallboxes with a serial number are unchanged.
+- **Breaking:** the wallbox service alone keeps the target time. Home
+  Assistant no longer stores a copy that it sends later: a time can only be
+  set while the service is reachable, a time changed while a guest charges
+  stays as changed afterwards, and a service that lost its saved plan has no
+  trip until one is set again. A time taken from a calendar or the car is
+  refused when the trip was edited while that answer was awaited.
+- **Breaking:** everything named `timed_*` is named `departure_*`, including
+  the vehicle options of departure planning. A vehicle profile saved with the
+  old option names is no longer valid, and with it the whole vehicle list:
+  set the vehicles up again. The target time entity gets a new unique ID
+  (`…_departure_time`); delete the old, now unavailable entity first, or the
+  new one gets `_2` appended to its entity ID.
+- **Breaking (service API):** a number that is not a permitted value is
+  refused with the error's name (for example `energy_goal_invalid`) instead of
+  as an invalid request; a current above the maximum is capped.
+- **Breaking (service API):** a command takes only its own fields. A field
+  that belongs to another command, which was ignored before, is refused.
+- Plug & Charge treats the plan's charge to the minimum level as a plan
+  that charges; before, it took that state for no plan at all.
+- A car that is seen again only after more than a minute without a valid
+  reading is no longer taken for surely the same one, also when few polls
+  fell into the gap: a Plug & Charge grant, a release by hand and a guest
+  permission end then.
+- One account of the plug-in decides for Plug & Charge, guest charging, the
+  unplug rule and the estimates whether a car is connected. Plug & Charge
+  counts a car's evidence from its real plug-in time, also when the gate was
+  switched on with the car already connected.
+- The app names its targets as Home Assistant does: energy target, cost
+  target, vehicle charge target and target time. The Charging page sorts them
+  into "for every charge", "own car only" and guest charging, each target has
+  its own Save and Clear, and the guest card lists what ends a guest charge.
+  While a guest holds the wallbox, the vehicle charge target says that it does
+  not apply.
+- The overview shows the four saved targets in one card with one link to the
+  Charging page, instead of three links to the same page. Its state carries
+  the target time as `targets.time`; the Charging page state carries
+  `guest_mode`.
+- Home Assistant uses the same names: "percentage target", "kWh limit", "time
+  limit" and "deadline" are now Vehicle charge target, Energy target and Target
+  time in all states, errors, actions and option texts; the departure plan
+  attribute is called Departure plan status. Every guest rule names the cost
+  target too. A past time typed in the app says so, and a target time changed
+  elsewhere is reported as changed, not as an uncertain save.
+- Errors while the wallbox or service cannot be reached are translated; every
+  configuration field has a description; the Vehicle charge target number has
+  the battery device class.
+- The release publication reads a new draft again for about two minutes before
+  it stops, and names the reason when it does.
+
 ## 0.10.0b6 — 2026-11-20
 
 ### Changed

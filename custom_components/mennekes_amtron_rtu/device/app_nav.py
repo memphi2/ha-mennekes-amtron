@@ -19,7 +19,7 @@ _NAV: tuple[tuple[tuple[str, ...], tuple[tuple[str, tuple[str, ...]], ...]], ...
         ("/", ("Overview", "Übersicht", "Vue d’ensemble", "Overzicht", "Panoramica")),
     )),
     (("Charging", "Laden", "Recharge", "Laden", "Ricarica"), (
-        ("/targets", ("Charging", "Laden", "Recharge", "Laden", "Ricarica")),
+        ("/charging", ("Charging", "Laden", "Recharge", "Laden", "Ricarica")),
     )),
     (("Settings", "Einstellungen", "Réglages", "Instellingen", "Impostazioni"), (
         ("/connection", ("Connection", "Verbindung", "Connexion", "Verbinding", "Connessione")),

@@ -48,8 +48,9 @@ One status tile and two rows of chips, so it fits next to other tiles:
 2. **Control chips:** **P&C** (green once the car is authorized, amber while
    it waits), the selected vehicle, the current limit (**0 A** removes the
    limit; it does not pause), **Pause** (tap toggles) and **Release**.
-3. **Limit chips:** kWh target, **target time**, and with a vehicle profile its
-   percentage target. Tap a chip to edit it: the time chip opens date and time
+3. **Target chips:** **Energy target**, **Target time**, and with a vehicle
+   profile its **Vehicle charge target**. The card has no chip for the cost
+   target; editing the energy target ends a running cost target. Tap a chip to edit it: the time chip opens date and time
    input; **hold** it to clear the time. **Start guest** appears only while no
    guest is charging; **Pause** stops a guest. **Calendar** and **Vehicle
    timer** appear with vehicle profiles; they run the `use_calendar_departure`
@@ -59,24 +60,25 @@ One status tile and two rows of chips, so it fits next to other tiles:
 The card uses only the integration's entities and actions; no helpers are
 needed.
 
-## Charge target
+## Energy and vehicle charge target
 
-[Shared limits](user-guide.md#shared-limits-and-target-time) explain which targets
-apply. A positive kWh setting establishes a new ceiling from the current meter.
-Saving a limit does not start charging. **0** disables an energy or percentage limit.
+[Shared targets](user-guide.md#shared-targets-and-target-time) explain which targets
+apply. A positive energy target counts from the current meter reading. Saving a
+target does not start charging. **0** disables the energy or vehicle charge target.
 
 ## Plan departure
 
 Configure the recognized vehicle's SoC and usable capacity in HA, then set its
-percentage target and next trip time. [Departure planning](departure-planning.md)
+vehicle charge target and target time. [Departure planning](departure-planning.md)
 explains waiting, actual-power learning, calendar imports and preconditioning.
 With the app, its pages show the same shared time; there is no separate
 planning editor.
 
 ## Guest charging
 
-Connect the guest, optionally set kWh and time, then press the guest button.
-It starts now and stops at whichever configured limit arrives first. While active,
+Connect the guest, optionally set the energy target and target time, then press
+the guest button. It starts now; the energy target, cost target or target time
+ends it, whichever comes first. While active,
 the card's button requests the ordinary pause. [Full behavior and restart limits](user-guide.md#guest-charging).
 
 ## Manual selection, automatic recognition and Plug & Charge

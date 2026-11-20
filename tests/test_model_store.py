@@ -14,7 +14,7 @@ from homeassistant.core import CoreState
 from homeassistant.helpers.storage import Store
 from homeassistant.util.file import WriteError
 
-from custom_components.mennekes_amtron_rtu import goal_store
+from custom_components.mennekes_amtron_rtu import model_store
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.persistence import (
@@ -25,15 +25,15 @@ from tests.ha_fakes import FakeHass
 from tests.test_home_assistant_smoke import _boot
 
 
-def energy_store(hass, identity: str = "wallbox") -> goal_store.ModelStore[EnergyGoal]:
-    return goal_store.ModelStore(hass, "entry", identity, kind="energy_goal", model=EnergyGoal)
+def energy_store(hass, identity: str = "wallbox") -> model_store.ModelStore[EnergyGoal]:
+    return model_store.ModelStore(hass, "entry", identity, kind="energy_goal", model=EnergyGoal)
 
 
-def soc_store(hass, identity: str = "wallbox") -> goal_store.ModelStore[SocGoal]:
-    return goal_store.ModelStore(hass, "entry", identity, kind="soc_goal", model=SocGoal)
+def soc_store(hass, identity: str = "wallbox") -> model_store.ModelStore[SocGoal]:
+    return model_store.ModelStore(hass, "entry", identity, kind="soc_goal", model=SocGoal)
 
 
-def store_at(path: Path, identity: str = "wallbox") -> goal_store.ModelStore[EnergyGoal]:
+def store_at(path: Path, identity: str = "wallbox") -> model_store.ModelStore[EnergyGoal]:
     hass = FakeHass(str(path))
     hass.state = CoreState.running
     hass.async_add_executor_job = asyncio.to_thread
@@ -175,14 +175,14 @@ def test_cancel_during_save_finishes_the_atomic_write(tmp_path, monkeypatch):
         goal = EnergyGoal()
         goal.set_target(1, 100)
         started, release = threading.Event(), threading.Event()
-        real_write = goal_store.write_utf8_file_atomic
+        real_write = model_store.write_utf8_file_atomic
 
         def delayed(*args, **kwargs):
             started.set()
             assert release.wait(5)
             real_write(*args, **kwargs)
 
-        monkeypatch.setattr(goal_store, "write_utf8_file_atomic", delayed)
+        monkeypatch.setattr(model_store, "write_utf8_file_atomic", delayed)
         task = asyncio.create_task(store.async_save(goal))
         try:
             assert await asyncio.to_thread(started.wait, 5)
@@ -205,7 +205,7 @@ def test_repeated_cancel_cannot_reorder_atomic_goal_writes(tmp_path, monkeypatch
         first.set_target(1, 100)
         second.set_target(2, 100)
         started, next_started, release = threading.Event(), threading.Event(), threading.Event()
-        real_write = goal_store.write_utf8_file_atomic
+        real_write = model_store.write_utf8_file_atomic
 
         def delayed(path, contents, **kwargs):
             target = json.loads(contents)["data"]["goal"]["target_kwh"]
@@ -216,7 +216,7 @@ def test_repeated_cancel_cannot_reorder_atomic_goal_writes(tmp_path, monkeypatch
                 next_started.set()
             real_write(path, contents, **kwargs)
 
-        monkeypatch.setattr(goal_store, "write_utf8_file_atomic", delayed)
+        monkeypatch.setattr(model_store, "write_utf8_file_atomic", delayed)
         saving = asyncio.create_task(store.async_save(first))
         following = None
         try:
@@ -290,7 +290,7 @@ def test_failed_atomic_save_keeps_previous_goal_and_propagates(tmp_path, monkeyp
         def fail(*args, **kwargs):
             raise error
 
-        monkeypatch.setattr(goal_store, "write_utf8_file_atomic", fail)
+        monkeypatch.setattr(model_store, "write_utf8_file_atomic", fail)
         goal.set_target(0)
         with pytest.raises(OSError, match=r"persisted|read-only filesystem"):
             await store.async_save(goal)
@@ -385,7 +385,7 @@ def test_stopping_save_is_durable_before_final_write_and_failure_is_never_queued
             with monkeypatch.context() as patch:
                 def fail(*args, **kwargs):
                     raise WriteError("disk full")
-                patch.setattr(goal_store, "write_utf8_file_atomic", fail)
+                patch.setattr(model_store, "write_utf8_file_atomic", fail)
                 with pytest.raises(OSError, match="persisted"):
                     await store.async_save(goal)
             hass.bus.async_fire(EVENT_HOMEASSISTANT_FINAL_WRITE)

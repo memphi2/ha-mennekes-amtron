@@ -194,7 +194,7 @@ def test_persist_finishes_atomically_even_when_the_caller_is_cancelled(
 
             monkeypatch.setattr(service._store, "save", blocked)
             service.control.pause_requested = True
-            task = asyncio.create_task(service._persist())
+            task = asyncio.create_task(service.persist())
             assert await asyncio.to_thread(entered.wait, 5)
             task.cancel()
             await asyncio.sleep(0)
@@ -230,7 +230,7 @@ def test_repeated_cancellation_keeps_older_store_write_serialized(tmp_path, monk
         monkeypatch.setattr(service._store, "save", blocked)
         try:
             service.control.pause_requested = True
-            first = asyncio.create_task(service._persist())
+            first = asyncio.create_task(service.persist())
             assert await asyncio.to_thread(entered.wait, 5)
             first.cancel()
             await asyncio.sleep(0)
@@ -238,7 +238,7 @@ def test_repeated_cancellation_keeps_older_store_write_serialized(tmp_path, monk
             await asyncio.sleep(0)
 
             service.control.pause_requested = False
-            second = asyncio.create_task(service._persist())
+            second = asyncio.create_task(service.persist())
             await asyncio.sleep(0)
             # The first thread still owns the store despite both cancellations.
             assert not first.done()
@@ -306,7 +306,7 @@ def test_service_shutdown_releases_the_port_even_if_state_cannot_be_saved(
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         monkeypatch.setattr(
-            service, "_persist", AsyncMock(side_effect=OSError("disk full"))
+            service, "persist", AsyncMock(side_effect=OSError("disk full"))
         )
         # A requested stop is no crash: it ends cleanly and says what was lost.
         await service.stop()

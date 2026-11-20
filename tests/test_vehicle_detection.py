@@ -96,7 +96,7 @@ def test_unique_candidates_settle_and_manual_override_cancels_pending_work(tmp_p
             hass.states.async_set("binary_sensor.second_plug", "on")
             await hass.async_block_till_done()
             assert entry.options["active_vehicle_profile"] is None
-            assert entry.options["timed_goal_reset_pending"] is True
+            assert entry.options["departure_reset_pending"] is True
             assert observer.selected() is None
             hass.states.async_set("binary_sensor.first_plug", "off")
             await hass.async_block_till_done()
@@ -148,7 +148,7 @@ def test_startup_invalidates_wrong_car_before_goals_restore_but_does_not_skip_se
                 hass.states.async_set(f"device_tracker.{name}", "home")
             m.prepare_vehicle_selection(hass, entry)
             assert entry.options["active_vehicle_profile"] is None
-            assert entry.options["timed_goal_reset_pending"] is True
+            assert entry.options["departure_reset_pending"] is True
             m.prepare_vehicle_selection(hass, entry)
             assert entry.options["active_vehicle_profile"] is None
             entry.options = activate_profile(entry.options, A)

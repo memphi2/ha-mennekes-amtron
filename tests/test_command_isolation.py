@@ -11,11 +11,11 @@ from custom_components.mennekes_amtron_rtu.device import (
     control as control_module,
 )
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from tests.test_timed_control import Harness
+from tests.test_departure_control import Harness
 
 
 @pytest.mark.parametrize("reason", ["goal_reached", "deadline_expired"])
-def test_lock_waits_for_timed_current_and_keeps_its_own_command_context(monkeypatch, reason):
+def test_lock_waits_for_departure_current_and_keeps_its_own_command_context(monkeypatch, reason):
     async def run():
         harness = Harness()
         control = await harness.connect()
@@ -30,8 +30,8 @@ def test_lock_waits_for_timed_current_and_keeps_its_own_command_context(monkeypa
             return transport
 
         monkeypatch.setattr(harness.client, "_async_transaction_client", delayed_identity)
-        timed = asyncio.create_task(control.async_set_timed_current(
-            6, deadline=deadline, owner="timed:one-trip",
+        timed = asyncio.create_task(control.async_set_departure_current(
+            6, deadline=deadline, owner="departure:one-trip",
         ))
         lock = None
         try:

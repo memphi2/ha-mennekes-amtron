@@ -26,7 +26,7 @@ from .device.notice import FailureNotice
 from .device.registers import EVSE_STATE, SESSION_ENERGY
 from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
-from .goal_store import ModelStore
+from .model_store import ModelStore
 from .vehicle_detection import vehicle_evidence
 from .vehicle_profiles import (
     CONF_VEHICLE_SOC_USE_PROFILE,

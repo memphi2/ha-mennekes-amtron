@@ -80,7 +80,7 @@ class CostGoalObserver:
         price = self._price()
         if value and price is None:
             raise service_validation_error("cost_goal_price_unknown")
-        await self._entry.runtime_data.control.async_set_cost_goal(value, price)
+        await self._entry.runtime_data.control.async_set_cost_goal(value, price, self._hass.config.currency)
         self._told_at = time.monotonic()
 
     async def async_observe(self, data: WallboxData | None) -> None:
@@ -103,7 +103,11 @@ class CostGoalObserver:
         known = goal.cost.price if running and goal.cost is not None else control.cost_price
         if (
             price is None
-            or (known is not None and abs(price - known) < PRICE_TOLERANCE)
+            or (
+                known is not None and abs(price - known) < PRICE_TOLERANCE
+                # A changed currency is told like a changed price.
+                and control.cost_currency == self._hass.config.currency
+            )
             or time.monotonic() - self._told_at < _RETRY_SECONDS
             or (self._task is not None and not self._task.done())
         ):
@@ -116,7 +120,7 @@ class CostGoalObserver:
 
     async def _tell(self, price: float) -> None:
         try:
-            await self._entry.runtime_data.control.async_set_cost_price(price)
+            await self._entry.runtime_data.control.async_set_cost_price(price, self._hass.config.currency)
         except (AmtronBusError, HomeAssistantError):
             self._notice.failed("new price not passed on", "retrying at a later poll")
         else:

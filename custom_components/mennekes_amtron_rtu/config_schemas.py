@@ -51,7 +51,7 @@ from .charging_cost_const import (
     NETWORK_MODULE_NONE,
     NETWORK_MODULES,
 )
-from .device.const import (
+from .const import (
     CONF_BAUDRATE,
     CONF_CONFIGURE_GATEWAY,
     CONF_CONNECTION_TYPE,
@@ -72,38 +72,40 @@ from .device.const import (
     CONF_TCP_PORT,
     CONNECTION_RTU_OVER_TCP,
     CONTROL_MODES,
-    DEFAULT_BAUDRATE,
     DEFAULT_CONTROL_MODE,
-    DEFAULT_DEVICE_ID,
     DEFAULT_FRAME,
-    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
-    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_SEARCH,
-    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
     DEFAULT_TCP_PORT,
     DEVICE_ID_MAX,
     DEVICE_ID_MIN,
-    MAX_PHASE_SWITCH_GRACE_SECONDS,
     MAX_SCAN_INTERVAL_SECONDS,
-    MAX_STATE_CHANGE_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
     NETWORK_CONNECTION_TYPES,
     SEARCH_MODES,
+)
+from .departure_const import (
+    CONF_DEPARTURE_CALENDAR_ENTITY,
+    CONF_DEPARTURE_CALENDAR_TITLE,
+    CONF_DEPARTURE_CAPACITY_ENTITY,
+    CONF_DEPARTURE_CAPACITY_KWH,
+    CONF_DEPARTURE_ENTITY,
+    CONF_DEPARTURE_MINIMUM_SOC,
+    CONF_DEPARTURE_TIMER1_DAYS,
+    CONF_DEPARTURE_TIMER2_DAYS,
+    CONF_DEPARTURE_VEHICLE_TIME_ZONE,
+    DEPARTURE_WEEKDAYS,
+)
+from .device.const import (
+    DEFAULT_BAUDRATE,
+    DEFAULT_DEVICE_ID,
+    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
+    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
+    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
+    MAX_PHASE_SWITCH_GRACE_SECONDS,
+    MAX_STATE_CHANGE_INTERVAL_SECONDS,
     SUPPORTED_BAUDRATES,
     SUPPORTED_FRAMES,
-)
-from .timed_goal_const import (
-    CONF_TIMED_CALENDAR_ENTITY,
-    CONF_TIMED_CALENDAR_TITLE,
-    CONF_TIMED_CAPACITY_ENTITY,
-    CONF_TIMED_CAPACITY_KWH,
-    CONF_TIMED_DEPARTURE_ENTITY,
-    CONF_TIMED_MINIMUM_SOC,
-    CONF_TIMED_TIMER1_DAYS,
-    CONF_TIMED_TIMER2_DAYS,
-    CONF_TIMED_VEHICLE_TIME_ZONE,
-    TIMED_WEEKDAYS,
 )
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
@@ -366,7 +368,7 @@ def departure_configure_schema(
 ) -> probatio.Schema:
     profile = current.get("vehicle_provider") not in (None, "none")
     capacity_sources = ["fixed", "entity", "profile"] if profile_capacity else ["fixed", "entity"]
-    default_source = "profile" if profile_capacity and current.get("timed_use_vehicle_capacity") is True else "entity" if current.get(CONF_TIMED_CAPACITY_ENTITY) else "fixed"
+    default_source = "profile" if profile_capacity and current.get("departure_use_vehicle_capacity") is True else "entity" if current.get(CONF_DEPARTURE_CAPACITY_ENTITY) else "fixed"
     selected_source = current.get("capacity_source", default_source)
     if selected_source not in capacity_sources:
         selected_source = default_source
@@ -384,19 +386,19 @@ def departure_configure_schema(
             probatio.Required(
                 "use_calendar",
                 default=current.get(
-                    "use_calendar", bool(current.get(CONF_TIMED_CALENDAR_ENTITY))
+                    "use_calendar", bool(current.get(CONF_DEPARTURE_CALENDAR_ENTITY))
                 ),
             ): BooleanSelector(),
             probatio.Required(
                 "use_departure_entity",
                 default=current.get(
                     "use_departure_entity",
-                    bool(current.get(CONF_TIMED_DEPARTURE_ENTITY)),
+                    bool(current.get(CONF_DEPARTURE_ENTITY)),
                 ),
             ): BooleanSelector(),
             probatio.Required(
-                CONF_TIMED_MINIMUM_SOC,
-                default=current.get(CONF_TIMED_MINIMUM_SOC, 0),
+                CONF_DEPARTURE_MINIMUM_SOC,
+                default=current.get(CONF_DEPARTURE_MINIMUM_SOC, 0),
             ): NumberSelector(
                 NumberSelectorConfig(
                     min=0, max=100, step=1, unit_of_measurement="%",
@@ -418,7 +420,7 @@ def departure_configure_schema(
 def departure_capacity_schema(
     current: dict[str, Any], *, entity: bool
 ) -> probatio.Schema:
-    key = CONF_TIMED_CAPACITY_ENTITY if entity else CONF_TIMED_CAPACITY_KWH
+    key = CONF_DEPARTURE_CAPACITY_ENTITY if entity else CONF_DEPARTURE_CAPACITY_KWH
     return probatio.Schema(
         {
             probatio.Required(
@@ -442,15 +444,15 @@ def departure_calendar_schema(current: dict[str, Any]) -> probatio.Schema:
     return probatio.Schema(
         {
             probatio.Required(
-                CONF_TIMED_CALENDAR_ENTITY,
+                CONF_DEPARTURE_CALENDAR_ENTITY,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_CALENDAR_ENTITY),
+                    "suggested_value": current.get(CONF_DEPARTURE_CALENDAR_ENTITY),
                 },
             ): _entity_selector(("calendar",)),
             probatio.Required(
-                CONF_TIMED_CALENDAR_TITLE,
+                CONF_DEPARTURE_CALENDAR_TITLE,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_CALENDAR_TITLE),
+                    "suggested_value": current.get(CONF_DEPARTURE_CALENDAR_TITLE),
                 },
             ): TextSelector(),
         }
@@ -461,9 +463,9 @@ def departure_entity_schema(current: dict[str, Any]) -> probatio.Schema:
     return probatio.Schema(
         {
             probatio.Required(
-                CONF_TIMED_DEPARTURE_ENTITY,
+                CONF_DEPARTURE_ENTITY,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_DEPARTURE_ENTITY),
+                    "suggested_value": current.get(CONF_DEPARTURE_ENTITY),
                 },
             ): _entity_selector(("sensor", "input_datetime")),
         }
@@ -593,22 +595,22 @@ def vehicle_device_schema(
     if timer_options:
         fields[
             probatio.Optional(
-                CONF_TIMED_VEHICLE_TIME_ZONE,
+                CONF_DEPARTURE_VEHICLE_TIME_ZONE,
                 description={
-                    "suggested_value": current.get(CONF_TIMED_VEHICLE_TIME_ZONE),
+                    "suggested_value": current.get(CONF_DEPARTURE_VEHICLE_TIME_ZONE),
                 },
             )
         ] = TextSelector()
-        for option in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+        for option in (CONF_DEPARTURE_TIMER1_DAYS, CONF_DEPARTURE_TIMER2_DAYS):
             fields[
                 probatio.Optional(
                     option, description={"suggested_value": current.get(option)}
                 )
             ] = SelectSelector(
                 SelectSelectorConfig(
-                    options=list(TIMED_WEEKDAYS),
+                    options=list(DEPARTURE_WEEKDAYS),
                     multiple=True,
-                    translation_key="timed_weekdays",
+                    translation_key="departure_weekdays",
                     mode=SelectSelectorMode.DROPDOWN,
                 ),
             )
@@ -649,6 +651,7 @@ def cost_source_schema(
     current: dict[str, Any],
     *,
     source: str,
+    currency: str,
 ) -> probatio.Schema:
     fields: dict[Any, Any] = {}
     if source == COST_SOURCE_FIXED:
@@ -659,7 +662,7 @@ def cost_source_schema(
                     "suggested_value": current.get(CONF_CHARGING_PRICE, 0.40),
                 },
             )
-        ] = _price_selector(allow_negative=True)
+        ] = _price_selector(currency, allow_negative=True)
     else:
         fields[
             probatio.Required(
@@ -687,7 +690,7 @@ def cost_module_schema(current: dict[str, Any]) -> probatio.Schema:
     })
 
 
-def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Schema:
+def cost_network_schema(current: dict[str, Any], *, module: str, currency: str) -> probatio.Schema:
     """Published network prices, shared by Module 2 and the full Module 3 form."""
     fields: dict[Any, Any] = {
         probatio.Required(
@@ -695,7 +698,7 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
             description={
                 "suggested_value": current.get(CONF_REGULAR_NETWORK),
             },
-        ): _price_selector(),
+        ): _price_selector(currency),
         probatio.Required(
             CONF_PRICE_INCLUDES_NETWORK,
             default=current.get(CONF_PRICE_INCLUDES_NETWORK, True),
@@ -707,7 +710,7 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
                 probatio.Required(
                     key, description={"suggested_value": current.get(key)}
                 )
-            ] = _price_selector()
+            ] = _price_selector(currency)
         fields[
             probatio.Required(
                 CONF_TARIFF_YEAR,
@@ -753,21 +756,21 @@ def cost_windows_schema(current: dict[str, Any]) -> probatio.Schema:
     return probatio.Schema(fields)
 
 
-def cost_module_three_schema(current: dict[str, Any]) -> probatio.Schema:
+def cost_module_three_schema(current: dict[str, Any], *, currency: str) -> probatio.Schema:
     """Review all imported prices and periods together before saving."""
     return probatio.Schema({
-        **cost_network_schema(current, module=NETWORK_MODULE_3).schema,
+        **cost_network_schema(current, module=NETWORK_MODULE_3, currency=currency).schema,
         **cost_windows_schema(current).schema,
     })
 
 
-def _price_selector(*, allow_negative: bool = False) -> NumberSelector:
+def _price_selector(currency: str, *, allow_negative: bool = False) -> NumberSelector:
     return NumberSelector(
         NumberSelectorConfig(
             min=-1000 if allow_negative else 0,
             max=1000,
             step="any",
-            unit_of_measurement="EUR/kWh",
+            unit_of_measurement=f"{currency}/kWh",
             mode=NumberSelectorMode.BOX,
         )
     )

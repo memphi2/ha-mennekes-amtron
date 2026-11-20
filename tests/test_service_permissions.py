@@ -13,10 +13,8 @@ from homeassistant.core import Context
 from homeassistant.exceptions import Unauthorized, UnknownUser
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
 

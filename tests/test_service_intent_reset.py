@@ -69,7 +69,7 @@ def test_reset_keeps_release_off_after_vehicle_absence(tmp_path, monkeypatch, in
             assert service.client.write_state is state
             assert state.limiter is limiter
             await service.refresh()
-            await service._persist()
+            await service.persist()
             restored = WriteState()
             assert IntentStore(path, service.identity.serial_number).load(restored)
             assert restored.charging_release_requested is False
@@ -102,7 +102,7 @@ def test_quarantine_recloses_release_unless_configured_read_only(tmp_path, read_
             assert service.control.read_only
             with pytest.raises(DeviceValidationError):
                 await service.command({"command": "resume", "expected_serial_number": service.identity.serial_number})
-            await service._persist()
+            await service.persist()
             assert path.read_bytes() == original
         finally:
             await service.stop()
@@ -126,13 +126,16 @@ def test_quarantine_survives_restart_and_never_overwrites_evidence(tmp_path, rea
                     assert any(address == R.CHARGING_RELEASE.address and words == [0] for address, words in transport.writes)
                 for command in ("resume", "plug_charge_config"):
                     with pytest.raises(DeviceValidationError):
-                        await service.command({"command": command, "value": False, "expected_serial_number": service.identity.serial_number})
+                        await service.command({
+                            "command": command, "expected_serial_number": service.identity.serial_number,
+                            **({} if command == "resume" else {"value": False}),
+                        })
                 service.data.values["error_code"] = 200
                 for _ in range(4):
                     await service._recover()
                     await service._enforce_current_cap()
                 assert service._attempts == 0
-                await service._persist()
+                await service.persist()
                 assert path.read_bytes() == original
             finally:
                 await service.stop()
@@ -181,7 +184,7 @@ def test_acknowledgement_needs_identity_and_durable_save(tmp_path, monkeypatch):
             with pytest.raises(DeviceError, match="device_identity_changed"):
                 await service.command(payload)
             payload["expected_serial_number"] = service.identity.serial_number
-            with pytest.raises(ValueError, match="invalid reset acknowledgement"):
+            with pytest.raises(ValueError, match="unknown command field"):
                 await service.command({**payload, "value": True})
             real_save = service._store.save
             def failed(_state):
@@ -246,7 +249,7 @@ def test_cancelled_reset_keeps_store_locked_until_the_save_finishes(tmp_path, mo
                 await asyncio.sleep(0)
                 assert not task.done()
                 assert service._store_lock.locked()
-                assert service._command_lock.locked()
+                assert service.command_lock.locked()
             release.set()
             with pytest.raises(asyncio.CancelledError):
                 await task
@@ -286,7 +289,7 @@ def test_quarantine_does_not_block_ha_setup_with_existing_options(tmp_path, conf
                 else:
                     options.update(catalog())
                     if configured == "trip_disabled":
-                        options["vehicle_profiles"][A]["options"]["timed_goal_enabled"] = False
+                        options["vehicle_profiles"][A]["options"]["departure_enabled"] = False
                 hass.config_entries.async_update_entry(entry, options=options)
                 await hass.async_block_till_done()
                 assert entry.state is ConfigEntryState.LOADED

@@ -122,11 +122,15 @@ above. The energy sensor and its settings belong to that vehicle's profile.
 
 Under **Charging costs**, choose **Fixed electricity price** or
 **Electricity price sensor**. For a fixed rate enter your gross
-price in **EUR/kWh**. New configurations suggest **0.40 EUR/kWh**; replace this
-with your own price. Saved prices are retained. With Tibber or another
-provider, select its existing HA sensor for the **current electricity price**.
-Supported units are `EUR/kWh`, `€/kWh`, `ct/kWh`, `EUR/MWh` and `€/MWh`.
-Negative prices are supported. Other currencies or a missing unit are not guessed.
+price per kWh in Home Assistant's currency (**Settings → System → General**).
+New configurations suggest **0.40**; replace this with your own price. Saved
+prices are retained. With Tibber or another provider, select its existing HA
+sensor for the **current electricity price**. Its unit must name that currency
+per kWh or MWh, for example `EUR/kWh` or `CHF/MWh`; with euros, `€/kWh`,
+`ct/kWh` and `€/MWh` also work. Negative prices are supported. Another
+currency or a missing unit is not guessed. Costs, the cost target and the
+app's Charging page all show that currency. The network price modules follow
+German rules and assume euros.
 
 A dynamic price stays valid for **90 minutes after its last report to Home
 Assistant**. Reporting the same value again renews that period. If reports stop,

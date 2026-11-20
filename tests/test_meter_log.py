@@ -21,7 +21,6 @@ def filled(*readings: tuple[float, float]) -> MeterLog:
 
 def test_a_span_between_flat_readings_is_exact_and_inside_a_charge_interpolated() -> None:
     log = filled((0, 100), (30, 100), (60, 100), (90, 101), (120, 102), (150, 102), (180, 102))
-    assert log.first_at == 0
     # The unchanged meter keeps its first and last reading only.
     assert log._times == [0, 60, 90, 120, 180]
     assert log.energy_between(10, 170) == pytest.approx(2)
@@ -31,7 +30,6 @@ def test_a_span_between_flat_readings_is_exact_and_inside_a_charge_interpolated(
 
 def test_a_span_that_is_not_covered_is_unknown() -> None:
     log = filled((100, 50), (130, 51))
-    assert MeterLog().first_at is None
     assert MeterLog().energy_between(0, 1) is None
     assert log.energy_between(90, 120) is None
     assert log.energy_between(110, 140) is None

@@ -15,11 +15,9 @@ from typing import TYPE_CHECKING, Any, Self
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .errors import DeviceError
 from .notice import FailureNotice
-from .vehicle import snapshot_vehicle_connected
 
 if TYPE_CHECKING:
     from .control import AmtronControl
-    from .data import WallboxData
 
 _LOGGER = logging.getLogger(__name__)
 _RETRY_SECONDS = 30
@@ -93,13 +91,10 @@ class UnplugRelease:
     def state(self) -> UnplugReleaseState:
         return self._control.write_state.unplug_release
 
-    def observe(self, data: WallboxData) -> None:
-        # Only values read in this poll decide: a held one is no evidence.
+    def follow(self) -> None:
+        """After the plug cycle took a poll."""
         control = self._control
-        self.state.observe(
-            snapshot_vehicle_connected(data.fresh, control.layout_version),
-            armed=control.energy_goal.target_kwh > 0,
-        )
+        self.state.observe(control.write_state.plug_cycle.present, armed=control.energy_goal.target_kwh > 0)
 
     async def async_end_reached_goal(self) -> None:
         """End a reached target of the car that left; the caller owns the command lock.

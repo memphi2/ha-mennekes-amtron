@@ -5,7 +5,6 @@
       "reconfigure_successful": "The connection was updated.",
       "reauth_successful": "Sign-in was updated.",
       "unique_id_mismatch": "This connection belongs to a different wallbox.",
-      "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration.",
       "invalid_service_discovery": "The app reported invalid connection details.",
       "service_identity_changed": "The discovered wallbox changed. Start setup again.",
       "service_discovery_updated": "The existing integration now uses the discovered app connection.",
@@ -159,6 +158,9 @@
         "description": "Enter the current access token for your separately hosted Modbus service. The service URL and existing wallbox entry are kept.",
         "data": {
           "server_token": "Access token"
+        },
+        "data_description": {
+          "server_token": "The access token the Modbus service accepts now."
         }
       },
       "reauth_app": {
@@ -532,7 +534,7 @@
           "waiting_for_device": "Waiting for wallbox",
           "waiting_for_soc": "Waiting for vehicle charge level",
           "waiting_for_capacity": "Waiting for battery capacity",
-          "waiting_for_target": "Waiting for percentage target",
+          "waiting_for_target": "Waiting for vehicle charge target",
           "read_only": "Read only",
           "command_pending": "Change queued",
           "target_reached": "Target reached",
@@ -631,10 +633,10 @@
             }
           },
           "departure_plan": {
-            "name": "Timed charging status",
+            "name": "Departure plan status",
             "state": {
               "disabled": "Disabled",
-              "waiting_for_target": "Waiting for percentage target",
+              "waiting_for_target": "Waiting for vehicle charge target",
               "waiting_for_capacity": "Waiting for battery capacity",
               "waiting_for_soc": "Waiting for vehicle charge level",
               "waiting_for_device": "Waiting for wallbox",
@@ -647,7 +649,7 @@
               "charging": "Charging at full current",
               "finishing": "Finishing at minimum current",
               "unreachable": "Target may be unreachable",
-              "late": "Deadline passed",
+              "late": "Target time passed",
               "estimated_reached": "Charged to the estimated target",
               "reached": "Target reached",
               "write_pending": "Write pending",
@@ -802,9 +804,9 @@
               "error_still_active": "Error is still active",
               "unknown": "Unknown reason",
               "user_cancelled": "Cancelled by user",
-              "energy_goal": "Charge target stop",
+              "energy_goal": "Stop requested by a target",
               "deadline_expired": "Departure time expired",
-              "time_limit": "Time limit reached",
+              "time_limit": "Target time reached",
               "guest_confirmation": "Guest start requires confirmation",
               "vehicle_authorized": "Recognized vehicle released for this connection",
               "vehicle_waiting": "Waiting for an authorized vehicle"
@@ -818,8 +820,8 @@
               "app": "App interface",
               "plug_charge": "Virtual Plug & Charge",
               "departure_plan": "Departure plan",
-              "energy_goal": "Energy target protection",
-              "soc_goal": "Vehicle percentage target",
+              "energy_goal": "Energy target",
+              "soc_goal": "Vehicle charge target",
               "recovery": "Error recovery",
               "guest": "Guest charging",
               "unplug": "Unplugged"
@@ -868,7 +870,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "name": "Target time"
       }
     }
@@ -925,6 +927,9 @@
     "service_unavailable": {
       "message": "The Modbus service is unavailable or could not confirm the command. Check the current state before repeating it."
     },
+    "connection_unavailable": {
+      "message": "The wallbox or the Modbus service cannot be reached right now ({error}). Home Assistant retries automatically."
+    },
     "service_auth_failed": {
       "message": "The Modbus service rejected authentication. Renew its access under Settings > Devices & services."
     },
@@ -944,25 +949,25 @@
       "message": "An energy target needs a supported total-energy meter and a fresh valid reading. Check the connection and try again."
     },
     "energy_goal_stop_active": {
-      "message": "A charging limit is reached, so charging stays paused. To continue, raise the kWh limit or vehicle percentage target, or set it to 0; after a meter reset, save the limit again. Changing a limit does not start charging by itself."
+      "message": "A target is reached, so charging stays paused. To continue, raise or clear the energy target, cost target or vehicle charge target; after a meter reset, save the energy target again. Changing a target does not start charging by itself."
     },
     "energy_goal_not_supported": {
       "message": "This Modbus service does not support energy targets. Update the app or standalone service first."
     },
     "soc_goal_invalid": {
-      "message": "Enter a target from 0 to 100%, no higher than the vehicle charge limit. 0 disables the percentage target."
+      "message": "Enter a target from 0 to 100%, no higher than the vehicle charge limit. 0 disables the vehicle charge target."
     },
     "soc_goal_unavailable": {
       "message": "The vehicle charge target cannot be changed right now. Check the configured vehicle sources and try again."
     },
     "soc_goal_limit_unavailable": {
-      "message": "The selected vehicle charge limit has not provided a valid value yet. Wait for it to become available before setting a percentage target. 0 remains available to disable the target."
+      "message": "The selected vehicle charge limit has not provided a valid value yet. Wait for it to become available before setting a vehicle charge target. 0 remains available to disable the target."
     },
     "soc_goal_source_changed": {
-      "message": "The vehicle sources have changed. Reload the integration before changing its percentage target."
+      "message": "The vehicle sources have changed. Reload the integration before changing its vehicle charge target."
     },
     "soc_goal_not_supported": {
-      "message": "The Modbus service does not support vehicle percentage targets. Update the app to use this optional feature."
+      "message": "The Modbus service does not support vehicle charge targets. Update the app to use this optional feature."
     },
     "loss_source_invalid": {
       "message": "Select a supported charging loss source and configure its matching vehicle or sensor."
@@ -976,13 +981,13 @@
     "loss_storage_unavailable": {
       "message": "The charging loss could not be saved. Check storage availability and try again."
     },
-    "timed_goal_state_invalid": {
+    "departure_state_invalid": {
       "message": "The saved departure time could not be restored. Check the stored plan before charging again."
     },
-    "timed_goal_unavailable": {
+    "departure_unavailable": {
       "message": "Queued departure commands could not be checked. The integration will retry when the connection is available."
     },
-    "timed_vehicle_unavailable": {
+    "departure_vehicle_unavailable": {
       "message": "No usable upcoming departure was found for the selected vehicle. Check its integration, timer sensors and settings."
     },
     "gateway_authentication_failed": {
@@ -1019,7 +1024,7 @@
       "message": "Guest charging cannot start: plug in the car, unlock the wallbox, clear any wallbox error and wait for a current status. In read-only mode, enable writing first."
     },
     "guest_deadline_expired": {
-      "message": "The saved time limit has expired. Choose a future time or clear it."
+      "message": "The saved target time has expired. Choose a future time or clear it."
     },
     "calendar_not_configured": {
       "message": "Set a calendar and the exact event title in the vehicle options first."
@@ -1029,9 +1034,6 @@
     },
     "calendar_no_event": {
       "message": "No timed calendar event with this title in the next 14 days."
-    },
-    "departure_save_failed": {
-      "message": "The departure time could not be saved. Check Home Assistant's storage and try again."
     },
     "intent_not_saved": {
       "message": "The wallbox has the command, but the service could not save it. After a restart of the service the earlier setting may apply. Check the service's storage."
@@ -1130,6 +1132,9 @@
         "description": "This wallbox runs through the Modbus app, so its settings are kept there and apply to Home Assistant as well.\n\nCharging current cap: {current_cap} A\nMinimum time between state changes: {state_change_interval} s\nExtra wait before phase changes: {phase_switch_grace} s\n\nChange these values, the polling intervals and the connection in the app under Open Web UI. Write permission is on the app’s Configuration tab.",
         "data": {
           "release_off_on_unplug": "Switch off charging release when unplugged"
+        },
+        "data_description": {
+          "release_off_on_unplug": "After a confirmed unplug, Charging release is switched off, so the next car needs an explicit release. Ignored while Virtual Plug & Charge is on."
         }
       },
       "wallbox_basic": {
@@ -1142,8 +1147,9 @@
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
-          "current_limit": "Upper limit for the charging-current control, in amperes per phase. This is not a percentage target or a pause command. The wallbox’s own limit also applies.",
-          "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."
+          "current_limit": "Upper limit for the charging-current control, in amperes per phase. This is not a vehicle charge target or a pause command. The wallbox’s own limit also applies.",
+          "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently.",
+          "release_off_on_unplug": "After a confirmed unplug, Charging release is switched off, so the next car needs an explicit release. Ignored while Virtual Plug & Charge is on."
         },
         "description": "The current cap limits what can be requested here; the wallbox’s own limit still applies."
       },
@@ -1181,10 +1187,10 @@
           "use_vehicle_limit": "Also use the vehicle’s charge limit"
         },
         "data_description": {
-          "vehicle_soc_entity": "Choose the vehicle sensor reporting its actual charge level in %. Missing data leaves charging unchanged until valid data returns. Changing the source clears the percentage target without resuming charging. To disable it, use the previous menu.",
+          "vehicle_soc_entity": "Choose the vehicle sensor reporting its actual charge level in %. Missing data leaves charging unchanged until valid data returns. Changing the source clears the vehicle charge target without resuming charging. To disable it, use the previous menu.",
           "use_vehicle_limit": "Enable this to select the vehicle’s own charge limit as an additional maximum. No setting is written to the vehicle."
         },
-        "description": "Profile: **{vehicle}**.\n\nThis enables the optional percentage target using an existing charge-level sensor. Afterwards, set the desired percentage on the wallbox device page. Setting a target only limits charging; it does not cancel a manual pause."
+        "description": "Profile: **{vehicle}**.\n\nThis enables the optional vehicle charge target using an existing charge-level sensor. Afterwards, set the desired percentage on the wallbox device page. Setting a target only limits charging; it does not cancel a manual pause."
       },
       "vehicle_limit": {
         "title": "Vehicle charge limit",
@@ -1192,9 +1198,9 @@
           "vehicle_charge_limit_entity": "Vehicle charge limit entity"
         },
         "data_description": {
-          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
+          "vehicle_charge_limit_entity": "Optional: additionally cap the vehicle charge target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
         },
-        "description": "Profile: **{vehicle}**.\n\nUse the vehicle’s configured charging limit as an additional maximum for the Home Assistant percentage target. Select the desired limit reported by the car, not its current charge level."
+        "description": "Profile: **{vehicle}**.\n\nUse the vehicle’s configured charging limit as an additional maximum for the vehicle charge target. Select the desired limit reported by the car, not its current charge level."
       },
       "departure": {
         "title": "Next departure",
@@ -1205,7 +1211,7 @@
           "wizard_next": "Next",
           "wizard_finish": "Save and finish"
         },
-        "description": "Profile: **{vehicle}**.\n\nIn use: departure **{departure_entity}**, battery capacity **{capacity_entity}**.\n\nWith departure planning, Home Assistant starts charging early enough to reach the percentage target by the departure time instead of charging at once.\n\nPlan one next trip with a percentage target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the percentage target remains."
+        "description": "Profile: **{vehicle}**.\n\nIn use: departure **{departure_entity}**, battery capacity **{capacity_entity}**.\n\nWith departure planning, Home Assistant starts charging early enough to reach the vehicle charge target by the departure time instead of charging at once.\n\nPlan one next trip with a vehicle charge target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the vehicle charge target remains."
       },
       "departure_requires_vehicle": {
         "title": "Charge level required",
@@ -1223,7 +1229,7 @@
           "capacity_source": "Battery capacity source",
           "use_calendar": "Use a calendar",
           "use_departure_entity": "Use a departure time entity",
-          "timed_minimum_soc": "Minimum charge level (%)",
+          "departure_minimum_soc": "Minimum charge level (%)",
           "use_vehicle_timer": "Use vehicle departure timers"
         },
         "description": "Profile: **{vehicle}**.\n\nManual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure.",
@@ -1231,71 +1237,75 @@
           "capacity_source": "Use usable battery capacity: a fixed value, a kWh/Wh sensor, or the profile value when supported. The plan waits if its chosen capacity or charge level is unavailable.",
           "use_calendar": "Adds a button to copy the next matching calendar event. Each press chooses one trip; use the supplied blueprint if you want scheduled calendar imports.",
           "use_departure_entity": "Automatically adopts a new future date and time from the selected entity. Manual selection remains possible; a different future timestamp from this source can replace it.",
-          "timed_minimum_soc": "Below this charge level the car charges at once at full current, then waits for the planned start. 0 switches it off.",
+          "departure_minimum_soc": "Below this charge level the car charges at once at full current, then waits for the planned start. 0 switches it off.",
           "use_vehicle_timer": "Adds a button to copy one active departure/climate timer from the vehicle integration. It reads the reported timer; it does not switch on the car’s climate control."
         }
       },
       "departure_capacity_fixed": {
         "title": "Usable battery capacity",
         "data": {
-          "timed_capacity_kwh": "Usable battery capacity (kWh)"
+          "departure_capacity_kwh": "Usable battery capacity (kWh)"
         },
         "data_description": {
-          "timed_capacity_kwh": "Enter the usable battery capacity, not the nominal capacity."
+          "departure_capacity_kwh": "Enter the usable battery capacity, not the nominal capacity."
         },
         "description": "Profile: **{vehicle}**.\n\nEnter the energy the battery can actually store for driving. This value is used to estimate the required charging time; changing it does not change the car’s own battery settings."
       },
       "departure_capacity_entity": {
         "title": "Battery capacity entity",
         "data": {
-          "timed_capacity_entity": "Usable battery capacity entity"
+          "departure_capacity_entity": "Usable battery capacity entity"
         },
         "data_description": {
-          "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh."
+          "departure_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh."
         },
         "description": "Profile: **{vehicle}**.\n\nChoose a sensor for usable capacity, not remaining energy or charge percentage. Its unit must be kWh or Wh. Without a valid value, the plan waits for capacity instead of guessing."
       },
       "departure_calendar": {
         "title": "Departure calendar",
         "data": {
-          "timed_calendar_entity": "Departure calendar",
-          "timed_calendar_title": "Exact calendar event title"
+          "departure_calendar_entity": "Departure calendar",
+          "departure_calendar_title": "Exact calendar event title"
         },
         "data_description": {
-          "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
-          "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored."
+          "departure_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
+          "departure_calendar_title": "Only events with this exact title are eligible. All-day events are ignored."
         },
         "description": "Profile: **{vehicle}**.\n\nChoose a calendar and an exact event title, for example “Drive to work”. The event start becomes the departure time. The button searches the next 14 days; all-day events are ignored."
       },
       "departure_entity": {
         "title": "Departure time entity",
         "data": {
-          "timed_departure_entity": "Departure time entity"
+          "departure_entity": "Departure time entity"
         },
         "data_description": {
-          "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip."
+          "departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip."
         },
         "description": "Profile: **{vehicle}**.\n\nChoose a source containing both date and time. A valid new future timestamp is adopted automatically. Configure only one source for this purpose; manual entry and the calendar/vehicle buttons remain available."
       },
       "departure_vehicle": {
         "title": "Vehicle integration",
         "data": {
-          "timed_vehicle_provider": "Vehicle integration"
+          "departure_vehicle_provider": "Vehicle integration"
+        },
+        "data_description": {
+          "departure_vehicle_provider": "The integration that already provides this car’s data in Home Assistant."
         },
         "description": "Choose an installed integration with a supported adapter. Generic HA entities can be selected without an adapter. Only existing local vehicle data is read."
       },
       "departure_vehicle_details": {
         "title": "Vehicle departure timers",
         "data": {
-          "timed_vehicle_device": "Vehicle",
-          "timed_vehicle_time_zone": "Vehicle time zone (optional)",
-          "timed_timer1_days": "BMW timer 1 weekdays (optional)",
-          "timed_timer2_days": "BMW timer 2 weekdays (optional)"
+          "departure_vehicle_device": "Vehicle",
+          "departure_vehicle_time_zone": "Vehicle time zone (optional)",
+          "departure_timer1_days": "BMW timer 1 weekdays (optional)",
+          "departure_timer2_days": "BMW timer 2 weekdays (optional)"
         },
         "data_description": {
-          "timed_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
-          "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
-          "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
+          "departure_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
+          "departure_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
+          "departure_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer.",
+          "departure_vehicle_device": "The car in that integration whose entities are read."
         },
         "description": "Profile: **{vehicle}**.\n\nUse the departure button to copy one active timer from the selected vehicle. With a profile, the vehicle is already selected. For BavarianData, enable the timer action, hour and minute sensors; enter recurring weekdays here because the integration does not publish them."
       },
@@ -1314,9 +1324,9 @@
         "data": {
           "charging_price": "Gross electricity price"
         },
-        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded. The initial suggestion is 0.40 EUR/kWh; use your own contract price.",
+        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded. The initial suggestion is 0.40 per kWh; use your own contract price.",
         "data_description": {
-          "charging_price": "Enter euros per kWh, including taxes: 0.40 means 40 cents/kWh. Use the energy price from your contract; any network-price adjustment is configured separately."
+          "charging_price": "Enter the price per kWh in Home Assistant’s currency, including taxes: 0.40 means forty hundredths per kWh. Use the energy price from your contract; any network-price adjustment is configured separately."
         }
       },
       "cost_sensor": {
@@ -1324,9 +1334,9 @@
         "data": {
           "charging_price_entity": "Electricity price sensor"
         },
-        "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded.",
+        "description": "Select a sensor with the current gross electricity price per kWh or MWh in Home Assistant’s currency, for example EUR/kWh (with euros, ct/kWh and the € symbol also work). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded.",
         "data_description": {
-          "charging_price_entity": "Choose the price for electricity consumed now, not a daily average, forecast list or export price. Its unit must identify EUR/kWh, ct/kWh or EUR/MWh."
+          "charging_price_entity": "Choose the price for electricity consumed now, not a daily average, forecast list or export price. Its unit must name Home Assistant’s currency per kWh or MWh."
         }
       },
       "cost_module2": {
@@ -1406,12 +1416,18 @@
         "data": {
           "charge_loss_vehicle_provider": "Vehicle integration"
         },
+        "data_description": {
+          "charge_loss_vehicle_provider": "The integration that already provides this car’s data in Home Assistant."
+        },
         "description": "Profile: **{vehicle}**.\n\nChoose an installed integration with a supported adapter. Generic HA entities can be selected without an adapter. Only existing local vehicle data is read."
       },
       "loss_vehicle_details": {
         "title": "Vehicle for charging history",
         "data": {
           "charge_loss_vehicle_device": "Vehicle"
+        },
+        "data_description": {
+          "charge_loss_vehicle_device": "The car in that integration whose entities are read."
         },
         "description": "Profile: **{vehicle}**.\n\nSelect the vehicle connected to this wallbox. Only existing local charging history is read; no vehicle refresh is requested. Missing or ambiguous matches remain unknown."
       },
@@ -1458,17 +1474,21 @@
         "data": {
           "vehicle_profile_id": "Vehicle profile"
         },
-        "description": "Select the vehicle connected to this wallbox. Switching does not start charging. Each car keeps its own percentage target and its own upcoming departure; a car without one starts without a departure. Each profile keeps its settings and loss average.",
+        "description": "Select the vehicle connected to this wallbox. Switching does not start charging. Each car keeps its own vehicle charge target and its own upcoming departure; a car without one starts without a departure. Each profile keeps its settings and loss average.",
         "data_description": {
           "vehicle_profile_id": "Select the actual car before starting a charge, especially when comparing charging losses. This manual choice disables automatic vehicle selection."
         }
       },
       "vehicle_profile_remove": {
         "title": "Remove profile",
-        "description": "Remove the selected profile and its saved feature settings. Removing the active profile also clears its percentage target and departure plan without starting charging.",
+        "description": "Remove the selected profile and its saved feature settings. Removing the active profile also clears its vehicle charge target and departure plan without starting charging.",
         "data": {
           "vehicle_profile_id": "Vehicle profile",
           "confirm": "Remove this profile"
+        },
+        "data_description": {
+          "vehicle_profile_id": "The profile to remove.",
+          "confirm": "Required: removal cannot be undone."
         }
       },
       "vehicle_profile_device": {
@@ -1493,7 +1513,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Configure charge level",
-        "description": "Profile: **{vehicle}**.\n\nUse this profile’s reported charge level for the optional percentage target. You can also use that car’s charge limit as an additional maximum. No setting is written to the vehicle.",
+        "description": "Profile: **{vehicle}**.\n\nUse this profile’s reported charge level for the optional vehicle charge target. You can also use that car’s charge limit as an additional maximum. No setting is written to the vehicle.",
         "data": {
           "use_vehicle_limit": "Also use the vehicle’s charge limit"
         },
@@ -1510,6 +1530,9 @@
         "description": "Profile: **{vehicle}**.\n\nIn use: plug **{plug_entity}**, location **{location_entity}**.\n\nDetection signals report that this car is plugged in and at home. Automatic vehicle selection and Virtual Plug & Charge use them.\n\nUse supported local entities from this profile’s vehicle integration, choose existing Home Assistant entities, or disable detection for this profile. Both cable connection and home presence are required. No additional cloud requests are made.",
         "data": {
           "vehicle_detection_source": "Source for detection"
+        },
+        "data_description": {
+          "vehicle_detection_source": "Where the cable and home signals of this car come from, or no detection."
         }
       },
       "vehicle_detection_entities": {
@@ -1539,11 +1562,14 @@
         "description": "Choose the car whose settings you want to change. Opening a profile does not select that car for charging.",
         "data": {
           "vehicle_profile_id": "Vehicle profile"
+        },
+        "data_description": {
+          "vehicle_profile_id": "The car whose settings open next."
         }
       },
       "vehicle_profile": {
         "title": "Vehicle profile",
-        "description": "Profile: **{vehicle}**.\n\nEverything here belongs only to this car and is kept even while another car is selected. Every item is optional:\n\n- **Name and vehicle source:** rename the profile or link it to the car in a vehicle integration such as BavarianData, so its data is read automatically.\n- **Charge level and charge limit:** lets Home Assistant stop at a percentage target, for example 80 %. Needed for departure planning.\n- **Next departure:** starts charging in time to reach the target by a departure time instead of charging at once.\n- **Charging losses:** shows how much of the wallbox energy actually reached the battery.\n- **Detection signals:** cable and home signals that recognise this car. **Automatic selection** in the **Active vehicle** entity uses them, and with the wallbox switch **Virtual Plug & Charge** on, the recognised car starts charging when it is plugged in. With a planned departure it first pauses and starts in time; it charges at once if the time would otherwise be too short.",
+        "description": "Profile: **{vehicle}**.\n\nEverything here belongs only to this car and is kept even while another car is selected. Every item is optional:\n\n- **Name and vehicle source:** rename the profile or link it to the car in a vehicle integration such as BavarianData, so its data is read automatically.\n- **Charge level and charge limit:** lets Home Assistant stop at a vehicle charge target, for example 80 %. Needed for departure planning.\n- **Next departure:** starts charging in time to reach the target by a departure time instead of charging at once.\n- **Charging losses:** shows how much of the wallbox energy actually reached the battery.\n- **Detection signals:** cable and home signals that recognise this car. **Automatic selection** in the **Active vehicle** entity uses them, and with the wallbox switch **Virtual Plug & Charge** on, the recognised car starts charging when it is plugged in. With a planned departure it first pauses and starts in time; it charges at once if the time would otherwise be too short.",
         "menu_options": {
           "vehicle_profile_edit": "Name and vehicle source",
           "vehicle_battery": "Charge level and charge limit",
@@ -1555,7 +1581,7 @@
       },
       "vehicle_settings": {
         "title": "Vehicle settings",
-        "description": "There are no vehicle profiles yet, so these settings apply to every car. Every item is optional:\n\n- **Charge level and charge limit:** lets Home Assistant stop at a percentage target, for example 80 %. Needed for departure planning.\n- **Next departure:** starts charging in time to reach the target by a departure time instead of charging at once.\n- **Charging losses:** shows how much of the wallbox energy actually reached the battery.\n\nAdd a profile under Vehicles to keep separate settings for each car.",
+        "description": "There are no vehicle profiles yet, so these settings apply to every car. Every item is optional:\n\n- **Charge level and charge limit:** lets Home Assistant stop at a vehicle charge target, for example 80 %. Needed for departure planning.\n- **Next departure:** starts charging in time to reach the target by a departure time instead of charging at once.\n- **Charging losses:** shows how much of the wallbox energy actually reached the battery.\n\nAdd a profile under Vehicles to keep separate settings for each car.",
         "menu_options": {
           "vehicle_battery": "Charge level and charge limit",
           "departure": "Next departure",
@@ -1565,7 +1591,7 @@
       },
       "vehicle_battery": {
         "title": "Charge level and charge limit",
-        "description": "Profile: **{vehicle}**.\n\nIn use: charge level **{soc_entity}**, charge limit **{limit_entity}**.\n\nThe charge level lets Home Assistant stop charging at a percentage target, for example 80 %, and departure planning needs it to calculate the charging time. The car’s own charge limit can be used as an additional maximum. Set the target percentage afterwards on the wallbox device page.\n\nTo cancel only the current percentage target, set Vehicle charge target to 0. Stop using vehicle charge level removes this profile’s source assignments here, including the optional maximum, and disables its departure planning; for the selected car it also clears the percentage target and departure plan. The source entities in the vehicle integration remain unchanged, as do vehicle permission, the kWh target and charging state.",
+        "description": "Profile: **{vehicle}**.\n\nIn use: charge level **{soc_entity}**, charge limit **{limit_entity}**.\n\nThe charge level lets Home Assistant stop charging at a vehicle charge target, for example 80 %, and departure planning needs it to calculate the charging time. The car’s own charge limit can be used as an additional maximum. Set the target percentage afterwards on the wallbox device page.\n\nTo cancel only the current vehicle charge target, set Vehicle charge target to 0. Stop using vehicle charge level removes this profile’s source assignments here, including the optional maximum, and disables its departure planning; for the selected car it also clears the vehicle charge target and departure plan. The source entities in the vehicle integration remain unchanged, as do vehicle permission, the kWh target and charging state.",
         "menu_options": {
           "vehicle_soc": "Configure charge level",
           "vehicle_source": "Configure charge level",
@@ -1581,14 +1607,14 @@
       "invalid_vehicle_entity": "Select an entity of the supported type.",
       "loss_source_invalid": "Select a supported charging loss source and configure its matching vehicle or sensor.",
       "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
-      "cost_price_invalid": "Enter a finite gross price in EUR/kWh between −1000 and 1000. Negative prices are allowed.",
+      "cost_price_invalid": "Enter a finite gross price per kWh between −1000 and 1000. Negative prices are allowed.",
       "network_tariff_invalid": "Check the gross prices, tariff year, two to four active quarters and HT/NT periods. Use one 15-minute-aligned HH:MM-HH:MM period per line; periods must not overlap and must leave standard-tariff time.",
-      "timed_source_invalid": "Invalid timed-goal source",
-      "timed_calendar_required": "Choose a calendar for this event title",
-      "timed_calendar_title_required": "Enter the exact event title",
-      "timed_capacity_invalid": "Enter a usable capacity between 1 and 250 kWh",
-      "timed_weekdays_invalid": "Choose valid weekdays",
-      "timed_timezone_invalid": "Enter a valid time zone, for example Europe/Berlin",
+      "departure_source_invalid": "Invalid timed-goal source",
+      "departure_calendar_required": "Choose a calendar for this event title",
+      "departure_calendar_title_required": "Enter the exact event title",
+      "departure_capacity_invalid": "Enter a usable capacity between 1 and 250 kWh",
+      "departure_weekdays_invalid": "Choose valid weekdays",
+      "departure_timezone_invalid": "Enter a valid time zone, for example Europe/Berlin",
       "options_changed": "This section changed while you were editing it. Return and reopen it to use the latest values; your draft was not saved.",
       "vehicle_provider_invalid": "Select a supported vehicle integration.",
       "vehicle_device_invalid": "Select a vehicle belonging to the chosen integration.",
@@ -1655,7 +1681,7 @@
         "4": "Q4: October–December"
       }
     },
-    "timed_weekdays": {
+    "departure_weekdays": {
       "options": {
         "mon": "Monday",
         "tue": "Tuesday",
@@ -1735,7 +1761,7 @@
     },
     "start_guest_charging": {
       "name": "Start guest charging",
-      "description": "Start immediately for this connection. Saved kWh and time limits apply; the vehicle percentage target stays unchanged.",
+      "description": "Start immediately for this connection. The saved energy target, cost target and target time end the charge; the vehicle charge target does not apply to a guest.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1745,7 +1771,7 @@
     },
     "clear_target_time": {
       "name": "Clear target time",
-      "description": "Clears the shared time without changing energy or vehicle targets."
+      "description": "Clears the target time without changing the other targets."
     },
     "use_calendar_departure": {
       "name": "Use next calendar event",

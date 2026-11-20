@@ -10,8 +10,8 @@ from collections.abc import Callable
 from .device.charge_loss import LossStatistics
 from .device.notice import FailureNotice
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
-from .goal_store import _finish_atomic
 from .loss_store import LossStore
+from .model_store import _finish_atomic
 
 _LOGGER = logging.getLogger(__name__)
 # A disk that refuses is asked again this often, not on every poll.

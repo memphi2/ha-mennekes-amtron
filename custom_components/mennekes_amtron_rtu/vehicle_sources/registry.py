@@ -10,10 +10,10 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     LOSS_SOURCE_DISABLED,
     LOSS_SOURCE_VEHICLE_HISTORY,
 )
-from custom_components.mennekes_amtron_rtu.timed_goal_const import (
-    CONF_TIMED_TIMER1_DAYS,
-    CONF_TIMED_TIMER2_DAYS,
-    CONF_TIMED_VEHICLE_TIME_ZONE,
+from custom_components.mennekes_amtron_rtu.departure_const import (
+    CONF_DEPARTURE_TIMER1_DAYS,
+    CONF_DEPARTURE_TIMER2_DAYS,
+    CONF_DEPARTURE_VEHICLE_TIME_ZONE,
 )
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
     CONF_VEHICLE_DEVICE,
@@ -34,10 +34,10 @@ from .bavariandata.telemetry import (
     telemetry_entities,
 )
 from .const import (
+    CONF_DEPARTURE_VEHICLE_DEVICE,
+    CONF_DEPARTURE_VEHICLE_PROVIDER,
     CONF_LOSS_VEHICLE_DEVICE,
     CONF_LOSS_VEHICLE_PROVIDER,
-    CONF_TIMED_VEHICLE_DEVICE,
-    CONF_TIMED_VEHICLE_PROVIDER,
     PROVIDER_BAVARIANDATA,
     PROVIDER_NONE,
 )
@@ -71,7 +71,7 @@ def provider_selection(options: Mapping[str, Any], capability: Capability) -> Pr
             device if isinstance(device, str) else "",
         )
     provider_key, device_key = (
-        (CONF_TIMED_VEHICLE_PROVIDER, CONF_TIMED_VEHICLE_DEVICE)
+        (CONF_DEPARTURE_VEHICLE_PROVIDER, CONF_DEPARTURE_VEHICLE_DEVICE)
         if capability == "departure" else
         (CONF_LOSS_VEHICLE_PROVIDER, CONF_LOSS_VEHICLE_DEVICE)
     )
@@ -150,12 +150,12 @@ def resolve_departure_source(hass: HomeAssistant, options: Mapping[str, Any]) ->
     selection = provider_selection(options, "departure")
     if selection.provider_id != PROVIDER_BAVARIANDATA or not selection.device_id:
         return None
-    zone = options.get(CONF_TIMED_VEHICLE_TIME_ZONE, hass.config.time_zone)
+    zone = options.get(CONF_DEPARTURE_VEHICLE_TIME_ZONE, hass.config.time_zone)
     return BavarianDepartureSource(
         hass, selection.device_id, time_zone=zone if isinstance(zone, str) else "",
-        timer1_days=_weekdays(options.get(CONF_TIMED_TIMER1_DAYS, ())),
-        timer2_days=_weekdays(options.get(CONF_TIMED_TIMER2_DAYS, ())),
-        expected_source_key=_expected_identity(options) if options.get(CONF_TIMED_VEHICLE_PROVIDER) == "profile" else None,
+        timer1_days=_weekdays(options.get(CONF_DEPARTURE_TIMER1_DAYS, ())),
+        timer2_days=_weekdays(options.get(CONF_DEPARTURE_TIMER2_DAYS, ())),
+        expected_source_key=_expected_identity(options) if options.get(CONF_DEPARTURE_VEHICLE_PROVIDER) == "profile" else None,
     )
 
 

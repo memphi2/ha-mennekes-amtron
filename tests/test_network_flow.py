@@ -13,17 +13,17 @@ from homeassistant.data_entry_flow import AbortFlow
 
 from custom_components.mennekes_amtron_rtu import _flow_connect, config_flow
 from custom_components.mennekes_amtron_rtu.config_schemas import network_schema
+from custom_components.mennekes_amtron_rtu.const import (
+    CONF_CONTROL_MODE,
+    CONF_CURRENT_LIMIT,
+    CONTROL_MODE_MASTER,
+)
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronBusError,
     AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.connection import NetworkConfig
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONF_CONTROL_MODE,
-    CONF_CURRENT_LIMIT,
-    CONTROL_MODE_MASTER,
-)
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_config_flow import IDENTITY, USER_INPUT, Flow, _suggested

@@ -26,7 +26,7 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 3 and service 0.10.0b6 or newer**,
+separately. The current requirement is **API 3 and service 0.10.0b7 or newer**,
 whose saved control state carries the unplug and target fields. Raise the minimum
 when a newer service feature is required. The published or planned service
 release must satisfy the declared minimum.
@@ -148,6 +148,9 @@ catalog version request is a stop condition, not permission to overwrite it.
 A genuine correction after publication needs a new version. A network failure,
 private first package or interrupted catalog update can be retried on the same
 approved source. Never delete/recreate tags to make a check pass.
+Right after the upload GitHub may list a new draft, or the digests of its
+assets, a little late; the publisher reads the draft again for about two
+minutes before it stops, and a stop names its reason in the job log.
 Use **Re-run failed jobs** to retain successful native build artifacts. If the
 image was already published and attested but catalog publication was interrupted,
 the retry can verify and reuse that exact image to finish the catalog update.

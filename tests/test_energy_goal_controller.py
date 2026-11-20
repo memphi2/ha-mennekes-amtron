@@ -34,8 +34,8 @@ from custom_components.mennekes_amtron_rtu.device.service_store import IntentSto
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests.fakes import put, raise_connection_error
 from tests.test_control import Harness
-from tests.test_goal_store import store_at
 from tests.test_modbus_service import current_writes, service_fixture
+from tests.test_model_store import store_at
 
 
 async def _runner(*, paused=False, read_only=False, persist=None, notify=None):
@@ -480,7 +480,7 @@ def test_cancelled_save_keeps_the_target_that_may_already_be_committed():
     asyncio.run(run())
 
 
-def test_cancelled_committed_target_invalidates_queued_timed_command():
+def test_cancelled_committed_target_invalidates_queued_departure_command():
     async def run():
         harness, control, runner, _saved = await _runner()
         control.soc_goal.configure_source("sensor.car_soc")
@@ -489,7 +489,7 @@ def test_cancelled_committed_target_invalidates_queued_timed_command():
         control._sleep = lambda _delay: release.wait()
         try:
             await control.async_pause_charging()
-            await control.async_set_timed_current(
+            await control.async_set_departure_current(
                 6, deadline=datetime.now(UTC) + timedelta(hours=1), owner="timed:entry"
             )
             assert control.pending_action == "set_current"
@@ -688,7 +688,7 @@ async def _assert_service_cancelled_store_wait(tmp_path, *, kind):
 
         async def save():
             started.set()
-            await service._persist()
+            await service.persist()
 
         controller._persist = save
         async with service._store_lock:

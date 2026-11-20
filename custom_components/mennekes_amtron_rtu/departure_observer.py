@@ -17,40 +17,35 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
+from .departure_const import (
+    CONF_DEPARTURE_CALENDAR_ENTITY,
+    CONF_DEPARTURE_CALENDAR_TITLE,
+    CONF_DEPARTURE_CAPACITY_ENTITY,
+    CONF_DEPARTURE_CAPACITY_KWH,
+    CONF_DEPARTURE_ENTITY,
+    CONF_DEPARTURE_MINIMUM_SOC,
+)
 from .device.charging_plan import usable_capacity
 from .device.client_errors import AmtronBusError
-from .device.departure_plan import DepartureForecast, DepartureInputs, DepartureState
+from .device.departure_plan import DepartureForecast, DepartureInputs
 from .device.departure_step import (
     minimum_level,
 )
-from .device.enums import (
-    DetectedEvPhases,
-    EvseState,
-    GridPhasesConnected,
-    SwitchedPhases,
-)
-from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
+from .device.departure_trip import DepartureTrip, matches_departure_source
+from .device.enums import EvseState
+from .device.power_window import car_phases, observed_phases
 from .device.registers import EVSE_STATE
-from .device.timed_goal import TimedGoal, matches_departure_source
 from .exceptions import home_assistant_error, service_validation_error
-from .goal_store import DepartureIntent, TimedGoalStore
-from .timed_goal_const import (
-    CONF_TIMED_CALENDAR_ENTITY,
-    CONF_TIMED_CALENDAR_TITLE,
-    CONF_TIMED_CAPACITY_ENTITY,
-    CONF_TIMED_CAPACITY_KWH,
-    CONF_TIMED_DEPARTURE_ENTITY,
-    CONF_TIMED_MINIMUM_SOC,
-)
 from .vehicle_phases import VehiclePhaseMemory
 from .vehicle_profiles import (
-    CONF_TIMED_USE_VEHICLE_CAPACITY,
+    CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
     CONF_VEHICLE_PROFILE_ID,
     CONF_VEHICLE_SOC_USE_PROFILE,
     vehicle_options,
 )
 from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
 from .vehicle_sources import resolve_departure_source
+from .vehicle_trips import VehicleTripMemory
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
@@ -58,8 +53,6 @@ if TYPE_CHECKING:
 from .device.notice import FailureNotice
 
 _LOGGER = logging.getLogger(__name__)
-# A service on another host may finish a trip slightly before this clock does.
-_CLOCK_TOLERANCE = timedelta(minutes=5)
 
 
 def departure_time(state: State | None) -> datetime | None:
@@ -96,16 +89,20 @@ def capacity_from_state(state: State | None) -> float | None:
     return usable_capacity(value, state.attributes.get("unit_of_measurement", ""))
 
 
-class TimedGoalObserver:
-    """Own the selected car's trip and keep the service's plan supplied."""
+class DepartureObserver:
+    """Keep the service's plan for the selected car supplied.
+
+    The service holds the one target time. This takes it from a calendar,
+    the car or an entity, hands over the car's data, and shows the plan.
+    """
 
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
         self._options = vehicle_options(entry.options)
         self._runtime = entry.runtime_data
-        self._store = TimedGoalStore(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
-        self.goal = TimedGoal()
+        # The trip this car had when another one was selected is still to be given back.
+        self._resume = self._options.get(CONF_VEHICLE_PROFILE_ID) is not None
         self.status = "disabled"
         # When the service's plan starts, or started, charging for the open trip.
         self.planned_start: datetime | None = None
@@ -117,27 +114,23 @@ class TimedGoalObserver:
         self._stopping = False
         self._handover_notice = FailureNotice(_LOGGER, "Departure plan")
         self._evaluation_notice = FailureNotice(_LOGGER, "Departure plan")
-        self._goal_lock = asyncio.Lock()
-        self._save_dirty = False
-        self._save_unknown = False
         # The selected car's phases from its last charge, if it had one.
         self._known_phases: int | None = None
-        # The trip changed here and the service has not taken it over yet.
-        self._trip_dirty = False
-        self._trip_base: dict[str, Any] | None = None
+
+    @property
+    def goal(self) -> DepartureTrip:
+        """The service's trip; an empty one while it is not known."""
+        remote = self._runtime.control.departure
+        return remote.trip if remote is not None else DepartureTrip()
 
     async def async_start(self) -> None:
-        intent = await self._store.async_load()
-        self.goal = intent.trip
-        self._trip_dirty = intent.pending
-        self._trip_base = {"edit_revision": intent.base_revision} if intent.base_revision is not None else None
         if (profile := self._options.get(CONF_VEHICLE_PROFILE_ID)) is not None:
             self._known_phases = await self._phase_memory().async_phases(profile)
         options = self._options
         sources = [
             options.get(CONF_VEHICLE_SOC_ENTITY),
-            options.get(CONF_TIMED_CAPACITY_ENTITY),
-            options.get(CONF_TIMED_DEPARTURE_ENTITY),
+            options.get(CONF_DEPARTURE_CAPACITY_ENTITY),
+            options.get(CONF_DEPARTURE_ENTITY),
         ]
         entities = [entity for entity in sources if isinstance(entity, str)]
         if entities:
@@ -145,7 +138,7 @@ class TimedGoalObserver:
                 self._hass, entities, self._source_changed,
             ))
         if self._runtime.vehicle_telemetry is not None and (
-            options.get(CONF_TIMED_USE_VEHICLE_CAPACITY) is True
+            options.get(CONF_DEPARTURE_USE_VEHICLE_CAPACITY) is True
             or options.get(CONF_VEHICLE_SOC_USE_PROFILE) is True
         ):
             self._unsubs.append(self._runtime.vehicle_telemetry.subscribe(self._source_changed))
@@ -198,7 +191,7 @@ class TimedGoalObserver:
         self._pending = True
         if self._task is None or self._task.done():
             self._task = self._hass.async_create_task(
-                self._run(), "amtron_timed_goal", eager_start=False,
+                self._run(), "amtron_departure_observer", eager_start=False,
             )
 
     async def _run(self) -> None:
@@ -229,105 +222,55 @@ class TimedGoalObserver:
 
     async def _set_user_deadline(
         self, value: datetime | None, *, source: str | None,
-        expected: TimedGoal | None = None,
+        expected: dict[str, Any] | None = None,
     ) -> None:
-        if self._stopping or (expected is not None and self.goal is not expected):
+        if self._stopping:
             return
         if self._runtime.control.guest_active():
             await self._runtime.control.async_set_target_time(value)
             return
         await self._set_deadline(value, source=source, expected=expected)
 
+    def _selection(self) -> dict[str, Any] | None:
+        """What the service's trip is now, to refuse an edit made on an older one."""
+        remote = self._runtime.control.departure
+        return remote.selection() if remote is not None else None
+
     async def _set_deadline(
         self, value: datetime | None, *, source: str | None,
-        expected: TimedGoal | None = None,
+        expected: dict[str, Any] | None = None,
     ) -> None:
         if value is not None and (value.utcoffset() is None or value <= dt_util.utcnow()):
             raise service_validation_error("target_time_not_future")
-        async with self._goal_lock:
-            if self._stopping or (expected is not None and self.goal is not expected):
-                return
-            original = self.goal
-            if source is None:
-                # An explicit selection/clear wins over the current external
-                # timestamp until that source changes to another trip.
-                source_entity = self._options.get(CONF_TIMED_DEPARTURE_ENTITY)
-                source_time = departure_time(self._hass.states.get(source_entity)) if source_entity else None
-                source = (
-                    f"entity:{source_entity}:{source_time.isoformat()}"
-                    if source_time is not None else original.source
-                )
-            candidate = TimedGoal.restore(original.snapshot())
-            try:
-                changed = candidate.set(value, source)
-            except ValueError as err:
-                raise HomeAssistantError(str(err)) from err
-            if not changed and not self._save_dirty:
-                return
-            if not self._trip_dirty:
-                remote = self._runtime.control.departure
-                self._trip_base = remote.selection() if remote is not None else None
-            self._trip_dirty = True
-            await self._save_goal(candidate)
-            # A new trip plans its own start; the old one no longer applies.
-            self.planned_start = None
+        original = self.goal
+        if source is None:
+            # An explicit selection/clear wins over the current external
+            # timestamp until that source changes to another trip.
+            source_entity = self._options.get(CONF_DEPARTURE_ENTITY)
+            source_time = departure_time(self._hass.states.get(source_entity)) if source_entity else None
+            source = (
+                f"entity:{source_entity}:{source_time.isoformat()}"
+                if source_time is not None else original.source
+            )
+        # The time was checked above; only a malformed source, which no
+        # user input can produce, still fails here.
+        if not DepartureTrip.restore(original.snapshot()).set(value, source):
+            return
+        await self._runtime.control.async_set_departure_trip(value, source, expected_selection=expected)
+        # A new trip plans its own start; the old one no longer applies.
+        self.planned_start = None
         self._notify()
         self.request_evaluate()
 
-    async def _save_goal(self, candidate: TimedGoal) -> None:
-        """Keep the live trip aligned with a save that survives cancellation."""
-        intent = DepartureIntent(candidate, self._trip_dirty,
-                                 self._trip_base["edit_revision"] if self._trip_dirty and self._trip_base is not None else None)
-        task = asyncio.create_task(self._store.async_save(intent))
-        try:
-            await asyncio.shield(task)
-        except (StorageCommitUncertainError, StorageStateUnknownError) as err:
-            # The file contains this trip, although directory durability was
-            # not confirmed, or its state could not be read. Keep the pending
-            # trip and report failure; unknown storage blocks plan commands.
-            self._publish_uncertain_goal(candidate, unknown=isinstance(err, StorageStateUnknownError))
-            raise
-        except asyncio.CancelledError:
-            # The store finishes atomic writes even when its caller is
-            # cancelled. Shield the whole save, including lock acquisition,
-            # so we know whether the candidate was actually committed.
-            while not task.done():
-                try:
-                    await asyncio.shield(task)
-                except asyncio.CancelledError:
-                    continue
-            try:
-                task.result()
-            except (StorageCommitUncertainError, StorageStateUnknownError) as err:
-                self._publish_uncertain_goal(candidate, unknown=isinstance(err, StorageStateUnknownError))
-                raise
-            self.goal = candidate
-            self._save_dirty = self._save_unknown = False
-            self._notify()
-            self.request_evaluate()
-            raise
-        self.goal = candidate
-        self._save_dirty = self._save_unknown = False
-
-    def _publish_uncertain_goal(self, candidate: TimedGoal, *, unknown: bool) -> None:
-        self.goal = candidate
-        self._save_dirty = True
-        self._save_unknown = unknown
-        for publish in (self._notify, self.request_evaluate):
-            try:
-                publish()
-            except Exception:  # noqa: BLE001 - preserve the storage failure
-                _LOGGER.error("Departure plan: unable to publish an uncertain update")
-
     async def async_use_next_calendar_event(self) -> None:
         """Select a single matching future event; later events never roll in."""
-        entity_id = self._options.get(CONF_TIMED_CALENDAR_ENTITY)
-        title = self._options.get(CONF_TIMED_CALENDAR_TITLE)
+        entity_id = self._options.get(CONF_DEPARTURE_CALENDAR_ENTITY)
+        title = self._options.get(CONF_DEPARTURE_CALENDAR_TITLE)
         if not isinstance(entity_id, str) or not isinstance(title, str) or not title:
             raise service_validation_error("calendar_not_configured")
         now = dt_util.utcnow()
         end = now + timedelta(days=14)
-        original = self.goal
+        original = self._selection()
         response = await self._hass.services.async_call(
             "calendar", "get_events",
             {"entity_id": entity_id, "start_date_time": now.isoformat(),
@@ -359,48 +302,38 @@ class TimedGoalObserver:
 
     async def async_use_vehicle_departure(self) -> None:
         """Copy one enabled local vehicle timer; never arm a recurring schedule."""
-        original = self.goal
+        original = self._selection()
         source = resolve_departure_source(self._hass, self._options)
         value = source.next_departure(dt_util.utcnow()) if source is not None else None
         if value is None:
-            raise service_validation_error("timed_vehicle_unavailable")
+            raise service_validation_error("departure_vehicle_unavailable")
         await self._set_user_deadline(value, source=None, expected=original)
 
     def _capacity(self) -> float | None:
         options = self._options
-        if options.get(CONF_TIMED_USE_VEHICLE_CAPACITY) is True:
+        if options.get(CONF_DEPARTURE_USE_VEHICLE_CAPACITY) is True:
             telemetry = self._runtime.vehicle_telemetry
             return telemetry.snapshot.capacity_kwh if telemetry is not None else None
-        entity = options.get(CONF_TIMED_CAPACITY_ENTITY)
+        entity = options.get(CONF_DEPARTURE_CAPACITY_ENTITY)
         if entity:
             return capacity_from_state(self._hass.states.get(entity))
-        return usable_capacity(options.get(CONF_TIMED_CAPACITY_KWH))
+        return usable_capacity(options.get(CONF_DEPARTURE_CAPACITY_KWH))
 
     def _minimum(self) -> float:
         """The level below which the car charges at once; zero is off."""
-        return minimum_level(self._options.get(CONF_TIMED_MINIMUM_SOC))
+        return minimum_level(self._options.get(CONF_DEPARTURE_MINIMUM_SOC))
 
     def _phases(self) -> int:
         data = self._runtime.coordinator.current_data()
-        switched = data.get("switched_phases")
-        connected = data.get("grid_phases_connected")
-        if switched == SwitchedPhases.SINGLE_PHASE or connected == GridPhasesConnected.L1:
-            return 1
-        if switched == SwitchedPhases.ALL_AVAILABLE and connected == GridPhasesConnected.L1_L2_L3:
-            detected = data.get("detected_ev_phases")
-            if detected in (
-                DetectedEvPhases.ONE_PHASE, DetectedEvPhases.TWO_PHASES,
-                DetectedEvPhases.THREE_PHASES,
-            ):
-                if data.get(EVSE_STATE.key) == EvseState.CHARGING:
-                    # Only a drawing car proves the reading is its own.
-                    self._remember_phases(int(detected))
-                return int(detected)
+        car = car_phases(data.fresh)
+        if car is not None and data.fresh(EVSE_STATE.key) == EvseState.CHARGING:
+            # Only a drawing car proves the reading is its own.
+            self._remember_phases(car)
         # Detection is zero while the car draws no current, i.e. all the time
         # before a late start. The car's last detected phases then decide, and
         # a car never seen charging is assumed three-phase. A one-phase car
         # corrects that on its first charge, from the reserve the start keeps.
-        return self._known_phases or 3
+        return observed_phases(data.fresh) or self._known_phases or 3
 
     def _remember_phases(self, phases: int) -> None:
         profile = self._options.get(CONF_VEHICLE_PROFILE_ID)
@@ -417,23 +350,46 @@ class TimedGoalObserver:
         )
 
     async def _evaluate(self) -> None:
-        if self._save_unknown:
-            self._set_status("error")
-            return
-        source_entity = self._options.get(CONF_TIMED_DEPARTURE_ENTITY)
-        if source_entity:
-            value = departure_time(self._hass.states.get(source_entity))
-            if value is not None and value > dt_util.utcnow():
-                source = f"entity:{source_entity}:{value.isoformat()}"
-                if not matches_departure_source(self.goal.source, source_entity, value):
-                    await self._set_deadline(value, source=source, expected=self.goal)
+        control = self._runtime.control
+        if control.departure is not None and not control.guest_active():
+            await self._resume_trip()
+            await self._follow_source()
         await self._follow_service()
 
+    async def _resume_trip(self) -> None:
+        """Give this car back the trip it had before another car was selected."""
+        if not self._resume:
+            return
+        profile = self._options[CONF_VEHICLE_PROFILE_ID]
+        trips = VehicleTripMemory(
+            self._hass, self._entry.entry_id, self._runtime.identity.serial_number or "",
+        )
+        trip = await trips.async_peek(profile)
+        remote = self._runtime.control.departure
+        # A time the service only kept for a guest is no other car's choice.
+        if trip is not None and (self.goal.deadline is None or (remote is not None and remote.withdrawn)):
+            await self._runtime.control.async_set_departure_trip(trip.deadline, trip.source)
+            if self.goal.deadline != trip.deadline:
+                # Not taken, e.g. a guest started meanwhile: it stays parked.
+                return
+        # Handed over, or no longer wanted: the service has the trip now.
+        await trips.async_swap(None, None, profile)
+        self._resume = False
+
+    async def _follow_source(self) -> None:
+        """Take a new time from the entity that names the next departure."""
+        source_entity = self._options.get(CONF_DEPARTURE_ENTITY)
+        if not source_entity:
+            return
+        value = departure_time(self._hass.states.get(source_entity))
+        if value is None or value <= dt_util.utcnow():
+            return
+        if not matches_departure_source(self.goal.source, source_entity, value):
+            await self._set_deadline(value, source=f"entity:{source_entity}:{value.isoformat()}")
+
     async def _follow_service(self) -> None:
-        """Hand trip and car data to the service, which plans; show its state."""
+        """Hand the car's data to the service, which plans; show its state."""
         control = self._runtime.control
-        if (remote := control.departure) is not None and not control.guest_active():
-            await self._sync_trip(remote)
         if (remote := control.departure) is not None and not control.guest_active():
             inputs = self._departure_inputs(remote.scope)
             if inputs is not None and inputs.digest != remote.inputs:
@@ -446,50 +402,6 @@ class TimedGoalObserver:
         if (status, start, forecast) != (self.status, self.planned_start, self.forecast):
             self.status, self.planned_start, self.forecast = status, start, forecast
             self._notify()
-
-    async def _sync_trip(self, remote: DepartureState) -> None:
-        service, editor, vehicle = remote.trip, remote.editor, remote.selection_vehicle
-        trip = self.goal
-        same = (trip.deadline, trip.source) == (service.deadline, service.source)
-        selection = remote.selection()
-        observer = self._runtime.vehicle_soc
-        from_app = editor == "app" and observer is not None and observer.source == vehicle
-        if self._trip_dirty and from_app and self._trip_base is not None and selection != self._trip_base:
-            # A newer app edit supersedes an unsent HA edit after an outage.
-            async with self._goal_lock:
-                if self.goal is trip and not self._stopping:
-                    self._trip_dirty = False
-                    self._trip_base = None
-                    await self._save_goal(TimedGoal.restore(service.snapshot()))
-                    self._notify()
-            return
-        if not self._trip_dirty:
-            if (trip.deadline is None and service.deadline is None) or (
-                same and trip.finished == service.finished
-            ):
-                return
-            # The service decides how a trip ends: it finishes the trip it
-            # was given, and clears its time once that has passed.
-            ended = (
-                service.deadline is None and service.finished is not None
-                and trip.deadline is not None
-                and trip.deadline <= dt_util.utcnow() + _CLOCK_TOLERANCE
-            )
-            if same or ended or from_app:
-                async with self._goal_lock:
-                    if self.goal is trip and not self._stopping:
-                        await self._save_goal(TimedGoal.restore(service.snapshot()))
-                        self._notify()
-                return
-        # The trip was set here, or the service lost its plan.
-        await self._runtime.control.async_set_departure_trip(
-            trip.deadline, trip.source, expected_selection=selection,
-        )
-        async with self._goal_lock:
-            if self.goal is trip and self._trip_dirty:
-                self._trip_dirty = False
-                self._trip_base = None
-                await self._save_goal(trip)
 
     def _departure_inputs(self, scope: str | None) -> DepartureInputs | None:
         observer = self._runtime.vehicle_soc

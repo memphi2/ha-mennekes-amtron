@@ -11,6 +11,9 @@ from custom_components.mennekes_amtron_rtu.device import (
     departure_planner as departure_runtime,
 )
 from custom_components.mennekes_amtron_rtu.device import server
+from custom_components.mennekes_amtron_rtu.device.connection_sample import (
+    connection_sample,
+)
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureInputs,
 )
@@ -115,7 +118,7 @@ def test_the_snapshot_summarizes_who_controls_the_charge(departure_service):
                 "kind": "level", "value": 80.0, "deadline": s.departure.trip.deadline.isoformat(),
             }
             assert Operation.restore(summary).controller == "departure_plan"
-            s.guest.scope = s.guest.connection_sample().scope
+            s.guest.scope = connection_sample(s).scope
             assert s.snapshot()["control"]["operation"]["controller"] == "guest"
 
     asyncio.run(run())
@@ -270,7 +273,7 @@ def test_guest_start_invalidates_departure_writes_already_waiting_for_command_lo
             clock[0] += 1000
             await service.control.async_pause_charging()
             clock[0] += 1000
-            await service._command_lock.acquire()
+            await service.command_lock.acquire()
             guest = asyncio.create_task(service.command({
                 "command": "guest_start",
                 "expected_serial_number": service.identity.serial_number,
@@ -285,7 +288,7 @@ def test_guest_start_invalidates_departure_writes_already_waiting_for_command_lo
             await asyncio.sleep(0)
             assert not guest.done()
             assert not old_plan.done()
-            service._command_lock.release()
+            service.command_lock.release()
             await guest
             with pytest.raises(DeviceError, match="soc_goal_source_changed"):
                 await old_plan

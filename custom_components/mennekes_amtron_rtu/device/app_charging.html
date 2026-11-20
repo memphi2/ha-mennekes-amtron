@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>Mennekes Amtron</title><link rel="stylesheet" href="./app_settings.css"><script src="./app_charging.js" defer></script></head>
+<body><!-- app-nav --><main data-charging-page="all">
+<header><h1 data-text="charging"></h1><p data-text="simple_hint"></p></header>
+<p id="notice" role="status" aria-live="polite"></p><noscript>JavaScript is required.</noscript>
+<div class="charging-layout"><section class="card charging-editor" aria-labelledby="limits_title">
+<h2 id="limits_title" data-text="limits"></h2><p class="hint" data-text="limits_hint"></p>
+<form id="energy_form"><div class="target-head"><label for="energy_value" data-text="energy_label"></label><span id="energy_status"></span></div><div class="limit-input"><input id="energy_value" type="number" min="0" max="1000" step="0.1" required><span>kWh</span><button id="energy_save" type="submit" class="secondary" data-text="save" disabled></button><button id="energy_clear" type="button" class="secondary" data-text="clear" disabled></button></div><p class="hint" data-text="energy_hint"></p></form>
+<form id="cost_form"><div class="target-head"><label for="cost_value" data-text="cost_label"></label><span id="cost_status"></span></div><div class="limit-input"><input id="cost_value" type="number" min="0" max="1000" step="0.1" required><span id="cost_unit"></span><button id="cost_save" type="submit" class="secondary" data-text="save" disabled></button><button id="cost_clear" type="button" class="secondary" data-text="clear" disabled></button></div><p class="hint" data-text="cost_hint"></p></form>
+<form id="departure_form"><div class="target-head"><label for="departure_value" data-text="departure_label"></label><span id="departure_status"></span></div><div class="limit-input"><input id="departure_value" type="datetime-local" required><button id="departure_save" type="submit" class="secondary" data-text="save" disabled></button><button id="departure_clear" type="button" class="secondary" data-text="clear" disabled></button></div><p id="departure_summary" class="hint"></p><p class="hint" data-text="departure_hint"></p></form>
+</section><div class="charging-side"><section class="card charging-editor" aria-labelledby="vehicle_title">
+<h2 id="vehicle_title" data-text="vehicle_title"></h2>
+<form id="soc_form"><div class="target-head"><label for="soc_value" data-text="soc_label"></label><span id="soc_status"></span></div><div class="limit-input"><input id="soc_value" type="number" min="0" max="100" step="1" required><span>%</span><button id="soc_save" type="submit" class="secondary" data-text="save" disabled></button><button id="soc_clear" type="button" class="secondary" data-text="clear" disabled></button></div><p class="hint" data-text="soc_hint"></p></form>
+</section><section class="card charging-current" aria-labelledby="guest_title">
+<h2 id="guest_title" data-text="guest_title"></h2><p data-text="guest_hint"></p>
+<p id="guest_status" class="charging-state"></p><p id="guest_summary" class="hint"></p>
+<button id="guest_start" type="button" data-text="guest" disabled></button>
+</section></div></div>
+<p class="hint" data-text="shared"></p><button id="reload" class="secondary" type="button" data-text="reload"></button>
+</main></body></html>

@@ -22,7 +22,7 @@ def matches_departure_source(source: str | None, entity_id: str, value: datetime
         return False
 
 
-class TimedGoal:
+class DepartureTrip:
     """Persist the selected next trip without a rolling daily schedule."""
 
     def __init__(self) -> None:
@@ -63,7 +63,7 @@ class TimedGoal:
         }
 
     @classmethod
-    def restore(cls, raw: object) -> TimedGoal:
+    def restore(cls, raw: object) -> DepartureTrip:
         if not isinstance(raw, dict) or raw.keys() != {"deadline", "source", "finished"}:
             raise ValueError("invalid departure goal fields")
         deadline_raw, source = raw["deadline"], raw["source"]

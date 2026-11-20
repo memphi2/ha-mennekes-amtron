@@ -20,11 +20,6 @@
         "default": "mdi:account-arrow-right-outline"
       }
     },
-    "number": {
-      "soc_goal": {
-        "default": "mdi:battery-arrow-up-outline"
-      }
-    },
     "select": {
       "requested_phases": {
         "default": "mdi:swap-horizontal",
@@ -187,7 +182,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "default": "mdi:calendar-clock"
       }
     }
@@ -198,6 +193,7 @@
     "clear_target_time": "mdi:calendar-remove",
     "use_calendar_departure": "mdi:calendar-import",
     "use_vehicle_departure": "mdi:car-clock",
-    "assign_vehicle_charge": "mdi:link-variant-plus"
+    "assign_vehicle_charge": "mdi:link-variant-plus",
+    "get_recorder_exclusions": "mdi:database-search"
   }
 }

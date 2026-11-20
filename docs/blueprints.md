@@ -12,7 +12,7 @@ The PV sensor comes from your inverter or energy-management setup.
 | **Charge from PV surplus** | Adjust the current while a vehicle is connected and charging is not paused |
 | **Pause and resume on PV surplus** | Pause below one power threshold and resume above a higher one, after a hold time |
 | **Notify on a grid-operator downgrade** | Notify when a downgrade starts and ends |
-| **Plan the next trip from a calendar** | Copy one matching departure into the timed charging plan |
+| **Plan the next trip from a calendar** | Copy one matching departure into the departure plan |
 | **Precondition before the next trip** | Run your vehicle climate action once before the selected departure |
 
 ## Notify on a grid-operator downgrade
@@ -95,7 +95,7 @@ the next check can then run it again. Changing the departure to a different time
 counts as a new trip and can start climate again.
 
 The climate action does not bypass SoC or energy limits or directly change the
-wallbox pause switch. An active timed charging plan may resume charging while
+wallbox pause switch. An active departure plan may resume charging while
 below its target. Once a charge limit is reached, it remains authoritative.
 Whether the vehicle draws climate energy from the grid depends on the vehicle
 and its current charging state; this automation cannot guarantee grid power.

@@ -5,7 +5,6 @@
       "reconfigure_successful": "Die Verbindung wurde aktualisiert.",
       "reauth_successful": "Die Anmeldung wurde aktualisiert.",
       "unique_id_mismatch": "Diese Verbindung gehört zu einer anderen Wallbox.",
-      "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich.",
       "invalid_service_discovery": "Die App hat ungültige Verbindungsdaten gemeldet.",
       "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
       "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung.",
@@ -159,6 +158,9 @@
         "description": "Gib den aktuellen Zugangstoken deines separat betriebenen Modbus-Dienstes ein. Die Dienst-URL und der vorhandene Wallbox-Eintrag bleiben erhalten.",
         "data": {
           "server_token": "Zugangstoken"
+        },
+        "data_description": {
+          "server_token": "Der Zugangstoken, den der Modbus-Dienst jetzt annimmt."
         }
       },
       "reauth_app": {
@@ -532,7 +534,7 @@
           "waiting_for_device": "Wartet auf Wallbox",
           "waiting_for_soc": "Wartet auf Fahrzeugladestand",
           "waiting_for_capacity": "Wartet auf Akkukapazität",
-          "waiting_for_target": "Wartet auf Prozentziel",
+          "waiting_for_target": "Wartet auf Fahrzeug-Ladeziel",
           "read_only": "Nur lesen",
           "command_pending": "Änderung vorgemerkt",
           "target_reached": "Ziel erreicht",
@@ -581,7 +583,7 @@
             "name": "Zielwert"
           },
           "target_deadline": {
-            "name": "Zielzeit"
+            "name": "Zielzeitpunkt"
           },
           "pending": {
             "name": "Vorgemerkte Änderung",
@@ -631,10 +633,10 @@
             }
           },
           "departure_plan": {
-            "name": "Status des zeitgesteuerten Ladens",
+            "name": "Status der Abfahrtsplanung",
             "state": {
               "disabled": "Deaktiviert",
-              "waiting_for_target": "Wartet auf Prozentziel",
+              "waiting_for_target": "Wartet auf Fahrzeug-Ladeziel",
               "waiting_for_capacity": "Wartet auf Akkukapazität",
               "waiting_for_soc": "Wartet auf Fahrzeugladestand",
               "waiting_for_device": "Wartet auf Wallbox",
@@ -647,7 +649,7 @@
               "charging": "Lädt mit vollem Strom",
               "finishing": "Lädt mit Mindeststrom bis zur Abfahrt",
               "unreachable": "Ziel eventuell nicht erreichbar",
-              "late": "Zielzeit überschritten",
+              "late": "Zielzeitpunkt überschritten",
               "estimated_reached": "Bis zum errechneten Ziel geladen",
               "reached": "Ziel erreicht",
               "write_pending": "Schreibbefehl ausstehend",
@@ -676,7 +678,7 @@
               "departure_plan": "Abfahrtsplanung bereitet den Ladestrom vor",
               "pause_requested": "Laden pausiert",
               "release_off": "Ladefreigabe ausgeschaltet",
-              "energy_goal_stop": "Energieziel erreicht",
+              "energy_goal_stop": "Ladeziel erreicht",
               "wallbox_locked": "Wallbox gesperrt",
               "error_code": "Wallbox-Fehler",
               "authorization_required": "Autorisierung an der Wallbox aktiv",
@@ -802,9 +804,9 @@
               "error_still_active": "Fehler weiterhin aktiv",
               "unknown": "Unbekannter Grund",
               "user_cancelled": "Vom Benutzer abgebrochen",
-              "energy_goal": "Ladestopp durch ein Ladeziel",
+              "energy_goal": "Ladestopp durch ein Ziel",
               "deadline_expired": "Abfahrtszeit abgelaufen",
-              "time_limit": "Zeitgrenze erreicht",
+              "time_limit": "Zielzeitpunkt erreicht",
               "guest_confirmation": "Gaststart muss bestätigt werden",
               "vehicle_authorized": "Erkanntes Fahrzeug für diesen Steckvorgang freigegeben",
               "vehicle_waiting": "Warten auf ein freigegebenes Fahrzeug"
@@ -818,8 +820,8 @@
               "app": "App-Oberfläche",
               "plug_charge": "Virtuelles Plug & Charge",
               "departure_plan": "Abfahrtsplanung",
-              "energy_goal": "Schutz des Energieziels",
-              "soc_goal": "Fahrzeug-Prozentziel",
+              "energy_goal": "Ladeziel",
+              "soc_goal": "Fahrzeug-Ladeziel",
               "recovery": "Fehlerbehebung",
               "guest": "Gastladen",
               "unplug": "Ausgesteckt"
@@ -868,7 +870,7 @@
       }
     },
     "datetime": {
-      "timed_departure": {
+      "departure_time": {
         "name": "Zielzeitpunkt"
       }
     }
@@ -925,6 +927,9 @@
     "service_unavailable": {
       "message": "Der Modbus-Dienst ist nicht erreichbar oder konnte den Befehl nicht bestätigen. Prüfe den aktuellen Zustand, bevor du den Befehl erneut sendest."
     },
+    "connection_unavailable": {
+      "message": "Die Wallbox oder der Modbus-Dienst ist gerade nicht erreichbar ({error}). Home Assistant versucht es automatisch erneut."
+    },
     "service_auth_failed": {
       "message": "Der Modbus-Dienst hat die Anmeldung abgelehnt. Erneuere den Zugang unter Einstellungen > Geräte & Dienste."
     },
@@ -944,25 +949,25 @@
       "message": "Für ein Ladeziel wird ein unterstützter Gesamtenergiezähler mit einem aktuellen gültigen Messwert benötigt. Prüfe die Verbindung und versuche es erneut."
     },
     "energy_goal_stop_active": {
-      "message": "Eine Ladegrenze ist erreicht, deshalb bleibt das Laden pausiert. Zum Weiterladen kWh-Grenze oder Fahrzeug-Prozentziel erhöhen oder auf 0 setzen; nach einem Zählerreset die Grenze neu speichern. Eine Änderung allein startet das Laden nicht."
+      "message": "Ein Ziel ist erreicht, deshalb bleibt das Laden pausiert. Zum Weiterladen Ladeziel, Kostenziel oder Fahrzeug-Ladeziel erhöhen oder löschen; nach einem Zählerreset das Ladeziel neu speichern. Eine Änderung allein startet das Laden nicht."
     },
     "energy_goal_not_supported": {
       "message": "Dieser Modbus-Dienst unterstützt keine Ladeziele. Aktualisiere zuerst die App oder den eigenständigen Dienst."
     },
     "soc_goal_invalid": {
-      "message": "Gib ein Ziel von 0 bis 100 % ein, höchstens das Ladelimit des Fahrzeugs. 0 deaktiviert das Prozentziel."
+      "message": "Gib ein Ziel von 0 bis 100 % ein, höchstens das Ladelimit des Fahrzeugs. 0 deaktiviert das Fahrzeug-Ladeziel."
     },
     "soc_goal_unavailable": {
       "message": "Das Fahrzeug-Ladeziel kann gerade nicht geändert werden. Prüfe die gewählten Fahrzeugquellen und versuche es erneut."
     },
     "soc_goal_limit_unavailable": {
-      "message": "Das gewählte Fahrzeug-Ladelimit hat noch keinen gültigen Wert geliefert. Warte auf einen verfügbaren Wert, bevor du ein Prozentziel setzt. Mit 0 kannst du das Ziel weiterhin deaktivieren."
+      "message": "Das gewählte Fahrzeug-Ladelimit hat noch keinen gültigen Wert geliefert. Warte auf einen verfügbaren Wert, bevor du ein Fahrzeug-Ladeziel setzt. Mit 0 kannst du das Ziel weiterhin deaktivieren."
     },
     "soc_goal_source_changed": {
-      "message": "Die Fahrzeugquellen wurden geändert. Lade die Integration neu, bevor du ihr Prozentziel änderst."
+      "message": "Die Fahrzeugquellen wurden geändert. Lade die Integration neu, bevor du ihr Fahrzeug-Ladeziel änderst."
     },
     "soc_goal_not_supported": {
-      "message": "Der Modbus-Dienst unterstützt keine Fahrzeug-Prozentziele. Aktualisiere die App, um diese optionale Funktion zu nutzen."
+      "message": "Der Modbus-Dienst unterstützt keine Fahrzeug-Ladeziele. Aktualisiere die App, um diese optionale Funktion zu nutzen."
     },
     "loss_source_invalid": {
       "message": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein."
@@ -976,13 +981,13 @@
     "loss_storage_unavailable": {
       "message": "Der Ladeverlust konnte nicht gespeichert werden. Prüfe den verfügbaren Speicher und versuche es erneut."
     },
-    "timed_goal_state_invalid": {
+    "departure_state_invalid": {
       "message": "Die gespeicherte Abfahrtszeit konnte nicht wiederhergestellt werden. Prüfe den gespeicherten Plan vor dem nächsten Laden."
     },
-    "timed_goal_unavailable": {
+    "departure_unavailable": {
       "message": "Vorgemerkte Abfahrtsbefehle konnten nicht geprüft werden. Die Integration versucht es erneut, sobald die Verbindung verfügbar ist."
     },
-    "timed_vehicle_unavailable": {
+    "departure_vehicle_unavailable": {
       "message": "Für das ausgewählte Fahrzeug wurde keine nutzbare kommende Abfahrt gefunden. Prüfe seine Integration, Timer-Sensoren und Einstellungen."
     },
     "gateway_authentication_failed": {
@@ -998,7 +1003,7 @@
       "message": "Virtuelles Plug & Charge ist derzeit nicht verfügbar. Prüfe die Verbindung zur Wallbox oder Modbus-App und versuche es erneut."
     },
     "plug_charge_blocked": {
-      "message": "Automatisches Laden ist derzeit gesperrt. Prüfe die Fahrzeugerlaubnis, manuelle Pause und Ladeziele."
+      "message": "Automatisches Laden ist derzeit gesperrt. Prüfe die Fahrzeugerlaubnis, manuelle Pause und Ziele."
     },
     "plug_charge_session_changed": {
       "message": "Die Fahrzeugverbindung oder Freigabeeinstellungen haben sich geändert. Die Ladefreigabe wurde nicht übernommen; warte auf die erneute Erkennung der aktuellen Sitzung."
@@ -1029,9 +1034,6 @@
     },
     "calendar_no_event": {
       "message": "Kein Termin mit Uhrzeit und diesem Titel in den nächsten 14 Tagen."
-    },
-    "departure_save_failed": {
-      "message": "Die Abfahrtszeit konnte nicht gespeichert werden. Speicher von Home Assistant prüfen und erneut versuchen."
     },
     "intent_not_saved": {
       "message": "Die Wallbox hat den Befehl erhalten, der Dienst konnte ihn aber nicht speichern. Nach einem Neustart des Dienstes kann die frühere Einstellung gelten. Speicher des Dienstes prüfen."
@@ -1130,6 +1132,9 @@
         "description": "Diese Wallbox läuft über die Modbus-App. Ihre Einstellungen liegen deshalb dort und gelten auch für Home Assistant.\n\nStromgrenze: {current_cap} A\nMindestabstand zwischen Zustandswechseln: {state_change_interval} s\nZusätzliche Wartezeit vor Phasenwechseln: {phase_switch_grace} s\n\nDiese Werte, die Abfrageintervalle und die Verbindung änderst du in der App unter Benutzeroberfläche öffnen. Die Schreibfreigabe steht im Reiter Konfiguration der App.",
         "data": {
           "release_off_on_unplug": "Ladefreigabe beim Abstecken ausschalten"
+        },
+        "data_description": {
+          "release_off_on_unplug": "Nach bestätigtem Abstecken wird die Ladefreigabe ausgeschaltet; das nächste Fahrzeug braucht eine ausdrückliche Freigabe. Wird bei eingeschaltetem Virtual Plug & Charge ignoriert."
         }
       },
       "wallbox_basic": {
@@ -1142,8 +1147,9 @@
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
-          "current_limit": "Obergrenze für den Ladestrom-Regler, in Ampere pro Phase. Dies ist weder ein Prozent-Ladeziel noch ein Pausenbefehl. Die Grenze der Wallbox gilt zusätzlich.",
-          "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."
+          "current_limit": "Obergrenze für den Ladestrom-Regler, in Ampere pro Phase. Dies ist weder ein Fahrzeug-Ladeziel noch ein Pausenbefehl. Die Grenze der Wallbox gilt zusätzlich.",
+          "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon.",
+          "release_off_on_unplug": "Nach bestätigtem Abstecken wird die Ladefreigabe ausgeschaltet; das nächste Fahrzeug braucht eine ausdrückliche Freigabe. Wird bei eingeschaltetem Virtual Plug & Charge ignoriert."
         },
         "description": "Die Stromgrenze begrenzt, was hier angefordert werden kann; die Grenze der Wallbox gilt zusätzlich."
       },
@@ -1181,10 +1187,10 @@
           "use_vehicle_limit": "Ladegrenze des Fahrzeugs zusätzlich verwenden"
         },
         "data_description": {
-          "vehicle_soc_entity": "Wähle den Sensor für den tatsächlichen Fahrzeug-Ladestand in %. Fehlende Daten lassen die Ladung unverändert, bis gültige Werte zurückkehren. Ein Quellenwechsel löscht das Prozentziel, ohne das Laden zu starten. Zum Deaktivieren dient das vorherige Menü.",
+          "vehicle_soc_entity": "Wähle den Sensor für den tatsächlichen Fahrzeug-Ladestand in %. Fehlende Daten lassen die Ladung unverändert, bis gültige Werte zurückkehren. Ein Quellenwechsel löscht das Fahrzeug-Ladeziel, ohne das Laden zu starten. Zum Deaktivieren dient das vorherige Menü.",
           "use_vehicle_limit": "Aktiviere dies, um die Ladegrenze des Fahrzeugs als zusätzliches Maximum auszuwählen. Es wird keine Einstellung ins Fahrzeug geschrieben."
         },
-        "description": "Profil: **{vehicle}**.\n\nDamit richtest du das optionale Prozent-Ladeziel über einen vorhandenen Ladestandssensor ein. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein. Ein Ladeziel begrenzt nur die Ladung; es hebt eine manuelle Pause nicht auf."
+        "description": "Profil: **{vehicle}**.\n\nDamit richtest du das optionale Fahrzeug-Ladeziel über einen vorhandenen Ladestandssensor ein. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein. Ein Ladeziel begrenzt nur die Ladung; es hebt eine manuelle Pause nicht auf."
       },
       "vehicle_limit": {
         "title": "Ladegrenze des Fahrzeugs",
@@ -1192,9 +1198,9 @@
           "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit"
         },
         "data_description": {
-          "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
+          "vehicle_charge_limit_entity": "Optional: Begrenze das Fahrzeug-Ladeziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
         },
-        "description": "Profil: **{vehicle}**.\n\nNutze die im Fahrzeug eingestellte Ladegrenze als zusätzliche Obergrenze für das Prozent-Ladeziel in Home Assistant. Wähle die vom Auto gemeldete Zielgrenze, nicht seinen aktuellen Ladestand."
+        "description": "Profil: **{vehicle}**.\n\nNutze die im Fahrzeug eingestellte Ladegrenze als zusätzliche Obergrenze für das Fahrzeug-Ladeziel in Home Assistant. Wähle die vom Auto gemeldete Zielgrenze, nicht seinen aktuellen Ladestand."
       },
       "departure": {
         "title": "Nächste Abfahrt",
@@ -1205,7 +1211,7 @@
           "wizard_next": "Weiter",
           "wizard_finish": "Speichern und beenden"
         },
-        "description": "Profil: **{vehicle}**.\n\nGenutzt: Abfahrt **{departure_entity}**, Akkukapazität **{capacity_entity}**.\n\nMit der Abfahrtsplanung startet Home Assistant das Laden so rechtzeitig, dass das Prozentziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n\nPlane die nächste einzelne Fahrt mit Prozent-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Prozent-Ladeziel bleibt bestehen."
+        "description": "Profil: **{vehicle}**.\n\nGenutzt: Abfahrt **{departure_entity}**, Akkukapazität **{capacity_entity}**.\n\nMit der Abfahrtsplanung startet Home Assistant das Laden so rechtzeitig, dass das Fahrzeug-Ladeziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n\nPlane die nächste einzelne Fahrt mit Fahrzeug-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Fahrzeug-Ladeziel bleibt bestehen."
       },
       "departure_requires_vehicle": {
         "title": "Ladestand erforderlich",
@@ -1223,7 +1229,7 @@
           "capacity_source": "Quelle der Akkukapazität",
           "use_calendar": "Kalender verwenden",
           "use_departure_entity": "Entität für Abfahrtszeit verwenden",
-          "timed_minimum_soc": "Mindestladestand (%)",
+          "departure_minimum_soc": "Mindestladestand (%)",
           "use_vehicle_timer": "Abfahrtszeiten des Fahrzeugs verwenden"
         },
         "description": "Profil: **{vehicle}**.\n\nDatum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen.",
@@ -1231,71 +1237,75 @@
           "capacity_source": "Verwende die nutzbare Akkukapazität: als festen Wert, kWh-/Wh-Sensor oder unterstützten Profilwert. Fehlt die gewählte Kapazität oder der Ladestand, wartet die Planung.",
           "use_calendar": "Ergänzt einen Button zum Übernehmen des nächsten passenden Kalendereintrags. Jeder Druck wählt eine Fahrt; für zeitgesteuerte Kalenderübernahmen kannst du die mitgelieferte Blaupause nutzen.",
           "use_departure_entity": "Übernimmt ein neues Datum mit Uhrzeit in der Zukunft automatisch aus der gewählten Entität. Manuelle Auswahl bleibt möglich; ein neuer zukünftiger Zeitstempel dieser Quelle kann sie ersetzen.",
-          "timed_minimum_soc": "Unter diesem Ladestand lädt das Auto sofort mit vollem Strom und wartet danach auf den geplanten Start. 0 schaltet das aus.",
+          "departure_minimum_soc": "Unter diesem Ladestand lädt das Auto sofort mit vollem Strom und wartet danach auf den geplanten Start. 0 schaltet das aus.",
           "use_vehicle_timer": "Ergänzt einen Button zum Übernehmen eines aktiven Abfahrts-/Klimatimers aus der Fahrzeugintegration. Er liest den gemeldeten Timer; die Klimaanlage des Autos schaltet er nicht ein."
         }
       },
       "departure_capacity_fixed": {
         "title": "Nutzbare Akkukapazität",
         "data": {
-          "timed_capacity_kwh": "Nutzbare Akkukapazität (kWh)"
+          "departure_capacity_kwh": "Nutzbare Akkukapazität (kWh)"
         },
         "data_description": {
-          "timed_capacity_kwh": "Gib die nutzbare Akkukapazität ein, nicht die Nennkapazität."
+          "departure_capacity_kwh": "Gib die nutzbare Akkukapazität ein, nicht die Nennkapazität."
         },
         "description": "Profil: **{vehicle}**.\n\nTrage die Energie ein, die der Akku tatsächlich zum Fahren speichern kann. Daraus wird die nötige Ladezeit geschätzt; die Akkueinstellungen des Autos werden nicht verändert."
       },
       "departure_capacity_entity": {
         "title": "Entität für Akkukapazität",
         "data": {
-          "timed_capacity_entity": "Entität für nutzbare Akkukapazität"
+          "departure_capacity_entity": "Entität für nutzbare Akkukapazität"
         },
         "data_description": {
-          "timed_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen."
+          "departure_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen."
         },
         "description": "Profil: **{vehicle}**.\n\nWähle einen Sensor für die nutzbare Gesamtkapazität, nicht für Restenergie oder Ladeprozent. Die Einheit muss kWh oder Wh sein. Ohne gültigen Wert wartet die Planung auf Kapazitätsdaten, statt zu schätzen."
       },
       "departure_calendar": {
         "title": "Abfahrtskalender",
         "data": {
-          "timed_calendar_entity": "Abfahrtskalender",
-          "timed_calendar_title": "Genauer Titel des Kalendertermins"
+          "departure_calendar_entity": "Abfahrtskalender",
+          "departure_calendar_title": "Genauer Titel des Kalendertermins"
         },
         "data_description": {
-          "timed_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
-          "timed_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert."
+          "departure_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
+          "departure_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert."
         },
         "description": "Profil: **{vehicle}**.\n\nWähle einen Kalender und einen exakten Termin-Titel, zum Beispiel „Fahrt zur Arbeit“. Der Terminbeginn wird zur Abfahrtszeit. Der Button durchsucht die nächsten 14 Tage; ganztägige Termine werden ignoriert."
       },
       "departure_entity": {
         "title": "Entität für Abfahrtszeit",
         "data": {
-          "timed_departure_entity": "Entität für Abfahrtszeit"
+          "departure_entity": "Entität für Abfahrtszeit"
         },
         "data_description": {
-          "timed_departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht."
+          "departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht."
         },
         "description": "Profil: **{vehicle}**.\n\nWähle eine Quelle mit Datum und Uhrzeit. Ein neuer gültiger Zeitpunkt in der Zukunft wird automatisch übernommen. Richte dafür nur eine Quelle ein; manuelle Eingabe und Kalender-/Fahrzeugbuttons bleiben verfügbar."
       },
       "departure_vehicle": {
         "title": "Fahrzeug-Integration",
         "data": {
-          "timed_vehicle_provider": "Fahrzeug-Integration"
+          "departure_vehicle_provider": "Fahrzeug-Integration"
+        },
+        "data_description": {
+          "departure_vehicle_provider": "Die Integration, die die Daten dieses Fahrzeugs bereits in Home Assistant liefert."
         },
         "description": "Wähle eine installierte Integration mit unterstütztem Adapter. Allgemeine HA-Entitäten lassen sich ohne Adapter auswählen. Es werden nur bereits vorhandene lokale Fahrzeugdaten gelesen."
       },
       "departure_vehicle_details": {
         "title": "Abfahrtszeiten des Fahrzeugs",
         "data": {
-          "timed_vehicle_device": "Fahrzeug",
-          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs (optional)",
-          "timed_timer1_days": "Wochentage BMW-Timer 1 (optional)",
-          "timed_timer2_days": "Wochentage BMW-Timer 2 (optional)"
+          "departure_vehicle_device": "Fahrzeug",
+          "departure_vehicle_time_zone": "Zeitzone des Fahrzeugs (optional)",
+          "departure_timer1_days": "Wochentage BMW-Timer 1 (optional)",
+          "departure_timer2_days": "Wochentage BMW-Timer 2 (optional)"
         },
         "data_description": {
-          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs, zum Beispiel Europe/Berlin. Leer lassen, um die Home-Assistant-Zeitzone zu verwenden. BMW-Timer enthalten keine Zeitzone.",
-          "timed_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
-          "timed_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren."
+          "departure_vehicle_time_zone": "Zeitzone des Fahrzeugs, zum Beispiel Europe/Berlin. Leer lassen, um die Home-Assistant-Zeitzone zu verwenden. BMW-Timer enthalten keine Zeitzone.",
+          "departure_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
+          "departure_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren.",
+          "departure_vehicle_device": "Das Fahrzeug in dieser Integration, dessen Entitäten gelesen werden."
         },
         "description": "Profil: **{vehicle}**.\n\nÜbernimm mit der Abfahrtsschaltfläche einen aktiven Timer des gewählten Fahrzeugs. Bei einem Profil steht das Fahrzeug bereits fest. Aktiviere in BavarianData die Timer-Sensoren für Aktion, Stunde und Minute. Wiederkehrende Wochentage gibst du hier an, weil die Integration sie nicht veröffentlicht."
       },
@@ -1314,9 +1324,9 @@
         "data": {
           "charging_price": "Bruttostrompreis"
         },
-        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt. Vorgeschlagen sind zunächst 0,40 EUR/kWh; verwende deinen eigenen Vertragspreis.",
+        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt. Vorgeschlagen sind zunächst 0,40 je kWh; verwende deinen eigenen Vertragspreis.",
         "data_description": {
-          "charging_price": "Gib Euro pro kWh inklusive Steuern ein: 0,40 bedeutet 40 Cent/kWh. Verwende den Arbeitspreis deines Vertrags; eine mögliche Netzentgelt-Anpassung wird separat eingerichtet."
+          "charging_price": "Gib den Preis pro kWh in der Währung von Home Assistant inklusive Steuern ein: 0,40 bedeutet 40 Hundertstel pro kWh. Verwende den Arbeitspreis deines Vertrags; eine mögliche Netzentgelt-Anpassung wird separat eingerichtet."
         }
       },
       "cost_sensor": {
@@ -1324,9 +1334,9 @@
         "data": {
           "charging_price_entity": "Strompreissensor"
         },
-        "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis in EUR/kWh, ct/kWh oder EUR/MWh (auch das €-Zeichen wird unterstützt). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen.",
+        "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis je kWh oder MWh in der Währung von Home Assistant, zum Beispiel EUR/kWh (bei Euro gehen auch ct/kWh und das €-Zeichen). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen.",
         "data_description": {
-          "charging_price_entity": "Wähle den Preis für den aktuellen Strombezug, keinen Tagesmittelwert, keine Prognoseliste und keine Einspeisevergütung. Die Einheit muss EUR/kWh, ct/kWh oder EUR/MWh ausweisen."
+          "charging_price_entity": "Wähle den Preis für den aktuellen Strombezug, keinen Tagesmittelwert, keine Prognoseliste und keine Einspeisevergütung. Die Einheit muss die Währung von Home Assistant je kWh oder MWh nennen."
         }
       },
       "cost_module2": {
@@ -1406,12 +1416,18 @@
         "data": {
           "charge_loss_vehicle_provider": "Fahrzeug-Integration"
         },
+        "data_description": {
+          "charge_loss_vehicle_provider": "Die Integration, die die Daten dieses Fahrzeugs bereits in Home Assistant liefert."
+        },
         "description": "Profil: **{vehicle}**.\n\nWähle eine installierte Integration mit unterstütztem Adapter. Allgemeine HA-Entitäten lassen sich ohne Adapter auswählen. Es werden nur bereits vorhandene lokale Fahrzeugdaten gelesen."
       },
       "loss_vehicle_details": {
         "title": "Fahrzeug für Ladehistorie",
         "data": {
           "charge_loss_vehicle_device": "Fahrzeug"
+        },
+        "data_description": {
+          "charge_loss_vehicle_device": "Das Fahrzeug in dieser Integration, dessen Entitäten gelesen werden."
         },
         "description": "Profil: **{vehicle}**.\n\nWähle das Fahrzeug an dieser Wallbox. Es wird nur vorhandene lokale Ladehistorie gelesen, keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
       },
@@ -1458,17 +1474,21 @@
         "data": {
           "vehicle_profile_id": "Fahrzeugprofil"
         },
-        "description": "Wähle das an dieser Wallbox angeschlossene Fahrzeug. Der Wechsel startet kein Laden. Jedes Auto behält sein eigenes Prozentziel und seine eigene geplante Abfahrt; ein Auto ohne eigene Abfahrt startet ohne Abfahrt. Einstellungen und mittlere Ladeverluste bleiben je Profil erhalten.",
+        "description": "Wähle das an dieser Wallbox angeschlossene Fahrzeug. Der Wechsel startet kein Laden. Jedes Auto behält sein eigenes Fahrzeug-Ladeziel und seine eigene geplante Abfahrt; ein Auto ohne eigene Abfahrt startet ohne Abfahrt. Einstellungen und mittlere Ladeverluste bleiben je Profil erhalten.",
         "data_description": {
           "vehicle_profile_id": "Wähle das tatsächlich angeschlossene Auto vor Ladebeginn, besonders für den Vergleich der Ladeverluste. Diese manuelle Wahl schaltet die automatische Fahrzeugauswahl aus."
         }
       },
       "vehicle_profile_remove": {
         "title": "Profil entfernen",
-        "description": "Entfernt das gewählte Profil mit seinen Funktionseinstellungen. Wird das aktive Profil entfernt, werden auch dessen Prozentziel und Abfahrtsplan gelöscht, ohne das Laden zu starten.",
+        "description": "Entfernt das gewählte Profil mit seinen Funktionseinstellungen. Wird das aktive Profil entfernt, werden auch dessen Fahrzeug-Ladeziel und Abfahrtsplan gelöscht, ohne das Laden zu starten.",
         "data": {
           "vehicle_profile_id": "Fahrzeugprofil",
           "confirm": "Dieses Profil entfernen"
+        },
+        "data_description": {
+          "vehicle_profile_id": "Das Profil, das entfernt wird.",
+          "confirm": "Erforderlich: Das Entfernen lässt sich nicht rückgängig machen."
         }
       },
       "vehicle_profile_device": {
@@ -1493,12 +1513,12 @@
       },
       "vehicle_profile_soc": {
         "title": "Ladestand einrichten",
-        "description": "Profil: **{vehicle}**.\n\nVerwende den gemeldeten Ladestand dieses Profils für das optionale Prozentziel. Die Ladegrenze dieses Autos lässt sich zusätzlich als Maximum verwenden. Im Fahrzeug wird keine Einstellung geändert.",
+        "description": "Profil: **{vehicle}**.\n\nVerwende den gemeldeten Ladestand dieses Profils für das optionale Fahrzeug-Ladeziel. Die Ladegrenze dieses Autos lässt sich zusätzlich als Maximum verwenden. Im Fahrzeug wird keine Einstellung geändert.",
         "data": {
           "use_vehicle_limit": "Ladegrenze des Fahrzeugs zusätzlich verwenden"
         },
         "data_description": {
-          "use_vehicle_limit": "Optional und unabhängig von der Ladestandsquelle. Eine niedrigere Fahrzeuggrenze senkt das Ladeziel; eine höhere erhöht es nicht. Wird diese Grenze nicht mehr gemeldet, gilt der letzte gültige Wert weiter."
+          "use_vehicle_limit": "Optional und unabhängig von der Ladestandsquelle. Eine niedrigere Fahrzeuggrenze senkt das Fahrzeug-Ladeziel; eine höhere erhöht es nicht. Wird diese Grenze nicht mehr gemeldet, gilt der letzte gültige Wert weiter."
         }
       },
       "loss_profile": {
@@ -1510,6 +1530,9 @@
         "description": "Profil: **{vehicle}**.\n\nGenutzt: Stecker **{plug_entity}**, Standort **{location_entity}**.\n\nErkennungssignale melden, dass dieses Auto eingesteckt und zu Hause ist. Die automatische Fahrzeugauswahl und das virtuelle Plug & Charge verwenden sie.\n\nNutze unterstützte lokale Entitäten der Fahrzeugintegration dieses Profils, wähle vorhandene Home-Assistant-Entitäten oder schalte die Erkennung für dieses Profil aus. Kabelverbindung und Anwesenheit zu Hause werden beide benötigt. Es gibt keine zusätzlichen Cloud-Abfragen.",
         "data": {
           "vehicle_detection_source": "Quelle für die Erkennung"
+        },
+        "data_description": {
+          "vehicle_detection_source": "Woher die Kabel- und Zuhause-Signale dieses Fahrzeugs kommen, oder keine Erkennung."
         }
       },
       "vehicle_detection_entities": {
@@ -1539,11 +1562,14 @@
         "description": "Wähle das Auto, dessen Einstellungen du ändern möchtest. Das Öffnen eines Profils wählt dieses Auto nicht zum Laden aus.",
         "data": {
           "vehicle_profile_id": "Fahrzeugprofil"
+        },
+        "data_description": {
+          "vehicle_profile_id": "Das Fahrzeug, dessen Einstellungen als Nächstes geöffnet werden."
         }
       },
       "vehicle_profile": {
         "title": "Fahrzeugprofil",
-        "description": "Profil: **{vehicle}**.\n\nAlles hier gehört nur zu diesem Auto und bleibt erhalten, auch wenn gerade ein anderes Auto ausgewählt ist. Jeder Punkt ist optional:\n\n- **Name und Fahrzeugquelle:** Profil umbenennen oder mit dem Auto in einer Fahrzeugintegration wie BavarianData verknüpfen, damit seine Daten automatisch gelesen werden.\n- **Ladestand und Ladegrenze:** damit stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %. Wird für die Abfahrtsplanung benötigt.\n- **Nächste Abfahrt:** startet das Laden rechtzeitig, damit das Ziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n- **Ladeverluste:** zeigt, wie viel der Energie aus der Wallbox tatsächlich im Akku angekommen ist.\n- **Erkennungssignale:** Kabel- und Zuhause-Signale, an denen dieses Auto erkannt wird. **Automatische Auswahl** in der Entität **Aktives Fahrzeug** nutzt sie, und ist der Wallbox-Schalter **Virtuelles Plug & Charge** an, beginnt das erkannte Auto beim Einstecken zu laden. Mit geplanter Abfahrt wird zuerst pausiert und rechtzeitig gestartet; reicht die Zeit sonst nicht, wird sofort geladen.",
+        "description": "Profil: **{vehicle}**.\n\nAlles hier gehört nur zu diesem Auto und bleibt erhalten, auch wenn gerade ein anderes Auto ausgewählt ist. Jeder Punkt ist optional:\n\n- **Name und Fahrzeugquelle:** Profil umbenennen oder mit dem Auto in einer Fahrzeugintegration wie BavarianData verknüpfen, damit seine Daten automatisch gelesen werden.\n- **Ladestand und Ladegrenze:** damit stoppt Home Assistant bei einem Fahrzeug-Ladeziel, zum Beispiel 80 %. Wird für die Abfahrtsplanung benötigt.\n- **Nächste Abfahrt:** startet das Laden rechtzeitig, damit das Ziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n- **Ladeverluste:** zeigt, wie viel der Energie aus der Wallbox tatsächlich im Akku angekommen ist.\n- **Erkennungssignale:** Kabel- und Zuhause-Signale, an denen dieses Auto erkannt wird. **Automatische Auswahl** in der Entität **Aktives Fahrzeug** nutzt sie, und ist der Wallbox-Schalter **Virtuelles Plug & Charge** an, beginnt das erkannte Auto beim Einstecken zu laden. Mit geplanter Abfahrt wird zuerst pausiert und rechtzeitig gestartet; reicht die Zeit sonst nicht, wird sofort geladen.",
         "menu_options": {
           "vehicle_profile_edit": "Name und Fahrzeugquelle",
           "vehicle_battery": "Ladestand und Ladegrenze",
@@ -1555,7 +1581,7 @@
       },
       "vehicle_settings": {
         "title": "Fahrzeugeinstellungen",
-        "description": "Es gibt noch keine Fahrzeugprofile, daher gelten diese Einstellungen für jedes Auto. Jeder Punkt ist optional:\n\n- **Ladestand und Ladegrenze:** damit stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %. Wird für die Abfahrtsplanung benötigt.\n- **Nächste Abfahrt:** startet das Laden rechtzeitig, damit das Ziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n- **Ladeverluste:** zeigt, wie viel der Energie aus der Wallbox tatsächlich im Akku angekommen ist.\n\nLege unter Fahrzeuge ein Profil an, um für jedes Auto eigene Einstellungen zu haben.",
+        "description": "Es gibt noch keine Fahrzeugprofile, daher gelten diese Einstellungen für jedes Auto. Jeder Punkt ist optional:\n\n- **Ladestand und Ladegrenze:** damit stoppt Home Assistant bei einem Fahrzeug-Ladeziel, zum Beispiel 80 %. Wird für die Abfahrtsplanung benötigt.\n- **Nächste Abfahrt:** startet das Laden rechtzeitig, damit das Ziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n- **Ladeverluste:** zeigt, wie viel der Energie aus der Wallbox tatsächlich im Akku angekommen ist.\n\nLege unter Fahrzeuge ein Profil an, um für jedes Auto eigene Einstellungen zu haben.",
         "menu_options": {
           "vehicle_battery": "Ladestand und Ladegrenze",
           "departure": "Nächste Abfahrt",
@@ -1565,7 +1591,7 @@
       },
       "vehicle_battery": {
         "title": "Ladestand und Ladegrenze",
-        "description": "Profil: **{vehicle}**.\n\nGenutzt: Ladestand **{soc_entity}**, Ladegrenze **{limit_entity}**.\n\nMit dem Ladestand stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %, und die Abfahrtsplanung berechnet damit die nötige Ladezeit. Die Ladegrenze im Auto lässt sich zusätzlich als Obergrenze verwenden. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein.\n\nUm nur das aktuelle Prozentziel aufzuheben, stelle Fahrzeug-Ladeziel auf 0. Ladestand nicht mehr verwenden entfernt hier die Quellenzuordnung dieses Profils einschließlich des optionalen Maximums und deaktiviert seine Abfahrtsplanung; beim ausgewählten Auto werden außerdem Prozentziel und geplante Fahrt gelöscht. Die Quellentitäten der Fahrzeugintegration bleiben erhalten, ebenso Fahrzeugberechtigung, kWh-Ziel und Ladezustand.",
+        "description": "Profil: **{vehicle}**.\n\nGenutzt: Ladestand **{soc_entity}**, Ladegrenze **{limit_entity}**.\n\nMit dem Ladestand stoppt Home Assistant bei einem Fahrzeug-Ladeziel, zum Beispiel 80 %, und die Abfahrtsplanung berechnet damit die nötige Ladezeit. Die Ladegrenze im Auto lässt sich zusätzlich als Obergrenze verwenden. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein.\n\nUm nur das aktuelle Fahrzeug-Ladeziel aufzuheben, stelle Fahrzeug-Ladeziel auf 0. Ladestand nicht mehr verwenden entfernt hier die Quellenzuordnung dieses Profils einschließlich des optionalen Maximums und deaktiviert seine Abfahrtsplanung; beim ausgewählten Auto werden außerdem Fahrzeug-Ladeziel und geplante Fahrt gelöscht. Die Quellentitäten der Fahrzeugintegration bleiben erhalten, ebenso Fahrzeugberechtigung, Ladeziel und Ladezustand.",
         "menu_options": {
           "vehicle_soc": "Ladestand einrichten",
           "vehicle_source": "Ladestand einrichten",
@@ -1581,14 +1607,14 @@
       "invalid_vehicle_entity": "Wähle eine Entität des unterstützten Typs.",
       "loss_source_invalid": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein.",
       "cost_source_invalid": "Wähle eine unterstützte Kostenquelle und für einen sensorbasierten Preis eine Sensor-Entität.",
-      "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 EUR/kWh an. Negative Preise sind erlaubt.",
+      "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 je kWh an. Negative Preise sind erlaubt.",
       "network_tariff_invalid": "Prüfe Brutto-Netzentgelte, Tarifjahr, zwei bis vier aktive Quartale und HT/NT-Zeiträume. Je Zeile HH:MM-HH:MM mit Viertelstundengrenzen; keine Überschneidung und eine Standardtarifzeit muss bleiben.",
-      "timed_source_invalid": "Ungültige Quelle für das Zeitziel",
-      "timed_calendar_required": "Für diesen Titel einen Kalender wählen",
-      "timed_calendar_title_required": "Genauen Termintitel eingeben",
-      "timed_capacity_invalid": "Nutzbare Kapazität zwischen 1 und 250 kWh eingeben",
-      "timed_weekdays_invalid": "Wähle gültige Wochentage",
-      "timed_timezone_invalid": "Gib eine gültige Zeitzone ein, zum Beispiel Europe/Berlin",
+      "departure_source_invalid": "Ungültige Quelle für das Zeitziel",
+      "departure_calendar_required": "Für diesen Titel einen Kalender wählen",
+      "departure_calendar_title_required": "Genauen Termintitel eingeben",
+      "departure_capacity_invalid": "Nutzbare Kapazität zwischen 1 und 250 kWh eingeben",
+      "departure_weekdays_invalid": "Wähle gültige Wochentage",
+      "departure_timezone_invalid": "Gib eine gültige Zeitzone ein, zum Beispiel Europe/Berlin",
       "options_changed": "Dieser Bereich wurde während der Bearbeitung geändert. Kehre zurück und öffne ihn mit den aktuellen Werten erneut; dein Entwurf wurde nicht gespeichert.",
       "vehicle_provider_invalid": "Wähle eine unterstützte Fahrzeug-Integration.",
       "vehicle_device_invalid": "Wähle ein Fahrzeug der ausgewählten Integration.",
@@ -1655,7 +1681,7 @@
         "4": "Q4: Oktober–Dezember"
       }
     },
-    "timed_weekdays": {
+    "departure_weekdays": {
       "options": {
         "mon": "Montag",
         "tue": "Dienstag",
@@ -1735,7 +1761,7 @@
     },
     "start_guest_charging": {
       "name": "Gastladen starten",
-      "description": "Startet sofort für diese Verbindung. Gespeichertes kWh-Ziel und Zeitpunkt begrenzen die Ladung; das Fahrzeug-Prozentziel bleibt unberührt.",
+      "description": "Startet sofort für diese Verbindung. Gespeichertes Ladeziel, Kostenziel und Zielzeitpunkt beenden die Ladung; das Fahrzeug-Ladeziel gilt nicht für Gäste.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1745,11 +1771,11 @@
     },
     "clear_target_time": {
       "name": "Zielzeitpunkt löschen",
-      "description": "Löscht den gemeinsamen Zeitpunkt. Energie- und Fahrzeugziel bleiben erhalten."
+      "description": "Löscht den Zielzeitpunkt. Die anderen Ziele bleiben erhalten."
     },
     "use_calendar_departure": {
       "name": "Nächsten Kalendertermin übernehmen",
-      "description": "Übernimmt den nächsten passenden Kalendertermin als Zielzeit.",
+      "description": "Übernimmt den nächsten passenden Kalendertermin als Zielzeitpunkt.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1759,7 +1785,7 @@
     },
     "use_vehicle_departure": {
       "name": "Abfahrt vom Fahrzeug übernehmen",
-      "description": "Übernimmt die nächste Abfahrt des Fahrzeugs als Zielzeit.",
+      "description": "Übernimmt die nächste Abfahrt des Fahrzeugs als Zielzeitpunkt.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

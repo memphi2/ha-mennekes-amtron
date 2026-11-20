@@ -14,19 +14,19 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from tests.fakes import put, raise_connection_error
+from tests.test_departure_control import OWNER, Harness, future, service_fixture
 from tests.test_modbus_service import current_writes
-from tests.test_timed_control import OWNER, Harness, future, service_fixture
 
 
 @pytest.mark.parametrize("value", [None, 10.0])
 @pytest.mark.parametrize("cp", [CpState.A1, CpState.A2])
-def test_timed_write_cancels_only_after_live_consistent_absence(value, cp):
+def test_departure_write_cancels_only_after_live_consistent_absence(value, cp):
     async def run():
         harness = Harness(values={"evse_state": EvseState.CHARGING, "charging_current_ems": 1})
         control = await harness.connect()
         put(harness.transport.bank, R.EVSE_STATE, EvseState.IDLE)
         put(harness.transport.bank, R.CP_STATE, cp)
-        await control.async_set_timed_current(value, deadline=future(), owner=OWNER)
+        await control.async_set_departure_current(value, deadline=future(), owner=OWNER)
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
         assert control.events.snapshot()["events"][-1]["outcome"] == "cancelled"
         assert control.events.snapshot()["events"][-1]["reason"] == "unknown"
@@ -55,7 +55,7 @@ def test_unknown_or_conflicting_presence_is_not_cancelled_as_absent(state, cp):
         control = await harness.connect()
         put(harness.transport.bank, R.EVSE_STATE, state)
         put(harness.transport.bank, R.CP_STATE, cp)
-        await control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+        await control.async_set_departure_current(10, deadline=future(), owner=OWNER)
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
         assert control.events.snapshot()["events"][-1]["outcome"] == "executed"
         await control.async_shutdown()
@@ -71,7 +71,7 @@ def test_failed_presence_read_is_not_mistaken_for_proven_absence(failed):
         put(harness.transport.bank, R.EVSE_STATE, EvseState.IDLE)
         put(harness.transport.bank, R.CP_STATE, CpState.A1)
         harness.transport.read_exceptions[failed.address] = raise_connection_error()
-        await control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+        await control.async_set_departure_current(10, deadline=future(), owner=OWNER)
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
         await control.async_shutdown()
 
@@ -79,7 +79,7 @@ def test_failed_presence_read_is_not_mistaken_for_proven_absence(failed):
 
 
 @pytest.mark.parametrize("delay", ["state_interval", "register_floor"])
-def test_queued_timed_write_is_cancelled_when_vehicle_is_unplugged(delay):
+def test_queued_departure_write_is_cancelled_when_vehicle_is_unplugged(delay):
     async def run():
         harness = Harness(
             state_change_interval_seconds=300 if delay == "state_interval" else 0,
@@ -98,7 +98,7 @@ def test_queued_timed_write_is_cancelled_when_vehicle_is_unplugged(delay):
 
         control._sleep = sleep
         try:
-            await control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+            await control.async_set_departure_current(10, deadline=future(), owner=OWNER)
             task = control._flush_task
             assert control.pending_action == "set_current"
             await asyncio.wait_for(sleeping.wait(), 2)
@@ -118,13 +118,13 @@ def test_queued_timed_write_is_cancelled_when_vehicle_is_unplugged(delay):
     asyncio.run(run())
 
 
-def test_timed_presence_is_checked_after_waiting_for_bus():
+def test_departure_presence_is_checked_after_waiting_for_bus():
     async def run():
         harness = Harness(values={"evse_state": EvseState.EV_CONNECTED, "charging_current_ems": 1})
         control = await harness.connect()
         async with harness.client._lock:
             writing = asyncio.create_task(
-                control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+                control.async_set_departure_current(10, deadline=future(), owner=OWNER)
             )
             await asyncio.sleep(0)
             assert not writing.done()
@@ -139,7 +139,7 @@ def test_timed_presence_is_checked_after_waiting_for_bus():
 
 
 @pytest.mark.parametrize("changed", ["goal", "deadline", "connection"])
-def test_timed_precondition_rechecks_goal_and_link_after_live_read(changed, monkeypatch):
+def test_departure_precondition_rechecks_goal_and_link_after_live_read(changed, monkeypatch):
     async def run():
         harness = Harness(values={"evse_state": EvseState.EV_CONNECTED, "charging_current_ems": 1})
         control = await harness.connect()
@@ -155,7 +155,7 @@ def test_timed_precondition_rechecks_goal_and_link_after_live_read(changed, monk
         harness.transport.read_holding_registers = delayed_read
         deadline = future()
         writing = asyncio.create_task(
-            control.async_set_timed_current(10, deadline=deadline, owner=OWNER)
+            control.async_set_departure_current(10, deadline=deadline, owner=OWNER)
         )
         try:
             await asyncio.wait_for(reading.wait(), 2)
@@ -204,7 +204,7 @@ def test_manual_handover_keeps_the_no_car_bypass():
 
         control._sleep = sleep
         try:
-            await control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+            await control.async_set_departure_current(10, deadline=future(), owner=OWNER)
             await asyncio.wait_for(sleeping.wait(), 2)
             await control.async_set_charging_current(12)
             assert control._pending.owner is None
@@ -223,7 +223,7 @@ def test_manual_handover_keeps_the_no_car_bypass():
 
 
 @pytest.mark.parametrize("blocked", ["identity", "evse"])
-def test_priority_heartbeat_passes_between_timed_presence_reads(blocked):
+def test_priority_heartbeat_passes_between_departure_presence_reads(blocked):
     async def run():
         harness = Harness(values={"charging_current_ems": 1})
         control = await harness.connect()
@@ -256,7 +256,7 @@ def test_priority_heartbeat_passes_between_timed_presence_reads(blocked):
         harness.transport.read_holding_registers = read
         harness.transport.write_register = write
         timed = asyncio.create_task(
-            control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+            control.async_set_departure_current(10, deadline=future(), owner=OWNER)
         )
         try:
             await asyncio.wait_for(started.wait(), 2)
@@ -276,7 +276,7 @@ def test_priority_heartbeat_passes_between_timed_presence_reads(blocked):
     asyncio.run(run())
 
 
-def test_cancelled_timed_reacquire_cannot_release_the_heartbeat_lock():
+def test_cancelled_departure_reacquire_cannot_release_the_heartbeat_lock():
     async def run():
         harness = Harness(values={"charging_current_ems": 1})
         control = await harness.connect()
@@ -301,7 +301,7 @@ def test_cancelled_timed_reacquire_cannot_release_the_heartbeat_lock():
         harness.transport.read_holding_registers = read
         harness.transport.write_register = write
         timed = asyncio.create_task(
-            control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+            control.async_set_departure_current(10, deadline=future(), owner=OWNER)
         )
         heartbeat = None
         try:
@@ -332,7 +332,7 @@ def test_cancelled_timed_reacquire_cannot_release_the_heartbeat_lock():
 
 
 @pytest.mark.parametrize("rollback", [False, True])
-def test_gateway_configuration_during_timed_guard_prevents_stale_write(rollback):
+def test_gateway_configuration_during_departure_guard_prevents_stale_write(rollback):
     async def run():
         harness = Harness(values={"charging_current_ems": 1})
         control = await harness.connect()
@@ -361,7 +361,7 @@ def test_gateway_configuration_during_timed_guard_prevents_stale_write(rollback)
 
         harness.transport.read_holding_registers = read
         timed = asyncio.create_task(
-            control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+            control.async_set_departure_current(10, deadline=future(), owner=OWNER)
         )
         configuration = None
         try:
@@ -388,7 +388,7 @@ def test_gateway_configuration_during_timed_guard_prevents_stale_write(rollback)
     asyncio.run(run())
 
 
-def test_service_cancels_timed_resume_without_home_assistant_once_the_car_left(tmp_path):
+def test_service_cancels_departure_resume_without_home_assistant_once_the_car_left(tmp_path):
     async def run():
         service, transport, clock = await service_fixture(tmp_path)
         sleeping, release = asyncio.Event(), asyncio.Event()
@@ -404,8 +404,8 @@ def test_service_cancels_timed_resume_without_home_assistant_once_the_car_left(t
             await service.refresh()
             control = service.control
             control._sleep = sleep
-            await control.async_set_timed_current(None, deadline=future(), owner=OWNER)
-            await control.async_set_timed_current(10, deadline=future(), owner=OWNER)
+            await control.async_set_departure_current(None, deadline=future(), owner=OWNER)
+            await control.async_set_departure_current(10, deadline=future(), owner=OWNER)
             task = control._flush_task
             assert control.pending_action == "set_current"
             await asyncio.wait_for(sleeping.wait(), 2)

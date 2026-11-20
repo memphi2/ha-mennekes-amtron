@@ -151,7 +151,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         current = dict(draft.values) if user_input is None else user_input
         return self.async_show_form(
             step_id=f"cost_{source}",
-            data_schema=cost_source_schema(current, source=source),
+            data_schema=cost_source_schema(current, source=source, currency=self.hass.config.currency),
             errors=errors,
             last_step=not allow_network,
         )
@@ -206,7 +206,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
             step_id="cost_module2",
             data_schema=cost_network_schema(
                 self._details["tariff"] if user_input is None else user_input,
-                module="module_2",
+                module="module_2", currency=self.hass.config.currency,
             ),
             errors=errors,
             last_step=True,
@@ -280,7 +280,10 @@ class EstimateOptionsFlow(SectionOptionsFlow):
             errors["base"] = "tariff_lookup_failed"
         return self.async_show_form(
             step_id="cost_module3_prices",
-            data_schema=cost_module_three_schema(self._details["tariff"] if user_input is None else user_input),
+            data_schema=cost_module_three_schema(
+                self._details["tariff"] if user_input is None else user_input,
+                currency=self.hass.config.currency,
+            ),
             errors=errors,
             description_placeholders={"source": self._details["source"]},
             last_step=True,

@@ -16,9 +16,9 @@ from .const import (
 )
 from .control_types import (
     STOPS,
+    DepartureCommandCancelledError,
     PendingCommand,
     PhaseWaitError,
-    TimedCommandCancelledError,
 )
 from .errors import DeviceError
 from .runtime_events import EventType
@@ -47,7 +47,7 @@ class CommandQueue:
             if deferred and self._control._validate_deferred is not None:
                 self._control._validate_deferred()
             await self._control.writes.async_apply_command(command)
-        except TimedCommandCancelledError as err:
+        except DepartureCommandCancelledError as err:
             self._control.events.record("cancelled", command.action, err.reason, source=command.source, requested_value=command.value)
         except (PhaseWaitError, AmtronRateLimitedError):
             raise

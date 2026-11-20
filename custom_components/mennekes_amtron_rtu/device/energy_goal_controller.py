@@ -73,6 +73,8 @@ class EnergyGoalController:
         # The last price Home Assistant reported, per kWh.
         self._price: float | None = None
         self.price_at: datetime | None = None
+        # The currency of that price, as Home Assistant names it.
+        self.currency: str | None = None
         control.goal_controller = self
         self.model.resume_on_recovery = False
 
@@ -108,6 +110,16 @@ class EnergyGoalController:
             raise
         self._storage_unknown = False
         self._dirty = False
+
+    def note_currency(self, currency: object) -> None:
+        """Remember the currency a price or an amount came in; None keeps it."""
+        if currency is None:
+            return
+        if not isinstance(currency, str) or len(currency) != 3 or not (currency.isascii() and currency.isalpha() and currency.isupper()):
+            raise ValueError("currency must be a three-letter code")
+        if currency != self.currency:
+            self.currency = currency
+            self._notify_changed()
 
     async def async_set_cost_target(self, amount: object, price: object = None) -> None:
         """Arm an amount of money at ``price``; zero ends it with its target.

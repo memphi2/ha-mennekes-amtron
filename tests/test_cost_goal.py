@@ -29,10 +29,12 @@ class Control:
         self.fail: Exception | None = None
         # The last price the service was told.
         self.cost_price: float | None = None
+        self.cost_currency: str | None = "EUR"
         self.read_only = False
         self.supports_energy_goal = True
 
-    async def async_set_cost_goal(self, amount, price):
+    async def async_set_cost_goal(self, amount, price, currency):
+        self.cost_currency = currency
         self.calls.append(("goal", amount, price))
         if price is not None:
             self.cost_price = price
@@ -42,10 +44,11 @@ class Control:
         else:
             self.energy_goal.set_target(0, 0)
 
-    async def async_set_cost_price(self, price):
+    async def async_set_cost_price(self, price, currency):
         self.calls.append(("price", None, price))
         if self.fail is not None:
             raise self.fail
+        self.cost_currency = currency
         self.cost_price = price
 
 

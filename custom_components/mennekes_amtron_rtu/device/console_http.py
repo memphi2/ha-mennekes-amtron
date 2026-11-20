@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .service_runtime import ModbusService
 
 CONSOLE_ASSETS = {
-    "/targets": ("app_targets.html", "text/html"),
+    "/charging": ("app_charging.html", "text/html"),
     "/app_charging.js": ("app_charging.js", "text/javascript"),
     "/registers": ("app_registers.html", "text/html"),
     "/runtime": ("app_runtime.html", "text/html"),
@@ -153,6 +153,8 @@ class ServiceConsole(AppSettings):
             "revision": service.choice_revision,
             "guest_revision": service.guest.revision,
             "guest_active": service.guest.active,
+            # Also a paused guest: the car's own targets do not apply to it.
+            "guest_mode": service.guest.mode,
             "energy": {"target": control.energy_goal.target_kwh, "status": control.energy_goal.status},
             # An amount of money carried by the energy target, and the last
             # price Home Assistant reported (none without charging costs).
@@ -160,6 +162,8 @@ class ServiceConsole(AppSettings):
                 "amount": cost.amount, "spent": control.energy_goal.cost_spent, "price": cost.price,
             },
             "cost_price": None if runner is None else runner.price,
+            # Home Assistant's currency; unknown until it reported a price.
+            "cost_currency": None if runner is None else runner.currency,
             # When Home Assistant last reported the price, alone or with an
             # amount.
             "cost_price_at": None if runner is None or runner.price_at is None else runner.price_at.isoformat(),
@@ -168,7 +172,7 @@ class ServiceConsole(AppSettings):
                 "configured": control.soc_goal.source is not None,
                 "target": control.soc_goal.target_percent,
                 "maximum": control.soc_goal.maximum_percent,
-                "maximum_required": service.snapshot()["control"]["soc_maximum_required"],
+                "maximum_required": service.soc_choice.maximum_required,
                 "status": control.soc_goal.status,
             },
             "departure": None if plan is None or departure is None else {
@@ -201,42 +205,25 @@ class ServiceConsole(AppSettings):
         service = self._configured_service()
         if not isinstance(payload["revision"], str):
             raise SettingsError("invalid_request")
-        action = payload["action"]
+        action, value, revision = payload["action"], payload["value"], payload["revision"]
+        if isinstance(action, str) and action in ("guest", "pause") and value is not True:
+            # A start or a pause must be explicit.
+            raise SettingsError("invalid_request")
+        commands: dict[str, dict[str, Any]] = {
+            "energy": {"command": "energy_goal", "value": value, "expected_choice_revision": revision},
+            "soc": {"command": "soc_goal_choice", "value": value, "expected_choice_revision": revision},
+            "cost": {"command": "cost_goal", "value": value, "expected_choice_revision": revision},
+            "guest": {"command": "guest_start", "expected_guest_revision": revision},
+            "pause": {"command": "pause"},
+            "departure": {"command": "departure_choice", "deadline": value, "revision": revision},
+        }
+        if not isinstance(action, str) or action not in commands:
+            raise SettingsError("invalid_request")
         try:
-            if action in ("energy", "soc"):
-                await service.command({"origin": "app",
-                    "command": "energy_goal" if action == "energy" else "soc_goal_choice",
-                    "value": payload["value"], "expected_choice_revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "cost":
-                await service.command({"origin": "app",
-                    "command": "cost_goal", "value": payload["value"],
-                    "expected_choice_revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "guest":
-                if payload["value"] is not True:
-                    raise ValueError("guest start must be explicit")
-                await service.command({"origin": "app",
-                    "command": "guest_start", "expected_guest_revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "pause":
-                if payload["value"] is not True:
-                    raise ValueError("pause must be explicit")
-                await service.command({"origin": "app",
-                    "command": "pause", "value": True,
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            elif action == "departure":
-                await service.command({"origin": "app",
-                    "command": "departure_choice", "deadline": payload["value"],
-                    "revision": payload["revision"],
-                    "expected_serial_number": service.identity.serial_number,
-                })
-            else:
-                raise SettingsError("invalid_request")
+            # The same command, checks and answer as for every other caller.
+            await service.command({
+                **commands[action], "origin": "app", "expected_serial_number": service.identity.serial_number,
+            })
         except DeviceError as err:
             # Codes only; never expose source IDs, credentials or arbitrary errors.
             code = str(err)

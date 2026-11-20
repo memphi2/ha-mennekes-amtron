@@ -11,11 +11,11 @@ from zoneinfo import ZoneInfo
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
-    DOMAIN,
 )
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import heartbeat_running
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot

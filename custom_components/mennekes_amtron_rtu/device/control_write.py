@@ -34,10 +34,10 @@ from .const import (
     MIN_PHASE_CHANGE_INTERVAL_SECONDS,
 )
 from .control_types import (
+    DepartureCommandCancelledError,
     PendingCommand,
     PhaseChange,
     PhaseWaitError,
-    TimedCommandCancelledError,
 )
 from .enums import CpState, EvseState
 from .errors import DeviceError, device_error, validation_error
@@ -253,12 +253,17 @@ class WritePath:
             raise validation_error("control_state_unknown")
         return value
 
-    async def _async_transition_write(
+    async def async_transition_write(
         self, spec: RegisterSpec, value: int, *, changed: bool | Callable[[], bool],
         min_interval: float = 0.0,
         precondition: WritePrecondition | None = None,
+        refresh: bool = True,
     ) -> None:
-        """Write a switch; ``changed`` may be decided by the write's precondition."""
+        """Write a switch; ``changed`` may be decided by the write's precondition.
+
+        Without ``refresh`` the caller reads the result back itself, after
+        it has settled what the acknowledged write means.
+        """
         def switched() -> bool:
             return changed() if callable(changed) else changed
 
@@ -291,7 +296,7 @@ class WritePath:
             # A write outside a command, e.g. closing the release after an
             # unplug, settles nothing that waits in the queue.
             self._control._clear_pending()
-        if self._control._request_refresh is not None:
+        if refresh and self._control._request_refresh is not None:
             await self._control._request_refresh()
 
     async def async_apply_release(self, released: bool) -> None:
@@ -318,11 +323,11 @@ class WritePath:
         previous = self._control.charging_release_requested
         self._control.charging_release_requested = released
         try:
-            await self._async_transition_write(
+            await self.async_transition_write(
                 CHARGING_RELEASE, int(released), changed=lambda: switches,
                 precondition=admit if released and current != 1 else None,
             )
-        except (AmtronRateLimitedError, TimedCommandCancelledError):
+        except (AmtronRateLimitedError, DepartureCommandCancelledError):
             # Nothing was sent; the request is not an intent yet.
             self._control.charging_release_requested = previous
             raise
@@ -338,7 +343,7 @@ class WritePath:
         changed = current != int(locked)
         if changed and not (locked and self._repeats_stop(LOCK_EVSE, 1)):
             await self.async_check_transition_interval()
-        await self._async_transition_write(LOCK_EVSE, int(locked), changed=changed)
+        await self.async_transition_write(LOCK_EVSE, int(locked), changed=changed)
 
     async def _async_apply_phases(self, phases: int) -> None:
         current = await self.async_read_switch(REQUESTED_PHASES)
@@ -377,7 +382,7 @@ class WritePath:
         self._control._client.check_write_interval(
             REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
         )
-        await self._async_transition_write(
+        await self.async_transition_write(
             REQUESTED_PHASES, phases, changed=True,
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
             precondition=lambda read: self._async_check_phase_write(change, read),
@@ -474,15 +479,15 @@ class WritePath:
     async def _async_grant_release_for_start(self) -> None:
         """Keep release and resume in one queued command, under the same lock."""
         gate = self._control._plug_charge.state
-        manual, written = gate.manual_marks, self._control._release_writes
+        manual, written = gate.manual_marks(self._control.write_state.plug_cycle), self._control._release_writes
         if gate.enabled:
             self._control._plug_charge.set_manual(True)
         try:
             await self.async_apply_release(True)
         except BaseException as err:
-            refused = isinstance(err, (AmtronRateLimitedError, TimedCommandCancelledError))
+            refused = isinstance(err, (AmtronRateLimitedError, DepartureCommandCancelledError))
             if self._control._release_writes == written and (refused or not self._control._command_write_started or not self._control._uncertain(err)):
-                gate.manual_marks = manual
+                gate.restore_manual(manual, self._control.write_state.plug_cycle)
             raise
 
     async def async_write(
@@ -533,7 +538,6 @@ class WritePath:
             self._control._diagnostics.writes_rejected += 1
             if spec != HEARTBEAT:
                 self._control._diagnostics.write_errors.add(spec.key)
-            self._control._diagnostics.last_error = str(err)
             if self._control._notify_write_error is not None:
                 self._control._notify_write_error()
             raise device_error(
@@ -590,4 +594,4 @@ class WritePath:
     async def _async_check_command_vehicle(self, read: LockedRegisterReader) -> None:
         """Cancel a bound command if live EVSE and CP both prove unplugging."""
         if await self.async_vehicle_absent(read):
-            raise TimedCommandCancelledError("unknown")
+            raise DepartureCommandCancelledError("unknown")

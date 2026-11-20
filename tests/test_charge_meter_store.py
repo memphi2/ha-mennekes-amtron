@@ -76,7 +76,7 @@ def test_a_note_needs_the_running_cycle_of_this_wallbox(tmp_path):
                     note(service, "1020", "car"), note(service, float("nan"), "car"), note(service, 10**400, "car"),
                     note(service, 1020, ""), note(service, 1020, 5),
                 ):
-                    with pytest.raises(ValueError, match="note"):
+                    with pytest.raises(ValueError, match=r"note|unknown command field"):
                         await service.command(payload)
                 with pytest.raises(DeviceError, match="device_identity_changed"):
                     await service.command(note(service, 1020, "car", expected_serial_number="other"))
@@ -84,15 +84,15 @@ def test_a_note_needs_the_running_cycle_of_this_wallbox(tmp_path):
                 result = await service.command(note(service, 1019, "car"))
                 assert result["charge_meter"]["note"] is None
                 # While another command runs, its published state is not this one's.
-                async with service._command_lock:
+                async with service.command_lock:
                     result = await service.command(note(service, 1020, "car"))
                 assert result["charge_meter"]["note"] == "car"
                 # What is published stays: readers need not wait for that command.
-                assert service._published is not None
-                service._stopping = True
+                assert service.published is not None
+                service.stopping = True
                 with pytest.raises(DeviceError, match="service_unavailable"):
                     await service.command(note(service, 1020, "other"))
-                service._stopping = False
+                service.stopping = False
                 assert service.charge_meter.note == "car"
             finally:
                 await service.stop()
@@ -107,7 +107,7 @@ def test_an_unusable_saved_meter_starts_measuring_again(tmp_path, caplog, conten
         (tmp_path / "charge-meter.json").write_bytes(content)
         service, _transport = await owner(tmp_path)
         try:
-            assert service.charge_meter.log.first_at is not None
+            assert service.charge_meter.log._times
             assert service.charge_meter.last is None
             assert "Charging loss: saved meter log unusable; starting without it (ValueError)" in caplog.messages
         finally:

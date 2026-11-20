@@ -36,7 +36,7 @@ protection; restrict gateway access to a trusted private LAN. See
   charging estimates retain the latest completed cycle, latest cost result and
   bounded loss totals with one correctable match in HA's local storage, outside
   Recorder. They do not retain a growing vehicle-history or price-history list.
-- Optional timed charging stores the selected source entities, calendar and
+- Optional departure planning stores the selected source entities, calendar and
   exact event title in the integration options, plus one departure and its
   source/finished marker in local storage. The optional BavarianData adapter
   reads the last locally published timer sensors for the selected vehicle; no

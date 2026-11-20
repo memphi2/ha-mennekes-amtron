@@ -16,10 +16,11 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import CONF_SERIAL_NUMBER, MANUFACTURER
 from .coordinator import ServiceCoordinator
 from .data import WallboxData
 from .device.capabilities import capability_is_supported
-from .device.const import CONF_SERIAL_NUMBER, DOMAIN, MANUFACTURER
+from .device.const import DOMAIN
 from .device.identity import display_identifier, model_name
 from .entry_types import MennekesAmtronConfigEntry
 from .vehicle_features import vehicle_features

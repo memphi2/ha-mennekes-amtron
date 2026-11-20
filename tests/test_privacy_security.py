@@ -108,7 +108,6 @@ def test_diagnostics_never_report_the_port_or_the_serial_number() -> None:
     async def run() -> None:
         hass, entry, wallbox = await build_runtime()
         message = "ABC123456789 failed on /dev/fake"
-        entry.service.diagnostics.last_error = message
         # Every raw block read fails with a message naming both identifiers.
         for block in supported_blocks(entry.runtime_data.identity.layout_version):
             wallbox.read_exceptions[block.address] = ConnectionException(message)

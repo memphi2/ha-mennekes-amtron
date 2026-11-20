@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.mennekes_amtron_rtu import goal_store
+from custom_components.mennekes_amtron_rtu import model_store
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
     CONF_LOSS_AUTO_MATCH,
@@ -524,7 +524,7 @@ def test_cancelled_assignment_keeps_memory_and_durable_loss_in_sync(tmp_path, mo
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass)
         started, release = threading.Event(), threading.Event()
-        writer = goal_store.write_utf8_file_atomic
+        writer = model_store.write_utf8_file_atomic
 
         def delayed(*args, **kwargs):
             started.set()
@@ -536,7 +536,7 @@ def test_cancelled_assignment_keeps_memory_and_durable_loss_in_sync(tmp_path, mo
             coordinator.complete()
             await hass.async_block_till_done()
             hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
-            monkeypatch.setattr(goal_store, "write_utf8_file_atomic", delayed)
+            monkeypatch.setattr(model_store, "write_utf8_file_atomic", delayed)
             task = asyncio.create_task(observer.async_assign())
             try:
                 assert await asyncio.to_thread(started.wait, 5)

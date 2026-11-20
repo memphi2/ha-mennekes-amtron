@@ -16,12 +16,10 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.mennekes_amtron_rtu import repair_health, repairs
+from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONTROL_MODE_MASTER,
-    DOMAIN,
-)
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.repair_issues import (
     ISSUE_EMS_HEARTBEAT_LOST,
     ISSUE_HEARTBEAT_UNAVAILABLE,

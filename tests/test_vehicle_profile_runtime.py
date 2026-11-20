@@ -26,7 +26,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_soc import VehicleSocObserver
 from custom_components.mennekes_amtron_rtu.vehicle_sources import VehicleTelemetry
 from tests.ha_fakes import FakeConfigEntry, build_runtime, collect
 from tests.test_charge_loss_observer import Coordinator as LossCoordinator
-from tests.test_timed_goal import setup_observer
+from tests.test_departure import setup_observer
 from tests.test_vehicle_soc import Control, Coordinator
 
 A = "a" * 32
@@ -166,7 +166,7 @@ def test_manual_profile_selection_is_available_without_write_permission():
             writes = list(transport.writes)
             await selector.async_select_option("Second car")
             assert entry.options["active_vehicle_profile"] == B
-            assert entry.options["timed_goal_reset_pending"] is True
+            assert entry.options["departure_reset_pending"] is True
             assert selector.current_option == "Second car"
             await selector.async_select_option("none")
             assert selector.current_option == "none"
@@ -265,12 +265,12 @@ def test_departure_keeps_captured_profile_options_and_uses_optional_vehicle_capa
     observer, _control, _hass = setup_observer(monkeypatch)
     source = Telemetry()
     observer._runtime.vehicle_telemetry = source
-    observer._options["timed_use_vehicle_capacity"] = True
+    observer._options["departure_use_vehicle_capacity"] = True
     assert observer._capacity() == 80
     source.publish(20, 90, None)
     assert observer._capacity() is None
     # A concurrently selected next car cannot change the old worker's sources.
-    observer._entry.options = {"timed_capacity_kwh": 120}
+    observer._entry.options = {"departure_capacity_kwh": 120}
     assert observer._capacity() is None
-    observer._options["timed_use_vehicle_capacity"] = False
+    observer._options["departure_use_vehicle_capacity"] = False
     assert observer._capacity() == 80

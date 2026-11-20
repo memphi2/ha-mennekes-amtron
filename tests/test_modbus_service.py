@@ -207,8 +207,9 @@ def test_service_uses_the_shared_command_guards(
         try:
             await service.command(
                 {
-                    "command": command, "value": value, "allow_unlimited": True,
-                    "expected_serial_number": "ABC123456789",
+                    "command": command, "expected_serial_number": "ABC123456789",
+                    **({} if value is None else {"value": value}),
+                    **({"allow_unlimited": True} if command == "set_current" else {}),
                 }
             )
             writes = [
@@ -429,7 +430,7 @@ def test_one_lost_poll_does_not_pause_a_kwh_goal(tmp_path, monkeypatch):
             with pytest.raises(AmtronBusError):
                 await service.refresh()
             assert service.control.energy_goal.status == "active"
-            assert service._energy_sample is None
+            assert service.energy_sample is None
             # After a minute of failures the goal is told about the outage.
             failing[0] += 61
             with pytest.raises(AmtronBusError):
@@ -452,11 +453,11 @@ def test_a_failing_intent_save_keeps_the_wallbox_available(tmp_path, monkeypatch
             async def fail(**_kwargs):
                 raise OSError("disk full")
 
-            monkeypatch.setattr(service, "_persist", fail)
-            await service._save_intent()
-            await service._save_intent()
+            monkeypatch.setattr(service, "persist", fail)
+            await service.save_intent()
+            await service.save_intent()
             assert caplog.text.count("Control: intent not saved") == 1
-            assert service._is_available()
+            assert service.is_available()
             monkeypatch.undo()
         finally:
             await service.stop()
@@ -488,7 +489,7 @@ def test_a_command_polls_the_wallbox_once_after_its_write(tmp_path):
 
             service._poll = carried
             polls = []
-            service.guest.after_poll = lambda *, polled: polls.append(polled)
+            service.guest.follow = lambda: polls.append(True)
             await service.command({"command": "set_current", "value": 12, "expected_serial_number": "ABC123456789"})
             assert polls == [True, True]
         finally:
@@ -596,7 +597,7 @@ def test_error_200_is_recovered_while_the_disk_refuses(tmp_path, monkeypatch):
         async def refused():
             raise OSError("read-only file system")
 
-        monkeypatch.setattr(service, "_persist", refused)
+        monkeypatch.setattr(service, "persist", refused)
         put(transport.bank, R.ERROR_CODE, 200)
         transport.writes.clear()
         try:
@@ -608,7 +609,7 @@ def test_error_200_is_recovered_while_the_disk_refuses(tmp_path, monkeypatch):
             # Heartbeat, the wallbox's own recovery register and the current again.
             assert [address for address, _words in transport.writes] == [0x0D00, 0x0D05, 0x0302]
             assert service._attempts == 1
-            assert service._is_available()
+            assert service.is_available()
         finally:
             monkeypatch.undo()
             await service.stop()
@@ -661,7 +662,7 @@ def test_a_command_the_disk_could_not_save_is_not_reported_as_an_unreachable_ser
         async def refused():
             raise OSError("no space left on device")
 
-        monkeypatch.setattr(service, "_persist", refused)
+        monkeypatch.setattr(service, "persist", refused)
         try:
             status, reply = await ServiceApi(service).dispatch("POST", "/v2/command", {
                 "command": "set_current", "value": 10, "expected_serial_number": "ABC123456789",

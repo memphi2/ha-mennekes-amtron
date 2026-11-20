@@ -11,11 +11,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
-from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.goal_store import (
-    DepartureIntent,
-    TimedGoalStore,
-)
 from tests.fakes import FakeModbusClient, device_bank
 from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
@@ -39,8 +34,8 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 options = profile_options(provider="none", feature={
                     "vehicle_soc_entity": "sensor.car_soc",
                     "vehicle_charge_limit_entity": "number.car_maximum",
-                    "timed_goal_enabled": True,
-                    "timed_capacity_kwh": 80,
+                    "departure_enabled": True,
+                    "departure_capacity_kwh": 80,
                 })
                 options.update({
                     "control_mode": "master", "scan_interval_seconds": 300,
@@ -59,10 +54,8 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 await entry.runtime_data.coordinator.async_refresh()
                 await hass.services.async_call("number", "set_value", {"entity_id": target, "value": 75}, blocking=True)
                 await hass.async_block_till_done()
-                trip = TimedGoal()
-                trip.set(dt_util.utcnow() + timedelta(hours=8))
-                store = TimedGoalStore(hass, entry.entry_id, SERIAL_NUMBER)
-                await store.async_save(DepartureIntent(trip))
+                await entry.runtime_data.control.async_set_departure_trip(dt_util.utcnow() + timedelta(hours=8), None)
+                assert entry.runtime_data.control.departure.trip.deadline is not None
                 before = current_writes(transport)
 
                 # Opening the car guides through its settings, name first.
@@ -76,13 +69,14 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 assert entry.options["active_vehicle_profile"] == A
                 assert entry.options["vehicle_profiles"][B] == second_profile
                 assert entry.options["vehicle_profiles"][A]["options"] == {
-                    "timed_capacity_kwh": 80, "timed_goal_enabled": False,
+                    "departure_capacity_kwh": 80, "departure_enabled": False,
                 }
                 assert entry.runtime_data.control.soc_goal.target_percent == 0
                 assert entry.runtime_data.control.soc_goal.source is None
                 assert entry.runtime_data.control.soc_goal.maximum_percent is None
-                assert entry.runtime_data.timed_goal is None
-                assert (await store.async_load()).trip.deadline is None
+                assert entry.runtime_data.departure_observer is None
+                # The service's one trip went with the car's planning.
+                assert entry.runtime_data.control.departure.trip.deadline is None
                 assert entry.runtime_data.control.is_paused is True
                 assert current_writes(transport) == before
                 menu = await async_options(hass, entry, *battery)

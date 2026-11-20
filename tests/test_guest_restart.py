@@ -107,7 +107,7 @@ def test_restart_enforces_already_reached_limit(tmp_path, monkeypatch, expired):
             else:
                 await service.control.async_set_energy_goal(1)
                 service.control.energy_goal.observe(service.control.energy_goal.baseline_kwh + 1)
-            await service._persist()
+            await service.persist()
             bank = transport.bank
         async with runtime.guest_service(tmp_path, bank=bank) as (service, transport, clock):
             assert service.guest.mode
@@ -155,7 +155,7 @@ def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, mo
     async def run():
         async with runtime.guest_service(tmp_path) as (service, transport, _clock):
             if failure == "store":
-                real_persist = service._persist
+                real_persist = service.persist
                 calls = 0
 
                 async def fail_once(**kwargs):
@@ -164,9 +164,9 @@ def test_failed_start_before_acceptance_rolls_back_guest_permission(tmp_path, mo
                     if calls == 1:
                         raise OSError("disk full")
                     await real_persist(**kwargs)
-                monkeypatch.setattr(service, "_persist", fail_once)
+                monkeypatch.setattr(service, "persist", fail_once)
             else:
-                method = "async_cancel_timed_current" if failure == "cancel" else "async_start_guest_charging"
+                method = "async_cancel_departure_current" if failure == "cancel" else "async_start_guest_charging"
                 monkeypatch.setattr(service.control, method, AsyncMock(side_effect=DeviceError("guest_start_not_permitted")))
             with pytest.raises((OSError, DeviceError)):
                 await service.command({"command": "guest_start", "expected_serial_number": service.identity.serial_number,

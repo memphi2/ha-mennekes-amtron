@@ -20,22 +20,19 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
 from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_CHARGING_COST_SOURCE,
 )
-from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
-from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
-from custom_components.mennekes_amtron_rtu.device.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
-    DOMAIN,
 )
+from custom_components.mennekes_amtron_rtu.cost_observer import LastChargingCost
+from custom_components.mennekes_amtron_rtu.device.charge_loss import LossStatistics
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
-from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.embedded import state_directory
-from custom_components.mennekes_amtron_rtu.goal_store import (
-    DepartureIntent,
-    ModelStore,
-    TimedGoalStore,
-)
 from custom_components.mennekes_amtron_rtu.loss_store import LossStore
+from custom_components.mennekes_amtron_rtu.model_store import (
+    ModelStore,
+)
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass, heartbeat_running
 from tests.test_modbus_service import TOKEN, service_fixture
@@ -187,12 +184,9 @@ def test_entry_removal_removes_all_bounded_stores_and_only_owned_repairs(tmp_pat
     async def run():
         hass = FakeHass(str(tmp_path))
         entry = FakeConfigEntry()
-        trip = TimedGoal()
-        trip.set(None, "manual")
         stores = [
             (LossStore(hass, entry.entry_id, "box"), LossStatistics()),
             (ModelStore(hass, entry.entry_id, "box", kind="charging_cost", model=LastChargingCost), LastChargingCost()),
-            (TimedGoalStore(hass, entry.entry_id, "box"), DepartureIntent(trip)),
         ]
         for store, model in stores:
             await store.async_save(model)

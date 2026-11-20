@@ -298,10 +298,10 @@ class MennekesModbusClient:
         self._connection_generation += 1
         if self._connection_generation == 1:
             # A new client may reach another connection; nothing carries over.
-            self.write_state.plug_charge.invalidate()
+            self.write_state.forget_connection()
         else:
             # A reconnect alone proves no unplug; the next reads decide.
-            self.write_state.plug_charge.suspect()
+            self.write_state.plug_cycle.suspect(self._monotonic())
 
     async def _async_verify_identity(self, client: ModbusTransport) -> None:
         """Confirm the bound serial while holding the transaction lock."""
@@ -396,7 +396,7 @@ class MennekesModbusClient:
             client = self._client
             self._client = None
             self._connection_changed(False)
-            self.write_state.plug_charge.invalidate()
+            self.write_state.forget_connection()
             await _async_close_transport(client)
 
     @asynccontextmanager
@@ -410,7 +410,7 @@ class MennekesModbusClient:
         async with self._lock:
             was_pending = self._configuration_pending_restart
             self._configuration_pending_restart = True
-            self.write_state.plug_charge.invalidate()
+            self.write_state.forget_connection()
             self._identity_check_needed = True
             guard = ConnectionConfigurationGuard()
             try:

@@ -6,7 +6,7 @@ blueprint:
     calendar and vehicle-sensor departure times. A Text helper records
     the attempted departure before calling the actions, so a Home Assistant
     restart does not repeat them. Choose actions that start climate explicitly,
-    not a toggle. Charging remains controlled by the timed charging plan.
+    not a toggle. Charging remains controlled by the departure plan.
   domain: automation
   homeassistant:
     min_version: "2026.9.0"

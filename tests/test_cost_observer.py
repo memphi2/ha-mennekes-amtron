@@ -109,9 +109,18 @@ def data(at, energy, *, present=False, fresh=True):
 ])
 def test_price_units_negative_rates_and_unknown(value, unit, expected):
     state = State("sensor.price", value, {"unit_of_measurement": unit})
-    assert electricity_price(state) == pytest.approx(expected) if expected is not None else electricity_price(state) is None
-    assert electricity_price(None) is None
-    assert electricity_price(State("sensor.price", "0.3", {"unit_of_measurement": "EUR/kWh", "restored": True})) is None
+    assert electricity_price(state, "EUR") == pytest.approx(expected) if expected is not None else electricity_price(state, "EUR") is None
+    assert electricity_price(None, "EUR") is None
+    assert electricity_price(State("sensor.price", "0.3", {"unit_of_measurement": "EUR/kWh", "restored": True}), "EUR") is None
+
+
+@pytest.mark.parametrize(("unit", "expected"), [
+    ("CHF/kWh", 0.35), ("CHF/MWh", 0.00035), ("EUR/kWh", None), ("ct/kWh", None), ("€/kWh", None),
+])
+def test_a_price_counts_only_in_home_assistants_currency(unit, expected):
+    state = State("sensor.price", "0.35", {"unit_of_measurement": unit})
+    price = electricity_price(state, "CHF")
+    assert price == pytest.approx(expected) if expected is not None else price is None
 
 
 def test_dynamic_price_changes_applied_to_intervals_not_final_total(tmp_path):
