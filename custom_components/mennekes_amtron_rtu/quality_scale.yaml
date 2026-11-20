@@ -93,7 +93,7 @@ rules:
   unique-config-entry:
     status: done
     comment: The [config flow](custom_components/mennekes_amtron_rtu/config_flow.py) uses the wallbox
-      serial, or a transport-specific endpoint and unit ID where no serial exists. [Discovery tests](tests/test_service_discovery.py)
+      serial; a wallbox without one has no unique ID and is matched by its endpoint. [Discovery tests](tests/test_service_discovery.py)
       preserve existing entries instead of duplicating devices.
   action-exceptions:
     status: done
