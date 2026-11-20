@@ -13,6 +13,7 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
     AmtronRateLimitedError,
 )
+from custom_components.mennekes_amtron_rtu.device.control_types import PendingCommand
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.unplug_release import (
     UnplugReleaseState,
@@ -520,6 +521,8 @@ def test_another_limits_pause_is_left_and_ended_once_that_limit_goes(tmp_path):
         _plug(transport, False)
         await _poll(service)
         assert (control.energy_goal.status, state.goal_owed, control.pause_requested) == ("disabled", "pause", True)
+        # Waiting is no failure: nothing was tried against the other limit.
+        assert not control.unplug_release._goal_notice.failing
         control.soc_goal.set_target(0)
         clock[0] += 1000
         await _poll(service)
@@ -635,6 +638,122 @@ def test_a_write_that_came_too_soon_waits_for_its_interval(tmp_path):
         clock[0] += 5
         await _poll(service)
         assert (state.goal_owed, control.pause_requested) == (None, False)
+        await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("rule", [False, True])
+def test_a_pause_by_hand_before_a_reach_seen_while_plugged_is_kept(tmp_path, rule):
+    async def run():
+        service, transport, clock = await _rule(tmp_path, enabled=rule)
+        control = service.control
+        await _command(service, "energy_goal", value=1)
+        await _command(service, "pause")
+        await _poll(service)
+        # The last meter reading before the unplug shows the target reached.
+        put(transport.bank, R.ENERGY_TOTAL, control.energy_goal.baseline_kwh + 2)
+        clock[0] += 1000
+        service._poller._slow_read_at = None
+        await _poll(service)
+        await _settled(service)
+        assert control.energy_goal.status == "reached"
+        clock[0] += 1000
+        _plug(transport, False)
+        for _ in range(3):
+            await _poll(service)
+            await _settled(service)
+            clock[0] += 1000
+        assert control.write_state.unplug_release.goal_owed is None
+        assert control.energy_goal.status == "disabled"
+        # With the rule on no pause is left without a car, whoever set it.
+        assert control.pause_requested is not rule
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_an_end_that_failed_after_the_target_was_cleared_still_ends_the_pause(tmp_path):
+    async def run():
+        service, transport, clock = await _rule(tmp_path, enabled=False)
+        control = await _reached(service, transport, clock)
+        state = control.write_state.unplug_release
+        clock[0] += 1000
+        _plug(transport, False)
+        real = control.async_set_energy_goal
+
+        async def uncertain(value):
+            await real(value)
+            raise OSError("directory not synced")
+
+        control.async_set_energy_goal = uncertain
+        await _poll(service)
+        control.async_set_energy_goal = real
+        assert (control.energy_goal.status, control.pause_requested, state.goal_owed) == ("disabled", True, "goal_pause")
+        clock[0] += 1000
+        await _poll(service)
+        assert (control.pause_requested, state.goal_owed) == (False, None)
+        assert not control.unplug_release._goal_notice.failing
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_failed_end_that_the_car_coming_back_settled_is_reported_anew(tmp_path, caplog):
+    async def run():
+        service, transport, clock = await _rule(tmp_path, enabled=False)
+        real = service.control.async_set_energy_goal
+
+        async def refuse(_value):
+            raise OSError("no")
+
+        with caplog.at_level("WARNING"):
+            for _ in range(2):
+                control = await _reached(service, transport, clock)
+                clock[0] += 1000
+                _plug(transport, False)
+                control.async_set_energy_goal = refuse
+                await _poll(service)
+                control.async_set_energy_goal = real
+                _plug(transport, True, release=1)
+                await _poll(service)
+                assert control.write_state.unplug_release.goal_owed is None
+                assert not control.unplug_release._goal_notice.failing
+                # The car is back with its target: a new one for the next round.
+                await _command(service, "energy_goal", value=0)
+                clock[0] += 1000
+                await _command(service, "resume")
+                clock[0] += 1000
+        warnings = [r for r in caplog.records if "not ended after unplugging" in r.getMessage()]
+        assert [r.levelname for r in warnings] == ["WARNING", "WARNING"]
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_nothing_is_written_read_only_or_without_a_pause(tmp_path):
+    async def run():
+        service, transport, clock = await _rule(tmp_path, enabled=False)
+        control = await _reached(service, transport, clock)
+        state = control.write_state.unplug_release
+        state.goal_owed = "goal_pause"
+        control.startup_hold = True
+        _plug(transport, False)
+        await control.unplug_release.async_end_reached_goal()
+        assert (state.goal_owed, control.energy_goal.status) == ("goal_pause", "reached")
+        control.startup_hold = False
+        # The pause's end already waits in the queue: no second one.
+        state.goal_owed = "pause"
+        control._pending = PendingCommand("resume", 0)
+        calls = []
+        control.async_resume_charging = lambda: calls.append(1)
+        await control.unplug_release.async_end_reached_goal()
+        assert (state.goal_owed, calls) == ("pause", [])
+        # No pause on: nothing to end, nothing written.
+        control._pending = None
+        control.pause_requested = False
+        await control.unplug_release.async_end_reached_goal()
+        assert (state.goal_owed, calls) == (None, [])
         await service.stop()
 
     asyncio.run(run())
