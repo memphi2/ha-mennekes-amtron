@@ -141,13 +141,17 @@ class PlugChargeState:
         self.manual_connected = self.manual
 
     @property
-    def manual_marks(self) -> tuple[bool, bool, bool]:
+    def manual_marks(self) -> tuple[bool, bool, bool, str | None]:
         """A release by hand with what is known about it, to take a refused one back."""
-        return self.manual, self.manual_connected, self.restored_manual
+        return self.manual, self.manual_connected, self.restored_manual, self.session
 
     @manual_marks.setter
-    def manual_marks(self, marks: tuple[bool, bool, bool]) -> None:
-        self.manual, self.manual_connected, self.restored_manual = marks
+    def manual_marks(self, marks: tuple[bool, bool, bool, str | None]) -> None:
+        if marks[3] != self.session:
+            # The connection changed while the command waited: what a poll
+            # decided about its release meanwhile stands.
+            return
+        self.manual, self.manual_connected, self.restored_manual = marks[:3]
 
     def snapshot(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}

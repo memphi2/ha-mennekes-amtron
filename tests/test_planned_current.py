@@ -64,7 +64,7 @@ def test_a_pause_after_the_plan_returns_to_the_chosen_current(tmp_path, cap):
             chosen = service.control.charging_setpoint
             await hand_over(service, hours=2)
             await service.departure.tick()
-            runtime.current_writes(transport)[-1]
+            assert runtime.current_writes(transport)[-1] == pytest.approx(cap)
             assert service.control.charging_setpoint == chosen
             await withdraw(service)
             clock[0] += 1000
@@ -130,5 +130,32 @@ def test_a_current_set_by_hand_during_a_plan_is_the_chosen_one(tmp_path):
             await service.command({"command": "set_current", "value": 10, "expected_serial_number": serial})
             assert not service.control.writes.line_planned
             assert service.control.charging_setpoint == 10
+
+    asyncio.run(run())
+
+
+def test_a_cap_that_has_to_wait_keeps_the_chosen_current_too(tmp_path):
+    async def run():
+        async with svc(tmp_path, 16) as (service, transport, clock):
+            control = service.control
+            chosen = control.charging_setpoint
+            await hand_over(service, hours=2)
+            await service.departure.tick()
+            assert runtime.current_writes(transport)[-1] == 16
+            await service.refresh()
+            await control.async_set_limits(replace(control.options, current_cap=12.0))
+            # Inside the interval between two current writes the cap waits.
+            await control.async_enforce_current_cap()
+            assert control._pending is not None
+            assert control.charging_setpoint == chosen
+            clock[0] += 10
+            control._pending_due = 0
+            control._pending_changed.set()
+            for _ in range(50):
+                await asyncio.sleep(0.01)
+                if control._pending is None:
+                    break
+            assert runtime.current_writes(transport)[-1] == 12
+            assert control.charging_setpoint == chosen
 
     asyncio.run(run())

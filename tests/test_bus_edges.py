@@ -111,8 +111,9 @@ def test_a_weak_phase_lasts_until_five_minutes_without_a_late_heartbeat(caplog):
     manager._late_notice = FailureNotice(logging.getLogger(HeartbeatTask.__module__), "Heartbeat")
     manager._late_at = None
     with caplog.at_level(logging.DEBUG):
-        # Late once, then on time for just under five minutes, then late again.
-        for at in (0.0, 15.0, *range(20, 315, 5), 330.0):
+        # Late, late again later, then on time until five minutes after the
+        # first late one but not after the second: still the same weak phase.
+        for at in (0.0, 15.0, *range(20, 200, 5), 210.0, *range(215, 335, 5)):
             manager._note_delivery(float(at))
     assert len([record for record in caplog.records if record.levelno == logging.WARNING]) == 1
     assert not any("within the deadline again" in record.getMessage() for record in caplog.records)
