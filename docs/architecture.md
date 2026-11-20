@@ -658,7 +658,9 @@ Home Assistant never holds the bus itself.
 
 ## Testing
 
-`tests/` is flat, one `test_<module>.py` per module, with no `conftest.py`.
+`tests/` is flat, one `test_<module>.py` per module. The only shared setup,
+`tests/conftest.py`, keeps the test process from giving up its privileges
+the way the service's start does.
 Home Assistant is installed from the CI matrix and used for real; only the
 runtime around it is faked, in `tests/ha_fakes.py`.
 
