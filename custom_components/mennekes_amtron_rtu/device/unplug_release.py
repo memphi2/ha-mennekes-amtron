@@ -34,11 +34,12 @@ class UnplugReleaseState:
     plugged: bool | None = None
     # The car left and the release is still to be switched off.
     owed: bool = False
-    # The car left with an energy or cost target set. Reached, now or by a
-    # meter reading that only comes after the unplug, the target was that
-    # charge's and is to be ended: "goal". With "goal_pause" the pause it
-    # causes is to be ended too, and "pause" is what is left once the target
-    # is cleared. A pause somebody set by hand before the unplug is not ours.
+    # The car left with an energy or cost target set: "goal". Reached, now or
+    # by a meter reading that only comes after the unplug, the target was
+    # that charge's and is to be ended with the pause that is on then;
+    # "pause" is what is left once the target is cleared. Whose pause it is
+    # is not asked: without a car ending one lets no current flow, while one
+    # left behind keeps the next car from charging.
     goal_owed: str | None = None
 
     def configure(self, enabled: object) -> None:
@@ -48,7 +49,7 @@ class UnplugReleaseState:
         if not enabled:
             self.owed = False
 
-    def observe(self, present: bool | None, *, armed: bool = False, pause_ours: bool = False) -> None:
+    def observe(self, present: bool | None, *, armed: bool = False) -> None:
         if present is None:
             return
         if present:
@@ -58,7 +59,7 @@ class UnplugReleaseState:
             self.goal_owed = None
         elif self.plugged is True:
             self.owed = self.enabled
-            self.goal_owed = ("goal_pause" if pause_ours else "goal") if armed else None
+            self.goal_owed = "goal" if armed else None
         self.plugged = present
 
     def snapshot(self) -> dict[str, Any]:
@@ -71,7 +72,7 @@ class UnplugReleaseState:
         if (
             not isinstance(raw, dict) or raw.keys() != {"enabled", "plugged", "owed", "goal_owed"}
             or type(raw["enabled"]) is not bool or type(raw["owed"]) is not bool
-            or raw["goal_owed"] not in (None, "goal", "goal_pause", "pause")
+            or raw["goal_owed"] not in (None, "goal", "pause")
             or raw["plugged"] not in (None, True, False)
         ):
             raise ValueError("invalid saved unplug rule")
@@ -87,8 +88,6 @@ class UnplugRelease:
         self._notice = FailureNotice(_LOGGER, "Control")
         self._goal_retry_at = 0.0
         self._goal_notice = FailureNotice(_LOGGER, "Energy target")
-        # Whether a pause was on while the target still ran; see observe.
-        self._foreign_pause = False
 
     @property
     def state(self) -> UnplugReleaseState:
@@ -97,18 +96,9 @@ class UnplugRelease:
     def observe(self, data: WallboxData) -> None:
         # Only values read in this poll decide: a held one is no evidence.
         control = self._control
-        goal = control.energy_goal
-        if goal.status == "active":
-            # A pause while the target still runs is not the target's: set by
-            # hand or by a plan. Seen before the reach, kept through it.
-            self._foreign_pause = control.pause_requested is True
-        elif not goal.target_kwh:
-            self._foreign_pause = False
         self.state.observe(
             snapshot_vehicle_connected(data.fresh, control.layout_version),
-            armed=goal.target_kwh > 0,
-            # With the rule on, no pause is left without a car in any case.
-            pause_ours=self.state.enabled or not self._foreign_pause,
+            armed=control.energy_goal.target_kwh > 0,
         )
 
     async def async_end_reached_goal(self) -> None:
@@ -130,27 +120,32 @@ class UnplugRelease:
         if control.read_only or control.monotonic() < self._goal_retry_at:
             return
         goal = control.energy_goal
-        clear = owed != "pause" and goal.target_kwh > 0
-        if clear and goal.status != "reached":
-            # Not reached: it waits for the next plug-in, or for the meter
-            # reading that shows this charge reached it.
-            return
-        if owed != "pause" and not clear:
-            # Cleared already: by hand, or by an end of ours that failed
-            # after it took effect. Its pause is still to end.
-            state.goal_owed = owed = "pause" if owed == "goal_pause" else None
-        ended = clear
+        if owed == "goal":
+            if not goal.target_kwh:
+                # Cleared by hand meanwhile: nothing of the rule's is left,
+                # and a pause set since is not its to end.
+                state.goal_owed = None
+                return
+            if goal.status != "reached":
+                # Not reached: it waits for the next plug-in, or for the
+                # meter reading that shows this charge reached it.
+                return
         try:
-            if owed is not None:
-                async with control.energy_goal_guard:
-                    absent = await control.async_unplugged()
-                if not absent:
-                    # Unknown, or plugged in again: the next poll decides.
-                    return
-            if clear:
-                await control.async_set_energy_goal(0)
-                state.goal_owed = owed = "pause" if owed == "goal_pause" else None
-            if owed == "pause" and control.pause_requested is True:
+            async with control.energy_goal_guard:
+                absent = await control.async_unplugged()
+            if not absent:
+                # Unknown, or plugged in again: the next poll decides.
+                return
+            if owed == "goal":
+                try:
+                    await control.async_set_energy_goal(0)
+                finally:
+                    # Read anew: setting a target replaces the model.
+                    if not control.energy_goal.target_kwh:
+                        # Also when it failed after it took effect: the
+                        # pause is still to end.
+                        state.goal_owed = "pause"
+            if control.pause_requested is True:
                 if control.energy_goal_stop_requested or control.pending_action is not None:
                     # Another limit holds the pause, or its end already waits.
                     return
@@ -158,7 +153,6 @@ class UnplugRelease:
                 if control.pause_requested is True:
                     # Queued behind the floor between two current writes.
                     return
-                ended = True
         except AmtronRateLimitedError as err:
             self._goal_retry_at = control.monotonic() + err.retry_after
             return
@@ -171,7 +165,7 @@ class UnplugRelease:
             return
         state.goal_owed = None
         self._goal_retry_at = 0.0
-        if not self._goal_notice.recovered("reached target ended after unplugging") and ended:
+        if not self._goal_notice.recovered("reached target ended after unplugging"):
             _LOGGER.info("Energy target: reached target ended after unplugging")
 
     async def async_apply(self) -> None:

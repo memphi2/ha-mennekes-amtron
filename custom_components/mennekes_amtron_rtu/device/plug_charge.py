@@ -149,7 +149,10 @@ class PlugChargeState:
     def manual_marks(self, marks: tuple[bool, bool, bool, str | None]) -> None:
         if marks[3] != self.session:
             # The connection changed while the command waited: what a poll
-            # decided about its release meanwhile stands.
+            # decided about its release meanwhile stands. Only a release the
+            # refused command itself added goes: waiting opened nothing.
+            if not marks[0]:
+                self.manual = self.manual_connected = self.restored_manual = False
             return
         self.manual, self.manual_connected, self.restored_manual = marks[:3]
 

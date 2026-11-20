@@ -932,3 +932,40 @@ def test_a_refused_release_does_not_bring_back_one_that_an_unplug_ended(tmp_path
         await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_refused_release_for_the_next_car_is_gone_when_that_car_came_meanwhile(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        control = service.control
+        serial = service.identity.serial_number
+        await control.async_configure_plug_charge(True, policy=POLICY)
+        await service.refresh()
+        state = control._plug_charge.state
+        assert state.session is None
+        assert not state.manual
+        clock[0] += 1000
+        real = control._client.async_write_register
+
+        async def lost(spec, value, **kwargs):
+            if spec == R.CHARGING_RELEASE:
+                # A car is plugged in and a poll sees it while the command
+                # waits for the bus; then the command's write is lost.
+                transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+                transport.bank[R.CP_STATE.address] = int(CpState.B1)
+                await service._poll()
+                raise AmtronConnectionError("timeout")
+            return await real(spec, value, **kwargs)
+
+        control._client.async_write_register = lost
+        with pytest.raises((DeviceError, AmtronConnectionError)):
+            await service.command({"command": "release", "value": True, "expected_serial_number": serial})
+        control._client.async_write_register = real
+        # The command failed: it released nothing, also not this car.
+        assert state.session is not None
+        assert not state.manual
+        assert state.blocked
+        await service.stop()
+
+    asyncio.run(run())

@@ -21,8 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   is cleared and its pause ends, so the next car charges without the previous
   limit. Before, the stop stayed until it was resumed by hand. This also
   holds when the meter shows the target reached only after the unplug. A
-  pause set by hand before the target was reached stays, as does a stop by
-  another limit.
+  pause set by hand ends with it; a stop by another limit stays.
 - The departure plan's charging current is the plan's only: a pause and
   resume after the plan returns to the current chosen by hand. Before, the
   plan's current replaced it. Lowering the plan's current to a new current

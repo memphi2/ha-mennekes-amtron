@@ -99,7 +99,7 @@ def test_a_saved_rule_comes_back_and_owes_nothing_once_disabled():
     assert not UnplugReleaseState.restore(
         {"enabled": False, "plugged": False, "owed": True, "goal_owed": None},
     ).owed
-    owing = UnplugReleaseState(False, False, False, "goal_pause")
+    owing = UnplugReleaseState(False, False, False, "goal")
     assert UnplugReleaseState.restore(owing.snapshot()) == owing
 
 
@@ -109,17 +109,14 @@ def test_only_an_unplug_with_a_target_owes_its_end():
     state.observe(False)
     assert state.goal_owed is None
     # A target set without a car is the next car's.
-    state.observe(False, armed=True, pause_ours=True)
+    state.observe(False, armed=True)
     assert state.goal_owed is None
     state.observe(True, armed=True)
     state.observe(None, armed=True)
-    state.observe(False, armed=True, pause_ours=True)
-    assert state.goal_owed == "goal_pause"
-    state.observe(True, armed=True)
-    assert state.goal_owed is None
-    # A pause set by hand before the unplug is not the target's.
     state.observe(False, armed=True)
     assert state.goal_owed == "goal"
+    state.observe(True, armed=True)
+    assert state.goal_owed is None
 
 
 @pytest.mark.parametrize("rule", [False, True])
@@ -476,7 +473,7 @@ def test_a_target_not_reached_waits_for_the_next_car(tmp_path):
         await _command(service, "energy_goal", value=1)
         _plug(transport, False)
         await _poll(service)
-        assert control.write_state.unplug_release.goal_owed == "goal_pause"
+        assert control.write_state.unplug_release.goal_owed == "goal"
         assert control.energy_goal.status == "active"
         _plug(transport, True, release=1)
         await _poll(service)
@@ -532,29 +529,6 @@ def test_another_limits_pause_is_left_and_ended_once_that_limit_goes(tmp_path):
     asyncio.run(run())
 
 
-def test_a_pause_set_by_hand_before_the_unplug_is_kept(tmp_path):
-    async def run():
-        service, transport, clock = await _rule(tmp_path, enabled=False)
-        control = service.control
-        await _command(service, "energy_goal", value=1)
-        await _command(service, "pause")
-        clock[0] += 1000
-        _plug(transport, False)
-        await _poll(service)
-        assert control.write_state.unplug_release.goal_owed == "goal"
-        put(transport.bank, R.ENERGY_TOTAL, control.energy_goal.baseline_kwh + 2)
-        clock[0] += 1000
-        service._poller._slow_read_at = None
-        for _ in range(3):
-            await _poll(service)
-            await _settled(service)
-        assert control.write_state.unplug_release.goal_owed is None
-        assert (control.energy_goal.status, control.pause_requested) == ("disabled", True)
-        await service.stop()
-
-    asyncio.run(run())
-
-
 def test_a_target_cleared_by_hand_leaves_nothing_owed(tmp_path):
     async def run():
         service, transport, _clock = await _rule(tmp_path, enabled=False)
@@ -586,12 +560,12 @@ def test_a_failed_end_is_retried_and_reported_once(tmp_path, caplog):
         with caplog.at_level("INFO"):
             await _poll(service)
             await _poll(service)
-            assert state.goal_owed == "goal_pause"
+            assert state.goal_owed == "goal"
             assert caplog.text.count("reached target not ended after unplugging") == 1
             control.async_set_energy_goal = real
             # Not before the retry time.
             await _poll(service)
-            assert state.goal_owed == "goal_pause"
+            assert state.goal_owed == "goal"
             clock[0] += 31
             await _poll(service)
         assert (state.goal_owed, control.pause_requested) == (None, False)
@@ -606,10 +580,10 @@ def test_a_car_back_before_the_check_keeps_its_target(tmp_path):
         service, _transport, clock = await _rule(tmp_path, enabled=False)
         control = await _reached(service, _transport, clock)
         state = control.write_state.unplug_release
-        state.goal_owed = "goal_pause"
+        state.goal_owed = "goal"
         # Owed from an earlier poll, but the wallbox shows a car again.
         await control.unplug_release.async_end_reached_goal()
-        assert state.goal_owed == "goal_pause"
+        assert state.goal_owed == "goal"
         assert (control.energy_goal.status, control.pause_requested) == ("reached", True)
         await service.stop()
 
@@ -643,36 +617,6 @@ def test_a_write_that_came_too_soon_waits_for_its_interval(tmp_path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("rule", [False, True])
-def test_a_pause_by_hand_before_a_reach_seen_while_plugged_is_kept(tmp_path, rule):
-    async def run():
-        service, transport, clock = await _rule(tmp_path, enabled=rule)
-        control = service.control
-        await _command(service, "energy_goal", value=1)
-        await _command(service, "pause")
-        await _poll(service)
-        # The last meter reading before the unplug shows the target reached.
-        put(transport.bank, R.ENERGY_TOTAL, control.energy_goal.baseline_kwh + 2)
-        clock[0] += 1000
-        service._poller._slow_read_at = None
-        await _poll(service)
-        await _settled(service)
-        assert control.energy_goal.status == "reached"
-        clock[0] += 1000
-        _plug(transport, False)
-        for _ in range(3):
-            await _poll(service)
-            await _settled(service)
-            clock[0] += 1000
-        assert control.write_state.unplug_release.goal_owed is None
-        assert control.energy_goal.status == "disabled"
-        # With the rule on no pause is left without a car, whoever set it.
-        assert control.pause_requested is not rule
-        await service.stop()
-
-    asyncio.run(run())
-
-
 def test_an_end_that_failed_after_the_target_was_cleared_still_ends_the_pause(tmp_path):
     async def run():
         service, transport, clock = await _rule(tmp_path, enabled=False)
@@ -689,7 +633,7 @@ def test_an_end_that_failed_after_the_target_was_cleared_still_ends_the_pause(tm
         control.async_set_energy_goal = uncertain
         await _poll(service)
         control.async_set_energy_goal = real
-        assert (control.energy_goal.status, control.pause_requested, state.goal_owed) == ("disabled", True, "goal_pause")
+        assert (control.energy_goal.status, control.pause_requested, state.goal_owed) == ("disabled", True, "pause")
         clock[0] += 1000
         await _poll(service)
         assert (control.pause_requested, state.goal_owed) == (False, None)
@@ -736,11 +680,11 @@ def test_nothing_is_written_read_only_or_without_a_pause(tmp_path):
         service, transport, clock = await _rule(tmp_path, enabled=False)
         control = await _reached(service, transport, clock)
         state = control.write_state.unplug_release
-        state.goal_owed = "goal_pause"
+        state.goal_owed = "goal"
         control.startup_hold = True
         _plug(transport, False)
         await control.unplug_release.async_end_reached_goal()
-        assert (state.goal_owed, control.energy_goal.status) == ("goal_pause", "reached")
+        assert (state.goal_owed, control.energy_goal.status) == ("goal", "reached")
         control.startup_hold = False
         # The pause's end already waits in the queue: no second one.
         state.goal_owed = "pause"
@@ -754,6 +698,48 @@ def test_nothing_is_written_read_only_or_without_a_pause(tmp_path):
         control.pause_requested = False
         await control.unplug_release.async_end_reached_goal()
         assert (state.goal_owed, calls) == (None, [])
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_pause_set_after_the_unplug_stays_when_the_target_is_cleared_by_hand(tmp_path):
+    async def run():
+        service, transport, clock = await _rule(tmp_path, enabled=False)
+        control = service.control
+        await _command(service, "energy_goal", value=1)
+        _plug(transport, False)
+        await _poll(service)
+        assert control.write_state.unplug_release.goal_owed == "goal"
+        # For the next car: a pause by hand, then the target taken away.
+        clock[0] += 1000
+        await _command(service, "pause")
+        await _command(service, "energy_goal", value=0)
+        await _poll(service)
+        assert control.write_state.unplug_release.goal_owed is None
+        assert control.pause_requested is True
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_pause_by_hand_ends_with_the_reached_target_too(tmp_path):
+    async def run():
+        service, transport, clock = await _rule(tmp_path, enabled=False)
+        control = service.control
+        await _command(service, "energy_goal", value=1)
+        await _command(service, "pause")
+        put(transport.bank, R.ENERGY_TOTAL, control.energy_goal.baseline_kwh + 2)
+        clock[0] += 1000
+        service._poller._slow_read_at = None
+        _plug(transport, False)
+        for _ in range(3):
+            await _poll(service)
+            await _settled(service)
+            clock[0] += 1000
+        # No pause is left behind for the next car, whoever set it.
+        assert (control.energy_goal.status, control.pause_requested) == ("disabled", False)
+        assert control.write_state.unplug_release.goal_owed is None
         await service.stop()
 
     asyncio.run(run())
