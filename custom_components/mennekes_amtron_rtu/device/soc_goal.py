@@ -79,8 +79,14 @@ class SocGoal:
         if target and cap is not None and target > cap:
             raise ValueError("target exceeds the vehicle charge limit")
         previous = self.snapshot()
+        # Setting the target in force again, as a release of its reach does,
+        # chooses nothing: a value the limit pressed down stays the chosen one.
+        again = target == self.target_percent and target == (
+            self.chosen_percent if cap is None else min(self.chosen_percent, cap)
+        )
         self.target_percent = target
-        self.chosen_percent = 100.0 if target == cap else target
+        if not again:
+            self.chosen_percent = 100.0 if target == cap else target
         self.maximum_percent = cap
         self.status = "active" if target else "disabled"
         if target and current is not None and current >= target:

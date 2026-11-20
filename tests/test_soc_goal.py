@@ -197,3 +197,21 @@ def test_only_a_target_below_the_car_limit_pauses_when_reached():
     unknown.set_target(80, 50)
     assert unknown.observe(80)
     assert unknown.stop_requested
+
+
+def test_setting_the_target_in_force_again_keeps_the_chosen_value():
+    goal = SocGoal()
+    goal.configure_source("car")
+    goal.set_target(70, 20, 90)
+    goal.observe(60, 60)
+    assert (goal.target_percent, goal.chosen_percent, goal.status) == (60, 70, "reached")
+    # What releasing a reach does: the same target, without a charge level.
+    goal.set_target(60, maximum=60)
+    assert (goal.target_percent, goal.chosen_percent, goal.status) == (60, 70, "active")
+    goal.observe(None, 90)
+    assert goal.target_percent == 70
+    # With another limit the same number is a new choice.
+    goal.observe(None, 60)
+    goal.set_target(60, maximum=80)
+    assert (goal.target_percent, goal.chosen_percent) == (60, 60)
+    assert SocGoal.restore(goal.snapshot()).snapshot() == goal.snapshot()

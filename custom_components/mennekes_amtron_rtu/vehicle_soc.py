@@ -396,7 +396,7 @@ class VehicleSocObserver:
                     self._async_restore_target(), "amtron_vehicle_target", eager_start=False,
                 )
             return
-        if self._memory_key is not None and self._memory.remember(self._memory_key, goal.target_percent):
+        if self._memory_key is not None and self._memory.remember(self._memory_key, goal.chosen_percent):
             self._hass.async_create_task(self._memory.async_save(), eager_start=False)
 
     @callback
