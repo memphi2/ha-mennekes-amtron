@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   sensor must name that currency per kWh or MWh, and Home Assistant tells the
   app the currency with the price. The app's overview state carries
   `targets.cost` and `targets.cost_currency` instead of `cost_eur`.
+- **Breaking:** a wallbox without a serial-number register no longer gets a
+  unique ID made from its port or address; its endpoint only keeps it from
+  being set up twice. Remove such an entry and set it up again. Entries of
+  wallboxes with a serial number are unchanged.
 - The app names its targets as Home Assistant does: energy target, cost
   target, vehicle charge target and target time. The Charging page sorts them
   into "for every charge", "own car only" and guest charging, each target has

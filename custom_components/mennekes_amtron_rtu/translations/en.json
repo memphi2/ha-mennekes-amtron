@@ -5,7 +5,6 @@
       "reconfigure_successful": "The connection was updated.",
       "reauth_successful": "Sign-in was updated.",
       "unique_id_mismatch": "This connection belongs to a different wallbox.",
-      "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration.",
       "invalid_service_discovery": "The app reported invalid connection details.",
       "service_identity_changed": "The discovered wallbox changed. Start setup again.",
       "service_discovery_updated": "The existing integration now uses the discovered app connection.",

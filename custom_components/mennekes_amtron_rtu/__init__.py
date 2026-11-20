@@ -799,14 +799,9 @@ async def _async_reset_disabled_trip(hass: HomeAssistant, entry: MennekesAmtronC
 
 
 def _entry_serial_binding(entry: MennekesAmtronConfigEntry) -> str | None:
-    """Return a known serial, retaining old endpoint-only entry identities."""
+    """The serial number this entry was set up for, if the wallbox has one."""
     serial = entry.data.get(CONF_SERIAL_NUMBER)
-    if isinstance(serial, str) and serial:
-        return serial
-    unique_id = getattr(entry, "unique_id", None)
-    if isinstance(unique_id, str) and unique_id and not unique_id.startswith(f"{DOMAIN}_"):
-        return unique_id
-    return None
+    return serial if isinstance(serial, str) and serial else None
 
 
 async def async_unload_entry(

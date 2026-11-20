@@ -5,7 +5,6 @@
       "reconfigure_successful": "La connexion a été mise à jour.",
       "reauth_successful": "La connexion a été mise à jour.",
       "unique_id_mismatch": "Cette connexion correspond à une autre borne.",
-      "service_migration_requires_serial": "Le numéro de série de la borne doit pouvoir être lu pour retrouver l’appareil existant lors de la migration.",
       "invalid_service_discovery": "L’application a fourni des informations de connexion non valides.",
       "service_identity_changed": "La borne détectée a changé. Recommencez la configuration.",
       "service_discovery_updated": "L’intégration existante utilise désormais la connexion de l’application détectée.",

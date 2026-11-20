@@ -5,7 +5,6 @@
       "reconfigure_successful": "De verbinding is bijgewerkt.",
       "reauth_successful": "De aanmelding is bijgewerkt.",
       "unique_id_mismatch": "Deze verbinding hoort bij een andere wallbox.",
-      "service_migration_requires_serial": "De wallbox moet een leesbaar serienummer hebben om deze bij de overstap aan het bestaande apparaat te koppelen.",
       "invalid_service_discovery": "De app heeft ongeldige verbindingsgegevens doorgegeven.",
       "service_identity_changed": "De gevonden wallbox is gewijzigd. Begin de configuratie opnieuw.",
       "service_discovery_updated": "De bestaande integratie gebruikt nu de verbinding met de gevonden app.",

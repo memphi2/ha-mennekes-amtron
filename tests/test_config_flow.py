@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.data_entry_flow import AbortFlow
 
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu._flow_connect import async_test_connection
@@ -177,7 +179,7 @@ def test_a_good_connection_creates_the_entry(monkeypatch: pytest.MonkeyPatch) ->
     asyncio.run(run())
 
 
-def test_a_device_without_a_serial_number_falls_back_to_the_port(
+def test_a_device_without_a_serial_number_has_no_unique_id_and_is_set_up_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def run() -> None:
@@ -185,8 +187,15 @@ def test_a_device_without_a_serial_number_falls_back_to_the_port(
         flow = Flow(FakeHass())
         result = await flow.async_step_serial(dict(USER_INPUT))
         assert CONF_SERIAL_NUMBER not in result["data"]
-        assert flow.set_unique_id == "mennekes_amtron_rtu_/dev/fake"
+        assert flow.set_unique_id is None
         assert result["data"][CONF_PORT] == "/dev/fake"
+        # The same port and address a second time is refused by its endpoint.
+        flow.hass.config_entries.entries["one"] = SimpleNamespace(
+            entry_id="one", domain="mennekes_amtron_rtu", data=result["data"], options={}, source="user",
+        )
+        again = Flow(flow.hass)
+        with pytest.raises(AbortFlow, match="already_configured"):
+            await again.async_step_serial(dict(USER_INPUT))
 
     asyncio.run(run())
 

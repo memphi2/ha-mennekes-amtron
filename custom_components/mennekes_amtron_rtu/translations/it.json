@@ -5,7 +5,6 @@
       "reconfigure_successful": "La connessione è stata aggiornata.",
       "reauth_successful": "L’accesso è stato aggiornato.",
       "unique_id_mismatch": "Questa connessione appartiene a un’altra wallbox.",
-      "service_migration_requires_serial": "Per riconoscere il dispositivo esistente durante la migrazione, il numero di serie della wallbox deve essere leggibile.",
       "invalid_service_discovery": "L'app ha fornito dati di connessione non validi.",
       "service_identity_changed": "La wallbox rilevata è cambiata. Riavvia la configurazione.",
       "service_discovery_updated": "L'integrazione esistente ora usa la connessione dell'app rilevata.",

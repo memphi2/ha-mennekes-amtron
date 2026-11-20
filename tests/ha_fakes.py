@@ -56,7 +56,7 @@ class FakeConfigEntries:
 
         return self.entries.get(entry_id)
 
-    def async_entries(self, domain: str | None = None) -> list[Any]:
+    def async_entries(self, domain: str | None = None, *_include: bool) -> list[Any]:
         """Return the registered entries of one integration."""
 
         return [entry for entry in self.entries.values() if domain in (None, entry.domain)]

@@ -28,7 +28,7 @@ NUMBER = "number.mennekes_amtron_charging_current_limit"
 
 
 @pytest.mark.parametrize("transport_type", ["serial", "rtu_over_tcp", "modbus_tcp", "service"])
-@pytest.mark.parametrize("binding", ["serial_number", "unique_id"])
+@pytest.mark.parametrize("binding", ["serial_number"])
 def test_setup_rejects_another_wallbox_before_starting_controls(
     tmp_path, monkeypatch, caplog, transport_type, binding
 ):
@@ -37,22 +37,7 @@ def test_setup_rejects_another_wallbox_before_starting_controls(
         hass = await _boot(tmp_path / "ha")
         try:
             async with TestServer(create_app(service)) as server:
-                if binding == "unique_id":
-                    # Model an already stored serial binding whose data has
-                    # always used the entry-ID entity fallback. Do not remove
-                    # a serial field after entities were created from it.
-                    assert await async_setup_component(hass, "network", {})
-                    entry = ConfigEntry(
-                        version=1, minor_version=1, domain=DOMAIN,
-                        title="Mennekes Amtron", unique_id=SERIAL, source="user",
-                        data={"server_url": str(server.make_url("/")), "server_token": TOKEN},
-                        options={"scan_interval_seconds": 300},
-                        discovery_keys=MappingProxyType({}), subentries_data=[],
-                    )
-                    await hass.config_entries.async_add(entry)
-                    assert entry.state is ConfigEntryState.LOADED
-                else:
-                    entry = await add_entry(hass, str(server.make_url("/")))
+                entry = await add_entry(hass, str(server.make_url("/")))
                 before = entity_ids(hass, entry)
                 await hass.config_entries.async_unload(entry.entry_id)
                 if transport_type == "service":
@@ -191,7 +176,7 @@ def test_runtime_service_identity_change_blocks_commands_and_recovers_in_place(
 
 
 @pytest.mark.parametrize("available_serial", [None, SERIAL])
-def test_legacy_endpoint_identity_remains_usable_and_is_not_reassigned(
+def test_a_wallbox_without_a_serial_number_has_no_unique_id_and_gets_none_later(
     tmp_path, available_serial
 ):
     async def run():
@@ -202,12 +187,13 @@ def test_legacy_endpoint_identity_remains_usable_and_is_not_reassigned(
             async with TestServer(create_app(service)) as server:
                 url = str(server.make_url("/"))
                 entry = await add_entry(hass, url, expected_serial=None)
-                old_unique_id = f"{DOMAIN}_{url.rstrip('/')}"
+                # No serial register: no unique ID; an address is none.
+                assert entry.unique_id is None
                 before = entity_ids(hass, entry)
                 await hass.config_entries.async_unload(entry.entry_id)
                 service.identity.serial_number = available_serial
                 assert await hass.config_entries.async_setup(entry.entry_id)
-                assert entry.unique_id == old_unique_id
+                assert entry.unique_id is None
                 assert "serial_number" not in entry.data
                 assert entity_ids(hass, entry) == before
                 assert entry.state is ConfigEntryState.LOADED

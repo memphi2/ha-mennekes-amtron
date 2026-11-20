@@ -5,7 +5,6 @@
       "reconfigure_successful": "Die Verbindung wurde aktualisiert.",
       "reauth_successful": "Die Anmeldung wurde aktualisiert.",
       "unique_id_mismatch": "Diese Verbindung gehört zu einer anderen Wallbox.",
-      "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich.",
       "invalid_service_discovery": "Die App hat ungültige Verbindungsdaten gemeldet.",
       "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
       "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung.",
