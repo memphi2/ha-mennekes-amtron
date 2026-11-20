@@ -5,461 +5,162 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.10.0 — 2026-11-20
 
-### Fixed
-
-- A start or restart command checks its conditions again after waiting for
-  the line to fall silent: a stop that arrived during that wait of up to about
-  a second no longer lets the write out.
-- A vehicle charge target lowered in the app is reached also when the car
-  keeps reporting the same level: a new report of the car with an unchanged
-  level renews it in the app at least every five minutes, so the app still
-  knows it. Ordinary polls renew nothing, and a level the car stopped
-  reporting is not made current again.
-- The climate and calendar blueprints act only for their own car: they never
-  run while a guest charges, whose end time **Target time** then is, and with
-  a **Vehicle** entered not while another car is selected. **Target time**
-  carries the attributes `guest` and `vehicle` for this.
-- A reached cost target shows the money used up to the reading that reached
-  it, and keeps it through a restart of the app; before, it showed the
-  reading before and, after a restart, only the part booked at a price change,
-  often nothing.
-
-## 0.10.0b8 — 2026-11-20
-
-### Fixed
-
-- Saving a car works again when the saved vehicle list is no longer valid, for
-  example after the `departure_*` rename: the car starts a fresh list instead
-  of being added to the unusable one, which stayed empty.
-
-## 0.10.0b7 — 2026-11-20
-
-### Changed
-
-- **Breaking:** money is in Home Assistant's currency instead of fixed euros:
-  the cost target, both cost sensors and the price fields use it, a price
-  sensor must name that currency per kWh or MWh, and Home Assistant tells the
-  app the currency with the price. The app's overview state carries
-  `targets.cost` and `targets.cost_currency` instead of `cost_eur`.
-- **Breaking:** a wallbox without a serial-number register no longer gets a
-  unique ID made from its port or address; its endpoint only keeps it from
-  being set up twice. Remove such an entry and set it up again. Entries of
-  wallboxes with a serial number are unchanged.
-- **Breaking:** the wallbox service alone keeps the target time. Home
-  Assistant no longer stores a copy that it sends later: a time can only be
-  set while the service is reachable, a time changed while a guest charges
-  stays as changed afterwards, and a service that lost its saved plan has no
-  trip until one is set again. A time taken from a calendar or the car is
-  refused when the trip was edited while that answer was awaited.
-- **Breaking:** everything named `timed_*` is named `departure_*`, including
-  the vehicle options of departure planning. A vehicle profile saved with the
-  old option names is no longer valid, and with it the whole vehicle list:
-  set the vehicles up again. The target time entity gets a new unique ID
-  (`…_departure_time`); delete the old, now unavailable entity first, or the
-  new one gets `_2` appended to its entity ID.
-- **Breaking (service API):** a number that is not a permitted value is
-  refused with the error's name (for example `energy_goal_invalid`) instead of
-  as an invalid request; a current above the maximum is capped.
-- **Breaking (service API):** a command takes only its own fields. A field
-  that belongs to another command, which was ignored before, is refused.
-- Plug & Charge treats the plan's charge to the minimum level as a plan
-  that charges; before, it took that state for no plan at all.
-- A car that is seen again only after more than a minute without a valid
-  reading is no longer taken for surely the same one, also when few polls
-  fell into the gap: a Plug & Charge grant, a release by hand and a guest
-  permission end then.
-- One account of the plug-in decides for Plug & Charge, guest charging, the
-  unplug rule and the estimates whether a car is connected. Plug & Charge
-  counts a car's evidence from its real plug-in time, also when the gate was
-  switched on with the car already connected.
-- The app names its targets as Home Assistant does: energy target, cost
-  target, vehicle charge target and target time. The Charging page sorts them
-  into "for every charge", "own car only" and guest charging, each target has
-  its own Save and Clear, and the guest card lists what ends a guest charge.
-  While a guest holds the wallbox, the vehicle charge target says that it does
-  not apply.
-- The overview shows the four saved targets in one card with one link to the
-  Charging page, instead of three links to the same page. Its state carries
-  the target time as `targets.time`; the Charging page state carries
-  `guest_mode`.
-- Home Assistant uses the same names: "percentage target", "kWh limit", "time
-  limit" and "deadline" are now Vehicle charge target, Energy target and Target
-  time in all states, errors, actions and option texts; the departure plan
-  attribute is called Departure plan status. Every guest rule names the cost
-  target too. A past time typed in the app says so, and a target time changed
-  elsewhere is reported as changed, not as an uncertain save.
-- Errors while the wallbox or service cannot be reached are translated; every
-  configuration field has a description; the Vehicle charge target number has
-  the battery device class.
-- The release publication reads a new draft again for about two minutes before
-  it stops, and names the reason when it does.
-
-## 0.10.0b6 — 2026-11-20
-
-### Changed
-
-- The app's overview state no longer carries `configured`; `state` already
-  says `setup_required`. The Charging page state no longer carries the
-  unused `forecast` of the departure plan.
-- **Breaking:** the saved control state has new fields and the state of
-  0.10.0b5 is not read. After the update the service switches the charging
-  release off and blocks charging commands until the reset is confirmed
-  under **Settings → System → Repairs**; then set the targets again. See
-  [Saved charging settings could not be loaded](docs/troubleshooting.md#saved-charging-settings-could-not-be-loaded).
-- A reached energy or cost target ends when the car is unplugged: the target
-  is cleared and its pause ends, so the next car charges without the previous
-  limit. Before, the stop stayed until it was resumed by hand. This also
-  holds when the meter shows the target reached only after the unplug. A
-  pause set by hand ends with it; a stop by another limit stays.
-- The departure plan's charging current is the plan's only: a pause and
-  resume after the plan returns to the current chosen by hand. Before, the
-  plan's current replaced it. Lowering the plan's current to a new current
-  cap or reasserting it after wallbox error 200 does not replace it either.
-  After a restart of the service during a plan, a pause still takes the
-  current it finds.
-- A percentage target that a lower charge limit of the car pressed down
-  returns to the chosen value when the limit rises again. Before, it rose to
-  the limit itself. A target chosen at the limit still follows it. The
-  target remembered per car is the chosen value.
-
-### Added
-
-- App: without a running amount the **Charging** page names the price and
-  since when Home Assistant reported it; the departure plan shows its
-  planned start, or that it could not be saved.
-
-### Fixes
-
-- A guest start behind a waiting stop is refused before its first write.
-  Before, it opened the charging release and then failed at its current: the
-  release stayed open without a guest.
-- A charging current set behind a waiting lock or withdrawn release is
-  refused. Before, it was reported as done and never written.
-- A stop by a limit no longer cancels a pause that still waits.
-- Plug & Charge: a release withdrawn by hand closes the gate with its own
-  write, not earlier inside the state-change interval.
-- A guest start for a car that was unplugged a moment ago is refused instead
-  of reported as started.
-- A charge paused for a missing energy meter no longer resumes by itself
-  when a guest time limit or percentage target that stopped it meanwhile is
-  moved or cleared.
-- A refused guest start no longer turns a charging release that was
-  switched off by hand into a requested one.
-- Closing the release after an unplug, and an error recovery whose write
-  stayed unanswered, no longer drop a lock or pause that still waits.
-- Plug & Charge: a release given by hand to a connected car no longer passes
-  to the next car when that car was unplugged while the service was down. A
-  release given without a car still waits for the next plug-in.
-- A current above 32 A found in the wallbox, e.g. from another controller, is
-  no longer saved as the current to return to. Before, the next start
-  rejected the saved state and blocked charging until acknowledged.
-- The departure plan no longer ends a guest's pause after the guest unplugs.
-- A clock set back no longer ties a new charge level report of the car to an
-  old meter reading.
-- With a guest permission saved, the service starts also while the disk
-  refuses writes; a stop of the service can no longer hang on a save that
-  fails at that moment.
-- After a serial port was lost while the service started, the library's own
-  attempts to reopen it no longer go on beside the new connection.
-- A serial adapter that was gone is used again within seconds of its return.
-  Before, the wait doubled up to five minutes, with the wallbox on its
-  fallback current meanwhile.
-- A write no longer follows a serial port that was reopened in the short
-  quiet wait before it, without a new check of the wallbox's identity.
-- A negative reading of the energy meter is no longer published while it is
-  read again.
-- A weak line logs late heartbeat acknowledgements once per weak phase,
-  until five minutes passed without one, instead of each time.
-- Reconfiguring the connection to a separately hosted service no longer
-  fills the form with the stored access token, nor with one typed before a
-  failed attempt. Enter the token again there.
-- A tariff change, the Plug & Charge switch and a vehicle switch are applied
-  without a reload in any order, so the running cost estimate is kept.
-  Before, the second of them reloaded the entry.
-- Attributes of Total power, Session energy, Charging status, Wallbox
-  settings, Error, Authorization, Cable lock, Requested phases and the departure plan have
-  names in all five languages. Connection quality names its `heartbeat`
-  attribute instead of two counters it never carried.
-- App: a page read behind a long command ends after five seconds instead of
-  blocking the app's other pages. The Charging and Registers pages show "No
-  current response" until the command is done; the overview shows the last
-  state meanwhile.
-- App: the unused access to the host's udev database is gone.
-- Documentation: a guest charge follows the blueprints' current and pause
-  like any other charge; the fields of `set_charging_current` are listed in
-  the user guide.
-- Cost target: the app arms an amount at the price of the running amount,
-  also after a restart of the service, and a price that changed nothing no
-  longer delays the next one by a minute.
-- Cost target: a price that arrived while the target was stopped or its meter
-  was missing is applied once the target runs again. With less than one
-  0.1 kWh step of money left, a new price now leaves one step at that price
-  instead of being ignored.
-
-## 0.10.0b5 — 2026-11-19
-
-[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/oliver7557)
-
-### Added
-
-- The app's **Charging** page sets and shows the cost ceiling, and the
-  overview names the amount beside its energy target. Home Assistant now
-  reports every price change to the service, also without a running amount,
-  so the app arms an amount at the last reported price.
-
-### Fixes
-
-- App: a command refused because it has to wait behind a waiting stop or the
-  write interval, and a target time in the past, are named as such. Before,
-  both read "Save not confirmed".
-- App: a guest charge interrupted by a restart asks for a new guest start
-  instead of a check of the selected vehicle.
-- App: the Charging page shows the status of the departure plan beside its
-  time, an unknown status no longer reads as a missing vehicle setup, and
-  the command results hint names their times.
-
-## 0.10.0b4 — 2026-11-19
-
-[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/oliver7557)
-
-### Added
-
-- **Cost target**: a charge target as an amount of money. The service keeps
-  the amount with the energy target that carries it, books the energy at
-  each price and stops the charge itself; Home Assistant only tells it the
-  current price. It needs configured charging costs and ends when the energy
-  target is set by hand.
-- The service takes `cost_goal` (amount and price) and `cost_price`, and its
-  energy target state carries the amount. Integration and app must be
-  updated together.
-
-### Fixes
-
-- A lock or a withdrawn release whose reply did not come is written again
-  after five seconds. Before, the repeat waited for a whole state-change
-  interval that the unanswered write itself had started.
-- A waiting pause, lock or withdrawn release is now kept against every
-  command except the one that overrides it. In 0.10.0b3 the other switch, a
-  different stop that had to wait and a phase request could still take its
-  place, and a start refused behind a waiting lock was accepted silently.
-- Repairs of an entry that is disabled while its setup never finished are
-  removed as well.
-- The app pages send their security headers also with a refusal (403, 404,
-  405, 413).
-- A write the service refuses before sending it no longer makes the next
-  request wait for a silent line.
-- The message for a command that could not be saved no longer claims the
-  earlier setting applies when the save may have succeeded.
-
-### Maintenance
-
-- CI runs the app image the way Supervisor does (root, default capabilities)
-  and requires the service to give them up; the release verifies the image's
-  attested list of contents.
-
-## 0.10.0b3 — 2026-11-19
+Stable release of the 0.10 changes since 0.9.1. Integration and app are both
+0.10.0 and must be updated together: the service API is version 3, and each
+side refuses the other's older version.
 
 ### Breaking changes
 
-- The service image runs as its own user, UID 10001, instead of root, and
-  the service gives up every capability at its start. A standalone container
-  needs a data directory that user can write, and for USB the group of the
-  adapter; see the standalone guide. The Home Assistant app needs nothing: it
-  stays root for Supervisor's data, without any capability.
+- **One service for every connection.** A direct USB or LAN connection runs
+  the same service inside Home Assistant that the app runs. Guest charging,
+  departure planning and all targets work the same everywhere. Targets saved
+  by a direct connection are not carried over; set them again.
+- **Saved control state is not taken over.** After the update the service
+  switches the charging release off and blocks charging commands until the
+  reset is confirmed under **Settings → System → Repairs**; then set the
+  targets again. Saved charging-loss averages start again.
+- **Fewer entities.** **Charging status** is the one sensor for what the
+  wallbox does (EVSE state, CP state and `downgraded_to` as attributes),
+  **Charging wait reason** says why a requested charge does not run, **Error**
+  carries heartbeat and fallback, and **Guest charging** is a binary sensor.
+  Removed: Operation controller, Next operation, Energy target status, Charge
+  target status, Departure status, Pending change, Virtual Plug & Charge
+  status, the Guest charging sensor and the binary sensors Downgrade active,
+  Heartbeat lost and Master-lost fallback. Connection quality, Authorization,
+  Cable lock, Detected vehicle phases and Wallbox settings are disabled by
+  default.
+- **One Activity event entity** replaces the command, wallbox and session
+  event entities, with one logbook row per event. Its types are `paused`,
+  `resumed`, `current_set`, `single_phase_set`, `all_phases_set`,
+  `release_enabled`, `release_disabled`, `unlocked`, `locked` and `recovered`
+  for completed commands, `<action>_failed` and `<action>_cancelled`, and the
+  wallbox changes by name, such as `vehicle_plugged_in`, `vehicle_unplugged`,
+  `charging_started` or `error_occurred`. Automations need the new entity and
+  types.
+- **Actions instead of buttons:** Use calendar departure, Use vehicle
+  departure and Assign vehicle charge are the actions
+  `mennekes_amtron_rtu.use_calendar_departure`, `use_vehicle_departure` and
+  `assign_vehicle_charge`.
+- **Switch off charging release when unplugged** is an integration option
+  instead of a switch, off by default. The service applies it, with the app
+  also while Home Assistant is not running.
+- **Departure planning is named `departure_*`** instead of `timed_*`,
+  including the vehicle options. Set the vehicles up again. **Target time**
+  has a new unique ID (`…_departure_time`): delete the old, unavailable
+  entity first, or the new one gets `_2` appended to its entity ID.
+- **The service alone keeps the target time.** It can only be set while the
+  service is reachable, and a service that lost its saved plan has no trip
+  until one is set again.
+- **Money is in Home Assistant's currency** instead of fixed euros: the cost
+  sensors and price fields use it, and a price sensor must name that currency
+  per kWh or MWh.
+- **A wallbox without a serial-number register** no longer gets a unique ID
+  made from its port or address. Remove such an entry and set it up again.
+- **Charging costs follow the charge:** the current charge starts at 0.00 at
+  the plug-in and is 0.00 again after the unplug; the last charge takes its
+  value whenever charging stops and at the unplug. A stored last cost is not
+  taken over.
+- **Names:** "percentage target", "kWh limit", "time limit" and "deadline"
+  are Vehicle charge target, Energy target and Target time in all states,
+  errors, actions and options, in Home Assistant and the app.
+- **Log lines** start with their area, such as `Connection:` or
+  `Departure plan:`. A failure that repeats on every poll is logged once, and
+  its end once. Log filters on the old wording need updating.
+- **The grid-operator downgrade blueprint** takes the Charging status sensor
+  instead of the Downgrade active binary sensor.
+- **The service image** runs as its own user, UID 10001, and gives up every
+  capability at its start. A standalone container needs a data directory that
+  user can write, and for USB the adapter's group. The Home Assistant app needs
+  nothing.
+- **Service API 3:** a command takes only its own fields, a value that is not
+  permitted is refused with the error's name, and the state no longer carries
+  a charging-session summary or the fields `choice_revision`,
+  `supports_plug_charge`, `supports_cancel_pending`,
+  `supports_departure_plan` and `soc_transactions_supported`.
 
-### Fixes
+### Added
 
-- On a serial line and through a transparent gateway (Modbus RTU over TCP),
-  an answer that arrived after its request had timed out was taken for the
-  answer to the next read of the same length, and every answer after it was
-  one late. A charging wallbox could read as idle. After a request without a
-  usable answer the service now waits until nothing arrived for one reply
-  timeout before it asks anything else.
-- A pause, a withdrawn release or a lock that waited for the state-change
-  interval was dropped when the latest poll had failed at its due time. It
-  now waits for the wallbox and is then written.
-- A waiting pause, lock or withdrawn release is also written again after a
-  reply that did not come. It is replaced only by what overrides it: the
-  planner's own newer decision, a start after a pause, or the opposite
-  switch. A current change that switches nothing (such as a surplus
-  adjustment), a different stop and a goal or time stop leave it waiting; a
-  command that would have to wait itself is refused instead of taking its
-  place. Before, each of these dropped the stop and the car went on charging.
-- The recovery from error 200 leaves the charging release closed when
-  nobody has decided it yet and the wallbox has it closed.
-- A manual Plug & Charge release ends when the vehicle state was unknown
-  for a minute, as an automatic grant already did.
-- With a line that does not answer at all, a poll gives up after two
-  register blocks instead of waiting out every block, so the heartbeat gets
-  the bus back within seconds.
-- The recovery from wallbox error 200 runs to its end while the service
-  cannot save its state; before, it broke off after its first write on
-  every poll.
-- The state-change interval counts from the acknowledged write even when the
-  command is cancelled right after it.
-- The service no longer starts without a serial number when that read merely
-  failed; only a wallbox that does not know the register starts without one.
-- A system clock set back no longer stretches the time a Plug & Charge
-  connection may stay unknown.
-- A target time in the past or without time zone is refused as a wrong value
-  with a translated message. Before, the entities became unavailable until
-  the next poll.
-- The repair for a rejected saved state reports a service that is down
-  instead of failing with an unknown error.
-- A successful new sign-in ends with a translated message, the calendar
-  action and a refused save of the departure time report in the user's
-  language, and a reply of the service that is no valid state no longer
-  reaches the interface as an unknown error.
-- Diagnostics can be downloaded for an entry whose setup never finished, and
-  a disabled entry takes its repairs along.
-- A command the wallbox received but the service could not save is
-  answered with its own message (`intent_not_saved`) instead of an
-  unreachable service, and a stop of the service ends cleanly while its
-  storage refuses.
-- A saved state the service cannot read is logged as that, not as a wallbox
-  that does not answer.
-- A vehicle note sent during a running command no longer makes status
-  readers wait for that command, and a request with an unknown character
-  set is answered with 400.
-- A failed save of the charging-loss averages is written again after a
-  minute, also in the history mode when the car's record is gone.
-- The app answers an `Authorization` header that is no text with 401, and a
-  charging change whose readback was lost with `charging_save_uncertain`.
+- **Cost target:** a charge target as an amount of money. The service books
+  the energy at each price Home Assistant reports, keeps the money used through
+  a restart and stops the charge itself. It needs configured charging costs.
+  The app's **Charging** page sets it and shows the amount used.
+- **A reached energy or cost target ends with the unplug**, together with its
+  pause, so the next car charges without the previous limit.
+- **The service measures charging losses and costs itself:** it keeps the
+  meter readings of the running and the last plug cycle through restarts of
+  Home Assistant and of itself. The BavarianData history and a vehicle energy
+  sensor are compared with the wallbox meter over the car's own plug cycle.
+- **One account of the plug-in** decides for Plug & Charge, guest charging, the
+  unplug rule and the estimates whether a car is connected. A car seen again
+  only after more than a minute without a valid reading is not taken for the
+  same one: a grant, a release by hand and a guest permission end then.
+- **The app** sorts its targets by whom they apply to (every charge, own car
+  only, guest), shows them in one card on the overview, names the price and
+  since when it is known, the departure plan's status and planned start, and
+  is reached at `/charging`.
+- **Target time** carries the attributes `guest` and `vehicle`. The climate
+  and calendar blueprints act only for their own car and never for a guest's
+  end time; with more than one car, enter the car's profile under
+  **Vehicle**.
 
-### Changes
+### Changed
 
-- A command polls the wallbox once after its write instead of twice.
-- The phase details on **Total power** and `duration_minutes` stay visible
-  but are no longer recorded.
-- A learned car power is saved only when it moves visibly, so a charging car
-  no longer writes the plan file at every step.
+- A percentage target pressed down by a lower charge limit of the car returns
+  to the chosen value when the limit rises again.
+- The departure plan's charging current is the plan's only: a pause and resume
+  after the plan return to the current chosen by hand.
+- A vehicle charge target lowered in the app is reached also when the car keeps
+  reporting the same level: each report of the car renews it in the app.
+- A command polls the wallbox once after its write instead of twice; a learned
+  car power is saved only when it moves visibly; the phase details on
+  **Total power** are no longer recorded.
+- Reconfiguring a connection to a separately hosted service no longer fills in
+  the stored access token.
 - The release attests the contents of the service image (SBOM) besides its
   provenance.
-- The network-operator lookup sends the Home coordinates rounded to four
-  decimals, and the price source step says that costs are estimates and not
-  suitable for billing others.
-- Privacy and legal texts name what is stored and shipped; the manifest no
-  longer claims a quality tier.
 
-## 0.10.0b2 — 2026-11-18
+### Fixed
 
-### Breaking changes
-
-- **Activity** has one logbook row per event, and the row says what happened.
-  Its event types are now `paused`, `resumed`, `current_set`,
-  `single_phase_set`, `all_phases_set`, `release_enabled`, `release_disabled`,
-  `unlocked`, `locked` and `recovered` for completed commands,
-  `<action>_failed` and `<action>_cancelled` per command, such as
-  `pause_failed` or `resume_cancelled`, and the wallbox changes by their
-  own name, such as `vehicle_plugged_in`, `vehicle_unplugged`,
-  `charging_started` or `error_occurred`. The types `command_done`,
-  `command_failed`, `command_cancelled`, `session_started`, `session_ended`
-  and `wallbox_changed`, the `change`
-  attribute and the extra logbook sentence are gone. Automations need the new
-  types.
-- The service no longer summarizes charging sessions. Its status loses
-  `charging_session`, and its saved intent loses the session history: the
-  app rejects an intent file saved by an earlier version once, and charging
-  stays blocked until that is acknowledged in Home Assistant Repairs.
-- Saved charging-loss averages start again.
-
-### Changes
-
-- The charging loss from the BavarianData history compares the car's newest
-  complete record with the wallbox's total energy meter over that record's
-  own time span, when that span lies in a plug cycle the service saw at this
-  wallbox. It no longer needs the service's session energy, which left the
-  loss unknown.
-- The charging loss from a vehicle energy sensor compares that value with the
-  meter's difference between plug-in and unplug.
-- The service keeps a bounded log of meter readings and the last plug cycle
-  (`charge_meter` in its status) and answers `POST /v2/energy` for any time
-  span; a restart of Home Assistant no longer interrupts a loss measurement.
-  The service saves both in `charge-meter.json` and goes on measuring after
-  its own ordinary restart of less than two minutes. Home Assistant hands it the
-  recognized vehicle as a note on the plug cycle (command `charge_note`), so
-  that name survives a restart as well.
-  The charging cost takes the plug state and its gaps from there as well.
-  The log keeps only what the running and the last plug cycle need, and the
-  file is written at a change of the plug cycle and every five minutes while
-  a car charges; an idle wallbox writes nothing.
-- A record from the car's history counts only when it was charged at this
-  wallbox, and with vehicle profiles only in a plug cycle of that car. A plug
-  cycle the meter cannot measure makes the last loss unknown instead of
-  leaving the charge before assignable.
-- The charging cost follows the charge itself: the current charge starts at
-  0.00 at the plug-in, runs while charging and is 0.00 again after the
-  unplug; the last charge takes its value over whenever charging stops and at
-  the unplug. It no longer waits for the service's session summary, which
-  often left it unknown. An incomplete cost shows the priced part with
-  `complete` false instead of unknown. A stored last cost from an earlier
-  version is not taken over. A plug-in that Home Assistant missed while the
-  service saw it starts the cost again.
-- The app and the integration must both be 0.10.0b2; update them together.
-  Home Assistant refuses an older service.
-- The service no longer reports the field `choice_revision` in its state; the
-  integration never read it.
-- The documentation and the connection form no longer carry upgrade hints for
-  versions before 0.10.0.
-- A reload or restart no longer shows the last command again as new
-  activity: the Activity entity is unknown until the next event.
-- Internal: the service's register monitor and live settings are part of the
-  service itself, and members nothing used are gone.
-- Test: the Recorder row check waits until the charging display has settled.
-
-## 0.10.0b1 — 2026-11-15
-
-### Breaking changes
-
-- A direct USB or LAN connection now runs the same service inside Home
-  Assistant that the app runs. Guest charging, departure planning and the
-  energy and charge targets work the same on every connection. Targets that
-  a direct connection had saved are not carried over; set them again.
-- The entity set is smaller. Removed: the sensors Operation controller, Next
-  operation, Energy target status, Charge target status, Departure status,
-  Pending change, Virtual Plug & Charge status and Guest charging, and the
-  binary sensors Downgrade active, Heartbeat lost and Master-lost fallback.
-  - **Charging status** is the one sensor that says what the wallbox is
-    doing. Its attributes carry the EVSE state, the CP state and
-    `downgraded_to`, the limit of an active grid-operator downgrade.
-  - **Charging wait reason** says why a requested charge is not running;
-    its attributes carry the details.
-  - **Error** carries the heartbeat and fallback state as attributes.
-  - **Guest charging** is a binary sensor.
-- One event entity, **Activity**, replaces the command, wallbox and session
-  event entities. Its event types are `command_done`, `command_failed`,
-  `command_cancelled`, `session_started`, `session_ended` and
-  `wallbox_changed`; the attributes say what happened. Automations that
-  triggered on the old event entities need the new entity and types.
-- The buttons Use calendar departure, Use vehicle departure and Assign
-  vehicle charge are actions now: `mennekes_amtron_rtu.use_calendar_departure`,
-  `mennekes_amtron_rtu.use_vehicle_departure` and
-  `mennekes_amtron_rtu.assign_vehicle_charge`. With one wallbox they need no
-  target.
-- Switching the charging release off when the vehicle is unplugged is an
-  option of the integration instead of a switch entity. It starts switched
-  off; switch it on again in the options if you used it. The service that
-  talks to the wallbox applies it, with the app also while Home Assistant is
-  not running.
-- The diagnostic sensors Connection quality, Authorization, Cable lock,
-  Detected vehicle phases and Wallbox settings are disabled by default.
-- The blueprint for grid-operator downgrade notifications takes the Charging
-  status sensor instead of the Downgrade active binary sensor.
-- Downloaded diagnostics contain the service state, its counters and the raw
-  registers.
-- The integration and the app must both be 0.10.0b1. Update them together;
-  the service API is now version 3, and each side refuses the other's older
-  version.
-
-### Changes
-
-- Log lines of the integration and the app now start with their area, such as
-  `Connection:`, `Heartbeat:`, `Departure plan:` or `Charging cost:`, followed
-  by what happened and the reason in parentheses. A failure that repeats on
-  every poll or retry is logged once as a warning, its repeats at debug level
-  and its end once. Log filters that match the old wording need updating.
+- **Late answers on the RTU line.** On a serial line and through a transparent
+  gateway, an answer that arrived after its request had timed out was taken
+  for the answer to the next read, and every answer after it was one late; a
+  charging wallbox could read as idle. After an unanswered request the service
+  now lets the line fall silent first. Every guarded write is judged after that
+  wait: a stop that arrived meanwhile, or a wallbox that started charging
+  before a restart, refuses the write.
+- **Waiting stops are kept.** A pause, a withdrawn release or a lock that has
+  to wait for the state-change interval is replaced only by what undoes it. A
+  missing reply, a failed poll, a current change, a different stop or a goal
+  stop no longer drops it while the car goes on charging. Such a stop whose
+  reply did not come is written again after five seconds.
+- A guest start behind a waiting stop, and a guest start for a car that just
+  left, are refused before the first write instead of opening the release
+  without a guest.
+- A Plug & Charge release given by hand to a connected car no longer passes to
+  the next car after a service restart, and ends when the vehicle state was
+  unknown for a minute.
+- Error 200 is recovered also while the service cannot save its state, and
+  leaves a release closed that nobody decided.
+- A serial adapter that returns is used again within seconds instead of after
+  up to five minutes on the fallback current, and a write never follows a
+  reopened port without a new identity check.
+- With a line that does not answer at all, a poll gives up after two register
+  blocks, so the heartbeat gets the bus back within seconds.
+- The service no longer starts without a serial number when that read merely
+  failed, and a foreign current above 32 A is not saved as the current to
+  return to.
+- A command the wallbox received but the service could not save is answered
+  as such (`intent_not_saved`); a page read behind a long command ends after
+  five seconds instead of blocking the app's other pages.
+- A target time in the past or without time zone is refused with a translated
+  message; errors while the wallbox or service cannot be reached, all
+  attributes and all configuration fields are translated in five languages.
+- A tariff change, the Plug & Charge switch and a vehicle switch apply without
+  a reload, so the running cost estimate is kept.
+- Diagnostics can be downloaded for an entry whose setup never finished, and a
+  disabled entry takes its repairs along.
 
 ## 0.9.1
 

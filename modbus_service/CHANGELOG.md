@@ -1,123 +1,40 @@
 # Changes
 
-## 0.10.0b7
+## 0.10.0
 
-- Integration and app must both be 0.10.0b7; update them together.
-- The Charging page sorts the targets by whom they apply to: for every
-  charge, own car only, guest charging. Names match Home Assistant, every
-  target has Save and Clear, and the guest card lists what ends a guest charge.
-- The overview shows the saved targets in one card with one link to Charging.
-- Money is shown in Home Assistant's currency, which it reports with the price.
-- The app keeps the one target time; Home Assistant no longer stores a copy.
-  A time changed while a guest charges stays as changed afterwards.
+- Publish the 0.10 service in both stable and beta app catalogs. Integration
+  and app must both be 0.10.0; the API is version 3, and each side refuses the
+  other's older version.
+- **Breaking:** control state saved by an earlier version is not taken over;
+  confirm the reset in Home Assistant's Repairs and set the targets again.
+  The image runs as UID 10001 and the service gives up every capability; the
+  app stays root for Supervisor's data, without any capability.
+- **Breaking (API):** a command takes only its own fields, a value that is not
+  permitted is refused with the error's name, and the commands `timed_current`
+  and `cancel_timed_current`, the session summary and the fields
+  `choice_revision`, `supports_plug_charge`, `supports_cancel_pending`,
+  `supports_departure_plan` and `soc_transactions_supported` are gone.
+- A direct connection in Home Assistant runs this same service.
+- New commands: `cost_goal` and `cost_price` for a target as an amount of
+  money, `unplug_release_config` to switch the release off after a confirmed
+  unplug also while Home Assistant is not running, and `charge_note`.
+- The service keeps the meter readings of the running and the last plug cycle
+  (`charge_meter`, `POST /v2/energy`) in `charge-meter.json`.
 - One account of the plug-in decides for Plug & Charge, guest charging and the
-  unplug rule whether a car is connected.
-- A command takes only its own fields; a field of another command is refused.
-- The Charging page is reached at `/charging` (before: `/targets`).
-
-## 0.10.0b6
-
-- Integration and app must both be 0.10.0b6; update them together.
-
-- **Breaking:** the saved control state of 0.10.0b5 is not read: after the
-  update, confirm the reset in Home Assistant's Repairs and set the targets
-  again.
-- An unplug ends a reached energy or cost target and its pause.
-- The departure plan's current no longer replaces the current chosen by
-  hand as the one a resume returns to.
-- A percentage target pressed down by the car's limit returns to the chosen
-  value when the limit rises again.
-- A guest start behind a waiting stop is refused before its first write
-  instead of leaving the release open without a guest.
-- A current behind a waiting lock or withdrawn release is refused instead of
-  dropped; a stop by a limit keeps a pause that still waits; a release
-  withdrawn by hand under Plug & Charge keeps the state-change interval.
-- A missing-meter pause no longer resumes by itself after a guest time limit
-  was lifted; a guest start for a car that just left is refused.
-- Writes outside a command (release closed after an unplug, error recovery)
-  keep a waiting lock or pause.
-- A manual Plug & Charge release given to a connected car ends when the
-  first answer after a restart shows no car; a foreign current above 32 A is
-  not saved as the setpoint.
-- The departure plan leaves a guest's pause alone; the service starts with a refusing disk and a saved guest permission.
-- A returned serial adapter is reopened within seconds; a write does not
-  follow a port reopened just before it; a negative meter reading is not
-  published; late heartbeats are logged once per weak phase of the line.
-- A page read behind a long command ends after five seconds instead of
-  holding one of the two request slots; the overview shows the last state.
-- The app no longer asks for the host's udev database (`udev: true`).
-- A price that arrived while a cost ceiling was stopped is applied once it
-  runs again.
-- The Charging page names the reported price and its time, and the planned
-  start of the departure plan.
-
-## 0.10.0b5
-
-- Integration and app must both be 0.10.0b5; update them together.
-
-- The Charging page sets and shows the cost ceiling; the service remembers
-  the last price Home Assistant reported (`cost_price` in its state) and
-  `cost_goal` works without a price.
-- A command that has to wait and a past target time are named instead of
-  "Save not confirmed"; an interrupted guest charge asks for a new start; the
-  departure plan's status is shown on the Charging page.
-
-## 0.10.0b4
-
-- Integration and app must both be 0.10.0b4; update them together.
-
-- New commands `cost_goal` (amount and price) and `cost_price`: the energy
-  target carries an amount of money and is re-armed at each new price.
-- A lock or withdrawn release whose reply did not come is repeated after
-  five seconds instead of a whole state-change interval.
-- Refusals of the app pages carry the security headers.
-
-## 0.10.0b3
-
-- Integration and app must both be 0.10.0b3; update them together.
-- The image runs as UID 10001 and the service drops every capability; the app stays root for Supervisor's data.
-- A waiting pause, lock or withdrawn release is not lost to a missing
-  reply, a current change or a goal stop.
-- A command that could not be saved answers `intent_not_saved` (409).
-- The app holds no capability any more, also with Protection mode off.
-- After a request without a usable answer the app lets the line fall silent
-  for one reply timeout, so a late answer is never taken for the next one
-  (serial and Modbus RTU over TCP).
-- A queued pause, release-off or lock survives a poll that failed at its due
-  time.
-- Error 200 is recovered while the state cannot be saved.
-- The app does not start without a serial number when that read merely failed.
-
-## 0.10.0b2
-
-- Integration and app must both be 0.10.0b2; update them together.
-- The state no longer carries the field `choice_revision`.
-- The service no longer summarizes charging sessions; an intent file saved by
-  an earlier version is rejected once and needs the acknowledgement in Home
-  Assistant Repairs.
-- The service keeps the meter readings of the running and the last plug
-  cycle (`charge_meter` in its state, `POST /v2/energy` for a time span) and
-  saves them in `charge-meter.json`, together with the vehicle Home Assistant
-  names with the new command `charge_note`.
-
-## 0.10.0b1
-
-- Log lines start with their area, such as `Service:`, `Connection:` or
-  `Heartbeat:`. A repeating failure is logged once, and its end once.
-
-- The app and a direct connection in Home Assistant run the same service.
-  Integration and app must both be 0.10.0b1; update them together. The API
-  is version 3, so an older integration reports a version mismatch instead of
-  sending commands the service no longer has.
-- The service switches the charging release off after a confirmed unplug
-  when Home Assistant asks for it with the new command
-  `unplug_release_config`, also while Home Assistant is not running. Its
-  state reports the setting as `control.release_off_on_unplug`. Control state
-  saved by an older version is not taken over; acknowledge the reset.
-- The service no longer accepts the commands `timed_current` and
-  `cancel_timed_current`; nothing sent them. Its state no longer carries the
-  fields `supports_plug_charge`, `supports_cancel_pending`,
-  `supports_departure_plan` and `soc_transactions_supported`.
+  unplug rule whether a car is connected. A reached energy or cost target ends
+  with the unplug.
+- The Charging page (`/charging`) sorts the targets by whom they apply to,
+  sets the cost target in Home Assistant's currency and shows the price, the
+  departure plan's status and planned start; the overview shows all targets in
+  one card. The app keeps the one target time.
+- After an unanswered request the line falls silent before the next one, so a
+  late answer is never taken for the next (serial and Modbus RTU over TCP),
+  and every guarded write is judged after that wait.
+- A waiting pause, lock or withdrawn release is kept until something undoes
+  it, and is repeated after five seconds when its reply did not come.
+- A returned serial adapter is reopened within seconds; error 200 is recovered
+  while the state cannot be saved; a page read behind a long command ends
+  after five seconds; log lines start with their area.
 
 ## 0.9.1
 
