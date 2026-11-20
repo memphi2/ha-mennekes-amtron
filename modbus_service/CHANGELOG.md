@@ -1,8 +1,8 @@
 # Changes
 
-## 1.0.0
+## 1.0.0b1
 
-- Integration and app must both be 1.0.0; the API starts again at version 1,
+- Beta of 1.0.0. Integration and app must both be 1.0.0b1; the API starts again at version 1,
   and each side refuses the other's older version.
 - **Breaking (API):** the endpoints are under `/v1/`; a charge level carries
   its age (`soc_age`), and the app counts it as known for 15 minutes after the
