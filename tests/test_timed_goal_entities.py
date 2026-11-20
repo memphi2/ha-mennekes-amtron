@@ -71,7 +71,8 @@ def test_departure_status_and_forecast_are_shown_with_the_services_summary():
         datetimes, sensors = await _entities(hass, entry)
         departure, waiting = datetimes["timed_departure"], sensors["operation_waiting"]
         assert departure.available
-        assert departure.native_value == observer.goal.deadline
+        # The time shown is the service's, not a copy the observer keeps.
+        assert departure.native_value is None
         assert waiting.available
         details = waiting.extra_state_attributes
         assert details["departure_plan"] == "charging"
@@ -179,7 +180,7 @@ def test_calendar_and_vehicle_departure_follow_the_selected_cars_planning(monkey
     asyncio.run(run())
 
 
-def test_guest_time_entity_edits_service_limit_without_changing_vehicle_trip(monkeypatch):
+def test_the_time_entity_shows_the_guests_time_and_hands_edits_to_the_cars_observer(monkeypatch):
     async def run():
         hass, entry, _transport = await build_runtime()
         control = entry.runtime_data.control
@@ -194,11 +195,12 @@ def test_guest_time_entity_edits_service_limit_without_changing_vehicle_trip(mon
         entity = dates["timed_departure"]
         assert entity.available
         assert entity.native_value == guest_time
+        # The observer knows that a guest charges and sets the guest's time.
         await entity.async_set_value(guest_time)
-        control.async_set_target_time.assert_awaited_with(guest_time)
+        observer.async_set_deadline.assert_awaited_with(guest_time)
         await entity.async_clear_value()
-        control.async_set_target_time.assert_awaited_with(None)
-        observer.async_set_deadline.assert_not_awaited()
+        observer.async_set_deadline.assert_awaited_with(None)
+        control.async_set_target_time.assert_not_awaited()
         # Neither a car's trip nor a plan of the service: nothing to show.
         entry.runtime_data.timed_goal = None
         monkeypatch.setattr(ServiceControl, "departure", property(lambda _: None))

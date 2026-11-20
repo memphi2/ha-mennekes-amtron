@@ -251,15 +251,14 @@ def test_only_rows_the_wallbox_and_vehicles_call_for_are_wanted() -> None:
 
 
 class _Trip:
-    def __init__(self, deadline) -> None:
-        self.goal = SimpleNamespace(deadline=deadline)
+    def __init__(self) -> None:
         self.set: list[object] = []
 
     async def async_set_deadline(self, value) -> None:
         self.set.append(value)
 
 
-def test_the_target_time_belongs_to_the_service_or_the_selected_car() -> None:
+def test_the_target_time_is_the_services_and_a_selected_car_adds_its_source() -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
         added: dict[str, object] = {}
@@ -275,18 +274,21 @@ def test_the_target_time_belongs_to_the_service_or_the_selected_car() -> None:
         await target.async_clear_value()
         assert target.native_value is None
 
-        trip = _Trip(deadline)
+        # A selected car's observer takes the edit, to mark the source it replaces.
+        trip = _Trip()
         runtime.timed_goal = trip
-        assert target.native_value == deadline
+        assert target.native_value is None
         await target.async_set_value(deadline)
         await target.async_clear_value()
         assert trip.set == [deadline, None]
-        # During a guest charge the time is the guest's, kept by the service.
-        runtime.client.snapshot["control"]["guest_mode"] = True
-        assert target.native_value is None
+        # What is shown is always the service's time, never a copy of the car's.
+        runtime.timed_goal = None
+        await target.async_set_value(deadline)
+        runtime.timed_goal = trip
+        assert target.native_value == deadline
+        # Without the service's plan there is no time to show or to set.
         runtime.client.departure = None
         assert target.native_value is None
-        runtime.timed_goal = None
         assert not target.available
 
     asyncio.run(run())

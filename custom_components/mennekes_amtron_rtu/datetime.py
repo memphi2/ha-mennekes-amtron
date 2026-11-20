@@ -9,10 +9,8 @@ from homeassistant.components.datetime import DateTimeEntity, DateTimeEntityDesc
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .entity import AmtronEntity, Projection
 from .entry_types import MennekesAmtronConfigEntry
-from .exceptions import home_assistant_error
 
 PARALLEL_UPDATES = 1
 
@@ -31,36 +29,24 @@ async def async_setup_entry(
 
 
 class AmtronTargetTime(AmtronEntity, DateTimeEntity):
-    """One time for whoever charges: the selected car's trip, or the guest.
+    """One time for whoever charges: the selected car's departure, or a guest's end.
 
-    The selected car's trip is kept by its observer, which also takes it from
-    a calendar or the car; without one, the service keeps the time itself.
+    The service keeps it. The selected car's observer adds what only Home
+    Assistant knows about a time set here: which calendar or car time it replaces.
     """
 
     @property
-    def _owns_trip(self) -> bool:
-        return self.runtime.timed_goal is not None and not self.runtime.control.guest_active()
-
-    @property
     def available(self) -> bool:
-        return super().available and (
-            self.runtime.timed_goal is not None or self.runtime.control.departure is not None
-        )
+        return super().available and self.runtime.control.departure is not None
 
     @property
     def native_value(self) -> datetime | None:
-        if self._owns_trip and (observer := self.runtime.timed_goal) is not None:
-            return observer.goal.deadline
         plan = self.runtime.control.departure
         return plan.trip.deadline if plan is not None else None
 
     async def _async_set(self, value: datetime | None) -> None:
-        if self._owns_trip and (observer := self.runtime.timed_goal) is not None:
-            try:
-                await observer.async_set_deadline(value)
-            except (StorageCommitUncertainError, StorageStateUnknownError, OSError) as err:
-                # Home Assistant's own storage refused, not the wallbox.
-                raise home_assistant_error("departure_save_failed") from err
+        if (observer := self.runtime.timed_goal) is not None:
+            await observer.async_set_deadline(value)
         else:
             await self.runtime.control.async_set_target_time(value)
 

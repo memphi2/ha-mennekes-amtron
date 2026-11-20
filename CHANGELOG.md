@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   unique ID made from its port or address; its endpoint only keeps it from
   being set up twice. Remove such an entry and set it up again. Entries of
   wallboxes with a serial number are unchanged.
+- **Breaking:** the wallbox service alone keeps the target time. Home
+  Assistant no longer stores a copy that it sends later: a time can only be
+  set while the service is reachable, a time changed while a guest charges
+  stays as changed afterwards, and a service that lost its saved plan has no
+  trip until one is set again. A time taken from a calendar or the car is
+  refused when the trip was edited while that answer was awaited.
 - One account of the plug-in decides for Plug & Charge, guest charging, the
   unplug rule and the estimates whether a car is connected. Plug & Charge
   counts a car's evidence from its real plug-in time, also when the gate was

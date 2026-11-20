@@ -1035,9 +1035,6 @@
     "calendar_no_event": {
       "message": "Nessun evento con orario e questo titolo nei prossimi 14 giorni."
     },
-    "departure_save_failed": {
-      "message": "Impossibile salvare l’orario di partenza. Controllare l’archiviazione di Home Assistant e riprovare."
-    },
     "intent_not_saved": {
       "message": "La wallbox ha ricevuto il comando, ma il servizio non ha potuto salvarlo. Dopo un riavvio del servizio può valere l’impostazione precedente. Controllare l’archiviazione del servizio."
     },

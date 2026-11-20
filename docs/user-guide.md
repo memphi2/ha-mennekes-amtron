@@ -57,7 +57,9 @@ Saving a positive kWh value starts a fresh baseline. Guest start uses that
 baseline, including energy already delivered since it was set. It does not
 restart the counter. Change or disable an already reached goal before resuming.
 Vehicle-profile changes cannot replace an active guest's target time; edit it
-explicitly in HA or the app.
+explicitly in HA or the app. There is one target time, and the wallbox service
+keeps it: a time changed while a guest charges stays as changed afterwards, and
+a time can only be set while the service is reachable.
 
 ## Guest charging
 

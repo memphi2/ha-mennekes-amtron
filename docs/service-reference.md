@@ -348,7 +348,7 @@ saved plan loads:
 | Field | Meaning |
 |---|---|
 | `trip` | `deadline` (ISO timestamp or `null`), `source` and `finished` (`reached`, `late` or `null`) |
-| `edit_revision` | Opaque persisted identifier changed by explicit trip edits, not by automatic completion; HA uses it to reject stale handovers |
+| `edit_revision` | Opaque persisted identifier changed by explicit trip edits, not by automatic completion; HA sends it with a time taken from a calendar or the car, so an edit made meanwhile is not overwritten |
 | `editor`, `selection_vehicle` | Last explicit editor (`ha` or `app`) and its vehicle binding; not public vehicle identity labels |
 | `status` | The plan's state, as shown by the `departure_plan` attribute of **Charging wait reason** |
 | `planned_start` | When charging starts or started for this trip, or `null` |
@@ -379,14 +379,15 @@ is derived from their published state and decides nothing:
 The overview page receives the same object as `operation` from
 `/api/overview`, or `null` when it does not validate.
 
-Three commands carry data from Home Assistant without accessing the bus: two
-hand the plan over, one names the car of the plug cycle. Each needs
+The service keeps the one trip; Home Assistant holds no copy of it. Three
+commands carry data from Home Assistant without accessing the bus: one sets
+the trip, one hands over the car's data, one names the car of the plug cycle. Each needs
 `expected_serial_number`, rejects other fields and is accepted while the
 wallbox is unreachable:
 
 | Command | Additional fields | Behavior |
 |---|---|---|
-| `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
+| `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean; optional `expected_selection`: `{"edit_revision": …}` as last reported | Sets or clears the trip. With `expected_selection`, a trip edited meanwhile refuses the command with `soc_goal_source_changed`. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
 | `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
 | `charge_note` | `plugged_at`: the `charge_meter.plugged_at` of the running plug cycle; `note`: string of 1 to 128 characters or `null` | Attach a note to the running plug cycle, such as the car Home Assistant recognized. The note means nothing to the service; it stays with the cycle as `charge_meter.note` and, after the unplug, as `charge_meter.last_note`. A cycle that is over keeps what it had. No bus access. |
 

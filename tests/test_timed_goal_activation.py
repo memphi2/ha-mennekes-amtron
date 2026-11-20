@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import shutil
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -13,7 +12,6 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
@@ -24,7 +22,6 @@ from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import (
     ModbusService,
 )
-from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
 from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
 from custom_components.mennekes_amtron_rtu.service_control import ServiceControl
 from custom_components.mennekes_amtron_rtu.service_errors import ServiceConnectionError
@@ -34,7 +31,6 @@ from custom_components.mennekes_amtron_rtu.timed_goal_const import (
     timed_goal_is_enabled,
 )
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import heartbeat_running
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_modbus_service import TOKEN, current_writes
 from tests.test_service_reauth import add_entry
@@ -200,70 +196,6 @@ def test_a_failed_withdrawal_keeps_the_reset_for_the_next_setup(tmp_path):
                 assert CONF_TIMED_GOAL_RESET_PENDING not in entry.options
                 assert entry.runtime_data.control.departure.trip.deadline is None
                 assert current_writes(transport) == []
-            finally:
-                await hass.async_stop()
-
-    asyncio.run(asyncio.wait_for(run(), 60))
-
-
-@pytest.mark.parametrize("marked", [False, True])
-def test_failed_trip_cleanup_stops_planner_and_survives_restart_and_reenable(tmp_path, marked):
-    async def run():
-        transport = FakeModbusClient(device_bank())
-        config = tmp_path / "ha"
-        with patch("custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient", return_value=transport):
-            hass = await _boot(config)
-            try:
-                entry = await _entry(hass)
-                hass.states.async_set(SOC, "20", {"unit_of_measurement": "%"})
-                hass.config_entries.async_update_entry(entry, options={**OPTIONS, CONF_TIMED_GOAL_ENABLED: True})
-                await hass.async_block_till_done()
-                runtime = entry.runtime_data
-                await runtime.control.async_set_soc_goal(80, source=f"{SOC}|", soc=20)
-                hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
-                await runtime.control.async_pause_charging()
-                deadline = datetime.now(UTC) + timedelta(hours=8)
-                await runtime.timed_goal.async_set_deadline(deadline)
-                stored = runtime.timed_goal._store.path
-                with patch.object(TimedGoalStore, "async_remove", side_effect=OSError("cannot delete")):
-                    hass.config_entries.async_update_entry(entry, options={
-                        **entry.options, CONF_TIMED_GOAL_ENABLED: False,
-                        **({CONF_TIMED_GOAL_RESET_PENDING: True} if marked else {}),
-                    })
-                    await hass.async_block_till_done()
-                    assert runtime.timed_goal._stopping
-                    assert entry.state is ConfigEntryState.LOADED
-                    assert entry.runtime_data.timed_goal is None
-                    assert heartbeat_running(entry.runtime_data.heartbeat)
-                    assert stored.exists()
-                    assert entry.options[CONF_TIMED_GOAL_RESET_PENDING] is True
-            finally:
-                await hass.async_stop()
-            shutil.rmtree(config / "custom_components" / DOMAIN)
-            hass = await _boot(config)
-            try:
-                entry = hass.config_entries.async_entries(DOMAIN)[0]
-                assert entry.options[CONF_TIMED_GOAL_RESET_PENDING] is True
-                hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_TIMED_GOAL_ENABLED: True})
-                with patch.object(TimedGoalStore, "async_remove", side_effect=OSError("still cannot delete")):
-                    assert await hass.config_entries.async_setup(entry.entry_id)
-                    await hass.async_block_till_done()
-                    assert entry.runtime_data.timed_goal is None
-                    assert heartbeat_running(entry.runtime_data.heartbeat)
-                    assert entry.runtime_data.control.soc_goal.target_percent == 80
-                    assert entry.runtime_data.control.is_paused
-                    assert stored.exists()
-                assert await hass.config_entries.async_reload(entry.entry_id)
-                await hass.async_block_till_done()
-                observer = entry.runtime_data.timed_goal
-                assert observer.goal.deadline is None
-                assert CONF_TIMED_GOAL_RESET_PENDING not in entry.options
-                assert not stored.exists()
-                await observer.async_set_deadline(deadline)
-                assert await hass.config_entries.async_reload(entry.entry_id)
-                await hass.async_block_till_done()
-                assert entry.runtime_data.timed_goal.goal.deadline == deadline
-                assert current_writes(transport) == [1]
             finally:
                 await hass.async_stop()
 

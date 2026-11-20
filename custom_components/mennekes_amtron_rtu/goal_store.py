@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, Self
 
@@ -15,7 +13,6 @@ from homeassistant.util.file import WriteError, write_utf8_file_atomic
 
 from .device.const import DOMAIN
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
-from .device.timed_goal import TimedGoal
 
 
 class _GoalModel(Protocol):
@@ -157,33 +154,3 @@ class ModelStore[Goal: _GoalModel]:
         await self._hass.async_add_executor_job(lambda: self.path.unlink(missing_ok=True))
         self._last = None
         self._write_unconfirmed = False
-
-
-@dataclass(frozen=True, slots=True)
-class DepartureIntent:
-    """Persist a trip and its unsynchronized HA edit in one atomic record."""
-
-    trip: TimedGoal = field(default_factory=TimedGoal)
-    pending: bool = False
-    base_revision: str | None = None
-
-    def snapshot(self) -> dict[str, Any]:
-        return {"trip": self.trip.snapshot(), "pending": self.pending, "base_revision": self.base_revision}
-
-    @classmethod
-    def restore(cls, raw: object) -> DepartureIntent:
-        if not isinstance(raw, dict) or raw.keys() != {"trip", "pending", "base_revision"}:
-            raise ValueError("invalid departure intent fields")
-        revision = raw["base_revision"]
-        if type(raw["pending"]) is not bool or (
-            revision is not None and (not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{32}", revision) is None)
-        ) or (not raw["pending"] and revision is not None):
-            raise ValueError("invalid departure intent provenance")
-        return cls(TimedGoal.restore(raw["trip"]), raw["pending"], revision)
-
-
-class TimedGoalStore(ModelStore[DepartureIntent]):
-    """Keep one trip and its handover provenance durable without Recorder."""
-
-    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
-        super().__init__(hass, entry_id, identity, kind="departure_intent", model=DepartureIntent)

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 from aiohttp import ClientSession
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureForecast,
@@ -51,6 +52,7 @@ class Service:
     def __init__(self) -> None:
         self.state: dict | None = plan()
         self.trips: list[tuple] = []
+        self.expected: list[dict | None] = []
         self.inputs: list[DepartureInputs] = []
         self.cancelled = 0
         self.fail: Exception | None = None
@@ -63,9 +65,10 @@ class Service:
         if self.fail is not None:
             raise self.fail
         self.trips.append((deadline, source, withdraw))
+        self.expected.append(expected_selection)
         trip = TimedGoal()
         trip.set(deadline, source)
-        self.state = {**self.state, "trip": trip.snapshot()}
+        self.state = {**self.state, "trip": trip.snapshot(), "edit_revision": f"{len(self.trips):032x}"}
 
     async def async_set_departure_inputs(self, inputs):
         self.inputs.append(inputs)
@@ -142,68 +145,97 @@ def test_the_service_decides_how_a_trip_ends(monkeypatch):
         await observer._evaluate()
         assert observer.goal.snapshot() == reached.snapshot()
         assert observer.status == "reached"
-        # A higher target lets the service plan the same trip again.
-        service.state = {**service.state, "trip": {**reached.snapshot(), "finished": None}, "status": "charging"}
+        # A trip the service ended at its time is shown as it is, and not sent again.
+        service.state = {**service.state, "trip": {"deadline": None, "source": "manual", "finished": "late"}, "status": "late"}
         await observer._evaluate()
-        assert observer.goal.finished is None
+        assert observer.goal.snapshot() == {"deadline": None, "source": "manual", "finished": "late"}
         assert len(service.trips) == 1
     asyncio.run(run())
 
 
-def test_a_trip_the_service_finished_at_its_time_is_adopted_not_sent_again(monkeypatch):
+def test_the_service_keeps_the_only_trip(monkeypatch):
     async def run():
         observer, service, _hass = handover(monkeypatch)
-        observer.goal.set(NOW - timedelta(minutes=1), "manual")
-        service.state = plan(status="late", trip=None)
-        service.state["trip"] = {"deadline": None, "source": "manual", "finished": "late"}
+        # A time chosen in the app is the trip, whoever chose it.
+        chosen = TimedGoal()
+        chosen.set(NOW + timedelta(hours=7), "manual")
+        service.state = plan(chosen, editor="app", selection_vehicle="another-car", edit_revision="b" * 32)
         await observer._evaluate()
-        assert observer.goal.snapshot() == {"deadline": None, "source": "manual", "finished": "late"}
+        assert observer.goal.deadline == chosen.deadline
+        assert service.trips == []
+        # A service that lost its plan has no trip: nothing here brings one back.
+        service.state = plan()
+        await observer._evaluate()
+        assert observer.goal.deadline is None
         assert service.trips == []
     asyncio.run(run())
 
 
-@pytest.mark.parametrize(("minutes", "adopted"), [(2, True), (10, False)])
-def test_a_service_clock_slightly_ahead_still_ends_the_trip(monkeypatch, minutes, adopted):
+def test_a_refused_edit_is_reported_and_leaves_nothing_behind(monkeypatch):
     async def run():
         observer, service, _hass = handover(monkeypatch)
-        deadline = NOW + timedelta(minutes=minutes)
-        observer.goal.set(deadline, "manual")
-        ended = {"deadline": None, "source": "manual", "finished": "late"}
-        service.state = {**plan(status="late"), "trip": ended}
-        await observer._evaluate()
-        # Further ahead than a clock differs, the service lost the trip instead.
-        assert service.trips == ([] if adopted else [(deadline, "manual", False)])
-        assert (observer.goal.snapshot() == ended) is adopted
-    asyncio.run(run())
-
-
-def test_a_service_that_lost_its_plan_gets_the_trip_again(monkeypatch):
-    async def run():
-        observer, service, _hass = handover(monkeypatch)
-        deadline = NOW + timedelta(hours=8)
-        observer.goal.set(deadline, "manual")
-        await observer._evaluate()
-        assert service.trips == [(deadline, "manual", False)]
-        # A cleared trip is sent as well.
-        await observer.async_set_deadline(None, source="manual")
-        await observer._evaluate()
-        assert service.trips[-1] == (None, "manual", False)
-    asyncio.run(run())
-
-
-def test_a_failed_hand_over_is_tried_again(monkeypatch):
-    async def run():
-        observer, service, _hass = handover(monkeypatch)
-        await observer.async_set_deadline(NOW + timedelta(hours=8), source="manual")
         service.fail = HomeAssistantError("service_unavailable")
         with pytest.raises(HomeAssistantError):
-            await observer._evaluate()
-        assert observer._trip_dirty
+            await observer.async_set_deadline(NOW + timedelta(hours=8), source="manual")
+        assert observer.goal.deadline is None
+        service.fail = None
+        # Nothing waits to be sent later.
+        await observer._evaluate()
+        assert service.trips == []
+    asyncio.run(run())
+
+
+def test_a_time_from_the_calendar_or_the_car_replaces_only_the_trip_it_was_asked_for(monkeypatch):
+    async def run():
+        observer, service, hass = handover(monkeypatch)
+        observer._options.update({"timed_calendar_entity": "calendar.trips", "timed_calendar_title": "Departure"})
+        start = NOW + timedelta(hours=2)
+        hass.services.async_call.return_value = {"calendar.trips": {"events": [
+            {"start": start.isoformat(), "summary": "Departure"},
+        ]}}
+        await observer.async_use_next_calendar_event()
+        # The service refuses it if the trip was edited while the calendar answered.
+        assert service.expected == [{"edit_revision": "a" * 32}]
+        assert observer.goal.deadline == start
+    asyncio.run(run())
+
+
+def test_a_parked_trip_is_given_back_once_and_only_to_an_empty_plan(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.vehicle_trips import VehicleTripMemory
+    from tests.ha_fakes import FakeHass
+
+    async def run(occupied):
+        observer, service, _hass = handover(monkeypatch)
+        storage = FakeHass(str(tmp_path / str(occupied)))
+        storage.async_add_executor_job = asyncio.to_thread
+        observer._hass.config = storage.config
+        observer._hass.async_add_executor_job = asyncio.to_thread
+        observer._options["vehicle_profile_id"] = "car"
+        observer._resume = True
+        parked = TimedGoal()
+        parked.set(dt_util.utcnow() + timedelta(hours=8), "manual")
+        memory = VehicleTripMemory(observer._hass, "entry", "SERIAL")
+        await memory.async_swap("car", parked, None)
+        if occupied:
+            current = TimedGoal()
+            current.set(NOW + timedelta(hours=3), "manual")
+            service.state = plan(current)
+        # A service that cannot take it yet gets it at the next evaluation.
+        service.fail = HomeAssistantError("service_unavailable")
+        if not occupied:
+            with pytest.raises(HomeAssistantError):
+                await observer._evaluate()
+            assert await memory.async_peek("car") is not None
         service.fail = None
         await observer._evaluate()
-        assert len(service.trips) == 1
-        assert not observer._trip_dirty
-    asyncio.run(run())
+        assert service.trips == ([] if occupied else [(parked.deadline, "manual", False)])
+        # Either way the parked trip is used up.
+        assert await memory.async_peek("car") is None
+        await observer._evaluate()
+        assert len(service.trips) == (0 if occupied else 1)
+
+    asyncio.run(run(False))
+    asyncio.run(run(True))
 
 
 def test_a_loading_service_is_waited_for(monkeypatch):
@@ -220,7 +252,8 @@ def test_a_loading_service_is_waited_for(monkeypatch):
 def test_only_another_car_withdraws_the_services_plan(monkeypatch, withdraw):
     async def run():
         observer, service, _hass = handover(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8), "manual")
+        await observer.async_set_deadline(NOW + timedelta(hours=8), source="manual")
+        service.trips.clear()
         await observer.async_stop(withdraw=withdraw)
         assert service.trips == ([(None, "manual", True)] if withdraw else [])
     asyncio.run(run())
@@ -297,107 +330,6 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
     asyncio.run(run())
 
 
-def test_new_app_departure_supersedes_an_unsent_ha_edit(monkeypatch):
-    async def body():
-        observer, service, _hass = handover(monkeypatch)
-        await observer.async_set_deadline(NOW + timedelta(hours=5), source="manual")
-        newer = TimedGoal()
-        newer.set(NOW + timedelta(hours=7), "manual")
-        service.state = plan(newer, editor="app", selection_vehicle=CAR, edit_revision="b" * 32)
-        await observer._evaluate()
-        assert observer.goal.deadline == newer.deadline
-        assert not observer._trip_dirty
-        assert service.trips == []
-    asyncio.run(body())
-
-
-def test_foreign_vehicle_app_choice_is_not_adopted(monkeypatch):
-    async def body():
-        observer, service, _hass = handover(monkeypatch)
-        await observer.async_set_deadline(NOW + timedelta(hours=5), source="manual")
-        newer = TimedGoal()
-        newer.set(NOW + timedelta(hours=7), "manual")
-        service.state = plan(newer, editor="app", selection_vehicle="another-car")
-        await observer._evaluate()
-        assert observer.goal.deadline == NOW + timedelta(hours=5)
-        assert service.trips == [(observer.goal.deadline, "manual", False)]
-    asyncio.run(body())
-
-
-@pytest.mark.parametrize("completion", ["reached", "late"])
-def test_automatic_completion_of_app_trip_does_not_discard_new_ha_choice(monkeypatch, completion):
-    async def body():
-        observer, service, _hass = handover(monkeypatch)
-        old = TimedGoal()
-        old.set(NOW + timedelta(hours=1), "manual")
-        service.state = plan(old, editor="app", selection_vehicle=CAR)
-        await observer._evaluate()
-        new_deadline = NOW + timedelta(hours=8)
-        await observer.async_set_deadline(new_deadline, source="manual")
-        old.finish(completion)
-        service.state["trip"] = old.snapshot()  # Lifecycle change, same edit revision.
-        await observer._evaluate()
-        assert observer.goal.deadline == new_deadline
-        assert observer.goal.finished is None
-        assert service.trips == [(new_deadline, "manual", False)]
-        assert not observer._trip_dirty
-    asyncio.run(body())
-
-
-@pytest.mark.parametrize("newer_app", [False, True])
-@pytest.mark.parametrize("clear", [False, True])
-def test_pending_ha_edit_survives_reload(tmp_path, monkeypatch, newer_app, clear):
-    from custom_components.mennekes_amtron_rtu import timed_goal_observer as module
-    from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
-    from tests.ha_fakes import FakeHass
-
-    async def body():
-        observer, service, _hass = handover(monkeypatch)
-        storage = FakeHass(str(tmp_path))
-        storage.async_add_executor_job = asyncio.to_thread
-        observer._store = TimedGoalStore(storage, "entry", "SERIAL")
-        old = TimedGoal()
-        old.set(NOW + timedelta(hours=1), "manual")
-        service.state = plan(old, editor="app", selection_vehicle=CAR)
-        await observer._evaluate()
-        deadline = None if clear else NOW + timedelta(hours=8)
-        await observer.async_set_deadline(deadline, source="manual")
-        service.fail = HomeAssistantError("service_unavailable")
-        with pytest.raises(HomeAssistantError):
-            await observer._evaluate()
-        await observer.async_stop()
-        if newer_app:
-            service.state = plan(old, editor="app", selection_vehicle=CAR, edit_revision="b" * 32)
-        service.fail = None
-        restarted, _, _ = handover(monkeypatch)
-        restarted._runtime.control = service
-        restarted._store = TimedGoalStore(storage, "entry", "SERIAL")
-        monkeypatch.setattr(module, "async_track_state_change_event", lambda *_args: lambda: None)
-        monkeypatch.setattr(module, "async_track_time_interval", lambda *_args: lambda: None)
-        await restarted.async_start()
-        assert restarted._trip_dirty
-        assert restarted._trip_base == {"edit_revision": "a" * 32}
-        await restarted._evaluate()
-        assert restarted.goal.deadline == (old.deadline if newer_app else deadline)
-        assert service.trips == ([] if newer_app else [(deadline, "manual", False)])
-        saved = await TimedGoalStore(storage, "entry", "SERIAL").async_load()
-        assert not saved.pending
-        assert saved.base_revision is None
-        assert saved.trip.snapshot() == restarted.goal.snapshot()
-        await restarted.async_stop()
-    asyncio.run(body())
-
-
-@pytest.mark.parametrize("raw", [{}, {"trip": {}, "pending": True, "base_revision": None},
-    {"trip": TimedGoal().snapshot(), "pending": 1, "base_revision": None},
-    {"trip": TimedGoal().snapshot(), "pending": True, "base_revision": "invalid"},
-    {"trip": TimedGoal().snapshot(), "pending": False, "base_revision": "a" * 32}])
-def test_invalid_departure_provenance_is_rejected(raw):
-    from custom_components.mennekes_amtron_rtu.goal_store import DepartureIntent
-    with pytest.raises(ValueError, match="invalid departure"):
-        DepartureIntent.restore(raw)
-
-
 def test_guest_mode_holds_vehicle_handover_but_keeps_explicit_time_editing(monkeypatch):
     from unittest.mock import AsyncMock
     async def run():
@@ -406,7 +338,12 @@ def test_guest_mode_holds_vehicle_handover_but_keeps_explicit_time_editing(monke
         service.async_set_target_time = AsyncMock()
         service.state["status"] = "guest_mode"
         original = observer.goal.snapshot()
-        await observer._follow_service()
+        # Not even a new time from the car's own source replaces the guest's.
+        observer._options["timed_departure_entity"] = "sensor.departure"
+        _hass.states["sensor.departure"] = SimpleNamespace(
+            entity_id="sensor.departure", state=(NOW + timedelta(hours=4)).isoformat(), attributes={},
+        )
+        await observer._evaluate()
         assert service.trips == []
         assert service.inputs == []
         assert observer.status == "guest_mode"
@@ -451,29 +388,4 @@ def test_a_capacity_sensor_in_wh_is_handed_over_in_kwh(monkeypatch):
         )
         await observer._evaluate()
         assert service.inputs[-1].capacity_kwh == 64.0
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("pending", [False, True])
-def test_a_trip_replaced_while_the_app_edit_waits_is_kept(monkeypatch, pending):
-    async def run():
-        observer, service, _hass = handover(monkeypatch)
-        if pending:
-            # An unsent edit here, which a newer app edit would supersede.
-            await observer.async_set_deadline(NOW + timedelta(hours=5), source="manual")
-        newer = TimedGoal()
-        newer.set(NOW + timedelta(hours=7), "manual")
-        service.state = plan(newer, editor="app", selection_vehicle=CAR, edit_revision="b" * 32)
-        replacement = TimedGoal()
-        replacement.set(NOW + timedelta(hours=9), "manual")
-        async with observer._goal_lock:
-            following = asyncio.create_task(observer._follow_service())
-            for _ in range(5):
-                await asyncio.sleep(0)
-            # Another edit takes the trip's place before the app's is adopted.
-            observer.goal = replacement
-        await following
-        assert observer.goal is replacement
-        assert observer._trip_dirty is pending
-        assert service.trips == []
     asyncio.run(run())

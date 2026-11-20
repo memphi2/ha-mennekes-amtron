@@ -16,9 +16,9 @@ from custom_components.mennekes_amtron_rtu.datetime import (
     async_setup_entry as setup_datetime,
 )
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.departure_plan import DepartureState
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.goal_store import DepartureIntent
 from custom_components.mennekes_amtron_rtu.options_flow import (
     _timed_errors,
 )
@@ -104,19 +104,17 @@ def test_timed_options_accept_separate_fixed_and_dynamic_sources() -> None:
 
 
 
-class FakeStore:
-    def __init__(self, *_args: object) -> None:
-        self.saved: list[dict[str, str | None]] = []
-
-    async def async_save(self, goal: DepartureIntent) -> None:
-        self.saved.append(goal.trip.snapshot())
-
-    async def async_load(self) -> DepartureIntent:
-        return DepartureIntent()
+def plan_state(trip: TimedGoal | None = None, **changes: object) -> dict:
+    """The service's plan as it reports it."""
+    return {
+        "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
+        "estimated_soc": None, "inputs": None, "scope": None, "confirmed": False, "forecast": None,
+        "editor": "ha", "selection_vehicle": None, "edit_revision": "a" * 32, **changes,
+    }
 
 
 class FakeControl:
-    """The service control as the observer uses it, without a planning service."""
+    """The service control as the observer uses it: the service keeps the one trip."""
 
     @staticmethod
     def guest_active() -> bool:
@@ -124,19 +122,34 @@ class FakeControl:
 
     def __init__(self, data: WallboxData) -> None:
         self.read_only = False
-        self.departure = None
+        self.state: dict | None = plan_state()
         self.data = data
         self.trips: list[tuple[datetime | None, str | None, bool]] = []
+        self.expected: list[dict | None] = []
         self.target_times: list[datetime | None] = []
+        self.edits = 0
+
+    @property
+    def departure(self) -> DepartureState | None:
+        return None if self.state is None else DepartureState.restore(self.state)
 
     async def async_set_departure_trip(
         self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
         expected_selection: dict | None = None,
     ) -> None:
+        if expected_selection not in (None, {"edit_revision": (self.state or {}).get("edit_revision")}):
+            # As the service does: the trip was edited meanwhile.
+            raise HomeAssistantError("soc_goal_source_changed")
         self.trips.append((deadline, source, withdraw))
+        self.expected.append(expected_selection)
+        if self.state is not None:
+            trip = TimedGoal.restore(self.state["trip"])
+            trip.set(deadline, source)
+            self.edits += 1
+            self.state = {**self.state, "trip": trip.snapshot(), "edit_revision": f"{self.edits:032x}"}
 
     async def async_set_departure_inputs(self, inputs: object) -> None:
-        raise AssertionError("no service plan, so no car data is handed over")
+        raise AssertionError("no car, so no car data is handed over")
 
     async def async_set_target_time(self, deadline: datetime | None) -> None:
         self.target_times.append(deadline)
@@ -168,7 +181,6 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
         data={}, services=SimpleNamespace(async_call=AsyncMock()),
     )
     hass.async_create_task = lambda coro, _name, **_kwargs: asyncio.create_task(coro)
-    monkeypatch.setattr(observer_module, "TimedGoalStore", FakeStore)
     observer = TimedGoalObserver(hass, entry)
     # Unit cases configure this observer's captured options. A real HA options
     # update replaces the entry mapping and creates a new observer on reload.
@@ -188,13 +200,20 @@ def test_timed_goal_source_updates_and_explicit_clear(monkeypatch: pytest.Monkey
         assert observer.goal.deadline == future
         await observer.async_set_deadline(None)
         assert observer.goal.deadline is None
+        # The cleared time keeps the source's mark: the same timestamp does not arm it again.
         await observer._evaluate()
         assert observer.goal.deadline is None
-        # Without the service's plan the trip waits for it.
-        assert observer.status == "waiting_for_device"
-        assert len(observer._store.saved) == 2
+        assert len(_control.trips) == 2
+        # Nothing changes: nothing is sent.
         await observer.async_set_deadline(None)
-        assert len(observer._store.saved) == 2
+        assert len(_control.trips) == 2
+        # While the service is still loading its plan, the trip is not known.
+        _control.state = None
+        await observer._evaluate()
+        assert observer.status == "waiting_for_device"
+        assert observer.goal.deadline is None
+        assert len(_control.trips) == 2
+        _control.state = plan_state()
         for wrong in (NOW - timedelta(seconds=1), NOW.replace(tzinfo=None)):
             with pytest.raises(HomeAssistantError) as refused:
                 await observer.async_set_deadline(wrong)
@@ -223,7 +242,7 @@ def test_observer_lifecycle_and_write_failure_status(
         )
         await observer.async_start()
         await observer._task
-        assert observer.status == "waiting_for_device"
+        assert observer.status == "disabled"
 
         async def failed() -> None:
             raise observer_module.HomeAssistantError("bus busy")
@@ -349,21 +368,21 @@ def test_calendar_requires_a_matching_timed_event(monkeypatch: pytest.MonkeyPatc
     asyncio.run(run())
 
 
-def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
+def test_departure_controls_show_the_services_time_and_delegate_actions() -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
-        goal = TimedGoal()
-        goal.set(NOW + timedelta(hours=8))
         timed = SimpleNamespace(
-            goal=goal, async_set_deadline=AsyncMock(),
-            async_use_next_calendar_event=AsyncMock(),
+            async_set_deadline=AsyncMock(), async_use_next_calendar_event=AsyncMock(),
         )
         runtime = entry.runtime_data
         runtime.timed_goal = timed
         datetimes: dict[str, object] = {}
         await setup_datetime(hass, entry, lambda items: datetimes.update(collect(items)))
         departure = datetimes["timed_departure"]
-        assert departure.native_value == NOW + timedelta(hours=8)
+        # The entity shows the service's one time, whoever set it.
+        soon = dt_util.utcnow() + timedelta(hours=8)
+        await runtime.control.async_set_target_time(soon)
+        assert departure.native_value == soon
         assert departure.available
         await departure.async_set_value(NOW + timedelta(hours=9))
         timed.async_set_deadline.assert_awaited_once_with(NOW + timedelta(hours=9))
@@ -371,15 +390,9 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         timed.async_use_next_calendar_event.assert_awaited_once()
         await departure.async_clear_value()
         timed.async_set_deadline.assert_any_await(None)
-        assert runtime.control.departure.trip.deadline is None
-        # Home Assistant's own storage refusing is reported in the user's language.
-        timed.async_set_deadline.side_effect = OSError("disk failed")
-        with pytest.raises(HomeAssistantError) as refused:
-            await departure.async_set_value(NOW + timedelta(hours=9))
-        assert refused.value.translation_key == "departure_save_failed"
-        timed.async_set_deadline.side_effect = None
-        # Without a selected car the service keeps the time itself.
+        # Without a selected car the time goes to the service directly.
         runtime.timed_goal = None
+        await runtime.control.async_set_target_time(None)
         assert departure.native_value is None
         with pytest.raises(ServiceValidationError):
             await DEVICE_ACTIONS["use_calendar_departure"](runtime)
@@ -390,7 +403,7 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         assert runtime.control.departure.trip.deadline == later
         await departure.async_clear_value()
         assert departure.native_value is None
-        assert timed.async_set_deadline.await_count == 3
+        assert timed.async_set_deadline.await_count == 2
         await runtime.client.async_close()
 
     asyncio.run(run())

@@ -1035,9 +1035,6 @@
     "calendar_no_event": {
       "message": "Geen afspraak met tijdstip en deze titel in de komende 14 dagen."
     },
-    "departure_save_failed": {
-      "message": "De vertrektijd kon niet worden opgeslagen. Controleer de opslag van Home Assistant en probeer het opnieuw."
-    },
     "intent_not_saved": {
       "message": "De wallbox heeft de opdracht ontvangen, maar de service kon die niet opslaan. Na een herstart van de service kan de eerdere instelling gelden. Controleer de opslag van de service."
     },

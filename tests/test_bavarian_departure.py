@@ -178,15 +178,15 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
         await observer._evaluate()
         assert observer.goal.deadline == NOW + timedelta(hours=2)
         reader.return_value = None
-        before = observer.goal
+        before = observer.goal.snapshot()
         with pytest.raises(ServiceValidationError):
             await observer.async_use_vehicle_departure()
-        assert observer.goal is before
+        assert observer.goal.snapshot() == before
         observer._entry.options["timed_vehicle_provider"] = "none"
         with pytest.raises(ServiceValidationError) as error:
             await observer.async_use_vehicle_departure()
         assert error.value.translation_key == "timed_vehicle_unavailable"
-        assert observer.goal is before
+        assert observer.goal.snapshot() == before
 
     asyncio.run(run())
 
@@ -211,7 +211,7 @@ def test_calendar_choice_outlasts_the_entity_trip_and_is_withdrawn_for_another_c
         # The cleared trip stays cleared while the entity keeps its time.
         assert (observer.goal.deadline, observer.goal.source) == (None, source)
         await observer.async_stop(withdraw=True)
-        assert control.trips == [(None, source, True)]
+        assert control.trips[-1] == (None, source, True)
 
     asyncio.run(run())
 

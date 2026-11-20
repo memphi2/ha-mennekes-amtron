@@ -1035,9 +1035,6 @@
     "calendar_no_event": {
       "message": "Kein Termin mit Uhrzeit und diesem Titel in den nächsten 14 Tagen."
     },
-    "departure_save_failed": {
-      "message": "Die Abfahrtszeit konnte nicht gespeichert werden. Speicher von Home Assistant prüfen und erneut versuchen."
-    },
     "intent_not_saved": {
       "message": "Die Wallbox hat den Befehl erhalten, der Dienst konnte ihn aber nicht speichern. Nach einem Neustart des Dienstes kann die frühere Einstellung gelten. Speicher des Dienstes prüfen."
     },

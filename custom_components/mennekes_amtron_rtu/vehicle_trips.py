@@ -87,6 +87,11 @@ class VehicleTripMemory:
             await self._async_save(trips)
         return resumed if _open(resumed) else None
 
+    async def async_peek(self, selected: str) -> TimedGoal | None:
+        """The selected car's parked trip, while it is still open."""
+        trip = (await self._async_load()).trips.get(selected)
+        return trip if _open(trip) else None
+
     async def async_retain(self, planning: set[str]) -> None:
         """Drop the parked trips of cars that no longer plan departures."""
         trips = await self._async_load()
