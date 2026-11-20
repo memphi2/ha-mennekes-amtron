@@ -132,8 +132,11 @@ def test_gate_closes_without_changing_manual_intent_and_grants_only_release():
         assert h.written(R.CHARGING_RELEASE) == [[0]]
         assert control.charging_release_requested is None
         assert control.pause_requested is None
+        releases = control._release_writes
         await authorize(control)
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        # The grant is a release like one by hand to everything that counts them.
+        assert control._release_writes == releases + 1
         assert control.plug_charge["authorized"]
         assert not control.plug_charge["manual"]
         assert h.written(R.CHARGING_CURRENT_EMS) == []

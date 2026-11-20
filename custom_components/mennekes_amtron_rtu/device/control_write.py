@@ -253,7 +253,7 @@ class WritePath:
             raise validation_error("control_state_unknown")
         return value
 
-    async def _async_transition_write(
+    async def async_transition_write(
         self, spec: RegisterSpec, value: int, *, changed: bool | Callable[[], bool],
         min_interval: float = 0.0,
         precondition: WritePrecondition | None = None,
@@ -318,7 +318,7 @@ class WritePath:
         previous = self._control.charging_release_requested
         self._control.charging_release_requested = released
         try:
-            await self._async_transition_write(
+            await self.async_transition_write(
                 CHARGING_RELEASE, int(released), changed=lambda: switches,
                 precondition=admit if released and current != 1 else None,
             )
@@ -338,7 +338,7 @@ class WritePath:
         changed = current != int(locked)
         if changed and not (locked and self._repeats_stop(LOCK_EVSE, 1)):
             await self.async_check_transition_interval()
-        await self._async_transition_write(LOCK_EVSE, int(locked), changed=changed)
+        await self.async_transition_write(LOCK_EVSE, int(locked), changed=changed)
 
     async def _async_apply_phases(self, phases: int) -> None:
         current = await self.async_read_switch(REQUESTED_PHASES)
@@ -377,7 +377,7 @@ class WritePath:
         self._control._client.check_write_interval(
             REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
         )
-        await self._async_transition_write(
+        await self.async_transition_write(
             REQUESTED_PHASES, phases, changed=True,
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
             precondition=lambda read: self._async_check_phase_write(change, read),

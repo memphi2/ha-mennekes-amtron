@@ -347,15 +347,14 @@ class PlugChargeController:
             self._check_request(session, deadline)
             self._authorizing = session, deadline
             try:
-                await self._control.writes.async_write(
-                    CHARGING_RELEASE, 1, refresh=False, precondition=self._live_presence,
+                # The same write as a release by hand: it counts as a release
+                # and an unanswered one restarts the state-change interval.
+                await self._control.writes.async_transition_write(
+                    CHARGING_RELEASE, 1, changed=switches, precondition=self._live_presence,
                 )
                 self._check_request(session, deadline)
                 self._control.events.record("executed", "enable_charging", source="plug_charge")
                 self.state.authorized = True
-                self.state.hold = False
-                if switches:
-                    self._control.write_state.mode_change_at = self._control._monotonic()
             except (DeviceError, AmtronBusError, OSError, asyncio.CancelledError) as err:
                 if not isinstance(err, DeviceValidationError) and self.state.session(self.cycle) == session:
                     self.state.revoke()
