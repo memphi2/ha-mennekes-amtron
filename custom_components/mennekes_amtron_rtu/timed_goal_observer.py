@@ -23,12 +23,8 @@ from .device.departure_plan import DepartureForecast, DepartureInputs
 from .device.departure_step import (
     minimum_level,
 )
-from .device.enums import (
-    DetectedEvPhases,
-    EvseState,
-    GridPhasesConnected,
-    SwitchedPhases,
-)
+from .device.enums import EvseState
+from .device.power_window import car_phases, observed_phases
 from .device.registers import EVSE_STATE
 from .device.timed_goal import TimedGoal, matches_departure_source
 from .exceptions import home_assistant_error, service_validation_error
@@ -329,25 +325,15 @@ class TimedGoalObserver:
 
     def _phases(self) -> int:
         data = self._runtime.coordinator.current_data()
-        switched = data.get("switched_phases")
-        connected = data.get("grid_phases_connected")
-        if switched == SwitchedPhases.SINGLE_PHASE or connected == GridPhasesConnected.L1:
-            return 1
-        if switched == SwitchedPhases.ALL_AVAILABLE and connected == GridPhasesConnected.L1_L2_L3:
-            detected = data.get("detected_ev_phases")
-            if detected in (
-                DetectedEvPhases.ONE_PHASE, DetectedEvPhases.TWO_PHASES,
-                DetectedEvPhases.THREE_PHASES,
-            ):
-                if data.get(EVSE_STATE.key) == EvseState.CHARGING:
-                    # Only a drawing car proves the reading is its own.
-                    self._remember_phases(int(detected))
-                return int(detected)
+        car = car_phases(data.fresh)
+        if car is not None and data.fresh(EVSE_STATE.key) == EvseState.CHARGING:
+            # Only a drawing car proves the reading is its own.
+            self._remember_phases(car)
         # Detection is zero while the car draws no current, i.e. all the time
         # before a late start. The car's last detected phases then decide, and
         # a car never seen charging is assumed three-phase. A one-phase car
         # corrects that on its first charge, from the reserve the start keeps.
-        return self._known_phases or 3
+        return observed_phases(data.fresh) or self._known_phases or 3
 
     def _remember_phases(self, phases: int) -> None:
         profile = self._options.get(CONF_VEHICLE_PROFILE_ID)

@@ -37,11 +37,22 @@ class PowerWindow:
         return (total - previous[1]) * 3600 / seconds
 
 
-def observed_phases(fresh: Callable[[str], object]) -> int | None:
-    """Read the selected physical phase configuration, never a held fallback."""
+def car_phases(fresh: Callable[[str], object]) -> int | None:
+    """The phases the car itself draws on, where the wallbox offers all three."""
     switched, grid, detected = (fresh(key) for key in (
         "switched_phases", "grid_phases_connected", "detected_ev_phases",
     ))
+    if isinstance(switched, bool) or isinstance(grid, bool) or isinstance(detected, bool):
+        return None
+    if (switched == SwitchedPhases.ALL_AVAILABLE and grid == GridPhasesConnected.L1_L2_L3
+            and isinstance(detected, (int, float)) and detected in (1, 2, 3)):
+        return int(detected)
+    return None
+
+
+def observed_phases(fresh: Callable[[str], object]) -> int | None:
+    """Read the selected physical phase configuration, never a held fallback."""
+    switched, grid = fresh("switched_phases"), fresh("grid_phases_connected")
     if isinstance(switched, bool):
         return None
     if switched == SwitchedPhases.SINGLE_PHASE:
@@ -50,7 +61,4 @@ def observed_phases(fresh: Callable[[str], object]) -> int | None:
         return None
     if grid == GridPhasesConnected.L1:
         return 1
-    if (grid == GridPhasesConnected.L1_L2_L3 and not isinstance(detected, bool)
-            and isinstance(detected, (int, float)) and detected in (1, 2, 3)):
-        return int(detected)
-    return None
+    return car_phases(fresh)
