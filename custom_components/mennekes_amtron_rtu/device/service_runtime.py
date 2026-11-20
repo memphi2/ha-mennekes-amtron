@@ -1015,6 +1015,10 @@ class ModbusService:
                             raise DeviceError("soc_goal_source_changed")
                         if value != 0 and self._soc_maximum_required and control.soc_goal.maximum_percent is None:
                             raise DeviceError("soc_goal_limit_unavailable")
+                        cap = control.soc_goal.maximum_percent
+                        if cap is not None and isinstance(value, (int, float)) and value > cap:
+                            # Typed into the app: said, not pressed down in silence.
+                            raise DeviceError("soc_goal_invalid")
                         reading = self._soc_reading
                         payload = {**payload, "source": control.soc_goal.source,
                             "maximum": control.soc_goal.maximum_percent,

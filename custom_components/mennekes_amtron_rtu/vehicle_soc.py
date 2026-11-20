@@ -350,7 +350,8 @@ class VehicleSocObserver:
             return
         stopped = goal.stop_requested
         try:
-            await self.async_set_target(goal.target_percent, automatic=True)
+            # The chosen value again, which a pressing limit leaves in place.
+            await self.async_set_target(goal.chosen_percent, automatic=True)
             resume = getattr(self._control, "async_resume_charging", None)
             if stopped and resume is not None and getattr(self._control, "pause_requested", None) is True:
                 await resume()
@@ -373,9 +374,9 @@ class VehicleSocObserver:
                 remembered = self._memory.recall(self._memory_key)
             # A read-only owner refuses the command; nothing is restored then.
             if remembered and not self._stopping and goal.status == "disabled":
-                maximum = self.maximum or goal.maximum_percent
                 try:
-                    await self.async_set_target(min(remembered, maximum) if maximum else remembered, automatic=True)
+                    # As chosen: the car's limit presses it down by itself.
+                    await self.async_set_target(remembered, automatic=True)
                 except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
                     _LOGGER.debug("Remembered vehicle charge target not restored: %s", err)
         finally:

@@ -102,7 +102,12 @@ def test_a_restored_target_is_capped_by_a_lower_vehicle_limit(tmp_path):
             await first.async_stop()
             control.soc_goal.configure_source(None)
             first = await _observer(hass, control, coordinator, "sensor.first", memory)
-            assert control.soc_goal.target_percent == 80
+            assert (control.soc_goal.target_percent, control.soc_goal.chosen_percent) == (80, 85)
+            # Restoring under the pressing limit does not rewrite the memory.
+            assert list(memory._targets.targets.values()) == [85]
+            hass.states.async_set("number.limit", "95", {"unit_of_measurement": "%"})
+            await hass.async_block_till_done()
+            assert control.soc_goal.target_percent == 85
             await first.async_stop()
         finally:
             await hass.async_stop()

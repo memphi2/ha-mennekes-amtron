@@ -65,28 +65,26 @@ class SocGoal:
     def set_target(
         self, value: object, soc: object = None, maximum: object = None,
     ) -> bool:
-        """Set a ceiling using the current vehicle data; zero only disables."""
-        target = percentage(value)
-        if target == 0:
+        """Choose a ceiling using the current vehicle data; zero only disables.
+
+        The value is what was chosen; the target in force is never above the
+        car's charge limit. A value at the limit follows the limit, one above
+        it comes into force as far as the limit allows.
+        """
+        chosen = percentage(value)
+        if chosen == 0:
             previous = self.snapshot()
             self.target_percent = self.chosen_percent = 0.0
             self.status = "disabled"
             return previous != self.snapshot()
         cap = self.maximum_percent if maximum is None else percentage(maximum, maximum=True)
         current = None if soc is None else percentage(soc)
-        if target and self.source is None:
+        if self.source is None:
             raise ValueError("vehicle source is not configured")
-        if target and cap is not None and target > cap:
-            raise ValueError("target exceeds the vehicle charge limit")
         previous = self.snapshot()
-        # Setting the target in force again, as a release of its reach does,
-        # chooses nothing: a value the limit pressed down stays the chosen one.
-        again = target == self.target_percent and target == (
-            self.chosen_percent if cap is None else min(self.chosen_percent, cap)
-        )
+        target = chosen if cap is None else min(chosen, cap)
         self.target_percent = target
-        if not again:
-            self.chosen_percent = 100.0 if target == cap else target
+        self.chosen_percent = 100.0 if chosen == cap else chosen
         self.maximum_percent = cap
         self.status = "active" if target else "disabled"
         if target and current is not None and current >= target:
