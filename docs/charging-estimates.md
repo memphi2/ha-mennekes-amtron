@@ -130,7 +130,8 @@ per kWh or MWh, for example `EUR/kWh` or `CHF/MWh`; with euros, `€/kWh`,
 `ct/kWh` and `€/MWh` also work. Negative prices are supported. Another
 currency or a missing unit is not guessed. Costs, the cost target and the
 app's Charging page all show that currency. The network price modules follow
-German rules and assume euros.
+German rules and are priced in euros: they are offered, imported, renewed and
+applied only while Home Assistant is set to Germany and euros.
 
 A dynamic price stays valid for **90 minutes after its last report to Home
 Assistant**. Reporting the same value again renews that period. If reports stop,
@@ -169,8 +170,9 @@ settings change later.
 ### Optional §14a EnWG network tariffs
 
 The §14a network-tariff choices appear only when Home Assistant's country is
-**Germany**. Fixed and dynamic electricity-price estimates remain available
-in other countries.
+**Germany** and its currency is **euro**; a saved network tariff is not
+applied otherwise. Fixed and dynamic electricity-price estimates remain
+available in other countries and currencies.
 
 These settings estimate the **variable network charge for charging energy**.
 They do not enroll a tariff, implement grid-operator control or establish that

@@ -1,3 +1,3 @@
 """Independent release version of the Modbus service and Supervisor app."""
 
-SERVICE_VERSION = "0.10.0"
+SERVICE_VERSION = "1.0.0b1"

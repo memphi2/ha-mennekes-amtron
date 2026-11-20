@@ -22,7 +22,7 @@ from .charging_cost_const import (
 )
 from .entry_types import MennekesAmtronConfigEntry
 from .network_tariff_config import parse_tariff_inputs
-from .network_tariff_lookup import async_lookup_home_tariff
+from .network_tariff_lookup import async_lookup_home_tariff, german_network_tariffs
 
 _LOGGER = logging.getLogger(__name__)
 _RUNNING_STATES = (ConfigEntryState.LOADED, ConfigEntryState.SETUP_IN_PROGRESS)
@@ -80,6 +80,9 @@ async def async_refresh_tariff_year(
         return False
     options = dict(entry.options)
     if not needs_year_refresh(options):
+        return False
+    if not german_network_tariffs(hass.config):
+        _LOGGER.warning("Network tariff: not renewed, the German network prices need Germany and euros in Home Assistant")
         return False
     values = await async_lookup_home_tariff(hass)
     if (

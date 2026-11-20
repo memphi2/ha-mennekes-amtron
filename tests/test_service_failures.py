@@ -48,7 +48,7 @@ def test_api_bus_queue_is_bounded_without_blocking_heartbeat(tmp_path, endpoint)
                 TestServer(create_app(service)) as server,
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
             ):
-                url = server.make_url(f"/v2/{endpoint}")
+                url = server.make_url(f"/v1/{endpoint}")
                 pending = [
                     asyncio.create_task(session.post(url, json={})) for _ in range(8)
                 ]
@@ -56,7 +56,7 @@ def test_api_bus_queue_is_bounded_without_blocking_heartbeat(tmp_path, endpoint)
                     await asyncio.wait_for(saturated.wait(), 2)
                     async with session.post(url, json={}) as response:
                         assert response.status == 503
-                    async with session.get(server.make_url("/v2/state")) as response:
+                    async with session.get(server.make_url("/v1/state")) as response:
                         assert response.status == 200
                     before = service.diagnostics.heartbeats_sent
                     await asyncio.sleep(0.08)
@@ -266,7 +266,7 @@ def test_io_failure_is_reported_without_leaking_exception_details(tmp_path):
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
                 session.post(
-                    server.make_url("/v2/read"),
+                    server.make_url("/v1/read"),
                     headers={"Authorization": f"Bearer {TOKEN}"},
                     json={"register": "error_code"},
                 ) as response,

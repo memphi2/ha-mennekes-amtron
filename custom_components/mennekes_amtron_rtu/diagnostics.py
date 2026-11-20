@@ -66,7 +66,7 @@ async def async_get_config_entry_diagnostics(
     data = coordinator.current_data()
     state = client.snapshot
     try:
-        trace = await client.request("GET", "/v2/diagnostics", update_connection=False)
+        trace = await client.request("GET", "/v1/diagnostics", update_connection=False)
         write_transactions = sanitize_snapshot(trace.get("write_transactions"))
         runtime_events = sanitize_events(trace.get("runtime_events"))
     except AmtronBusError:

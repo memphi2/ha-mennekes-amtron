@@ -184,8 +184,10 @@ COMMANDS: dict[str, Command] = {
     "cost_goal": Command(_fields("value", "price", "currency", "expected_choice_revision"), _cost),
     "cost_price": Command(_fields("price", "currency"), _cost),
     "soc_source": Command(_fields("source", "maximum_required"), _soc_source, wallbox=False),
-    "soc_goal": Command(_fields("value", "source", "soc", "maximum"), _soc),
-    "soc_observation": Command(_fields("source", "soc", "maximum", "expected_soc_revision"), _soc, wallbox=False),
+    "soc_goal": Command(_fields("value", "source", "soc", "soc_age", "maximum"), _soc),
+    "soc_observation": Command(
+        _fields("source", "soc", "soc_age", "maximum", "expected_soc_revision"), _soc, wallbox=False,
+    ),
     "soc_goal_choice": Command(_fields("value", "expected_choice_revision"), _soc),
     "plug_charge_config": Command(_fields("value", "policy"), _plug_charge_config),
     "plug_charge_authorize": Command(_fields("session", "deadline"), _plug_charge_authorize),

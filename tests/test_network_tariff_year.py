@@ -19,6 +19,7 @@ from custom_components.mennekes_amtron_rtu.network_tariff_year import (
 )
 from tests.test_charging_cost_options import NETWORK
 
+GERMANY = SimpleNamespace(country="DE", currency="EUR")
 
 def _entry():
     year = datetime.now(ZoneInfo("Europe/Berlin")).year
@@ -64,7 +65,7 @@ def test_new_year_updates_only_tariff_options(monkeypatch):
         updates.append(options)
         entry.options = options
 
-    hass = SimpleNamespace(config_entries=SimpleNamespace(async_update_entry=update))
+    hass = SimpleNamespace(config=GERMANY, config_entries=SimpleNamespace(async_update_entry=update))
     assert asyncio.run(async_refresh_tariff_year(hass, entry))
     assert len(updates) == 1
     assert updates[0]["charging_price"] == 0.3
@@ -81,16 +82,32 @@ def test_missing_new_year_data_keeps_old_options(monkeypatch):
         lookup,
     )
     entry = _entry()
-    hass = SimpleNamespace(config_entries=SimpleNamespace(
+    hass = SimpleNamespace(config=GERMANY, config_entries=SimpleNamespace(
         async_update_entry=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected update")),
     ))
     assert not asyncio.run(async_refresh_tariff_year(hass, entry))
 
 
+def test_german_network_prices_are_not_renewed_in_another_currency(monkeypatch, caplog):
+    async def unexpected_lookup(_hass):
+        raise AssertionError("unexpected lookup")
+
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.network_tariff_year.async_lookup_home_tariff",
+        unexpected_lookup,
+    )
+    entry = _entry()
+    hass = SimpleNamespace(config=SimpleNamespace(country="DE", currency="USD"), config_entries=SimpleNamespace(
+        async_update_entry=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected update")),
+    ))
+    assert not asyncio.run(async_refresh_tariff_year(hass, entry))
+    assert "need Germany and euros" in caplog.text
+
+
 def test_invalid_or_wrong_year_import_keeps_old_tariff(monkeypatch):
     entry = _entry()
     updates = []
-    hass = SimpleNamespace(config_entries=SimpleNamespace(
+    hass = SimpleNamespace(config=GERMANY, config_entries=SimpleNamespace(
         async_update_entry=lambda *_args, **kwargs: updates.append(kwargs),
     ))
 
@@ -124,7 +141,7 @@ def test_final_new_year_sheet_is_applied_without_provisional_marker(monkeypatch)
         lookup,
     )
     entry = _entry()
-    hass = SimpleNamespace(config_entries=SimpleNamespace(
+    hass = SimpleNamespace(config=GERMANY, config_entries=SimpleNamespace(
         async_update_entry=lambda _entry, *, options: setattr(entry, "options", options),
     ))
     assert asyncio.run(async_refresh_tariff_year(hass, entry))
@@ -141,7 +158,7 @@ def test_concurrent_options_edit_is_not_overwritten(monkeypatch):
         "custom_components.mennekes_amtron_rtu.network_tariff_year.async_lookup_home_tariff",
         lookup,
     )
-    hass = SimpleNamespace(config_entries=SimpleNamespace(
+    hass = SimpleNamespace(config=GERMANY, config_entries=SimpleNamespace(
         async_update_entry=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected update")),
     ))
     assert not asyncio.run(async_refresh_tariff_year(hass, entry))
@@ -179,7 +196,7 @@ def test_inflight_tariff_lookup_does_not_mutate_unloaded_or_replaced_runtime(mon
             "custom_components.mennekes_amtron_rtu.network_tariff_year.async_lookup_home_tariff",
             lookup,
         )
-        hass = SimpleNamespace(config_entries=SimpleNamespace(
+        hass = SimpleNamespace(config=GERMANY, config_entries=SimpleNamespace(
             async_update_entry=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected update")),
         ))
         assert not asyncio.run(async_refresh_tariff_year(hass, entry))
@@ -204,7 +221,7 @@ def test_annual_refresh_uses_the_same_german_tariff_clock_as_initial_setup(
     )
     entry = _entry()
     hass = SimpleNamespace(
-        config=SimpleNamespace(time_zone="UTC"),
+        config=SimpleNamespace(time_zone="UTC", country="DE", currency="EUR"),
         config_entries=SimpleNamespace(
             async_update_entry=lambda _entry, *, options: setattr(entry, "options", options),
         ),

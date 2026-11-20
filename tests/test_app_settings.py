@@ -417,7 +417,7 @@ def test_setup_api_is_live_but_never_ready_or_unauthenticated():
             response = await client.get("/health")
             assert response.status == 200
             assert await response.json() == {"status": "running", "configured": False}
-            for path in ("/v2/state", "/v2/command"):
+            for path in ("/v1/state", "/v1/command"):
                 assert (await client.post(path)).status == 401
                 response = await client.post(path, headers={"Authorization": f"Bearer {TOKEN}"})
                 assert response.status == 503
@@ -535,7 +535,7 @@ def test_setup_server_runs_both_listeners_without_modbus_and_stops_cleanly(tmp_p
             async with ClientSession() as session:
                 response = await session.get(f"http://127.0.0.1:{api_port}/health")
                 assert await response.json() == {"status": "running", "configured": False}
-                response = await session.get(f"http://127.0.0.1:{api_port}/v2/state", headers={"Authorization": f"Bearer {TOKEN}"})
+                response = await session.get(f"http://127.0.0.1:{api_port}/v1/state", headers={"Authorization": f"Bearer {TOKEN}"})
                 assert response.status == 503
                 response = await session.get(f"http://127.0.0.1:{ingress_port}/", headers=HEADERS)
                 assert response.status == 403

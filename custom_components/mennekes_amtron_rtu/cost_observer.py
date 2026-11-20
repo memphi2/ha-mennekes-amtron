@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from homeassistant.const import EVENT_CORE_CONFIG_UPDATE
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -42,6 +44,7 @@ from .device.notice import FailureNotice
 from .device.registers import ENERGY_TOTAL, EVSE_STATE
 from .entry_types import MennekesAmtronConfigEntry
 from .model_store import ModelStore
+from .network_tariff_lookup import german_network_tariffs
 
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60
@@ -91,7 +94,7 @@ class ChargingCostObserver:
         self._hass, self._entry = hass, entry
         self._entity = str(entry.options.get(CONF_CHARGING_PRICE_ENTITY, ""))
         self._fixed = entry.options.get(CONF_CHARGING_COST_SOURCE) == COST_SOURCE_FIXED
-        self._tariff = TariffConfig.parse(entry.options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
+        self._tariff = self._network_tariff(entry.options)
         self._configured_options = deepcopy(dict(entry.options))
         self._configured_data = dict(entry.data)
         self._identity = (
@@ -120,6 +123,7 @@ class ChargingCostObserver:
         self._price_at = self._started_at
         self._unsubscribe: CALLBACK_TYPE | None = None
         self._unsubscribe_report: CALLBACK_TYPE | None = None
+        self._unsubscribe_config: CALLBACK_TYPE | None = None
         self._expiry: CALLBACK_TYPE | None = None
         self._live_price: float | None = None
         self._closed = False
@@ -127,6 +131,12 @@ class ChargingCostObserver:
         self._storage_corrupt = False
         self._dirty = False
         self._retry_at = 0.0
+
+    def _network_tariff(self, options: Mapping[str, Any]) -> TariffConfig:
+        """A saved network tariff counts only where it was made for: Germany in euros."""
+        if not german_network_tariffs(self._hass.config):
+            return TariffConfig.parse({"module": "none"})
+        return TariffConfig.parse(options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
 
     def retain_for_reload(self, entry: MennekesAmtronConfigEntry) -> bool:
         """Keep observed prices and energy only across an unchanged live source.
@@ -165,7 +175,7 @@ class ChargingCostObserver:
         if self._closed or dict(self._entry.data) != self._configured_data:
             return False
         try:
-            tariff = TariffConfig.parse(current.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
+            tariff = self._network_tariff(current)
         except ValueError:
             return False
         if tariff != self._tariff:
@@ -225,9 +235,17 @@ class ChargingCostObserver:
             _LOGGER.warning("Charging cost: storage cannot be read; optional cost estimates are unavailable")
         if self._fixed:
             self._accumulator.set_price(self._started_at, self._price())
+        self._unsubscribe_config = self._hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, self._config_changed)
         if not self._fixed and self._entity:
             self._unsubscribe = async_track_state_change_event(self._hass, [self._entity], self._price_changed)
             self._unsubscribe_report = async_track_state_report_event(self._hass, [self._entity], self._price_changed)
+            self._accept_price(self._hass.states.get(self._entity), time.time())
+
+    @callback
+    def _config_changed(self, _event: Event[Any]) -> None:
+        """Another country or currency judges the tariff and the price again."""
+        self.apply_tariff_update()
+        if not self._fixed and self._entity:
             self._accept_price(self._hass.states.get(self._entity), time.time())
 
     @callback
@@ -355,6 +373,9 @@ class ChargingCostObserver:
         if self._unsubscribe_report is not None:
             self._unsubscribe_report()
             self._unsubscribe_report = None
+        if self._unsubscribe_config is not None:
+            self._unsubscribe_config()
+            self._unsubscribe_config = None
         if self._expiry is not None:
             self._expiry()
             self._expiry = None

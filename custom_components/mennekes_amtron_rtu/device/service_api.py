@@ -59,9 +59,9 @@ class ServiceApi:
 
     async def _route(self, method: str, path: str, payload: object) -> dict[str, Any]:
         service = self._service
-        if (method, path) == ("GET", "/v2/state"):
+        if (method, path) == ("GET", "/v1/state"):
             return await service.stable_snapshot(patient=True)
-        if (method, path) == ("GET", "/v2/diagnostics"):
+        if (method, path) == ("GET", "/v1/diagnostics"):
             # Passive RAM snapshot: no serial reads, writes or file access.
             return {
                 "write_transactions": service.client.write_trace.snapshot(),
@@ -71,34 +71,34 @@ class ServiceApi:
             raise _NotFoundError(path)
         if not isinstance(payload, dict):
             raise ValueError("expected an object")
-        if path == "/v2/energy":
+        if path == "/v1/energy":
             # From the meter log in memory: no bus access.
             if set(payload) != {"start", "end"}:
                 raise ValueError("invalid energy span")
             return {"energy_kwh": service.charge_meter.log.energy_between(
                 moment(payload["start"]), moment(payload["end"]),
             )}
-        if path == "/v2/soc-goal/reserve":
+        if path == "/v1/soc-goal/reserve":
             if payload != {}:
                 raise ValueError("invalid percentage-goal reservation")
             return {"token": service.soc_transactions.reserve()}
-        if path == "/v2/soc-goal/resolve":
+        if path == "/v1/soc-goal/resolve":
             if set(payload) != {"token"}:
                 raise ValueError("invalid percentage-goal resolution")
             return await service.soc_transactions.resolve(payload["token"])
         if self._bus_requests.locked():
             raise ServiceBusyError
-        if path == "/v2/soc-goal/commit":
+        if path == "/v1/soc-goal/commit":
             return await service.soc_transactions.commit(payload, gate=self._bus_requests)
         async with self._bus_requests:
-            if path == "/v2/command":
+            if path == "/v1/command":
                 return await service.command(payload)
             return await service.read(payload)
 
 
 # Every operation there is; the web server registers exactly these.
-GETS = ("/v2/state", "/v2/diagnostics")
+GETS = ("/v1/state", "/v1/diagnostics")
 POSTS = (
-    "/v2/command", "/v2/read", "/v2/energy", "/v2/soc-goal/reserve",
-    "/v2/soc-goal/commit", "/v2/soc-goal/resolve",
+    "/v1/command", "/v1/read", "/v1/energy", "/v1/soc-goal/reserve",
+    "/v1/soc-goal/commit", "/v1/soc-goal/resolve",
 )

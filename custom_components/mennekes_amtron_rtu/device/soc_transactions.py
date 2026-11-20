@@ -63,7 +63,7 @@ class SocTransactions:
     async def commit(
         self, payload: dict[str, Any], *, gate: asyncio.Semaphore | None = None,
     ) -> dict[str, Any]:
-        if set(payload) != {"token", "expected_serial_number", "value", "source", "soc", "maximum"}:
+        if set(payload) != {"token", "expected_serial_number", "value", "source", "soc", "soc_age", "maximum"}:
             raise ValueError("invalid percentage-goal request")
         token = self._token(payload["token"])
         item = self._reservations.get(token)

@@ -129,10 +129,13 @@ The service API's identity precondition and its limits are documented in the
 
 ## What this assessment does not prove
 
-The owner reported successful operation on an **Amtron 4You 310 11 C2** on
-2026-11-03. That report did not record a firmware version or verify every
-feature. It does not validate later code changes, other models or physical LAN
-gateways. The [compatibility matrix](compatibility.md) records that boundary.
+The owner reported successful operation of 1.0.0 on an **Amtron 4You 310 11
+C2** over Modbus RTU on 2026-11-20: charging, heartbeat and its recovery, phase
+switching, connection interruption, restarts, guest charging and vehicle
+changes. That report did not record a firmware version or a long-term Recorder
+measurement. It does not validate later code changes, other models or physical
+LAN gateways. The [compatibility matrix](compatibility.md) records that
+boundary.
 
 Automated tests use simulated wallbox replies. A physical installation still
 needs the [quick-start checks](quickstart.md) and the manufacturer's electrical

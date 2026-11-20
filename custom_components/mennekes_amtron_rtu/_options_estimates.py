@@ -47,7 +47,7 @@ from .config_schemas import (
     vehicle_device_schema,
 )
 from .network_tariff_config import parse_tariff_inputs, tariff_form_values
-from .network_tariff_lookup import async_lookup_home_tariff
+from .network_tariff_lookup import async_lookup_home_tariff, german_network_tariffs
 from .vehicle_profiles import (
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
@@ -116,7 +116,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
     ) -> ConfigFlowResult:
         if (draft := self._section("costs")) is None or self._details.get("cost_source") != source:
             return await self.async_step_init()
-        allow_network = getattr(self.hass.config, "country", None) == "DE"
+        allow_network = german_network_tariffs(self.hass.config)
         errors = _cost_errors(source, user_input) if user_input is not None else {}
         if user_input is not None and not errors:
             draft.values[CONF_CHARGING_COST_SOURCE] = source
@@ -162,7 +162,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         if (
             (draft := self._section("costs")) is None
             or not self._details.get("cost_ready")
-            or getattr(self.hass.config, "country", None) != "DE"
+            or not german_network_tariffs(self.hass.config)
         ):
             return await self.async_step_init()
         errors = {}

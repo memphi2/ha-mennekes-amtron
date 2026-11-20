@@ -54,7 +54,7 @@ def test_rejected_command_immediately_invalidates_cached_availability(tmp_path, 
                 assert not runtime.client.connected
                 assert not runtime.coordinator.last_update_success
                 assert hass.states.get(NUMBER).state == "unavailable"
-                assert requests == [("POST", "/v2/command")]
+                assert requests == [("POST", "/v1/command")]
                 assert not current_writes(bus)
 
                 # Only the normal next poll may restore availability. A
@@ -66,7 +66,7 @@ def test_rejected_command_immediately_invalidates_cached_availability(tmp_path, 
                 assert runtime.coordinator.last_update_success
                 assert hass.states.get(POWER).state != "unavailable"
                 assert (hass.states.get(NUMBER).state == "unavailable") is (reason == "read_only")
-                assert requests == [("POST", "/v2/command"), ("GET", "/v2/state")]
+                assert requests == [("POST", "/v1/command"), ("GET", "/v1/state")]
                 assert not current_writes(bus)
                 if reason == "read_only":
                     service.config = replace(service.config, read_only=False)
@@ -76,7 +76,7 @@ def test_rejected_command_immediately_invalidates_cached_availability(tmp_path, 
                     assert hass.states.get(NUMBER).state != "unavailable"
                 assert entity_ids(hass, entry) == before
                 assert not current_writes(bus)
-                assert requests.count(("POST", "/v2/command")) == 1
+                assert requests.count(("POST", "/v1/command")) == 1
         finally:
             await hass.async_stop()
             await service.stop()

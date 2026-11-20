@@ -43,6 +43,7 @@ def entry(*, dynamic=False):
 def test_tariff_only_update_keeps_cost_observer_and_modbus_connection(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
         configured = entry()
         observer = ChargingCostObserver(hass, configured)
         original_accumulator = observer._accumulator
@@ -57,6 +58,50 @@ def test_tariff_only_update_keeps_cost_observer_and_modbus_connection(tmp_path):
         assert observer._accumulator is original_accumulator
         assert observer._accumulator.tariff.module == "module_2"
         await hass.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("country", "currency"), [("FR", "EUR"), ("DE", "USD")])
+def test_a_german_network_tariff_counts_only_in_germany_with_euros(tmp_path, country, currency):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = country, currency
+        configured = entry()
+        configured.options = {**configured.options, "charging_network_tariff": {
+            "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
+        observer = ChargingCostObserver(hass, configured)
+        assert observer._tariff.module == "none"
+        assert observer.apply_tariff_update()
+        assert observer._tariff.module == "none"
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_a_running_observer_drops_the_network_tariff_when_the_currency_changes(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
+        configured = entry()
+        configured.options = {**configured.options, "charging_network_tariff": {
+            "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
+        observer = ChargingCostObserver(hass, configured)
+        try:
+            await observer.async_start()
+            german = observer.unit_price(time.time())
+            assert observer._tariff.module == "module_2"
+            assert german != pytest.approx(0.3)
+            await hass.config.async_update(currency="USD")
+            await hass.async_block_till_done()
+            assert observer._tariff.module == "none"
+            assert observer.unit_price(time.time()) == pytest.approx(0.3)
+            await hass.config.async_update(currency="EUR")
+            await hass.async_block_till_done()
+            assert observer.unit_price(time.time()) == pytest.approx(german)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
 
     asyncio.run(run())
 
@@ -360,6 +405,7 @@ def test_session_published_after_the_next_idle_reading_keeps_its_cost(tmp_path):
 def test_tariff_change_while_the_final_meter_is_pending_marks_a_gap(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
         configured = entry()
         observer = ChargingCostObserver(hass, configured)
         at = time.time()+1

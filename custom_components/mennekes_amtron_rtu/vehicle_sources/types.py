@@ -75,6 +75,9 @@ class VehicleTelemetry:
     # Since when the source reports this charge level; only a direct read of
     # the source carries it.
     soc_reported_at: datetime | None = field(default=None, kw_only=True)
+    # When the source last reported the charge level, also an unchanged one;
+    # a time, not a value.
+    soc_last_reported: datetime | None = field(default=None, kw_only=True, compare=False)
 
 
 class VehicleTelemetrySource(Protocol):

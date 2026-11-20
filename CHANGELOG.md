@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b1 — 2026-11-21
+
+Beta of 1.0.0, the first stable version, compared with 0.10.0. Integration
+and app are both 1.0.0b1 and must be updated together: the service API starts
+again at version 1, and each side refuses the other's older version.
+
+### Breaking changes
+
+- **Service API 1:** the authenticated endpoints are under `/v1/` instead of
+  `/v2/`, and a charge level Home Assistant reports carries its age
+  (`soc_age`) in `soc_observation`, `soc_goal` and the vehicle charge target
+  transaction.
+- **Saved control state starts again.** The service does not take over the
+  state saved by 0.10: it switches the charging release off and blocks
+  charging commands until the reset is confirmed under **Settings → System →
+  Repairs**; then set the targets again.
+
+### Fixed
+
+- A vehicle charge target is judged only on a charge level the car reported
+  within the last 15 minutes, whether it is chosen in the app or in Home
+  Assistant, or the car's limit changes: a report of the limit or a poll no
+  longer makes an old level count. A target already reached stays reached.
+  The app's Charging page says when the level is too old to judge the target.
+- A running cost estimate takes a change of Home Assistant's country or
+  currency at once instead of keeping the German network price.
+- Saving another target on the app's Charging page no longer makes a draft
+  current that was changed elsewhere meanwhile; it stays marked as changed.
+- The German network price modules are offered, imported, renewed and
+  applied only while Home Assistant is set to Germany and euros.
+
 ## 0.10.0 — 2026-11-20
 
 Stable release of the 0.10 changes since 0.9.1. Integration and app are both

@@ -120,7 +120,7 @@ def test_home_lookup_uses_coordinates_and_reads_complete_fragmented_bodies(monke
         lambda _hass: session,
     )
     hass = SimpleNamespace(config=SimpleNamespace(
-        country="DE", latitude=50.7753, longitude=6.0839,
+        country="DE", currency="EUR", latitude=50.7753, longitude=6.0839,
     ))
     result = asyncio.run(async_lookup_home_tariff(hass))
     assert result is not None
@@ -135,20 +135,20 @@ def test_home_lookup_does_not_guess_ambiguous_operator(monkeypatch):
         lambda _hass: session,
     )
     hass = SimpleNamespace(config=SimpleNamespace(
-        country="DE", latitude=50.7753, longitude=6.0839,
+        country="DE", currency="EUR", latitude=50.7753, longitude=6.0839,
     ))
     assert asyncio.run(async_lookup_home_tariff(hass)) is None
     assert session.urls == []
 
 
-def test_home_lookup_skips_non_german_and_bad_coordinates(monkeypatch):
+def test_home_lookup_skips_non_german_non_euro_and_bad_coordinates(monkeypatch):
     monkeypatch.setattr(
         "custom_components.mennekes_amtron_rtu.network_tariff_lookup.async_get_clientsession",
         lambda _hass: (_ for _ in ()).throw(AssertionError("unexpected request")),
     )
-    for country, latitude in (("FR", 50.0), ("DE", 100.0)):
+    for country, currency, latitude in (("FR", "EUR", 50.0), ("DE", "EUR", 100.0), ("DE", "USD", 50.0)):
         hass = SimpleNamespace(config=SimpleNamespace(
-            country=country, latitude=latitude, longitude=6.0,
+            country=country, currency=currency, latitude=latitude, longitude=6.0,
         ))
         assert asyncio.run(async_lookup_home_tariff(hass)) is None
 
@@ -163,7 +163,7 @@ def test_home_lookup_rejects_invalid_and_oversized_responses(monkeypatch):
             return _Response(self.body)
 
     hass = SimpleNamespace(config=SimpleNamespace(
-        country="DE", latitude=50.7753, longitude=6.0839,
+        country="DE", currency="EUR", latitude=50.7753, longitude=6.0839,
     ))
     for body in (b"not json", b"{}", b"x" * 100_001):
         monkeypatch.setattr(
@@ -208,7 +208,7 @@ def test_malformed_external_csv_leaves_options_lookup_available(monkeypatch):
         lambda _hass: session,
     )
     hass = SimpleNamespace(config=SimpleNamespace(
-        country="DE", latitude=50.7753, longitude=6.0839,
+        country="DE", currency="EUR", latitude=50.7753, longitude=6.0839,
     ))
     assert asyncio.run(async_lookup_home_tariff(hass)) is None
 

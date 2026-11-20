@@ -110,7 +110,7 @@ def test_auth_failure_starts_real_ha_reauth_and_preserves_entities(
                 else:
                     with pytest.raises(ServiceConnectionError):
                         await old_runtime.client.request(
-                            "GET", "/v2/diagnostics", update_connection=False
+                            "GET", "/v1/diagnostics", update_connection=False
                         )
                     assert not old_runtime.client.connected
                 await hass.async_block_till_done()

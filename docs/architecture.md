@@ -67,7 +67,7 @@ projection of that state: each platform is a table of descriptions
 entity shows, when it exists and when it is available. HA restore values cannot
 overwrite service intent, and HA decides nothing about the wallbox.
 
-The HTTP client checks API 3 and a minimum service version reported in every
+The HTTP client checks API 1 and a minimum service version reported in every
 snapshot. A release that changes no service input reuses the published app, so
 updating HA does not restart the app or interrupt its heartbeat. Service
 changes have their own version and publication decision; see
@@ -353,7 +353,7 @@ Cost and loss estimates rest on the service's `ChargeMeter`. It keeps a
 bounded log of total-energy readings and follows the plug cycle from plug-in
 to unplug; a gap too long to rule out an unplug ends the cycle unmeasured.
 Every loss is a vehicle's energy against the meter's difference over a time
-span, which Home Assistant asks for with `POST /v2/energy`: the span of the
+span, which Home Assistant asks for with `POST /v1/energy`: the span of the
 car's own charging record inside a plug cycle, or the plug cycle itself for a
 vehicle energy sensor. The
 cost observer prices the energy of the running cycle and takes the plug state
@@ -658,7 +658,9 @@ Home Assistant never holds the bus itself.
 
 ## Testing
 
-`tests/` is flat, one `test_<module>.py` per module, with no `conftest.py`.
+`tests/` is flat, one `test_<module>.py` per module. The only shared setup,
+`tests/conftest.py`, keeps the test process from giving up its privileges
+the way the service's start does.
 Home Assistant is installed from the CI matrix and used for real; only the
 runtime around it is faked, in `tests/ha_fakes.py`.
 

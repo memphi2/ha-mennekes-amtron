@@ -63,6 +63,34 @@ def test_console_targets_auth_cas_and_vehicle_maximum(tmp_path, monkeypatch):
             assert service.control.soc_goal.source == CAR
             for bad in [{**choice, "source": "foreign"}, {**choice, "confirm": False}, {**choice, "action": "write_register"}]:
                 assert (await client.post("/api/charging", headers=headers, json=bad)).status == 400
+            # A level the car reported 16 minutes ago is no longer known to the app.
+            observation = {"command": "soc_observation", "source": CAR, "soc": 40, "maximum": 75, "expected_serial_number": service.identity.serial_number}
+            await service.command({**observation, "soc_age": 960})
+            assert (await (await client.get("/api/charging", headers=HEADERS)).json())["soc"]["level_known"] is False
+            choice.update(value=30, revision=service.choice_revision)
+            assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
+            assert service.control.soc_goal.status == "active"
+            await service.command({**observation, "soc_age": 5})
+            assert (await (await client.get("/api/charging", headers=HEADERS)).json())["soc"]["level_known"] is True
+            choice.update(value=35, revision=service.choice_revision)
+            assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
+            assert service.control.soc_goal.status == "reached"
+            for age in (-1, True, "5", 8 * 86400):
+                with pytest.raises(ValueError, match="allowed range"):
+                    await service.command({**observation, "soc_age": age})
+            # A reached target stays reached when the report that reached it ages.
+            await service.command({**observation, "soc_age": 960})
+            assert service.control.soc_goal.status == "reached"
+            # An old level judges no target: not with a falling limit, not when set.
+            choice.update(value=38, revision=service.choice_revision)
+            assert (await client.post("/api/charging", headers=headers, json=choice)).status == 200
+            await service.command({**observation, "soc": 40, "maximum": 70, "soc_age": 960})
+            assert (service.control.soc_goal.maximum_percent, service.control.soc_goal.status) == (70, "active")
+            goal = {"command": "soc_goal", "source": CAR, "soc": 40, "maximum": 70, "expected_serial_number": service.identity.serial_number}
+            await service.command({**goal, "value": 36, "soc_age": 960})
+            assert service.control.soc_goal.status == "active"
+            await service.command({**goal, "value": 36, "soc_age": 30})
+            assert service.control.soc_goal.status == "reached"
     asyncio.run(body())
 
 

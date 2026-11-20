@@ -38,7 +38,7 @@ def test_optional_remote_setup_retries_or_requests_reauthentication(
         @web.middleware
         async def fail_once(request, handler):
             nonlocal failing
-            if request.path == "/v2/command":
+            if request.path == "/v1/command":
                 command = (await request.json()).get("command")
                 attempts.append(command)
                 if failing and command == target:
@@ -104,7 +104,7 @@ def test_lost_source_reply_recovers_from_authoritative_snapshot(tmp_path):
         @web.middleware
         async def lose_one_reply(request, handler):
             nonlocal lose_reply, source_requests
-            if request.path == "/v2/command" and (await request.json()).get("command") == "soc_source":
+            if request.path == "/v1/command" and (await request.json()).get("command") == "soc_source":
                 source_requests += 1
                 if lose_reply:
                     lose_reply = False

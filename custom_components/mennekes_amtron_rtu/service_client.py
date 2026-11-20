@@ -212,7 +212,7 @@ class ServiceClient:
     async def update(self, *, consume_energy: bool = True) -> WallboxData:
         """Fetch the state; ``consume_energy`` off leaves the meter sample to the next poll."""
         async with self.publication:
-            payload = await self.request("GET", "/v2/state")
+            payload = await self.request("GET", "/v1/state")
             return self.apply_snapshot(payload, consume_energy=consume_energy)
 
     def apply_snapshot(
@@ -527,7 +527,7 @@ class ServiceClient:
                     raise DeviceValidationError("soc_goal_not_supported")
                 self.apply_snapshot(
                     await self.request(
-                        "POST", "/v2/command", {
+                        "POST", "/v1/command", {
                             "command": command, **values, "origin": command_source.get(),
                             "expected_serial_number": self.bound_serial,
                         }
@@ -548,7 +548,7 @@ class ServiceClient:
         """What the meter delivered in a time span, from the service's log."""
         # An estimate must not mark the entry unavailable.
         data = await self.request(
-            "POST", "/v2/energy", {"start": start, "end": end}, update_connection=False,
+            "POST", "/v1/energy", {"start": start, "end": end}, update_connection=False,
         )
         value = data.get("energy_kwh")
         if value is None:
@@ -559,7 +559,7 @@ class ServiceClient:
 
     async def async_read_error_code(self) -> int:
         """Read the wallbox's error register now, not from the last poll."""
-        data = await self.request("POST", "/v2/read", {"register": ERROR_CODE.key})
+        data = await self.request("POST", "/v1/read", {"register": ERROR_CODE.key})
         value = data.get("value")
         if type(value) is not int:
             raise AmtronConnectionError("invalid error register")
@@ -577,7 +577,7 @@ class ServiceClient:
         if block is None:
             raise AmtronConnectionError("unsupported diagnostic block")
         # Diagnostics reads must not mark the entry unavailable.
-        response = await self.request("POST", "/v2/read", {"block": block.name}, update_connection=False)
+        response = await self.request("POST", "/v1/read", {"block": block.name}, update_connection=False)
         words = response.get("words")
         if (
             not isinstance(words, list)

@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../custom_components/mennekes_amtron_rtu/device');
 const source=fs.readFileSync(path.join(root,'app_charging.js'),'utf8');
-const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_currency:'EUR',cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
+const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_currency:'EUR',cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active',level_known:true},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(page='targets',responses=[initial()],language='de'){
  const html=fs.readFileSync(path.join(root,'app_charging.html'),'utf8');
@@ -145,6 +145,18 @@ test('an own save keeps another unsaved field current instead of calling it chan
  await h.emit('energy_form','submit');
  assert.equal(JSON.parse(h.calls[2].body).revision,'r2');
 });
+test('an own save leaves a draft that was changed elsewhere changed',async()=>{
+ const elsewhere=initial();elsewhere.revision='r2';elsewhere.soc.target=60;
+ const saved=initial();saved.revision='r3';saved.soc.target=60;saved.energy.target=20;
+ const h=setup('targets',[initial(),elsewhere,saved,{error:'soc_goal_source_changed'}],'en');await flush();
+ h.elements.get('soc_value').value='75';await h.emit('soc_form','input');await h.poll();
+ assert.match(h.elements.get('notice').textContent,/changed elsewhere/);
+ h.elements.get('energy_value').value='20';await h.emit('energy_form','input');await h.emit('energy_form','submit');
+ assert.equal(JSON.parse(h.calls[2].body).revision,'r2');
+ assert.match(h.elements.get('notice').textContent,/changed elsewhere/);assert.equal(h.elements.get('soc_value').value,'75');
+ await h.emit('soc_form','submit');
+ assert.equal(JSON.parse(h.calls[3].body).revision,'r1');
+});
 test('the departure plan names its planned start, and a plan that could not be saved',async()=>{
  const planned=initial();planned.departure.planned_start='2026-11-16T03:00:00.000Z';
  let h=setup('departure',[planned],'en');await flush();
@@ -224,4 +236,15 @@ test('money is shown in the currency Home Assistant reported, and as a bare numb
  const broken=initial();broken.cost_currency='euro';
  h=setup('targets',[broken],'en');await flush();
  assert.match(h.elements.get('notice').textContent,/No current response/);
+});
+
+test('an active vehicle target says when the car\'s level is too old to judge it',async()=>{
+ const old=initial();old.soc.level_known=false;
+ const h=setup('targets',[old],'en');await flush();
+ assert.equal(h.elements.get('soc_status').textContent,'80 % · Active · charge level report too old, judged on the next one');
+ const known=setup('targets',[initial()],'en');await flush();
+ assert.equal(known.elements.get('soc_status').textContent,'80 % · Active');
+ const broken=initial();delete broken.soc.level_known;
+ const b=setup('targets',[broken],'en');await flush();
+ assert.match(b.elements.get('notice').textContent,/No current response/);
 });

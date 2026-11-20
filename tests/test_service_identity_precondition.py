@@ -28,7 +28,7 @@ def test_api_rejects_missing_or_invalid_identity_preconditions(tmp_path, precond
             async with (
                 TestServer(create_app(service)) as server,
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
-                session.post(server.make_url("/v2/command"), json={
+                session.post(server.make_url("/v1/command"), json={
                     "command": "set_current", "value": 10, **precondition,
                 }) as response,
             ):
@@ -56,7 +56,7 @@ def test_null_identity_is_an_exact_match_not_a_wildcard(tmp_path, actual, expect
             async with (
                 TestServer(create_app(service)) as server,
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
-                session.post(server.make_url("/v2/command"), json={
+                session.post(server.make_url("/v1/command"), json={
                     "command": "set_current", "value": 10,
                     "expected_serial_number": expected,
                 }) as response,
@@ -64,7 +64,7 @@ def test_null_identity_is_an_exact_match_not_a_wildcard(tmp_path, actual, expect
                 assert response.status == (200 if accepted else 409)
                 data = await response.json()
                 if accepted:
-                    assert data["api_version"] == 3
+                    assert data["api_version"] == 1
                 else:
                     assert data["error"] == "device_identity_changed"
                     assert SERIAL not in str(data)
@@ -99,7 +99,7 @@ def test_every_command_rejects_a_different_wallbox_without_bus_reads_or_intent_c
             async with (
                 TestServer(create_app(service)) as server,
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
-                session.post(server.make_url("/v2/command"), json=payload) as response,
+                session.post(server.make_url("/v1/command"), json=payload) as response,
             ):
                 assert response.status == 409
                 assert (await response.json())["error"] == "device_identity_changed"
@@ -135,7 +135,7 @@ def test_identity_is_checked_after_waiting_for_the_service_command_lock(tmp_path
                 TestServer(create_app(service)) as server,
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
             ):
-                url = server.make_url("/v2/command")
+                url = server.make_url("/v1/command")
                 pending = asyncio.create_task(session.post(url, json={
                     "command": "set_current", "value": 10,
                     "expected_serial_number": SERIAL,
@@ -167,10 +167,10 @@ def test_identity_is_checked_after_waiting_for_the_service_command_lock(tmp_path
 
 
 @pytest.mark.parametrize(("method", "path"), [
-    ("GET", "/v1/state"), ("GET", "/v1/diagnostics"),
-    ("POST", "/v1/read"), ("POST", "/v1/command"),
+    ("GET", "/v2/state"), ("GET", "/v2/diagnostics"),
+    ("POST", "/v2/read"), ("POST", "/v2/command"),
 ])
-def test_removed_api_v1_has_no_aliases_or_write_access(tmp_path, method, path):
+def test_other_api_paths_have_no_aliases_or_write_access(tmp_path, method, path):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)
         try:
@@ -189,7 +189,7 @@ def test_removed_api_v1_has_no_aliases_or_write_access(tmp_path, method, path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("path", ["/v2/command", "/v2/read"])
+@pytest.mark.parametrize("path", ["/v1/command", "/v1/read"])
 def test_deeply_nested_body_is_a_bad_request_not_a_server_error(tmp_path, path):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)

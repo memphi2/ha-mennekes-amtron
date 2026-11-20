@@ -53,7 +53,7 @@ class IntentStore:
             or payload.keys() != {"version", "identity", "pause_requested", "unplug_release",
                                   "charging_release_requested", "charging_setpoint",
                                   "energy_goal", "soc_goal", "plug_charge", "guest_permission"}
-            or payload.get("version") != 2
+            or payload.get("version") != 1
             or payload.get("identity") != self.identity
         ):
             raise ValueError("saved intent does not match this wallbox or state format")
@@ -83,7 +83,7 @@ class IntentStore:
 
     def save(self, state: WriteState) -> None:
         payload = {
-            "version": 2,
+            "version": 1,
             "identity": self.identity,
             "pause_requested": state.pause_requested,
             "charging_release_requested": state.charging_release_requested,

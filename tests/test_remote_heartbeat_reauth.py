@@ -59,7 +59,7 @@ def test_remote_outage_followed_by_auth_failure_clears_repair(tmp_path, monkeypa
                     else:
                         with pytest.raises(ServiceConnectionError):
                             await runtime.client.request(
-                                "GET", "/v2/diagnostics", update_connection=False,
+                                "GET", "/v1/diagnostics", update_connection=False,
                             )
 
                 with patch.object(

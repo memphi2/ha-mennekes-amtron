@@ -92,6 +92,15 @@ reports the price and its currency to the app. It sets the energy target: saving
 target by hand ends it, and clearing it clears both. Without an amount the page
 names the price and when Home Assistant last reported it.
 
+The **vehicle charge target** is judged on the car's charge level only while
+the car reported it within the last 15 minutes. A report of the car's charge
+limit, or a poll, does not make an older level current; until the car reports
+its level again, the target stays active, does not stop the charge and says
+that the charge level report is too old. A target already reached stays
+reached.
+Saving one target leaves another input that was changed elsewhere marked as
+changed: reload and check it before saving it.
+
 ![Charging page with the targets for every charge, the own car's target and guest charging](images/charging-de.png)
 
 *German interface with simulated example values.*

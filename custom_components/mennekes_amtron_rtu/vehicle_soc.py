@@ -7,7 +7,7 @@ import logging
 import math
 from contextlib import suppress
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -25,11 +25,12 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_state_report_event,
 )
+from homeassistant.util import dt as dt_util
 
 from .device.client_errors import AmtronBusError
 from .device.errors import DeviceError
 from .device.notice import FailureNotice
-from .device.soc_choice import READING_SECONDS
+from .device.soc_choice import READING_SECONDS, SOC_AGE_LIMIT
 from .device.soc_goal import SocGoal
 from .exceptions import service_validation_error
 from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
@@ -57,11 +58,12 @@ class SocControl(Protocol):
 
     async def async_observe_soc(
         self, soc: float | None, maximum: float | None = None, *, source: str,
+        soc_age: float | None = None,
     ) -> None: ...
 
     async def async_set_soc_goal(
         self, value: float, *, source: str,
-        soc: float | None = None, maximum: float | None = None,
+        soc: float | None = None, maximum: float | None = None, soc_age: float | None = None,
     ) -> None: ...
 
 
@@ -84,7 +86,7 @@ class TransactionalSocControl(Protocol):
 
     async def async_observe_soc(
         self, soc: float | None, maximum: float | None = None, *, source: str,
-        expected_soc_revision: str | None = None,
+        expected_soc_revision: str | None = None, soc_age: float | None = None,
     ) -> None: ...
 
 
@@ -107,6 +109,22 @@ def vehicle_percentage(state: State | None, *, limit: bool = False) -> float | N
 class _Observation:
     soc: float | None
     maximum: float | None
+    # When the car last reported this level. Not part of the values: a
+    # repeated report says the same.
+    soc_reported: datetime | None = field(default=None, compare=False)
+
+    @property
+    def soc_age(self) -> float | None:
+        """Seconds since the car reported the level, for the service to judge."""
+        if self.soc is None or self.soc_reported is None:
+            return None
+        return min(max(0.0, (dt_util.utcnow() - self.soc_reported).total_seconds()), SOC_AGE_LIMIT)
+
+    @property
+    def judged(self) -> float | None:
+        """The level a target may be judged on, as the service judges it: a recent one."""
+        age = self.soc_age
+        return self.soc if age is None or age <= READING_SECONDS else None
 
 
 class _Observations:
@@ -118,17 +136,18 @@ class _Observations:
         self.revision = revision
         self.minimum: float | None = None
         self.maximum: float | None = None
-        self.reached_soc: float | None = None
+        self.reached: _Observation | None = None
         self.latest = _Observation(None, None)
 
     def add(self, observation: _Observation) -> None:
-        self.model.observe(observation.soc, observation.maximum)
+        level = observation.judged
+        self.model.observe(level, observation.maximum)
         if self.model.status != "reached":
-            self.reached_soc = None
-        elif observation.soc is not None and observation.soc >= self.model.target_percent:
+            self.reached = None
+        elif level is not None and level >= self.model.target_percent:
             # Also when a raised limit ended the latch and this charge level
             # reached the higher target at once.
-            self.reached_soc = observation.soc
+            self.reached = observation
         if observation.maximum is not None:
             self.minimum = (
                 min(self.minimum, observation.maximum)
@@ -143,11 +162,11 @@ class _Observations:
         # may tell us that an actually observed combination reached the goal.
         # A target following a raised car limit can end that reach again; then
         # the stale reaching SoC must not latch the newer target.
-        current = _Observation(
-            self.reached_soc if self.reached_soc is not None and self.model.status == "reached"
-            else self.latest.soc,
-            self.maximum,
+        level = (
+            self.reached if self.reached is not None and self.model.status == "reached"
+            else self.latest
         )
+        current = _Observation(level.soc, self.maximum, level.soc_reported)
         if self.minimum is not None and self.minimum != self.maximum:
             return _Observation(None, self.minimum), current
         return (current,)
@@ -208,7 +227,7 @@ class VehicleSocObserver:
         self._target_pending: _Observations | None = None
         self._last_sent: _Observation | None = None
         # When the car's level last reached the service: the service counts
-        # it as known for READING_SECONDS only.
+        # it as known for READING_SECONDS after the car reported it.
         self._sent_at: float | None = None
         self._task: asyncio.Task[None] | None = None
         self._command_lock = asyncio.Lock()
@@ -250,6 +269,17 @@ class VehicleSocObserver:
         return (value, reported) if value is not None and reported is not None else None
 
     @property
+    def latest_soc_reported(self) -> datetime | None:
+        """When the source last reported the charge level, also an unchanged one."""
+        if self._use_vehicle_soc:
+            return self._telemetry.snapshot.soc_last_reported if self._telemetry is not None else None
+        state = self._hass.states.get(self._soc_entity) if self._soc_entity else None
+        return state.last_reported if vehicle_percentage(state) is not None and state is not None else None
+
+    def _current(self) -> _Observation:
+        return _Observation(self.latest_soc, self.maximum, self.latest_soc_reported)
+
+    @property
     def maximum(self) -> float | None:
         if self._use_vehicle_limit:
             return self._telemetry.snapshot.maximum_percent if self._telemetry is not None else None
@@ -265,7 +295,7 @@ class VehicleSocObserver:
         )
         if self._binding is not None:
             self._unsubscribers.append(self._binding.subscribe(self._binding_changed))
-        observed_values = _Observation(self.latest_soc, self.maximum)
+        observed_values = self._current()
         if self._telemetry is not None and (self._use_vehicle_soc or self._use_vehicle_limit):
             @callback
             def telemetry_changed(value: VehicleTelemetry) -> None:
@@ -273,8 +303,9 @@ class VehicleSocObserver:
                 observed_values = _Observation(
                     value.soc_percent if self._use_vehicle_soc else observed_values.soc,
                     value.maximum_percent if self._use_vehicle_limit else observed_values.maximum,
+                    value.soc_last_reported if self._use_vehicle_soc else observed_values.soc_reported,
                 )
-                self._queue_observation(observed_values, reported=True)
+                self._queue_observation(observed_values)
 
             self._unsubscribers.append(self._telemetry.subscribe(telemetry_changed))
         entities = []
@@ -290,12 +321,15 @@ class VehicleSocObserver:
                 # Use the event's value, not a newer global state written by
                 # another listener before this event reaches our callback.
                 state = event.data["new_state"]
+                soc = vehicle_percentage(state)
                 observed_values = (
-                    _Observation(vehicle_percentage(state), observed_values.maximum)
+                    _Observation(soc, observed_values.maximum, state.last_reported if soc is not None and state is not None else None)
                     if event.data["entity_id"] == self._soc_entity else
-                    _Observation(observed_values.soc, vehicle_percentage(state, limit=True))
+                    _Observation(
+                        observed_values.soc, vehicle_percentage(state, limit=True), observed_values.soc_reported,
+                    )
                 )
-                self._queue_observation(observed_values, reported=True)
+                self._queue_observation(observed_values)
 
             self._unsubscribers.extend((
                 async_track_state_change_event(self._hass, entities, observed),
@@ -408,16 +442,17 @@ class VehicleSocObserver:
 
     @callback
     def _queue_current(self) -> None:
-        self._queue_observation(_Observation(self.latest_soc, self.maximum))
+        self._queue_observation(self._current())
 
     @callback
-    def _queue_observation(self, observation: _Observation, *, reported: bool = False) -> None:
-        """Queue what the car said; ``reported`` for a real report of the car.
+    def _queue_observation(self, observation: _Observation) -> None:
+        """Queue what the car said.
 
-        An unchanged value is new information only as a sign of life: a real
-        report renews it in the service before the service forgets the level,
-        so a target chosen in the app meanwhile is judged on it. Nothing but a
-        report of the car renews it.
+        An unchanged level is new information only as a sign of life: a new
+        report of the level itself renews it in the service before the service
+        forgets it, so a target chosen in the app meanwhile is judged on it.
+        A report of the limit, or a poll, carries the level with its own age
+        and renews nothing.
         """
         if self._stopping or self._resting():
             return
@@ -425,10 +460,7 @@ class VehicleSocObserver:
             if self._target_pending is None:
                 self._target_pending = _Observations(self._target_model, self.source)
             self._target_pending.add(observation)
-        if self._pending is None and observation == self._last_sent and not (
-            reported and self._sent_at is not None
-            and self._hass.loop.time() - self._sent_at >= SOC_RENEW_SECONDS
-        ):
+        if self._pending is None and observation == self._last_sent and not self._renews(observation):
             return
         if self._pending is None:
             model = (
@@ -443,6 +475,19 @@ class VehicleSocObserver:
             self._pending = _Observations(model, self.source, revision)
         self._pending.add(observation)
         self._ensure_task()
+
+    def _renews(self, observation: _Observation) -> bool:
+        """A newer report renews the level once the service's copy has aged."""
+        sent = self._last_sent
+        if sent is None or self._sent_at is None or observation.soc_reported is None:
+            return False
+        if sent.soc_reported is None:
+            # The service took it as reported when it arrived.
+            return self._hass.loop.time() - self._sent_at >= SOC_RENEW_SECONDS
+        return (
+            observation.soc_reported > sent.soc_reported
+            and (dt_util.utcnow() - sent.soc_reported).total_seconds() >= SOC_RENEW_SECONDS
+        )
 
     @callback
     def _ensure_task(self) -> None:
@@ -503,10 +548,12 @@ class VehicleSocObserver:
                                     await transaction.async_observe_soc(
                                         observation.soc, observation.maximum, source=self.source,
                                         expected_soc_revision=observations.revision,
+                                        soc_age=observation.soc_age,
                                     )
                                 else:
                                     await self._control.async_observe_soc(
                                         observation.soc, observation.maximum, source=self.source,
+                                        soc_age=observation.soc_age,
                                     )
                     except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
                         self._pending = (
@@ -558,7 +605,8 @@ class VehicleSocObserver:
                 raise service_validation_error("soc_goal_limit_unavailable")
             previous = self._pending
             self._pending = None
-            soc, maximum = self.latest_soc, self.maximum
+            current = self._current()
+            soc, maximum = current.judged, current.maximum
             limit = maximum if maximum is not None else self._control.soc_goal.maximum_percent
             if not automatic and value > 0 and value == limit:
                 # Picked at the top of the scale: the car's limit, wherever
@@ -581,7 +629,7 @@ class VehicleSocObserver:
             try:
                 await self._control.async_set_soc_goal(
                     value, source=self.source,
-                    soc=soc, maximum=maximum,
+                    soc=current.soc, maximum=maximum, soc_age=current.soc_age,
                 )
             except BaseException:
                 if self._resolution_pending():

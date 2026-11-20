@@ -230,7 +230,7 @@ def test_an_abandoned_request_keeps_running_until_the_service_drains(monkeypatch
         transport = EmbeddedTransport(api)
         monkeypatch.setattr(service_transport, "_TIMEOUT_SECONDS", 0.02)
         with pytest.raises(TimeoutError):
-            await transport.call("POST", "/v2/command", {"command": "pause"})
+            await transport.call("POST", "/v1/command", {"command": "pause"})
         # The command was not cancelled between its writes.
         assert len(transport._running) == 1
         api.release.set()
@@ -248,7 +248,7 @@ def test_a_failed_abandoned_request_is_not_reported_twice(monkeypatch):
         transport = EmbeddedTransport(api)
         monkeypatch.setattr(service_transport, "_TIMEOUT_SECONDS", 0.02)
         with pytest.raises(TimeoutError):
-            await transport.call("GET", "/v2/state", None)
+            await transport.call("GET", "/v1/state", None)
         api.release.set()
         await transport.async_drain()
         assert not transport._running
@@ -261,7 +261,7 @@ def test_a_busy_service_answers_like_its_http_api():
         api = _Api(ServiceBusyError())
         api.release.set()
         transport = EmbeddedTransport(api)
-        assert await transport.call("POST", "/v2/command", {"command": "pause"}) == (
+        assert await transport.call("POST", "/v1/command", {"command": "pause"}) == (
             503, {"error": "service_unavailable"},
         )
 
@@ -275,17 +275,17 @@ def test_requests_and_replies_cross_as_independent_json():
         api.release.set()
         transport = EmbeddedTransport(api)
         payload = {"command": "set_current", "value": 8}
-        status, body = await transport.call("POST", "/v2/command", payload)
+        status, body = await transport.call("POST", "/v1/command", payload)
         assert (status, body) == (200, reply)
         assert body is not reply
         assert api.calls[0][2] == payload
         assert api.calls[0][2] is not payload
         # What HTTP could not carry is an invalid message, not a crash.
         with pytest.raises(ValueError, match="not a JSON value"):
-            await transport.call("POST", "/v2/command", {"value": {1, 2}})
+            await transport.call("POST", "/v1/command", {"value": {1, 2}})
         api.reply = (200, {"at": object()})
         with pytest.raises(ValueError, match="not a JSON value"):
-            await transport.call("GET", "/v2/state", None)
+            await transport.call("GET", "/v1/state", None)
 
     asyncio.run(run())
 
@@ -461,7 +461,7 @@ def test_a_command_in_progress_finishes_its_writes_before_the_connection_closes(
         monkeypatch.setattr(wallbox, "close", record_close)
         monkeypatch.setattr(service_transport, "_TIMEOUT_SECONDS", 0.05)
         with pytest.raises(TimeoutError):
-            await host.transport.call("POST", "/v2/command", {"command": "pause"})
+            await host.transport.call("POST", "/v1/command", {"command": "pause"})
         assert between.is_set()
         release = asyncio.create_task(embedded.async_release(hass, entry.entry_id, force=True))
         for _ in range(10):
@@ -647,17 +647,17 @@ def test_a_draining_transport_refuses_new_requests():
     async def run():
         api = _Api((200, {"accepted": True}))
         transport = EmbeddedTransport(api)
-        running = asyncio.create_task(transport.call("POST", "/v2/command", {"command": "pause"}))
+        running = asyncio.create_task(transport.call("POST", "/v1/command", {"command": "pause"}))
         await api.started.wait()
         draining = asyncio.create_task(transport.async_drain())
         await asyncio.sleep(0)
         # Like a web server that no longer accepts connections.
-        assert await transport.call("GET", "/v2/state", None) == (503, {"error": "service_unavailable"})
+        assert await transport.call("GET", "/v1/state", None) == (503, {"error": "service_unavailable"})
         assert len(api.calls) == 1
         api.release.set()
         await draining
         assert await running == (200, {"accepted": True})
-        assert await transport.call("GET", "/v2/state", None) == (503, {"error": "service_unavailable"})
+        assert await transport.call("GET", "/v1/state", None) == (503, {"error": "service_unavailable"})
 
     asyncio.run(run())
 
@@ -1057,7 +1057,7 @@ def test_a_request_that_never_returns_does_not_keep_the_bus(monkeypatch, caplog)
         monkeypatch.setattr(service_transport, "_TIMEOUT_SECONDS", 0.02)
         monkeypatch.setattr(service_transport, "_DRAIN_SECONDS", 0.05)
         with pytest.raises(TimeoutError):
-            await transport.call("POST", "/v2/command", {"command": "pause"})
+            await transport.call("POST", "/v1/command", {"command": "pause"})
         (stuck,) = transport._running
         # Stuck behind a hung connection: given up, so the service can stop.
         await asyncio.wait_for(transport.async_drain(), 5)

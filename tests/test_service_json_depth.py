@@ -24,7 +24,7 @@ def test_deep_service_reply_invalidates_cached_connection(tmp_path):
             return web.Response(text=nested, content_type="application/json")
 
         app = web.Application()
-        app.router.add_get("/v2/state", reply)
+        app.router.add_get("/v1/state", reply)
         try:
             async with TestServer(app) as server, ClientSession() as session:
                 remote = ServiceClient(session, str(server.make_url("/")), TOKEN)

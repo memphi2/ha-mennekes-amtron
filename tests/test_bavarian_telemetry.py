@@ -199,10 +199,16 @@ def test_event_snapshots_keep_brief_target_crossings_and_independent_subscribers
             assert len(first) == 2
             assert second[-1] == VehicleTelemetry(50, 80, 82)
             assert len(second) == 3
+            # The repeated level is a new report of it; the limit's is not.
+            assert second[-1].soc_last_reported == hass.states.get(soc).last_reported > second[1].soc_last_reported
+            publish(hass, LIMIT_DESCRIPTOR, 80)
+            await hass.async_block_till_done()
+            assert second[-1].soc_last_reported == second[2].soc_last_reported
+            assert len(second) == 4
             unsub2()
             publish(hass, SOC_DESCRIPTORS[0], 90)
             await hass.async_block_till_done()
-            assert len(second) == 3
+            assert len(second) == 4
         finally:
             await hass.async_stop()
     asyncio.run(run())
