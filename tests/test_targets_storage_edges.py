@@ -15,8 +15,7 @@ from tests.test_departure_plan import NOW, Box, inputs
 from tests.test_departure_planner import hand_over
 
 
-@pytest.mark.parametrize("looked", [True, False])
-def test_the_plan_does_not_end_a_guests_pause_after_the_unplug(tmp_path, looked):
+def test_the_plan_does_not_end_a_guests_pause_after_the_unplug(tmp_path):
     async def run():
         async with runtime.guest_service(tmp_path) as (s, transport, clock):
             serial = s.identity.serial_number
@@ -34,9 +33,8 @@ def test_the_plan_does_not_end_a_guests_pause_after_the_unplug(tmp_path, looked)
                 }
             )
             assert s.control.pause_requested is False
-            if looked:
-                await s.departure.tick()
-            # the guest is paused by hand, also before the plan looked again
+            await s.departure.tick()
+            # the guest is paused by hand
             clock[0] += 1000
             await s.command({"command": "pause", "expected_serial_number": serial})
             assert s.control.pause_requested is True
@@ -284,7 +282,7 @@ def test_an_intent_file_far_too_large_counts_as_damaged(tmp_path):
     assert store.load(WriteState()) is False
 
 
-def test_a_current_written_before_the_plans_waiting_pause_ends_no_pause(tmp_path):
+def test_a_current_written_before_the_plans_waiting_pause_leaves_it_the_plans(tmp_path):
     async def run():
         async with runtime.guest_service(tmp_path) as (s, transport, clock):
             serial = s.identity.serial_number
@@ -297,7 +295,6 @@ def test_a_current_written_before_the_plans_waiting_pause_ends_no_pause(tmp_path
             assert s.departure.plan_paused
             clock[0] += 6
             await s.command({"command": "set_current", "value": 10, "expected_serial_number": serial})
-            assert s.control.writes.pause_ends == 0
             clock[0] += 1000
             for _ in range(30):
                 s.control._pending_changed.set()

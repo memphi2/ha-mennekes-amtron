@@ -1222,65 +1222,37 @@ def test_a_withdrawn_plan_still_ends_its_pause_when_the_guest_start_never_ran(tm
     run(go())
 
 
-@pytest.mark.parametrize("withdraw", [False, True])
-def test_a_pause_that_followed_the_guests_start_unseen_is_the_guests(tmp_path, withdraw):
-    async def go():
-        box = Box(tmp_path)
-        plan = await box.start(hours=10)
-        # The start ran and a guest limit paused again before the plan looked.
-        box.set(guest_mode=True, paused=True, pause_requested=True, pause_ends=1)
-        if withdraw:
-            await plan.set_trip(None, None, withdraw=True, vehicle_handover=True)
-        else:
-            await plan.tick()
-        assert not plan.plan_paused
-        box.set(guest_mode=False, present=False)
-        await plan.tick()
-        await plan.tick()
-        assert box.resumes == 0
-
-    run(go())
-
-
-def test_after_a_restart_the_plan_counts_from_its_first_look(tmp_path):
-    async def go():
-        box = Box(tmp_path)
-        plan = await box.start(hours=10)
-        assert plan.plan_paused
-        # The service restarts: the pause is still the plan's, the count new.
-        box.plan = plan = box.controller()
-        await plan.initialize()
-        assert plan.plan_paused
-        box.set(pause_ends=0)
-        await plan.tick()
-        # The guest's start ran and a limit paused again before the next look.
-        box.set(guest_mode=True, paused=True, pause_requested=True, pause_ends=1)
-        await plan.tick()
-        assert not plan.plan_paused
-        # Given up for good, also through another restart.
-        box.plan = plan = box.controller()
-        await plan.initialize()
-        assert not plan.plan_paused
-        box.set(guest_mode=False, present=False)
-        await plan.tick()
-        await plan.tick()
-        assert box.resumes == 0
-
-    run(go())
-
-
 def test_after_a_restart_a_guest_start_that_still_waits_leaves_the_pause_the_plans(tmp_path):
     async def go():
         box = Box(tmp_path)
         plan = await box.start(hours=10)
         box.plan = plan = box.controller()
         await plan.initialize()
-        box.set(guest_mode=True, pause_ends=0)
+        box.set(guest_mode=True)
         await plan.tick()
         assert plan.plan_paused
         box.set(guest_mode=False, present=False)
         await plan.tick()
         await plan.tick()
         assert (box.resumes, plan.plan_paused) == (1, False)
+
+    run(go())
+
+
+def test_a_pause_the_guests_start_ended_is_given_up_for_good(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        box.set(guest_mode=True, paused=False, pause_requested=False)
+        await plan.tick()
+        assert not plan.plan_paused
+        # Saved: a restart does not bring the pause back as the plan's.
+        box.plan = plan = box.controller()
+        await plan.initialize()
+        assert not plan.plan_paused
+        box.set(guest_mode=False, present=False, paused=True, pause_requested=True)
+        await plan.tick()
+        await plan.tick()
+        assert box.resumes == 0
 
     run(go())

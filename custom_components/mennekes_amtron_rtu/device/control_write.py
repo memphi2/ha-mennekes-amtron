@@ -70,10 +70,6 @@ class WritePath:
         # The current on the line is a planner's, not one somebody chose. A
         # flag and no value: the wallbox reads a current back as a float32.
         self.line_planned = False
-        # How often a write ended a pause since this start. Who owned the
-        # pause sees by it that it ended, also when another one followed
-        # before they looked.
-        self.pause_ends = 0
 
     async def async_current_evse_state(
         self, error_key: str, *, read: LockedRegisterReader | None = None,
@@ -185,10 +181,6 @@ class WritePath:
                     self._remember_pause_setpoint(previous, preserve_setpoint)
             raise
         self._control._write_state.confirmed_current = value
-        if not paused and self._control.pause_requested is True:
-            # Only a pause known to be on: a write while that is unknown, or
-            # before a pause that still waits, has ended none.
-            self.pause_ends += 1
         self._control.pause_requested = paused
         if not paused:
             self._remember(value, recovery)
