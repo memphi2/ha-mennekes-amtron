@@ -23,6 +23,7 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import 
 )
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
     DeviceValidationError,
 )
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
@@ -827,3 +828,61 @@ def test_a_clock_set_back_does_not_stretch_the_unknown_grace():
     assert state.authorized
     state.observe(None, observed_at=back + timedelta(seconds=61))
     assert not state.authorized
+
+
+def test_a_release_whose_car_left_is_saved_as_none():
+    state = PlugChargeState()
+    state.configure(True, POLICY)
+    # In memory the mark of the connection outlives the release it marked.
+    state.manual, state.manual_connected = False, True
+    saved = state.durable()
+    assert (saved["manual"], saved["manual_connected"]) == (False, False)
+    assert not PlugChargeState.restore(saved).restored_manual
+    with pytest.raises(ValueError, match="invalid saved Plug & Charge"):
+        PlugChargeState.restore({**saved, "manual": True, "manual_connected": 1})
+
+
+def test_a_release_by_hand_knows_at_once_whether_a_car_is_connected(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        gate = service.control._plug_charge
+        await service.control.async_configure_plug_charge(True, policy=POLICY)
+        state = gate.state
+        state.session = "c" * 64
+        gate.set_manual(True)
+        # Saved by the command itself, before the next poll looks.
+        assert state.durable()["manual_connected"] is True
+        gate.set_manual(False)
+        state.session = None
+        gate.set_manual(True)
+        assert state.durable()["manual_connected"] is False
+        await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_refused_release_keeps_what_was_known_about_the_restored_one(tmp_path):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        await service.heartbeat.async_stop()
+        control = service.control
+        await control.async_configure_plug_charge(True, policy=POLICY)
+        state = control._plug_charge.state
+        # As read from disk: a connected car's release, the car still unknown.
+        state.session = None
+        state.manual = state.manual_connected = state.restored_manual = True
+
+        async def refuse(_command):
+            raise DeviceError("write_rate_limited")
+
+        control.queue.async_submit_locked = refuse
+        with pytest.raises(DeviceError):
+            await control.async_set_charging_release(True)
+        assert state.manual_marks == (True, True, True)
+        # The first answer shows no car: the release was that car's and ends.
+        state.observe(False)
+        assert not state.manual
+        await service.stop()
+
+    asyncio.run(run())

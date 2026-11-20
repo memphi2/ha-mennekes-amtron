@@ -718,7 +718,7 @@ class AmtronControl:
         self._require_write_access()
         async with self._current_lock:
             gate = self._plug_charge.state
-            manual = gate.manual
+            manual = gate.manual_marks
             if gate.enabled:
                 if released and self.energy_goal_stop_requested:
                     raise self.stop_error()
@@ -737,7 +737,7 @@ class AmtronControl:
                 # A failure after the acknowledged write, e.g. of the refresh,
                 # must not make the gate close what the user just opened.
                 if self._release_writes == written:
-                    gate.manual = manual
+                    gate.manual_marks = manual
                 raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:

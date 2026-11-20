@@ -232,3 +232,97 @@ def test_a_forced_reload_rebuilds_the_runtime_although_no_option_changed(monkeyp
         assert marks == [True, False]
 
     asyncio.run(run())
+
+
+def _listening(tmp_path, monkeypatch, body):
+    """Run body with the real owners and a listener whose reload is counted."""
+    from homeassistant.core import HomeAssistant
+
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        try:
+            entry, runtime = _owners(hass)
+            entry.state = None
+            runtime.retain_cost_on_unload = False
+            monkeypatch.setattr(integration, "_async_park_trip", AsyncMock())
+            monkeypatch.setattr(integration, "mark_reloading", lambda *_args: None)
+            monkeypatch.setattr(integration, "async_release", AsyncMock())
+            reload = AsyncMock()
+            listener = SimpleNamespace(data={}, config_entries=SimpleNamespace(async_reload=reload))
+            await body(entry, runtime, listener, reload)
+        finally:
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_both_in_place_changes_in_one_update_are_applied_once(tmp_path, monkeypatch):
+    async def body(entry, runtime, listener, reload):
+        cost = runtime.charging_cost
+        applied = []
+        real = cost.apply_tariff_update
+        cost.apply_tariff_update = lambda: applied.append(1) or real()
+        _switch(entry, True)
+        entry.options = {**entry.options, "charging_network_tariff": TARIFF}
+        # Each of the two saves queued its own notification.
+        await integration._async_reload_entry_locked(listener, entry)
+        await integration._async_reload_entry_locked(listener, entry)
+        reload.assert_not_awaited()
+        assert applied == [1]
+        assert cost._tariff.module == "module_2"
+
+    _listening(tmp_path, monkeypatch, body)
+
+
+def test_a_tariff_that_cannot_be_read_reloads_and_records_nothing(tmp_path, monkeypatch):
+    async def body(entry, runtime, listener, reload):
+        _switch(entry, True)
+        entry.options = {**entry.options, "charging_network_tariff": {"module": "bogus"}}
+        await integration._async_reload_entry_locked(listener, entry)
+        reload.assert_awaited_once()
+        assert runtime.vehicle_base_options["virtual_plug_charge"] is False
+        assert "charging_network_tariff" not in runtime.vehicle_base_options
+
+    _listening(tmp_path, monkeypatch, body)
+
+
+@pytest.mark.parametrize("missing", ["cost", "gate"])
+def test_a_change_without_its_owner_reloads(tmp_path, monkeypatch, missing):
+    async def body(entry, runtime, listener, reload):
+        if missing == "cost":
+            runtime.charging_cost = None
+            entry.options = {**entry.options, "charging_network_tariff": TARIFF}
+        else:
+            runtime.plug_charge = None
+            entry.options = {**entry.options, "virtual_plug_charge": True}
+        await integration._async_reload_entry_locked(listener, entry)
+        reload.assert_awaited_once()
+
+    _listening(tmp_path, monkeypatch, body)
+
+
+def test_a_vehicle_switch_that_fails_after_an_applied_tariff_reloads_with_it(tmp_path, monkeypatch):
+    async def body(entry, runtime, listener, reload):
+        cost = runtime.charging_cost
+        monkeypatch.setattr(integration, "_async_stop_vehicle", AsyncMock(side_effect=[RuntimeError("x"), None]))
+        runtime.vehicle_switching = False
+        entry.options = {**entry.options, "charging_network_tariff": TARIFF, "active_vehicle_profile": "b" * 32}
+        await integration._async_reload_entry_locked(listener, entry)
+        reload.assert_awaited_once()
+        assert cost._tariff.module == "module_2"
+        assert cost.retain_for_reload(entry)
+
+    _listening(tmp_path, monkeypatch, body)
+
+
+def test_options_saved_back_against_the_applied_switch_reload(tmp_path, monkeypatch):
+    async def body(entry, runtime, listener, reload):
+        # The switch applied "on" at the service; before its notification ran,
+        # the options were saved with "off" again. Nothing differs from the
+        # record, but the service runs what the options do not say.
+        _switch(entry, True)
+        entry.options = {**entry.options, "virtual_plug_charge": False}
+        await integration._async_reload_entry_locked(listener, entry)
+        reload.assert_awaited_once()
+
+    _listening(tmp_path, monkeypatch, body)

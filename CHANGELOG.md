@@ -19,14 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   [Saved charging settings could not be loaded](docs/troubleshooting.md#saved-charging-settings-could-not-be-loaded).
 - A reached energy or cost target ends when the car is unplugged: the target
   is cleared and its pause ends, so the next car charges without the previous
-  limit. Before, the stop stayed until it was resumed by hand.
+  limit. Before, the stop stayed until it was resumed by hand. This also
+  holds when the meter shows the target reached only after the unplug. A
+  pause set by hand before the target was reached stays, as does a stop by
+  another limit.
 - The departure plan's charging current is the plan's only: a pause and
   resume after the plan returns to the current chosen by hand. Before, the
-  plan's current replaced it. After a restart of the service during a plan,
-  a pause still takes the current it finds.
+  plan's current replaced it. Lowering the plan's current to a new current
+  cap or reasserting it after wallbox error 200 does not replace it either.
+  After a restart of the service during a plan, a pause still takes the
+  current it finds.
 - A percentage target that a lower charge limit of the car pressed down
   returns to the chosen value when the limit rises again. Before, it rose to
-  the limit itself. A target chosen at the limit still follows it.
+  the limit itself. A target chosen at the limit still follows it. The
+  target remembered per car is the chosen value.
 
 ### Added
 

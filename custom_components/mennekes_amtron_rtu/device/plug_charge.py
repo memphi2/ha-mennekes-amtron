@@ -140,6 +140,15 @@ class PlugChargeState:
             self.since = self.last_absent_at or now
         self.manual_connected = self.manual
 
+    @property
+    def manual_marks(self) -> tuple[bool, bool, bool]:
+        """A release by hand with what is known about it, to take a refused one back."""
+        return self.manual, self.manual_connected, self.restored_manual
+
+    @manual_marks.setter
+    def manual_marks(self, marks: tuple[bool, bool, bool]) -> None:
+        self.manual, self.manual_connected, self.restored_manual = marks
+
     def snapshot(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
 

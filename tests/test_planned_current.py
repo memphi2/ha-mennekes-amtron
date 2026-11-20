@@ -117,3 +117,18 @@ def test_an_error_recovery_during_a_plan_keeps_both_currents(tmp_path):
             assert control.charging_setpoint == chosen
 
     asyncio.run(run())
+
+
+def test_a_current_set_by_hand_during_a_plan_is_the_chosen_one(tmp_path):
+    async def run():
+        async with svc(tmp_path, 16) as (service, _transport, clock):
+            serial = service.identity.serial_number
+            await hand_over(service, hours=2)
+            await service.departure.tick()
+            assert service.control.writes.line_planned
+            clock[0] += 1000
+            await service.command({"command": "set_current", "value": 10, "expected_serial_number": serial})
+            assert not service.control.writes.line_planned
+            assert service.control.charging_setpoint == 10
+
+    asyncio.run(run())
