@@ -1328,9 +1328,9 @@
         "data": {
           "charging_price": "Stroomprijs inclusief belastingen"
         },
-        "description": "Voer de prijs per kWh inclusief belastingen in. Negatieve prijzen zijn toegestaan. Zonder aanpassing van netkosten moet dit je eindprijs inclusief netkosten zijn. Vaste kosten en jaarlijkse kortingen worden niet meegenomen. Het eerste voorstel is 0,40 EUR/kWh; gebruik je eigen contractprijs.",
+        "description": "Voer de prijs per kWh inclusief belastingen in. Negatieve prijzen zijn toegestaan. Zonder aanpassing van netkosten moet dit je eindprijs inclusief netkosten zijn. Vaste kosten en jaarlijkse kortingen worden niet meegenomen. Het eerste voorstel is 0,40 per kWh; gebruik je eigen contractprijs.",
         "data_description": {
-          "charging_price": "Vul euro per kWh inclusief belastingen in: 0,40 betekent 40 cent/kWh. Gebruik de energieprijs van je contract; een eventuele aanpassing van netkosten stel je apart in."
+          "charging_price": "Vul de prijs per kWh in de valuta van Home Assistant in, inclusief belastingen: 0,40 betekent 40 honderdsten per kWh. Gebruik de energieprijs van je contract; een eventuele aanpassing van netkosten stel je apart in."
         }
       },
       "cost_sensor": {
@@ -1338,9 +1338,9 @@
         "data": {
           "charging_price_entity": "Stroomprijssensor"
         },
-        "description": "Selecteer een sensor met de actuele stroomprijs inclusief belastingen in EUR/kWh, ct/kWh of EUR/MWh (het €-teken wordt ook ondersteund). Negatieve prijzen zijn toegestaan. Zonder netaanpassing moet de prijs netkosten bevatten. Een gemelde waarde blijft 90 minuten geldig; dezelfde waarde opnieuw melden verlengt dit. Bij ontbrekende of verlopen prijzen krijgt die energie geen prijs. Vaste kosten en jaarlijkse kortingen worden niet meegenomen.",
+        "description": "Selecteer een sensor met de actuele stroomprijs inclusief belastingen per kWh of MWh in de valuta van Home Assistant, bijvoorbeeld EUR/kWh (bij euro’s werken ook ct/kWh en het €-teken). Negatieve prijzen zijn toegestaan. Zonder netaanpassing moet de prijs netkosten bevatten. Een gemelde waarde blijft 90 minuten geldig; dezelfde waarde opnieuw melden verlengt dit. Bij ontbrekende of verlopen prijzen krijgt die energie geen prijs. Vaste kosten en jaarlijkse kortingen worden niet meegenomen.",
         "data_description": {
-          "charging_price_entity": "Kies de prijs voor stroom die je nu afneemt, niet een daggemiddelde, voorspellijst of terugleverprijs. De eenheid moet EUR/kWh, ct/kWh of EUR/MWh zijn."
+          "charging_price_entity": "Kies de prijs voor stroom die je nu afneemt, niet een daggemiddelde, voorspellijst of terugleverprijs. De eenheid moet de valuta van Home Assistant per kWh of MWh noemen."
         }
       },
       "cost_module2": {
@@ -1611,7 +1611,7 @@
       "invalid_vehicle_entity": "Selecteer een entiteit van het ondersteunde type.",
       "loss_source_invalid": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in.",
       "cost_source_invalid": "Selecteer een ondersteunde kostenbron en een sensorentiteit voor een prijs uit een sensor.",
-      "cost_price_invalid": "Voer een eindige prijs inclusief belastingen tussen −1000 en 1000 EUR/kWh in. Negatieve prijzen zijn toegestaan.",
+      "cost_price_invalid": "Voer een eindige prijs inclusief belastingen tussen −1000 en 1000 per kWh in. Negatieve prijzen zijn toegestaan.",
       "network_tariff_invalid": "Controleer brutoprijzen, tariefjaar, twee tot vier actieve kwartalen en hoog/laagperioden. Eén HH:MM-HH:MM per regel op kwartiergrenzen, zonder overlap en met ruimte voor het standaardtarief.",
       "timed_source_invalid": "Ongeldige tijdbron",
       "timed_calendar_required": "Kies een kalender",

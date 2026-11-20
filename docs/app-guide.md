@@ -76,7 +76,7 @@ Open **Charging**. The page names every target as Home Assistant does and
 sorts them by whom they apply to:
 
 - **For every charge** (your own car and guests): the **energy target** in kWh,
-  the **cost target** in EUR and the **target time**.
+  the **cost target** in Home Assistant's currency and the **target time**.
 - **Own car only**: the **vehicle charge target** in percent. It never applies
   to a guest.
 - **Guest charging**: the start button, and below it what ends a guest charge
@@ -88,7 +88,7 @@ is saved or reloaded. The same values appear in Home Assistant. A target never
 starts a charge.
 
 The **cost target** needs charging costs configured in Home Assistant, which
-reports the price to the app. It sets the energy target: saving an energy
+reports the price and its currency to the app. It sets the energy target: saving an energy
 target by hand ends it, and clearing it clears both. Without an amount the page
 names the price and when Home Assistant last reported it.
 

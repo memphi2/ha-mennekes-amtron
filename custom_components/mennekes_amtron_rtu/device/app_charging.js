@@ -45,7 +45,7 @@
     cost_used:["used","verbraucht","utilisé","verbruikt","usati"],
     from_cost:["from the cost target", "aus dem Kostenziel", "issu de l’objectif de coût", "uit het kostendoel", "dall’obiettivo di costo"],
     price_unknown:["No price yet: configure charging costs in Home Assistant.","Noch kein Preis: Ladekosten in Home Assistant einrichten.","Pas encore de prix : configurez les coûts de recharge dans Home Assistant.","Nog geen prijs: stel laadkosten in Home Assistant in.","Nessun prezzo: configurare i costi di ricarica in Home Assistant."],
-    invalid_cost:["Enter 0 or 0.10–1000 EUR.","0 oder 0,10–1000 EUR eingeben.","Saisissez 0 ou 0,10–1000 EUR.","Voer 0 of 0,10–1000 EUR in.","Inserire 0 o 0,10–1000 EUR."],
+    invalid_cost:["Enter 0 or 0.10–1000.","0 oder 0,10–1000 eingeben.","Saisissez 0 ou 0,10–1000.","Voer 0 of 0,10–1000 in.","Inserire 0 o 0,10–1000."],
     must_wait:["Not accepted now: a waiting stop or the wallbox write interval comes first. Try again later.","Gerade nicht angenommen: Ein wartender Stopp oder der Schreibabstand der Wallbox geht vor. Später erneut versuchen.","Non accepté pour l’instant : un arrêt en attente ou l’intervalle d’écriture passe d’abord. Réessayez plus tard.","Nu niet geaccepteerd: een wachtende stop of het schrijfinterval gaat voor. Probeer het later opnieuw.","Non accettato ora: prima un arresto in attesa o l’intervallo di scrittura. Riprovare più tardi."],
     planned_start:["Planned start","Geplanter Start","Démarrage prévu","Geplande start","Avvio pianificato"],
     plan_unsaved:["The departure plan could not be saved. Check the app log.","Der Abfahrtsplan konnte nicht gespeichert werden. App-Protokoll prüfen.","Le plan de départ n’a pas pu être enregistré. Vérifiez le journal.","Het vertrekplan kon niet worden opgeslagen. Controleer het logboek.","Impossibile salvare il piano di partenza. Controllare il registro."],
@@ -93,7 +93,8 @@
   function revision(key){return key==="departure"?state?.departure?.revision:state?.revision;}
   function editable(key){return state&&!state.read_only&&(key==="energy"||(key==="cost"?state.cost_price!==null||state.cost!==null:key==="soc"?state.soc?.configured&&state.soc.maximum_required!==null:state.departure?.configured));}
   function chosen(key){return key==="cost"?state?.cost!==null:key==="departure"?!!state?.departure?.deadline:state?.[key]?.target>0;}
-  const euro=(v,digits=2)=>v.toLocaleString(langs[lang],{style:"currency",currency:"EUR",maximumFractionDigits:digits});
+  // Home Assistant's currency comes with its price; without it, the bare number.
+  const euro=(v,digits=2)=>v.toLocaleString(langs[lang],state?.cost_currency?{style:"currency",currency:state.cost_currency,maximumFractionDigits:digits}:{minimumFractionDigits:2,maximumFractionDigits:digits});
   function costText(){
     const c=state?.cost;if(c)return `${euro(c.amount)} · ${euro(c.spent)} ${t("cost_used")} · ${euro(c.price,4)}/kWh`;
     if(state?.cost_price===null)return t("price_unknown");
@@ -118,6 +119,7 @@
     // What ends a guest charge: the saved targets of every charge, by name.
     const ends=!state?[]:[state.cost?`${euro(state.cost.amount)} (${state.energy.target} kWh)`:state.energy.target>0?`${state.energy.target} kWh`:"",
       state.departure?.deadline?moment(state.departure.deadline):""].filter(Boolean);
+    el("cost_unit").textContent=state?.cost_currency||"";
     el("guest_status").textContent=!state?.guest_mode?"":t(state.guest_active?"guest_running":"guest_paused");
     el("guest_status").className=!state?.guest_mode?"":"charging-state "+(state.guest_active?"state-active":"state-wait");
     el("guest_summary").textContent=!state?"":ends.length?`${t("guest_ends")}: ${ends.join(" · ")}`:t("guest_open");
@@ -134,6 +136,7 @@
         ||typeof data.guest_confirmation_required!=="boolean"
         ||!(data.cost_price===null||typeof data.cost_price==="number"&&Number.isFinite(data.cost_price))
         ||!(data.cost_price_at===null||typeof data.cost_price_at==="string")
+        ||!(data.cost_currency===null||typeof data.cost_currency==="string"&&/^[A-Z]{3}$/.test(data.cost_currency))
         ||(data.cost!==null&&(!data.cost||!num(data.cost.amount,1000)||![data.cost.spent,data.cost.price].every(Number.isFinite)))
         ||!data.soc||typeof data.soc.configured!=="boolean"||!num(data.soc.target,100)
         ||!(data.soc.maximum===null||num(data.soc.maximum,100))

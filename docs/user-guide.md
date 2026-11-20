@@ -42,7 +42,7 @@ from vehicle planning until unplugging.
 | Setting | Guest | Selected vehicle |
 |---|---|---|
 | **Energy target** | Additional wallbox kWh from when the positive target was saved | Same |
-| **Cost target** | An amount in EUR from when it was saved; it sets the energy target | Same |
+| **Cost target** | An amount in Home Assistant's currency from when it was saved; it sets the energy target | Same |
 | **Target time** | Ends the charge at this time; start is immediate | With planning enabled: be ready for the next trip |
 | **Vehicle charge target** | Ignored; its saved value remains | Stop at the reported battery percentage |
 

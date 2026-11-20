@@ -649,6 +649,7 @@ def cost_source_schema(
     current: dict[str, Any],
     *,
     source: str,
+    currency: str,
 ) -> probatio.Schema:
     fields: dict[Any, Any] = {}
     if source == COST_SOURCE_FIXED:
@@ -659,7 +660,7 @@ def cost_source_schema(
                     "suggested_value": current.get(CONF_CHARGING_PRICE, 0.40),
                 },
             )
-        ] = _price_selector(allow_negative=True)
+        ] = _price_selector(currency, allow_negative=True)
     else:
         fields[
             probatio.Required(
@@ -687,7 +688,7 @@ def cost_module_schema(current: dict[str, Any]) -> probatio.Schema:
     })
 
 
-def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Schema:
+def cost_network_schema(current: dict[str, Any], *, module: str, currency: str) -> probatio.Schema:
     """Published network prices, shared by Module 2 and the full Module 3 form."""
     fields: dict[Any, Any] = {
         probatio.Required(
@@ -695,7 +696,7 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
             description={
                 "suggested_value": current.get(CONF_REGULAR_NETWORK),
             },
-        ): _price_selector(),
+        ): _price_selector(currency),
         probatio.Required(
             CONF_PRICE_INCLUDES_NETWORK,
             default=current.get(CONF_PRICE_INCLUDES_NETWORK, True),
@@ -707,7 +708,7 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
                 probatio.Required(
                     key, description={"suggested_value": current.get(key)}
                 )
-            ] = _price_selector()
+            ] = _price_selector(currency)
         fields[
             probatio.Required(
                 CONF_TARIFF_YEAR,
@@ -753,21 +754,21 @@ def cost_windows_schema(current: dict[str, Any]) -> probatio.Schema:
     return probatio.Schema(fields)
 
 
-def cost_module_three_schema(current: dict[str, Any]) -> probatio.Schema:
+def cost_module_three_schema(current: dict[str, Any], *, currency: str) -> probatio.Schema:
     """Review all imported prices and periods together before saving."""
     return probatio.Schema({
-        **cost_network_schema(current, module=NETWORK_MODULE_3).schema,
+        **cost_network_schema(current, module=NETWORK_MODULE_3, currency=currency).schema,
         **cost_windows_schema(current).schema,
     })
 
 
-def _price_selector(*, allow_negative: bool = False) -> NumberSelector:
+def _price_selector(currency: str, *, allow_negative: bool = False) -> NumberSelector:
     return NumberSelector(
         NumberSelectorConfig(
             min=-1000 if allow_negative else 0,
             max=1000,
             step="any",
-            unit_of_measurement="EUR/kWh",
+            unit_of_measurement=f"{currency}/kWh",
             mode=NumberSelectorMode.BOX,
         )
     )

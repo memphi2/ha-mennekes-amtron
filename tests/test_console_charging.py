@@ -295,10 +295,19 @@ def test_console_arms_a_cost_ceiling_at_the_last_reported_price(tmp_path, monkey
             assert (refused.status, (await refused.json())["error"]) == (409, "cost_goal_price_unknown")
             # Home Assistant reports the price; the app needs no price of its own.
             await service.command({
-                "command": "cost_price", "price": 0.25,
+                "command": "cost_price", "price": 0.25, "currency": "CHF",
                 "expected_serial_number": service.identity.serial_number,
             })
             assert service.snapshot()["control"]["cost_price"] == 0.25
+            # The currency comes with the price and reaches the page.
+            assert service.snapshot()["control"]["cost_currency"] == "CHF"
+            assert (await (await client.get("/api/charging", headers=HEADERS)).json())["cost_currency"] == "CHF"
+            for wrong in ("chf", "EURO", 7):
+                with pytest.raises(ValueError, match="three-letter"):
+                    await service.command({
+                        "command": "cost_price", "price": 0.25, "currency": wrong,
+                        "expected_serial_number": service.identity.serial_number,
+                    })
             told = (await (await client.get("/api/charging", headers=HEADERS)).json())["cost_price_at"]
             assert str(told).endswith("+00:00")
             saved = await client.post("/api/charging", headers=headers, json=choice)

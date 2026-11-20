@@ -1328,9 +1328,9 @@
         "data": {
           "charging_price": "Prix d’électricité TTC"
         },
-        "description": "Saisissez le prix par kWh toutes taxes comprises. Les prix négatifs sont acceptés. Sans ajustement réseau, ce doit être le prix final incluant les frais de réseau. Les abonnements et crédits annuels sont exclus. La proposition initiale est de 0,40 EUR/kWh ; utilisez le prix de votre contrat.",
+        "description": "Saisissez le prix par kWh toutes taxes comprises. Les prix négatifs sont acceptés. Sans ajustement réseau, ce doit être le prix final incluant les frais de réseau. Les abonnements et crédits annuels sont exclus. La proposition initiale est de 0,40 par kWh ; utilisez le prix de votre contrat.",
         "data_description": {
-          "charging_price": "Saisissez des euros par kWh, taxes comprises : 0,40 signifie 40 centimes/kWh. Utilisez le prix de votre contrat ; l’éventuel ajustement réseau se règle séparément."
+          "charging_price": "Saisissez le prix par kWh dans la devise de Home Assistant, taxes comprises : 0,40 signifie 40 centièmes par kWh. Utilisez le prix de votre contrat ; l’éventuel ajustement réseau se règle séparément."
         }
       },
       "cost_sensor": {
@@ -1338,9 +1338,9 @@
         "data": {
           "charging_price_entity": "Capteur de prix d’électricité"
         },
-        "description": "Sélectionnez un capteur du prix actuel de l’électricité TTC en EUR/kWh, ct/kWh ou EUR/MWh (le symbole € est aussi accepté). Les prix négatifs sont autorisés. Sans ajustement réseau, le prix doit inclure les frais réseau. Une valeur signalée reste valide 90 minutes ; la même valeur signalée à nouveau renouvelle cette durée. Les prix absents ou expirés laissent l’énergie concernée sans prix. Abonnements et crédits annuels sont exclus.",
+        "description": "Sélectionnez un capteur du prix actuel de l’électricité TTC par kWh ou MWh dans la devise de Home Assistant, par exemple EUR/kWh (en euros, ct/kWh et le symbole € sont aussi acceptés). Les prix négatifs sont autorisés. Sans ajustement réseau, le prix doit inclure les frais réseau. Une valeur signalée reste valide 90 minutes ; la même valeur signalée à nouveau renouvelle cette durée. Les prix absents ou expirés laissent l’énergie concernée sans prix. Abonnements et crédits annuels sont exclus.",
         "data_description": {
-          "charging_price_entity": "Choisissez le prix de l’électricité consommée maintenant, pas une moyenne quotidienne, une liste de prévisions ou le prix de revente. L’unité doit être EUR/kWh, ct/kWh ou EUR/MWh."
+          "charging_price_entity": "Choisissez le prix de l’électricité consommée maintenant, pas une moyenne quotidienne, une liste de prévisions ou le prix de revente. L’unité doit indiquer la devise de Home Assistant par kWh ou MWh."
         }
       },
       "cost_module2": {
@@ -1611,7 +1611,7 @@
       "invalid_vehicle_entity": "Sélectionnez une entité du type pris en charge.",
       "loss_source_invalid": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant.",
       "cost_source_invalid": "Sélectionnez une source de coût prise en charge et une entité capteur pour un prix issu d’un capteur.",
-      "cost_price_invalid": "Saisissez un prix TTC fini entre −1000 et 1000 EUR/kWh. Les prix négatifs sont autorisés.",
+      "cost_price_invalid": "Saisissez un prix TTC fini entre −1000 et 1000 par kWh. Les prix négatifs sont autorisés.",
       "network_tariff_invalid": "Vérifiez les prix bruts, l’année, deux à quatre trimestres et les périodes hautes/basses. Une période HH:MM-HH:MM par ligne, par quarts d’heure, sans chevauchement et avec une plage standard.",
       "timed_source_invalid": "Source de planification invalide",
       "timed_calendar_required": "Choisissez un calendrier",

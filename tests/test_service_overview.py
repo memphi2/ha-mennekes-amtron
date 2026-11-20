@@ -44,7 +44,7 @@ def test_overview_is_allowlisted_and_newest_first():
     assert result["state"] == "charging"
     assert result["heartbeat"] == "ok"
     assert result["measurements"] == {"power_w": 11040, "session_kwh": 12.5, "current_limit_a": 16}
-    assert result["targets"] == {"energy_kwh": 20, "soc_percent": 75, "cost_eur": None, "time": None}
+    assert result["targets"] == {"energy_kwh": 20, "soc_percent": 75, "cost": None, "cost_currency": None, "time": None}
     assert result["guest_confirmation_required"] is False
     assert [row["sequence"] for row in result["commands"]] == [2, 1]
     assert "private" not in json.dumps(result)

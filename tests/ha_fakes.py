@@ -132,7 +132,7 @@ class FakeHass:
     def __init__(self, config_dir: str | None = None) -> None:
         self.config_dir = config_dir or tempfile.mkdtemp(prefix="mennekes-hass-")
         self.config = SimpleNamespace(
-            config_dir=self.config_dir,
+            config_dir=self.config_dir, currency="EUR",
             components=set(),
             language="en",
             path=lambda *parts: str(Path(self.config_dir, *parts)),

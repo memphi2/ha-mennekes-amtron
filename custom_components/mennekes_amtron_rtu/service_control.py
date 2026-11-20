@@ -258,7 +258,7 @@ class ServiceControl:
         await self._command("energy_goal", value=value)
 
     @ha_command
-    async def async_set_cost_goal(self, amount: float, price: float | None) -> None:
+    async def async_set_cost_goal(self, amount: float, price: float | None, currency: str) -> None:
         """Arm an amount of money; the service carries it as its energy target."""
         if not self.supports_energy_goal:
             raise DeviceValidationError("energy_goal_not_supported")
@@ -266,7 +266,7 @@ class ServiceControl:
             raise DeviceValidationError("cost_goal_invalid")
         if amount and price is None:
             raise DeviceValidationError("cost_goal_price_unknown")
-        await self._command("cost_goal", value=amount, price=price)
+        await self._command("cost_goal", value=amount, price=price, currency=currency)
 
     @property
     def cost_price(self) -> float | None:
@@ -276,10 +276,16 @@ class ServiceControl:
             return None
         return float(price)
 
+    @property
+    def cost_currency(self) -> str | None:
+        """The currency the service was told with the price."""
+        currency = self._control.get("cost_currency")
+        return currency if isinstance(currency, str) else None
+
     @ha_command
-    async def async_set_cost_price(self, price: float) -> None:
-        """Tell the service the price that applies now."""
-        await self._command("cost_price", price=price)
+    async def async_set_cost_price(self, price: float, currency: str) -> None:
+        """Tell the service the price that applies now, and its currency."""
+        await self._command("cost_price", price=price, currency=currency)
 
     @property
     def supports_soc_goal(self) -> bool:

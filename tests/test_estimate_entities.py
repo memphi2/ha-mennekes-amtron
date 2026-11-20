@@ -128,12 +128,13 @@ def test_loss_entities_round_values_and_publish_no_per_poll_timestamps():
 
 def test_cost_entities_distinguish_unknown_incomplete_zero_and_negative_cost():
     async def run():
-        _hass, entry, _transport = await build_runtime(read_only=True)
+        hass, entry, _transport = await build_runtime(read_only=True)
         observer = cost_observer()
         entry.runtime_data.charging_cost = observer
         entities = estimate_entities(entry)
         current = entities["current_estimated_charging_cost"]
         last = entities["last_estimated_charging_cost"]
+        current.hass = last.hass = hass
         assert current.available
         assert last.available
         assert current.native_value is None
@@ -145,6 +146,9 @@ def test_cost_entities_distinguish_unknown_incomplete_zero_and_negative_cost():
         assert current.native_value == 3.46
         assert last.native_value == -1.23
         assert current.native_unit_of_measurement == last.native_unit_of_measurement == "EUR"
+        # Money follows Home Assistant's currency.
+        hass.config.currency = "CHF"
+        assert current.native_unit_of_measurement == last.native_unit_of_measurement == "CHF"
         assert current.extra_state_attributes == {"complete": True}
         assert last.extra_state_attributes == {"complete": True, "energy_kwh": 20, "unpriced_kwh": 0}
         # A partly priced charge shows what is known and says it is incomplete.

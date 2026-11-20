@@ -214,7 +214,7 @@
       put("op_car", text(`car_${summary.vehicle}`));
     }
     put("energy_target", data.targets.energy_kwh === 0 ? text("disabled") : format(data.targets.energy_kwh, "kWh", 2));
-    put("cost_target", typeof data.targets.cost_eur === "number" ? data.targets.cost_eur.toLocaleString(languages[column], {style: "currency", currency: "EUR"}) : text("disabled"));
+    put("cost_target", typeof data.targets.cost === "number" ? data.targets.cost.toLocaleString(languages[column], data.targets.cost_currency ? {style: "currency", currency: data.targets.cost_currency} : {minimumFractionDigits: 2, maximumFractionDigits: 2}) : text("disabled"));
     put("time_target", moment(data.targets.time) || text("disabled"));
     put("soc_target", data.targets.soc_percent === 0 ? text("disabled") : format(data.targets.soc_percent, "%"));
     const rows = data.commands.filter(command => !(command.action === "set_current" && command.outcome === "replaced")).map(command => {

@@ -162,6 +162,8 @@ class ServiceConsole(AppSettings):
                 "amount": cost.amount, "spent": control.energy_goal.cost_spent, "price": cost.price,
             },
             "cost_price": None if runner is None else runner.price,
+            # Home Assistant's currency; unknown until it reported a price.
+            "cost_currency": None if runner is None else runner.currency,
             # When Home Assistant last reported the price, alone or with an
             # amount.
             "cost_price_at": None if runner is None or runner.price_at is None else runner.price_at.isoformat(),

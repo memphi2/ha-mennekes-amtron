@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../custom_components/mennekes_amtron_rtu/device');
 const source=fs.readFileSync(path.join(root,'app_charging.js'),'utf8');
-const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
+const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_currency:'EUR',cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(page='targets',responses=[initial()],language='de'){
  const html=fs.readFileSync(path.join(root,'app_targets.html'),'utf8');
@@ -210,4 +210,18 @@ test('while a guest holds the wallbox the vehicle target says that it does not a
  h=setup('targets',[{...guest,guest_active:false}]);await flush();
  assert.equal(h.elements.get('guest_status').textContent,'Gastladen ist pausiert');
  assert.equal(h.elements.get('guest_start').textContent,'Gastladen starten');
+});
+
+test('money is shown in the currency Home Assistant reported, and as a bare number without one',async()=>{
+ const chf=initial();chf.cost_currency='CHF';chf.cost={amount:10,spent:1.5,price:0.3};
+ let h=setup('targets',[chf],'en');await flush();
+ assert.match(h.elements.get('cost_status').textContent,/CHF\s?10\.00/);
+ assert.equal(h.elements.get('cost_unit').textContent,'CHF');
+ const bare=initial();bare.cost_currency=null;bare.cost={amount:10,spent:1.5,price:0.3};
+ h=setup('targets',[bare],'en');await flush();
+ assert.match(h.elements.get('cost_status').textContent,/^10\.00 · 1\.50 used · 0\.30\/kWh$/);
+ assert.equal(h.elements.get('cost_unit').textContent,'');
+ const broken=initial();broken.cost_currency='euro';
+ h=setup('targets',[broken],'en');await flush();
+ assert.match(h.elements.get('notice').textContent,/No current response/);
 });

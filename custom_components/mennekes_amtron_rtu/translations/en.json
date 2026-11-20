@@ -1328,9 +1328,9 @@
         "data": {
           "charging_price": "Gross electricity price"
         },
-        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded. The initial suggestion is 0.40 EUR/kWh; use your own contract price.",
+        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded. The initial suggestion is 0.40 per kWh; use your own contract price.",
         "data_description": {
-          "charging_price": "Enter euros per kWh, including taxes: 0.40 means 40 cents/kWh. Use the energy price from your contract; any network-price adjustment is configured separately."
+          "charging_price": "Enter the price per kWh in Home Assistant’s currency, including taxes: 0.40 means forty hundredths per kWh. Use the energy price from your contract; any network-price adjustment is configured separately."
         }
       },
       "cost_sensor": {
@@ -1338,9 +1338,9 @@
         "data": {
           "charging_price_entity": "Electricity price sensor"
         },
-        "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded.",
+        "description": "Select a sensor with the current gross electricity price per kWh or MWh in Home Assistant’s currency, for example EUR/kWh (with euros, ct/kWh and the € symbol also work). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded.",
         "data_description": {
-          "charging_price_entity": "Choose the price for electricity consumed now, not a daily average, forecast list or export price. Its unit must identify EUR/kWh, ct/kWh or EUR/MWh."
+          "charging_price_entity": "Choose the price for electricity consumed now, not a daily average, forecast list or export price. Its unit must name Home Assistant’s currency per kWh or MWh."
         }
       },
       "cost_module2": {
@@ -1611,7 +1611,7 @@
       "invalid_vehicle_entity": "Select an entity of the supported type.",
       "loss_source_invalid": "Select a supported charging loss source and configure its matching vehicle or sensor.",
       "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
-      "cost_price_invalid": "Enter a finite gross price in EUR/kWh between −1000 and 1000. Negative prices are allowed.",
+      "cost_price_invalid": "Enter a finite gross price per kWh between −1000 and 1000. Negative prices are allowed.",
       "network_tariff_invalid": "Check the gross prices, tariff year, two to four active quarters and HT/NT periods. Use one 15-minute-aligned HH:MM-HH:MM period per line; periods must not overlap and must leave standard-tariff time.",
       "timed_source_invalid": "Invalid timed-goal source",
       "timed_calendar_required": "Choose a calendar for this event title",

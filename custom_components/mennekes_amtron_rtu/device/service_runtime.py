@@ -752,6 +752,10 @@ class ModbusService:
                     control.goal_controller.price
                     if control is not None and control.goal_controller is not None else None
                 ),
+                "cost_currency": (
+                    control.goal_controller.currency
+                    if control is not None and control.goal_controller is not None else None
+                ),
                 "read_only": self.config.read_only or self._intent_rejected,
                 "intent_rejected": self._intent_rejected,
                 "current_cap": self.config.current_cap,
@@ -892,7 +896,7 @@ class ModbusService:
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
             "source", "soc", "maximum", "deadline", "expected_soc_revision",
             "session", "policy", "maximum_required", "expected_choice_revision",
-            "price",
+            "price", "currency",
         }:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
@@ -987,6 +991,7 @@ class ModbusService:
                     if control.goal_controller is None or not control.supports_energy_goal:
                         raise validation_error("energy_goal_not_supported")
                     price = payload.get("price")
+                    control.goal_controller.note_currency(payload.get("currency"))
                     if command == "cost_goal":
                         await control.goal_controller.async_set_cost_target(number(value, 0, 1000), price)
                     else:

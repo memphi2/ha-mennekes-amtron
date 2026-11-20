@@ -143,7 +143,8 @@ def overview_snapshot(
             "energy_kwh": _number(energy.get("target_kwh")),
             "soc_percent": _number(soc.get("target_percent")),
             # The amount of money an energy target stands for, if any.
-            "cost_eur": _number(_mapping(energy.get("cost")).get("amount")),
+            "cost": _number(_mapping(energy.get("cost")).get("amount")),
+            "cost_currency": currency if isinstance(currency := control.get("cost_currency"), str) and len(currency) == 3 else None,
             # The shared target time: a car's departure, a guest's end.
             "time": _instant(_mapping(_mapping(control.get("departure")).get("trip")).get("deadline")),
         },

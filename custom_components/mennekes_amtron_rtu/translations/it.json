@@ -1328,9 +1328,9 @@
         "data": {
           "charging_price": "Prezzo dell’elettricità lordo"
         },
-        "description": "Inserisci il prezzo per kWh comprensivo di imposte. Sono ammessi prezzi negativi. Senza adeguamento della rete, deve essere il prezzo finale comprensivo degli oneri di rete. Canoni fissi e accrediti annuali sono esclusi. Il valore iniziale suggerito è 0,40 EUR/kWh; usa il prezzo del tuo contratto.",
+        "description": "Inserisci il prezzo per kWh comprensivo di imposte. Sono ammessi prezzi negativi. Senza adeguamento della rete, deve essere il prezzo finale comprensivo degli oneri di rete. Canoni fissi e accrediti annuali sono esclusi. Il valore iniziale suggerito è 0,40 per kWh; usa il prezzo del tuo contratto.",
         "data_description": {
-          "charging_price": "Inserisci euro per kWh, tasse incluse: 0,40 significa 40 centesimi/kWh. Usa il prezzo del contratto; l’eventuale modifica degli oneri di rete si configura separatamente."
+          "charging_price": "Inserisci il prezzo per kWh nella valuta di Home Assistant, tasse incluse: 0,40 significa 40 centesimi per kWh. Usa il prezzo del contratto; l’eventuale modifica degli oneri di rete si configura separatamente."
         }
       },
       "cost_sensor": {
@@ -1338,9 +1338,9 @@
         "data": {
           "charging_price_entity": "Sensore del prezzo dell’elettricità"
         },
-        "description": "Seleziona un sensore con il prezzo attuale dell’elettricità comprensivo di imposte in EUR/kWh, ct/kWh o EUR/MWh (è accettato anche il simbolo €). Sono ammessi prezzi negativi. Senza adeguamento della rete, il prezzo deve includere gli oneri di rete. Un valore ricevuto è valido per 90 minuti; ricevere nuovamente lo stesso valore rinnova la durata. Prezzi assenti o scaduti lasciano l’energia interessata senza prezzo. Canoni fissi e accrediti annuali sono esclusi.",
+        "description": "Seleziona un sensore con il prezzo attuale dell’elettricità comprensivo di imposte per kWh o MWh nella valuta di Home Assistant, ad esempio EUR/kWh (in euro valgono anche ct/kWh e il simbolo €). Sono ammessi prezzi negativi. Senza adeguamento della rete, il prezzo deve includere gli oneri di rete. Un valore ricevuto è valido per 90 minuti; ricevere nuovamente lo stesso valore rinnova la durata. Prezzi assenti o scaduti lasciano l’energia interessata senza prezzo. Canoni fissi e accrediti annuali sono esclusi.",
         "data_description": {
-          "charging_price_entity": "Scegli il prezzo dell’elettricità consumata ora, non una media giornaliera, un elenco di previsioni o il prezzo di immissione. L’unità deve essere EUR/kWh, ct/kWh o EUR/MWh."
+          "charging_price_entity": "Scegli il prezzo dell’elettricità consumata ora, non una media giornaliera, un elenco di previsioni o il prezzo di immissione. L’unità deve indicare la valuta di Home Assistant per kWh o MWh."
         }
       },
       "cost_module2": {
@@ -1611,7 +1611,7 @@
       "invalid_vehicle_entity": "Seleziona un’entità del tipo supportato.",
       "loss_source_invalid": "Seleziona una fonte supportata per le perdite di ricarica e configura il veicolo o il sensore corrispondente.",
       "cost_source_invalid": "Seleziona una fonte di costo supportata e un’entità sensore per un prezzo basato su sensore.",
-      "cost_price_invalid": "Inserisci un prezzo lordo finito compreso tra −1000 e 1000 EUR/kWh. Sono ammessi prezzi negativi.",
+      "cost_price_invalid": "Inserisci un prezzo lordo finito compreso tra −1000 e 1000 per kWh. Sono ammessi prezzi negativi.",
       "network_tariff_invalid": "Controlla prezzi lordi, anno, da due a quattro trimestri e periodi alti/bassi. Un periodo HH:MM-HH:MM per riga, ogni 15 minuti, senza sovrapposizioni e lasciando un periodo standard.",
       "timed_source_invalid": "Fonte oraria non valida",
       "timed_calendar_required": "Seleziona un calendario",

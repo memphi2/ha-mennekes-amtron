@@ -1328,9 +1328,9 @@
         "data": {
           "charging_price": "Bruttostrompreis"
         },
-        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt. Vorgeschlagen sind zunächst 0,40 EUR/kWh; verwende deinen eigenen Vertragspreis.",
+        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt. Vorgeschlagen sind zunächst 0,40 je kWh; verwende deinen eigenen Vertragspreis.",
         "data_description": {
-          "charging_price": "Gib Euro pro kWh inklusive Steuern ein: 0,40 bedeutet 40 Cent/kWh. Verwende den Arbeitspreis deines Vertrags; eine mögliche Netzentgelt-Anpassung wird separat eingerichtet."
+          "charging_price": "Gib den Preis pro kWh in der Währung von Home Assistant inklusive Steuern ein: 0,40 bedeutet 40 Hundertstel pro kWh. Verwende den Arbeitspreis deines Vertrags; eine mögliche Netzentgelt-Anpassung wird separat eingerichtet."
         }
       },
       "cost_sensor": {
@@ -1338,9 +1338,9 @@
         "data": {
           "charging_price_entity": "Strompreissensor"
         },
-        "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis in EUR/kWh, ct/kWh oder EUR/MWh (auch das €-Zeichen wird unterstützt). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen.",
+        "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis je kWh oder MWh in der Währung von Home Assistant, zum Beispiel EUR/kWh (bei Euro gehen auch ct/kWh und das €-Zeichen). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen.",
         "data_description": {
-          "charging_price_entity": "Wähle den Preis für den aktuellen Strombezug, keinen Tagesmittelwert, keine Prognoseliste und keine Einspeisevergütung. Die Einheit muss EUR/kWh, ct/kWh oder EUR/MWh ausweisen."
+          "charging_price_entity": "Wähle den Preis für den aktuellen Strombezug, keinen Tagesmittelwert, keine Prognoseliste und keine Einspeisevergütung. Die Einheit muss die Währung von Home Assistant je kWh oder MWh nennen."
         }
       },
       "cost_module2": {
@@ -1611,7 +1611,7 @@
       "invalid_vehicle_entity": "Wähle eine Entität des unterstützten Typs.",
       "loss_source_invalid": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein.",
       "cost_source_invalid": "Wähle eine unterstützte Kostenquelle und für einen sensorbasierten Preis eine Sensor-Entität.",
-      "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 EUR/kWh an. Negative Preise sind erlaubt.",
+      "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 je kWh an. Negative Preise sind erlaubt.",
       "network_tariff_invalid": "Prüfe Brutto-Netzentgelte, Tarifjahr, zwei bis vier aktive Quartale und HT/NT-Zeiträume. Je Zeile HH:MM-HH:MM mit Viertelstundengrenzen; keine Überschneidung und eine Standardtarifzeit muss bleiben.",
       "timed_source_invalid": "Ungültige Quelle für das Zeitziel",
       "timed_calendar_required": "Für diesen Titel einen Kalender wählen",

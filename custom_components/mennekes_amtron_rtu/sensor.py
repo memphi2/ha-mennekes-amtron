@@ -304,14 +304,14 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
     AmtronSensorDescription(
         key="current_estimated_charging_cost", value=_cost(current=True),
         exists=lambda runtime: runtime.charging_cost is not None,
-        device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        device_class=SensorDeviceClass.MONETARY,
         suggested_display_precision=2, entity_registry_enabled_default=False,
         offline=True, ready=_cost_ready, attributes=_cost_details(current=True),
     ),
     AmtronSensorDescription(
         key="last_estimated_charging_cost", value=_cost(current=False),
         exists=lambda runtime: runtime.charging_cost is not None,
-        device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        device_class=SensorDeviceClass.MONETARY,
         suggested_display_precision=2,
         offline=True, ready=_cost_ready, attributes=_cost_details(current=False),
     ),
@@ -376,6 +376,13 @@ class AmtronSensor(AmtronEntity, SensorEntity):
         heartbeat = self.runtime.heartbeat
         if self.entity_description.follows_heartbeat and heartbeat is not None:
             self.async_on_remove(heartbeat.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        # Money is in Home Assistant's currency, as the price it reports.
+        if self.entity_description.device_class is SensorDeviceClass.MONETARY:
+            return self.hass.config.currency
+        return self.entity_description.native_unit_of_measurement
 
     @property
     def native_value(self) -> StateType:

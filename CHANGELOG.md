@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Breaking:** money is in Home Assistant's currency instead of fixed euros:
+  the cost target, both cost sensors and the price fields use it, a price
+  sensor must name that currency per kWh or MWh, and Home Assistant tells the
+  app the currency with the price. The app's overview state carries
+  `targets.cost` and `targets.cost_currency` instead of `cost_eur`.
 - The app names its targets as Home Assistant does: energy target, cost
   target, vehicle charge target and target time. The Charging page sorts them
   into "for every charge", "own car only" and guest charging, each target has
