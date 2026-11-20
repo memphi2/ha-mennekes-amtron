@@ -29,5 +29,5 @@ def test_obsolete_order_routes_are_not_exposed(tmp_path, monkeypatch):
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             service.config = __import__("dataclasses").replace(service.config, token=TOKEN)
             async with TestClient(TestServer(create_app(service))) as client:
-                assert (await client.post("/v2/jobs", headers=AUTH, json={"action":"create"})).status == 404
+                assert (await client.post("/v1/jobs", headers=AUTH, json={"action":"create"})).status == 404
     asyncio.run(run())

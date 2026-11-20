@@ -31,4 +31,4 @@ Use short imperative subjects, such as “Reject backwards session evidence.” 
 
 ## Compatibility and Safety
 
-Before 1.0, remove obsolete beta migrations and compatibility fallbacks; document breaking changes. Preserve identity checks, electrical interlocks, and write intervals. Maintain one Modbus owner. Avoid per-heartbeat Recorder updates and unbounded histories. Keep credentials out of logs and commits. Local edits do not authorize hardware access or publication.
+1.0.0 starts without migrations or compatibility fallbacks for earlier versions; keep none for them and document breaking changes. Preserve identity checks, electrical interlocks, and write intervals. Maintain one Modbus owner. Avoid per-heartbeat Recorder updates and unbounded histories. Keep credentials out of logs and commits. Local edits do not authorize hardware access or publication.

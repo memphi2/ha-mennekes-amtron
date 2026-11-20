@@ -351,7 +351,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
                     require(child.process is not None and child.process.returncode is None, "service stopped during initialization")
                     try:
                         token = (DATA / "service-token").read_text()
-                        async with session.get(API + "/v2/state", headers={"Authorization": f"Bearer {token}"}) as response:
+                        async with session.get(API + "/v1/state", headers={"Authorization": f"Bearer {token}"}) as response:
                             payload = await response.json()
                             if response.status == 200 and payload.get("available") and payload["heartbeat"]["healthy"] is True and len(discoveries) >= len(children):
                                 require(payload["identity"]["serial_number"] == SERIAL, "initialized identity differs")
@@ -367,7 +367,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
             require(discoveries == [token], "discovery token differs from persistent token")
             require(stat.S_IMODE((DATA / "service-token").stat().st_mode) == 0o600, "token file is not private")
             await asyncio.sleep(5.1)
-            async with session.post(API + "/v2/command", headers={"Authorization": f"Bearer {token}"},
+            async with session.post(API + "/v1/command", headers={"Authorization": f"Bearer {token}"},
                                     json={"command": "pause", "expected_serial_number": SERIAL}) as response:
                 payload = await response.json()
                 require(response.status == 200, "pause command was rejected")

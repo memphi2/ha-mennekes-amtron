@@ -258,7 +258,7 @@ added to `intent.json` and is cancelled on service restart.
 
 ## Commands and API boundary
 
-Snapshots report `api_version: 4`, and authenticated endpoints use `/v2/`.
+Snapshots report `api_version: 1`, and authenticated endpoints use `/v1/`.
 The integration checks the API version and the snapshot's `service_version`.
 An unsupported API or a too old service produces the compatibility error; a
 malformed version or snapshot produces the data-validation error. Neither
@@ -293,16 +293,16 @@ cost and loss estimates; times are epoch seconds:
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Public process-liveness check; no wallbox data. |
-| `GET /v2/state` | Authenticated cached wallbox state and service status. While a command runs, the request waits up to two seconds and then returns the state published after the last completed command or poll, if that is at most a minute old. |
-| `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
-| `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
-| `POST /v2/energy` | Authenticated: the energy the meter delivered between `start` and `end` (epoch seconds), from the service's bounded meter log; `null` when the log does not cover the span. No bus access. |
-| `POST /v2/command` | Authenticated named control command with an identity precondition. |
-| `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
+| `GET /v1/state` | Authenticated cached wallbox state and service status. While a command runs, the request waits up to two seconds and then returns the state published after the last completed command or poll, if that is at most a minute old. |
+| `GET /v1/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
+| `POST /v1/read` | Authenticated diagnostic read from the register allowlist. |
+| `POST /v1/energy` | Authenticated: the energy the meter delivered between `start` and `end` (epoch seconds), from the service's bounded meter log; `null` when the log does not cover the span. No bus access. |
+| `POST /v1/command` | Authenticated named control command with an identity precondition. |
+| `POST /v1/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
 already bound to the client's configured wallbox. For example, a pause request
-to `/v2/command` has this body; replace the example serial with that configured
+to `/v1/command` has this body; replace the example serial with that configured
 identity:
 
 ```json
@@ -450,10 +450,10 @@ HA restore values.
 
 ## Guest charging API
 
-Read `control.guest_active`, `control.guest_mode` and `control.guest_revision` in `GET /v2/state`.
-Start with `POST /v2/command` naming `command: guest_start`,
+Read `control.guest_active`, `control.guest_mode` and `control.guest_revision` in `GET /v1/state`.
+Start with `POST /v1/command` naming `command: guest_start`,
 `expected_serial_number` and `expected_guest_revision`. A stale revision or a
-different wallbox is rejected. There is no `/v2/jobs` or `/api/jobs` route.
+different wallbox is rejected. There is no `/v1/jobs` or `/api/jobs` route.
 
 The command uses the existing energy baseline and selected time. It grants release
 for this connection and lifts manual pause, while preserving locks, faults and

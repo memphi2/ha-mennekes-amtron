@@ -52,7 +52,7 @@ class HttpTransport:
         ) as response:
             if response.status in (401, 403):
                 raise ServiceConnectionError("service_auth_failed", "service authentication failed")
-            if response.status == 404 and path == "/v2/state":
+            if response.status == 404 and path == "/v1/state":
                 raise ServiceConnectionError("service_version_mismatch", "service API version differs")
             raw = bytearray()
             async for chunk in response.content.iter_chunked(16384):

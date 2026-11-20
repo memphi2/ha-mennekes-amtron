@@ -166,7 +166,7 @@ def test_app_write_diagnostics_are_optional_and_allowlisted(failure):
             })
 
         async def request(method, path, *args, **kwargs):
-            if path == "/v2/diagnostics":
+            if path == "/v1/diagnostics":
                 return await download(method, path, *args, **kwargs)
             return await original(method, path, *args, **kwargs)
 
@@ -179,7 +179,7 @@ def test_app_write_diagnostics_are_optional_and_allowlisted(failure):
         else:
             assert dump["runtime_events"] is None
         assert "private-token" not in repr(dump)
-        download.assert_awaited_once_with("GET", "/v2/diagnostics", update_connection=False)
+        download.assert_awaited_once_with("GET", "/v1/diagnostics", update_connection=False)
         assert dump["registers"]["status"]["0x0100"] == 1
 
     asyncio.run(run())
@@ -212,6 +212,6 @@ def test_remote_diagnostic_reads_leave_the_connection_state_alone():
         remote.request = AsyncMock(return_value={"words": [0] * block.count})
         assert await remote.async_read_words(address=block.address, count=block.count) == [0] * block.count
         # A failed diagnostics download must not mark the entry unavailable.
-        remote.request.assert_awaited_once_with("POST", "/v2/read", {"block": block.name}, update_connection=False)
+        remote.request.assert_awaited_once_with("POST", "/v1/read", {"block": block.name}, update_connection=False)
 
     asyncio.run(run())

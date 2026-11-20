@@ -206,7 +206,7 @@ class ServiceControl:
             return "superseded"
         token, previous_revision = self._soc_transaction
         async with self._client.publication:
-            result = await self._soc_transaction_request("/v2/soc-goal/resolve", {"token": token})
+            result = await self._soc_transaction_request("/v1/soc-goal/resolve", {"token": token})
             outcome = self._apply_soc_transaction_result(result, previous_revision)
             if outcome == "unknown":
                 self._soc_transaction_fenced = True
@@ -322,13 +322,13 @@ class ServiceControl:
             raise DeviceValidationError("soc_goal_invalid") from err
         async with self._client.publication:
             previous_revision = self.soc_goal_revision
-            reservation = await self._soc_transaction_request("/v2/soc-goal/reserve", {})
+            reservation = await self._soc_transaction_request("/v1/soc-goal/reserve", {})
             token = reservation.get("token")
             if not is_hex32(token):
                 raise DeviceError("service_unavailable")
             self._soc_transaction = (token, previous_revision)
             self._soc_transaction_fenced = False
-            result = await self._soc_transaction_request("/v2/soc-goal/commit", {
+            result = await self._soc_transaction_request("/v1/soc-goal/commit", {
                 "token": token, "expected_serial_number": self._client.bound_serial,
                 "value": value, "source": source, "soc": soc, "soc_age": soc_age, "maximum": maximum,
             })

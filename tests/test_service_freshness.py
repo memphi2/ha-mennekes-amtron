@@ -46,10 +46,10 @@ def test_stale_service_rejects_every_command_without_changing_intent(tmp_path, p
                 TestServer(create_app(service)) as server,
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
             ):
-                async with session.get(server.make_url("/v2/state")) as response:
+                async with session.get(server.make_url("/v1/state")) as response:
                     assert (await response.json())["available"] is False
                 async with session.post(
-                    server.make_url("/v2/command"), json=payload
+                    server.make_url("/v1/command"), json=payload
                 ) as response:
                     assert response.status == 409
                     assert (await response.json())["error"] == "service_unavailable"
@@ -84,10 +84,10 @@ def test_snapshot_and_command_use_the_same_freshness_boundary(
                 TestServer(create_app(service)) as server,
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
             ):
-                async with session.get(server.make_url("/v2/state")) as response:
+                async with session.get(server.make_url("/v1/state")) as response:
                     assert (await response.json())["available"] is available
                 async with session.post(
-                    server.make_url("/v2/command"),
+                    server.make_url("/v1/command"),
                     json={"command": "set_current", "value": 10, "expected_serial_number": "ABC123456789"},
                 ) as response:
                     assert response.status == (200 if available else 409)
@@ -119,7 +119,7 @@ def test_command_rechecks_freshness_after_waiting_for_another_command(tmp_path):
                 ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
             ):
                 assert service.snapshot()["available"] is True
-                url = server.make_url("/v2/command")
+                url = server.make_url("/v1/command")
                 pending = asyncio.create_task(
                     session.post(url, json={"command": "set_current", "value": 10, "expected_serial_number": "ABC123456789"})
                 )

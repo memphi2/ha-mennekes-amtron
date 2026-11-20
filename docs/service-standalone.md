@@ -6,7 +6,7 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-Run service **1.0.0 or newer** (API 4) with this integration, and
+Run service **1.0.0 or newer** (API 1) with this integration, and
 update the service first. See [Updates](#operation-and-updates). The app's web
 pages, including guest charging, are part of the Home Assistant app and need
 Supervisor Ingress; a standalone service offers the same guest charging through

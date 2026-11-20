@@ -137,12 +137,12 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                async with session.get(server.make_url("/v2/state")) as response:
+                async with session.get(server.make_url("/v1/state")) as response:
                     assert response.status == 401
                 headers = {"Authorization": f"Bearer {TOKEN}"}
                 # A header that is no text is wrong, not a server error.
                 reader, writer = await asyncio.open_connection(server.host, server.port)
-                writer.write(b"GET /v2/state HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer \xff\xfe\r\n\r\n")
+                writer.write(b"GET /v1/state HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer \xff\xfe\r\n\r\n")
                 assert (await reader.readline()).split()[1] == b"401"
                 writer.close()
                 for payload in (
@@ -152,11 +152,11 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                     {},
                 ):
                     async with session.post(
-                        server.make_url("/v2/read"), headers=headers, json=payload
+                        server.make_url("/v1/read"), headers=headers, json=payload
                     ) as response:
                         assert response.status == 400
                 async with session.post(
-                    server.make_url("/v2/command"),
+                    server.make_url("/v1/command"),
                     headers=headers,
                     json={"command": "resume", "expected_serial_number": "ABC123456789"},
                 ) as response:
@@ -166,7 +166,7 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                 async with session.get(server.make_url("/health")) as response:
                     assert response.status == 200
                 # A probe that asks with HEAD gets the answer of GET, without a body.
-                async with session.head(server.make_url("/v2/state"), headers=headers) as response:
+                async with session.head(server.make_url("/v1/state"), headers=headers) as response:
                     assert response.status == 200
                 for payload in (
                     [],
@@ -174,11 +174,11 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                     {"command": "pause", "address": 1, "expected_serial_number": "ABC123456789"},
                 ):
                     async with session.post(
-                        server.make_url("/v2/command"), headers=headers, json=payload
+                        server.make_url("/v1/command"), headers=headers, json=payload
                     ) as response:
                         assert response.status == 400
                 async with session.post(
-                    server.make_url("/v2/command"), headers=headers, data="not JSON"
+                    server.make_url("/v1/command"), headers=headers, data="not JSON"
                 ) as response:
                     assert response.status == 415
         finally:
@@ -664,7 +664,7 @@ def test_a_command_the_disk_could_not_save_is_not_reported_as_an_unreachable_ser
 
         monkeypatch.setattr(service, "persist", refused)
         try:
-            status, reply = await ServiceApi(service).dispatch("POST", "/v2/command", {
+            status, reply = await ServiceApi(service).dispatch("POST", "/v1/command", {
                 "command": "set_current", "value": 10, "expected_serial_number": "ABC123456789",
             })
             # The wallbox has it; the caller learns what did not happen.

@@ -2,11 +2,13 @@
 
 ## 1.0.0
 
-- Integration and app must both be 1.0.0; the API is version 4, and each side
-  refuses the other's older version.
-- **Breaking (API):** a charge level carries its age (`soc_age`); the app
-  counts it as known for 15 minutes after the car reported it, no longer after
-  a report of the car's limit or a poll.
+- Integration and app must both be 1.0.0; the API starts again at version 1,
+  and each side refuses the other's older version.
+- **Breaking (API):** the endpoints are under `/v1/`; a charge level carries
+  its age (`soc_age`), and the app counts it as known for 15 minutes after the
+  car reported it, no longer after a report of the car's limit or a poll.
+- **Breaking:** control state saved by 0.10 is not taken over; confirm the
+  reset in Home Assistant's Repairs and set the targets again.
 - The Charging page keeps a draft that was changed elsewhere marked as
   changed when another target is saved, instead of saving it over the newer
   value.

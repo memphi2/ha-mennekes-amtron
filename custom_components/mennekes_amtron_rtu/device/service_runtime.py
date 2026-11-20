@@ -57,7 +57,7 @@ from .soc_transactions import SocTransactions
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
-API_VERSION = 4
+API_VERSION = 1
 # A state poll waits this long for a running command, then takes the last
 # published state unless that is older than the second value.
 _PATIENCE_SECONDS = 2.0

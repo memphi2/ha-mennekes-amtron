@@ -7,15 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 1.0.0 — 2026-11-20
 
-First 1.0 release, compared with 0.10.0. Integration and app are both 1.0.0
-and must be updated together: the service API is version 4, and each side
-refuses the other's older version.
+The first stable version, compared with 0.10.0. Integration and app are both
+1.0.0 and must be updated together: the service API starts again at version 1,
+and each side refuses the other's older version.
 
 ### Breaking changes
 
-- **Service API 4:** a charge level Home Assistant reports carries its age
-  (`soc_age`), in `soc_observation`, `soc_goal` and the vehicle charge target
+- **Service API 1:** the authenticated endpoints are under `/v1/` instead of
+  `/v2/`, and a charge level Home Assistant reports carries its age
+  (`soc_age`) in `soc_observation`, `soc_goal` and the vehicle charge target
   transaction.
+- **Saved control state starts again.** The service does not take over the
+  state saved by 0.10: it switches the charging release off and blocks
+  charging commands until the reset is confirmed under **Settings → System →
+  Repairs**; then set the targets again.
 
 ### Fixed
 

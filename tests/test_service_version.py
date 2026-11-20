@@ -24,7 +24,7 @@ from tests.test_service_reauth import add_entry
 
 
 @pytest.mark.parametrize("phase", ["flow", "setup", "poll"])
-@pytest.mark.parametrize("version", [1, 2, "missing_route", True, "3"])
+@pytest.mark.parametrize("version", [0, 2, "missing_route", True, "1"])
 def test_api_mismatch_is_distinct_from_auth_failure_and_recovers(
     tmp_path, phase, version
 ):
@@ -37,7 +37,7 @@ def test_api_mismatch_is_distinct_from_auth_failure_and_recovers(
         @web.middleware
         async def older_service(request, handler):
             paths.append(request.path)
-            if incompatible and request.path == "/v2/state":
+            if incompatible and request.path == "/v1/state":
                 if version == "missing_route":
                     return web.Response(status=404)
                 payload = service.snapshot()
@@ -93,7 +93,7 @@ def test_api_mismatch_is_distinct_from_auth_failure_and_recovers(
                 assert entry.unique_id == "ABC123456789"
                 assert entry.state is ConfigEntryState.LOADED
                 assert entry.runtime_data.coordinator.last_update_success
-                assert all(path.startswith("/v2/") for path in paths)
+                assert all(path.startswith("/v1/") for path in paths)
                 assert not bus.writes
         finally:
             await hass.async_stop()
@@ -180,7 +180,7 @@ def test_supported_services_work_without_a_matching_integration_version(tmp_path
         async def independent_version(request, handler):
             paths.append(request.path)
             response = await handler(request)
-            if request.path in ("/v2/state", "/v2/command") and response.status == 200:
+            if request.path in ("/v1/state", "/v1/command") and response.status == 200:
                 import json
 
                 payload = json.loads(response.body)
@@ -201,7 +201,7 @@ def test_supported_services_work_without_a_matching_integration_version(tmp_path
                 assert not current_writes(bus)
                 await entry.runtime_data.control.async_set_charging_current(10)
                 assert current_writes(bus) == [10]
-                assert paths.count("/v2/command") == 1
+                assert paths.count("/v1/command") == 1
                 assert not hass.config_entries.flow.async_progress_by_handler(DOMAIN)
         finally:
             await hass.async_stop()
@@ -229,7 +229,7 @@ def test_incompatible_service_version_blocks_and_recovers_without_reauth_or_repl
         @web.middleware
         async def version_response(request, handler):
             requests.append((request.method, request.path))
-            if request.path == "/v2/state" or (incompatible and request.path == "/v2/command"):
+            if request.path == "/v1/state" or (incompatible and request.path == "/v1/command"):
                 # For a command response an uncertain write must not be retried.
                 payload = service.snapshot()
                 payload["service_version"] = minimum
@@ -279,7 +279,7 @@ def test_incompatible_service_version_blocks_and_recovers_without_reauth_or_repl
                             assert error.value.translation_key == (
                                 expected if expected == "service_version_mismatch" else "service_unavailable"
                             )
-                            assert requests == [("POST", "/v2/command")]
+                            assert requests == [("POST", "/v1/command")]
                         else:
                             await runtime.coordinator.async_refresh()
                         await hass.async_block_till_done()
@@ -302,7 +302,7 @@ def test_incompatible_service_version_blocks_and_recovers_without_reauth_or_repl
                 assert entry.runtime_data.coordinator.last_update_success
                 assert hass.states.get("number.mennekes_amtron_charging_current_limit").state != "unavailable"
                 assert not current_writes(bus)
-                assert requests.count(("POST", "/v2/command")) == (1 if phase == "command" else 0)
+                assert requests.count(("POST", "/v1/command")) == (1 if phase == "command" else 0)
                 assert not hass.config_entries.flow.async_progress_by_handler(DOMAIN)
         finally:
             await hass.async_stop()

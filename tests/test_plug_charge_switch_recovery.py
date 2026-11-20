@@ -67,7 +67,7 @@ def test_lost_service_reply_reconciles_on_next_normal_poll_without_replaying_com
                 nonlocal drop_next
                 requests.append((request.method, request.path))
                 response = await handler(request)
-                if drop_next and request.method == "POST" and request.path == "/v2/command":
+                if drop_next and request.method == "POST" and request.path == "/v1/command":
                     drop_next = False
                     # The app accepted and saved the command, but HA gets no
                     # usable response snapshot (e.g. an intermediary fails).
@@ -99,7 +99,7 @@ def test_lost_service_reply_reconciles_on_next_normal_poll_without_replaying_com
             assert service.control.plug_charge["enabled"] is enabled
             assert entry.options.get("virtual_plug_charge", False) is not enabled
             assert not runtime.client.connected
-            assert requests == [("POST", "/v2/command")]
+            assert requests == [("POST", "/v1/command")]
 
             # Simulate the next scheduled state read. Recovery is observation
             # only, never a second physical configuration command.
@@ -109,7 +109,7 @@ def test_lost_service_reply_reconciles_on_next_normal_poll_without_replaying_com
             assert entry.runtime_data is runtime
             assert hass.states.get(switch).state == ("on" if enabled else "off")
             assert (runtime.plug_charge.status == "disabled") is not enabled
-            assert requests == [("POST", "/v2/command"), ("GET", "/v2/state")]
+            assert requests == [("POST", "/v1/command"), ("GET", "/v1/state")]
             assert current_writes(transport) == before_current
 
     asyncio.run(run())

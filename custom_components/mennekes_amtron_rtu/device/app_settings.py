@@ -663,5 +663,5 @@ def create_setup_app(config: SetupConfig) -> web.Application:
         return web.json_response({"error": "service_not_configured"}, status=503)
 
     app.router.add_get("/health", health)
-    app.router.add_route("*", "/v2/{path:.*}", unavailable)
+    app.router.add_route("*", "/v1/{path:.*}", unavailable)
     return app

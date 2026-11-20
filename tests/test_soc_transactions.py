@@ -210,7 +210,7 @@ def test_http_reservation_is_authenticated_and_late_commit_is_fenced(tmp_path):
         service = await _ready(tmp_path)
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as client:
-                url = str(server.make_url("/v2/soc-goal/reserve"))
+                url = str(server.make_url("/v1/soc-goal/reserve"))
                 async with client.post(url, json={}) as response:
                     assert response.status == 401
                 headers = {"Authorization": f"Bearer {TOKEN}"}
@@ -218,11 +218,11 @@ def test_http_reservation_is_authenticated_and_late_commit_is_fenced(tmp_path):
                     assert response.status == 200
                     token = (await response.json())["token"]
                 async with client.post(
-                    server.make_url("/v2/soc-goal/resolve"), json={"token": token}, headers=headers,
+                    server.make_url("/v1/soc-goal/resolve"), json={"token": token}, headers=headers,
                 ) as response:
                     assert (await response.json())["outcome"] == "cancelled"
                 async with client.post(
-                    server.make_url("/v2/soc-goal/commit"), json=_target(service, token), headers=headers,
+                    server.make_url("/v1/soc-goal/commit"), json=_target(service, token), headers=headers,
                 ) as response:
                     assert (await response.json())["outcome"] == "cancelled"
                 assert service.control.soc_goal.target_percent == 0
@@ -244,7 +244,7 @@ def test_http_rejects_malformed_transaction_without_mutation(tmp_path, path, pay
         try:
             async with TestServer(create_app(service)) as server, ClientSession() as client:
                 async with client.post(
-                    server.make_url(f"/v2/soc-goal/{path}"), json=payload,
+                    server.make_url(f"/v1/soc-goal/{path}"), json=payload,
                     headers={"Authorization": f"Bearer {TOKEN}"},
                 ) as response:
                     assert response.status == 400
@@ -276,19 +276,19 @@ def test_http_resolve_can_fence_target_while_bus_admission_is_full(tmp_path):
             async with TestServer(create_app(service)) as server, ClientSession() as client:
                 headers = {"Authorization": f"Bearer {TOKEN}"}
                 async with client.post(
-                    server.make_url("/v2/soc-goal/reserve"), json={}, headers=headers,
+                    server.make_url("/v1/soc-goal/reserve"), json={}, headers=headers,
                 ) as response:
                     token = (await response.json())["token"]
                 requests = [asyncio.create_task(client.post(
-                    server.make_url("/v2/read"), json={"register": "error_code"}, headers=headers,
+                    server.make_url("/v1/read"), json={"register": "error_code"}, headers=headers,
                 )) for _ in range(8)]
                 await asyncio.wait_for(entered.wait(), 3)
                 async with client.post(
-                    server.make_url("/v2/soc-goal/commit"), json=_target(service, token), headers=headers,
+                    server.make_url("/v1/soc-goal/commit"), json=_target(service, token), headers=headers,
                 ) as response:
                     assert response.status == 503
                 async with client.post(
-                    server.make_url("/v2/soc-goal/resolve"), json={"token": token}, headers=headers,
+                    server.make_url("/v1/soc-goal/resolve"), json={"token": token}, headers=headers,
                 ) as response:
                     assert response.status == 200
                     assert (await response.json())["outcome"] == "cancelled"
@@ -297,7 +297,7 @@ def test_http_resolve_can_fence_target_while_bus_admission_is_full(tmp_path):
                     async with response:
                         assert response.status == 200
                 async with client.post(
-                    server.make_url("/v2/soc-goal/commit"), json=_target(service, token), headers=headers,
+                    server.make_url("/v1/soc-goal/commit"), json=_target(service, token), headers=headers,
                 ) as response:
                     assert (await response.json())["outcome"] == "cancelled"
                 assert service.control.soc_goal.status == "disabled"
@@ -370,7 +370,7 @@ def test_state_waits_for_goal_save_and_never_exposes_rolled_back_candidate(tmp_p
                 await started.wait()
                 assert service.control.soc_goal.target_percent == 90
                 get = asyncio.create_task(client.get(
-                    server.make_url("/v2/state"), headers={"Authorization": f"Bearer {TOKEN}"},
+                    server.make_url("/v1/state"), headers={"Authorization": f"Bearer {TOKEN}"},
                 ))
                 await asyncio.sleep(0.05)
                 assert not get.done()

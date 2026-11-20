@@ -225,7 +225,7 @@ class PollingTransport(EmbeddedTransport):
         self.service = service
 
     async def call(self, method: str, path: str, payload: dict[str, Any] | None) -> Any:
-        if path.startswith("/v2/state"):
+        if path.startswith("/v1/state"):
             await self.service.refresh()
         return await super().call(method, path, payload)
 

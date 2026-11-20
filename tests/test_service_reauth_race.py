@@ -37,7 +37,7 @@ def test_inflight_probe_cannot_overwrite_changed_connection(tmp_path, change, pr
 
         @web.middleware
         async def delay_authenticated_probe(request, handler):
-            if intercept and request.path == "/v2/state" and request.headers.get("Authorization") == f"Bearer {NEW_TOKEN}":
+            if intercept and request.path == "/v1/state" and request.headers.get("Authorization") == f"Bearer {NEW_TOKEN}":
                 started.set()
                 await release.wait()
                 if probe != "success":

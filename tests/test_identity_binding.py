@@ -101,9 +101,9 @@ def test_runtime_service_identity_change_blocks_commands_and_recovers_in_place(
 
         @web.middleware
         async def observe(request, handler):
-            if request.path == "/v2/command":
+            if request.path == "/v1/command":
                 commands.append(request.path)
-            if pause_poll and request.path == "/v2/state":
+            if pause_poll and request.path == "/v1/state":
                 poll_started.set()
                 await release_poll.wait()
             return await handler(request)

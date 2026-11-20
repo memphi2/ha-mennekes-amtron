@@ -42,9 +42,9 @@ def test_lost_target_reply_is_fenced_before_transient_soc_is_forwarded(tmp_path,
         @web.middleware
         async def lose_commit_reply(request, handler):
             nonlocal resolved, replaced
-            command = await request.json() if request.path == "/v2/command" else {}
+            command = await request.json() if request.path == "/v1/command" else {}
             if not replaced and (
-                (request.path == "/v2/soc-goal/resolve" and superseded == "before_resolve")
+                (request.path == "/v1/soc-goal/resolve" and superseded == "before_resolve")
                 or (resolved and superseded == "before_observe" and command.get("command") == "soc_observation")
             ):
                 # An independent client explicitly replaces the target after
@@ -55,9 +55,9 @@ def test_lost_target_reply_is_fenced_before_transient_soc_is_forwarded(tmp_path,
                 })
                 replaced = True
             response = await handler(request)
-            if request.path == "/v2/soc-goal/resolve":
+            if request.path == "/v1/soc-goal/resolve":
                 resolved = True
-            if request.path == "/v2/soc-goal/commit" and not cancelled:
+            if request.path == "/v1/soc-goal/commit" and not cancelled:
                 request.transport.close()
             return response
 
@@ -120,10 +120,10 @@ def test_explicit_clear_supersedes_a_fenced_unknown_result(tmp_path):
         async def uncertain_first_commit(request, handler):
             nonlocal lose_reply
             response = await handler(request)
-            if request.path == "/v2/soc-goal/commit" and lose_reply:
+            if request.path == "/v1/soc-goal/commit" and lose_reply:
                 lose_reply = False
                 request.transport.close()
-            if request.path == "/v2/soc-goal/resolve":
+            if request.path == "/v1/soc-goal/resolve":
                 result = await service.soc_transactions.resolve((await request.json())["token"])
                 result.update(outcome="unknown", revision=None)
                 return web.json_response(result)
@@ -168,14 +168,14 @@ def test_outage_during_resolution_preserves_evidence_and_blocks_replacement(tmp_
 
         @web.middleware
         async def drop_then_disconnect(request, handler):
-            if request.path == "/v2/soc-goal/resolve" and resolve_offline:
+            if request.path == "/v1/soc-goal/resolve" and resolve_offline:
                 return web.json_response({"error": "offline"}, status=503)
-            if request.path == "/v2/command":
+            if request.path == "/v1/command":
                 data = await request.json()
                 if data.get("command") == "soc_observation":
                     observations.append(data)
             response = await handler(request)
-            if request.path == "/v2/soc-goal/commit":
+            if request.path == "/v1/soc-goal/commit":
                 request.transport.close()
             return response
 
@@ -257,9 +257,9 @@ def test_malformed_transaction_response_cannot_silently_apply_target(tmp_path, c
         @web.middleware
         async def invalid_response(request, handler):
             response = await handler(request)
-            if corrupt == "reservation" and request.path == "/v2/soc-goal/reserve":
+            if corrupt == "reservation" and request.path == "/v1/soc-goal/reserve":
                 return web.json_response({"token": "invalid"})
-            if corrupt == "commit" and request.path == "/v2/soc-goal/commit":
+            if corrupt == "commit" and request.path == "/v1/soc-goal/commit":
                 return web.json_response({"outcome": "invalid"})
             return response
 

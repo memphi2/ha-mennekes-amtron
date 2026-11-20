@@ -8,7 +8,7 @@ from packaging.version import Version
 
 from .service_errors import ServiceConnectionError
 
-SUPPORTED_API_VERSION = 4
+SUPPORTED_API_VERSION = 1
 MIN_SERVICE_VERSION = "1.0.0"
 
 

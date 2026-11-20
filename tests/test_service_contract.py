@@ -79,7 +79,7 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
     ("field", "value"),
     [
         ("api_version", 2),
-        ("api_version", 5),
+        ("api_version", 0),
         ("api_version", True),
         ("values", []),
         ("values", {"x": float("nan")}),
@@ -166,11 +166,11 @@ def test_http_errors_have_stable_types_and_no_retries(status, payload, kind):
             return web.json_response(payload, status=status)
 
         app = web.Application()
-        app.router.add_get("/v2/state", respond)
+        app.router.add_get("/v1/state", respond)
         async with TestServer(app) as server, ClientSession() as session:
             remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(kind):
-                await remote.request("GET", "/v2/state")
+                await remote.request("GET", "/v1/state")
             assert calls == [1]
 
     asyncio.run(run())
@@ -182,7 +182,7 @@ def test_large_or_streamed_replies_are_bounded():
             return web.Response(body=b"x" * 131073)
 
         app = web.Application()
-        app.router.add_get("/v2/state", oversized)
+        app.router.add_get("/v1/state", oversized)
         async with TestServer(app) as server, ClientSession() as session:
             remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(AmtronConnectionError, match="service response too large"):
@@ -376,7 +376,7 @@ def test_write_diagnostics_endpoint_requires_auth_and_performs_no_bus_io(tmp_pat
             service.diagnostics.timeline.record(EventType.CONNECTION_LOST)
             before = (list(transport.reads), list(transport.writes))
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                url = server.make_url("/v2/diagnostics")
+                url = server.make_url("/v1/diagnostics")
                 async with session.get(url) as response:
                     assert response.status == 401
                 async with session.get(url, headers={"Authorization": f"Bearer {TOKEN}"}) as response:
@@ -399,14 +399,14 @@ def test_optional_diagnostics_failure_does_not_mark_service_offline():
         async def unavailable(_request):
             raise web.HTTPNotFound
 
-        app.router.add_get("/v2/diagnostics", unavailable)
+        app.router.add_get("/v1/diagnostics", unavailable)
         async with TestServer(app) as server, ClientSession() as session:
             remote = ServiceClient(session, str(server.make_url("/")), TOKEN)
             remote._connected = True
             notifications = []
             remote.on_update = lambda: notifications.append(True)
             with pytest.raises(AmtronConnectionError):
-                await remote.request("GET", "/v2/diagnostics", update_connection=False)
+                await remote.request("GET", "/v1/diagnostics", update_connection=False)
             assert remote.connected
             assert notifications == []
 
@@ -479,8 +479,8 @@ def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hi
         try:
             api = ServiceApi(service)
             for method, path in (
-                ("GET", "/v2/unknown"), ("POST", "/v2/unknown"),
-                ("PUT", "/v2/command"), ("GET", "/v2/command"),
+                ("GET", "/v1/unknown"), ("POST", "/v1/unknown"),
+                ("PUT", "/v1/command"), ("GET", "/v1/command"),
             ):
                 assert await api.dispatch(method, path, {}) == (404, {"error": "not_found"})
 
@@ -490,15 +490,15 @@ def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hi
             service.read = broken
             # A programming error is no missing operation.
             with pytest.raises(KeyError, match="internal"):
-                await api.dispatch("POST", "/v2/read", {"register": "error_code"})
+                await api.dispatch("POST", "/v1/read", {"register": "error_code"})
             # Over HTTP it is a server error, and the server keeps answering.
             headers = {"Authorization": f"Bearer {TOKEN}"}
             async with TestServer(create_app(service)) as server, ClientSession() as session:
                 async with session.post(
-                    server.make_url("/v2/read"), json={"register": "error_code"}, headers=headers,
+                    server.make_url("/v1/read"), json={"register": "error_code"}, headers=headers,
                 ) as response:
                     assert response.status == 500
-                async with session.get(server.make_url("/v2/state"), headers=headers) as response:
+                async with session.get(server.make_url("/v1/state"), headers=headers) as response:
                     assert response.status == 200
         finally:
             await service.stop()
@@ -513,7 +513,7 @@ def test_the_web_server_offers_exactly_the_operations_the_service_has(tmp_path):
             offered = {
                 (route.method, route.resource.canonical)
                 for route in create_app(service).router.routes()
-                if route.resource is not None and route.resource.canonical.startswith("/v2/")
+                if route.resource is not None and route.resource.canonical.startswith("/v1/")
                 and route.method != "HEAD"
             }
             assert offered == {("GET", path) for path in GETS} | {("POST", path) for path in POSTS}
