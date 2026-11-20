@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   run while a guest charges, whose end time **Target time** then is, and with
   a **Vehicle** entered not while another car is selected. **Target time**
   carries the attributes `guest` and `vehicle` for this.
+- A reached cost target shows the money used up to the reading that reached
+  it, and keeps it through a restart of the app; before, it showed the
+  reading before and, after a restart, only the part booked at a price change,
+  often nothing.
 
 ## 0.10.0b8 — 2026-11-20
 

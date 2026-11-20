@@ -204,6 +204,11 @@ class EnergyGoal:
             self._status = "meter_reset"
         elif self._baseline_kwh is not None and total >= self._baseline_kwh + self._target_kwh:
             self._status = "reached"
+            # The last reading counts, and the money it used is kept with the
+            # goal, so it shows in full and survives a restart.
+            self._last_total_kwh = total
+            if self.cost is not None:
+                self.cost = self._booked(self.cost, self.cost.price)
         else:
             self._last_total_kwh = total
             self._status = "active"
@@ -241,15 +246,19 @@ class EnergyGoal:
         cost = self.cost
         if cost is None or self._status != "active":
             return False
-        delivered = self._delivered(cost)
-        spent = cost.spent + (delivered - cost.booked_kwh) * cost.price
+        booked = self._booked(cost, price)
         # With less than one step of money left the rest is one step.
         steps = math.floor(
-            (delivered + energy_for(cost.amount - spent, price)) / ENERGY_GOAL_STEP_KWH + 1e-9,
+            (booked.booked_kwh + energy_for(cost.amount - booked.spent, price)) / ENERGY_GOAL_STEP_KWH + 1e-9,
         )
         self._target_kwh = min(MAX_ENERGY_GOAL_KWH, max(MIN_ENERGY_GOAL_KWH, steps / 10))
-        self.cost = CostPart(cost.amount, spent, price, delivered)
+        self.cost = booked
         return True
+
+    def _booked(self, cost: CostPart, price: float) -> CostPart:
+        """The energy so far booked at the running price; ``price`` applies beyond."""
+        delivered = self._delivered(cost)
+        return CostPart(cost.amount, cost.spent + (delivered - cost.booked_kwh) * cost.price, price, delivered)
 
     def snapshot(self) -> EnergyGoalSnapshot:
         """Return bounded durable state, excluding ordinary meter progress."""
