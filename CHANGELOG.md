@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0 — 2026-11-20
+
+First 1.0 release, compared with 0.10.0. Integration and app are both 1.0.0
+and must be updated together: the service API is version 4, and each side
+refuses the other's older version.
+
+### Breaking changes
+
+- **Service API 4:** a charge level Home Assistant reports carries its age
+  (`soc_age`), in `soc_observation`, `soc_goal` and the vehicle charge target
+  transaction.
+
+### Fixed
+
+- A charge level counts in the app for 15 minutes after the car reported it,
+  no longer after a report of its charge limit or a poll: a target chosen in
+  the app is not judged reached on an old level.
+- Saving another target on the app's Charging page no longer makes a draft
+  current that was changed elsewhere meanwhile; it stays marked as changed.
+- The German network price modules are offered, imported, renewed and
+  applied only while Home Assistant is set to Germany and euros.
+
 ## 0.10.0 — 2026-11-20
 
 Stable release of the 0.10 changes since 0.9.1. Integration and app are both

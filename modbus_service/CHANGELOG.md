@@ -1,5 +1,16 @@
 # Changes
 
+## 1.0.0
+
+- Integration and app must both be 1.0.0; the API is version 4, and each side
+  refuses the other's older version.
+- **Breaking (API):** a charge level carries its age (`soc_age`); the app
+  counts it as known for 15 minutes after the car reported it, no longer after
+  a report of the car's limit or a poll.
+- The Charging page keeps a draft that was changed elsewhere marked as
+  changed when another target is saved, instead of saving it over the newer
+  value.
+
 ## 0.10.0
 
 - Publish the 0.10 service in both stable and beta app catalogs. Integration
