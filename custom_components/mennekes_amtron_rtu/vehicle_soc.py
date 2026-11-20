@@ -204,6 +204,8 @@ class VehicleSocObserver:
         self._target_model: SocGoal | None = None
         self._target_pending: _Observations | None = None
         self._last_sent: _Observation | None = None
+        # The target the service judged that level against.
+        self._sent_revision: str | None = None
         self._task: asyncio.Task[None] | None = None
         self._command_lock = asyncio.Lock()
         self._configured = False
@@ -319,7 +321,13 @@ class VehicleSocObserver:
         self._was_available = available
         if recovered or getattr(self._control, "soc_configuration_required", False) is True:
             self._configured = False
-        if recovered or not self._configured:
+        # A target changed elsewhere, such as in the app, is judged without a
+        # recent charge level; an unchanged level is told again for it.
+        retarget = (
+            self._last_sent is not None
+            and getattr(self._control, "soc_goal_revision", None) != self._sent_revision
+        )
+        if recovered or not self._configured or retarget:
             self._last_sent = None
             self._queue_current()
         self._ensure_task()
@@ -500,6 +508,7 @@ class VehicleSocObserver:
                         self._notice.failed("cannot be updated", type(err).__name__)
                         return
                     self._last_sent = observations.latest
+                    self._sent_revision = getattr(self._control, "soc_goal_revision", None)
                     self._notice.recovered("updated again")
         finally:
             self._inflight = None

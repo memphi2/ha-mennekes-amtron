@@ -201,3 +201,50 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                 await hass.async_stop()
 
     asyncio.run(asyncio.wait_for(run(), timeout=75))
+
+
+def test_a_target_lowered_in_the_app_is_judged_with_the_unchanged_level(tmp_path: Path):
+    async def run():
+        transport = FakeModbusClient(device_bank(charging_current=8))
+        with patch(
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
+            return_value=transport,
+        ):
+            hass = await _boot(tmp_path / "config")
+            try:
+                hass.states.async_set(SOC, "65", {"unit_of_measurement": "%"})
+                entry = await _entry(hass)
+                await _options(hass, entry)
+                registry = er.async_get(hass)
+                waiting = registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_operation_waiting")
+                await settle(hass, entry)
+                service = hass.data[f"{DOMAIN}_embedded"][entry.entry_id]._service
+                # The app has no recent level of its own (no car seen, or too
+                # old), and the car keeps reporting the same 65 %.
+                service.soc_choice._reading = None
+                forget_current_write(hass, entry)
+                await service.command({
+                    "command": "soc_goal_choice", "value": 60,
+                    "expected_choice_revision": service.choice_revision,
+                    "expected_serial_number": service.identity.serial_number,
+                })
+                assert service.control.soc_goal.status == "active"
+                forget_current_write(hass, entry)
+                await settle(hass, entry)
+                forget_current_write(hass, entry)
+                await settle(hass, entry)
+                assert vehicle_target(hass, waiting) == "reached"
+                # The service asks for the stop and pauses the charge.
+                assert service.control.energy_goal_stop_requested
+                for _ in range(20):
+                    if current_writes(transport)[-1:] == [1]:
+                        break
+                    forget_current_write(hass, entry)
+                    await settle(hass, entry)
+                    await asyncio.sleep(0.05)
+                assert current_writes(transport)[-1:] == [1]
+                assert await hass.config_entries.async_unload(entry.entry_id)
+            finally:
+                await hass.async_stop()
+
+    asyncio.run(run())
