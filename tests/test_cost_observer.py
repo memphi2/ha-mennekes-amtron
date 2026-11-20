@@ -79,6 +79,33 @@ def test_a_german_network_tariff_counts_only_in_germany_with_euros(tmp_path, cou
     asyncio.run(run())
 
 
+def test_a_running_observer_drops_the_network_tariff_when_the_currency_changes(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.country, hass.config.currency = "DE", "EUR"
+        configured = entry()
+        configured.options = {**configured.options, "charging_network_tariff": {
+            "module": "module_2", "regular_network": 0.1, "price_includes_network": True}}
+        observer = ChargingCostObserver(hass, configured)
+        try:
+            await observer.async_start()
+            german = observer.unit_price(time.time())
+            assert observer._tariff.module == "module_2"
+            assert german != pytest.approx(0.3)
+            await hass.config.async_update(currency="USD")
+            await hass.async_block_till_done()
+            assert observer._tariff.module == "none"
+            assert observer.unit_price(time.time()) == pytest.approx(0.3)
+            await hass.config.async_update(currency="EUR")
+            await hass.async_block_till_done()
+            assert observer.unit_price(time.time()) == pytest.approx(german)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("change", ["credentials", "connection_with_tariff"])
 def test_only_tariff_changes_with_unchanged_connection_can_skip_reload(tmp_path, change):
     async def run():

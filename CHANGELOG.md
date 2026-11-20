@@ -24,9 +24,13 @@ and each side refuses the other's older version.
 
 ### Fixed
 
-- A charge level counts in the app for 15 minutes after the car reported it,
-  no longer after a report of its charge limit or a poll: a target chosen in
-  the app is not judged reached on an old level.
+- A vehicle charge target is judged only on a charge level the car reported
+  within the last 15 minutes, whether it is chosen in the app or in Home
+  Assistant, or the car's limit changes: a report of the limit or a poll no
+  longer makes an old level count. A target already reached stays reached.
+  The app's Charging page says when the level is too old to judge the target.
+- A running cost estimate takes a change of Home Assistant's country or
+  currency at once instead of keeping the German network price.
 - Saving another target on the app's Charging page no longer makes a draft
   current that was changed elsewhere meanwhile; it stays marked as changed.
 - The German network price modules are offered, imported, renewed and

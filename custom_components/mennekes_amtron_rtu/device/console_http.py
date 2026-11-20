@@ -174,6 +174,9 @@ class ServiceConsole(AppSettings):
                 "maximum": control.soc_goal.maximum_percent,
                 "maximum_required": service.soc_choice.maximum_required,
                 "status": control.soc_goal.status,
+                # Whether the car reported its level lately; an older one
+                # judges no target.
+                "level_known": service.soc_choice.level(control) is not None,
             },
             "departure": None if plan is None or departure is None else {
                 "revision": departure.choice_revision,

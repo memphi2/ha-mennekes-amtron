@@ -11,6 +11,7 @@
     guest_open:["No target set: charges until the car is full or charging is paused.","Kein Ziel gesetzt: lädt, bis das Fahrzeug voll ist oder pausiert wird.","Aucun objectif : recharge jusqu’à ce que le véhicule soit plein ou mis en pause.","Geen doel ingesteld: laadt tot de auto vol is of wordt gepauzeerd.","Nessun obiettivo: ricarica finché il veicolo è pieno o viene messa in pausa."],
     guest_running:["Guest charging is active","Gastladen läuft","Recharge invité active","Gastladen actief","Ricarica ospite attiva"],
     guest_paused:["Guest charging is paused","Gastladen ist pausiert","Recharge invité en pause","Gastladen gepauzeerd","Ricarica ospite in pausa"],
+    level_old:["charge level report too old, judged on the next one","Ladestandsmeldung veraltet, bewertet mit der nächsten","niveau de charge trop ancien, évalué au prochain relevé","laadniveau verouderd, beoordeeld bij de volgende melding","livello di carica non aggiornato, valutato alla prossima segnalazione"],
     not_for_guest:["does not apply to the guest","gilt nicht für den Gast","ne s’applique pas à l’invité","geldt niet voor de gast","non vale per l’ospite"],
     guest:["Start guest charging", "Gastladen starten", "Démarrer la recharge invité", "Gastladen starten", "Avvia ricarica ospite"],
     departure_hint:["Own car: the departure plan charges to the vehicle charge target by this time; set it up in Home Assistant. Guest: the charge ends at this time.", "Eigenes Fahrzeug: Die Abfahrtsplanung lädt bis zu diesem Zeitpunkt auf das Fahrzeug-Ladeziel; Einrichtung in Home Assistant. Gast: Die Ladung endet zu diesem Zeitpunkt.", "Votre véhicule : la planification du départ charge jusqu’à l’objectif de charge du véhicule pour cette heure ; à configurer dans Home Assistant. Invité : la recharge se termine à cette heure.", "Eigen auto: de vertrekplanning laadt tegen dit tijdstip tot het laaddoel van het voertuig; instellen in Home Assistant. Gast: het laden eindigt op dit tijdstip.", "Proprio veicolo: la pianificazione della partenza carica fino all’obiettivo di carica del veicolo entro questo orario; da configurare in Home Assistant. Ospite: la ricarica termina a questo orario."],
@@ -107,7 +108,7 @@
       const info=state?.[key], input=el(key+"_value");
       input.disabled=busy||!editable(key);el(key+"_save").disabled=input.disabled;
       el(key+"_clear").disabled=input.disabled||!chosen(key);
-      el(key+"_status").textContent=key==="cost"?(state?costText():"—"):!info?"—":key==="departure"?(info.deadline?`${moment(info.deadline)} · ${t("plan_"+info.status)}`:t("disabled")):!editable(key)?t(state?.read_only?"plan_read_only":"configure"):`${info.target} ${key==="energy"?"kWh":"%"} · ${key==="soc"&&state.guest_mode&&info.target>0?t("not_for_guest"):t(info.status)}${key==="energy"&&state.cost?` · ${t("from_cost")}`:""}`;
+      el(key+"_status").textContent=key==="cost"?(state?costText():"—"):!info?"—":key==="departure"?(info.deadline?`${moment(info.deadline)} · ${t("plan_"+info.status)}`:t("disabled")):!editable(key)?t(state?.read_only?"plan_read_only":"configure"):`${info.target} ${key==="energy"?"kWh":"%"} · ${key==="soc"&&state.guest_mode&&info.target>0?t("not_for_guest"):t(info.status)}${key==="soc"&&!state.guest_mode&&info.target>0&&info.status==="active"&&!info.level_known?` · ${t("level_old")}`:""}${key==="energy"&&state.cost?` · ${t("from_cost")}`:""}`;
       el(key+"_status").className="charging-state "+(key==="cost"?(state?.cost?"state-active":"state-muted"):!editable(key)||(key==="soc"&&state.guest_mode)?"state-muted":["reached","estimated_reached"].includes(info?.status)?"state-good":["active","charging","minimum_level","finishing"].includes(info?.status)?"state-active":["error","meter_reset"].includes(info?.status)?"state-error":info?.status==="disabled"?"state-muted":"state-wait");
       if(key==="soc"&&info){input.max=String(info.maximum??100);if(info.maximum_required&&info.maximum===null)el(key+"_status").textContent=t("limit_missing");}
       if(key==="departure"){
@@ -141,7 +142,7 @@
         ||!data.soc||typeof data.soc.configured!=="boolean"||!num(data.soc.target,100)
         ||!(data.soc.maximum===null||num(data.soc.maximum,100))
         ||!(data.soc.maximum_required===null||typeof data.soc.maximum_required==="boolean")
-        ||typeof data.soc.status!=="string"
+        ||typeof data.soc.status!=="string"||typeof data.soc.level_known!=="boolean"
         ||(data.departure!==null&&(!data.departure||typeof data.departure.configured!=="boolean"
           ||typeof data.departure.revision!=="string"||typeof data.departure.status!=="string"
           ||!(data.departure.planned_start===null||typeof data.departure.planned_start==="string")

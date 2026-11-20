@@ -89,9 +89,11 @@ tests still run there. This does not claim catalog acceptance or a browser test.
 
 - AMTRON 4You 310 11 C2, article `1313201205`, 11 kW, fixed cable, 16 A.
 
-The owner reported successful operation with the released integration on
-2026-11-03. That report covers the functions they used, not every test case or
-later changes. See the [model matrix and test scope](docs/compatibility.md).
+The owner reported successful operation of 1.0.0 over Modbus RTU on
+2026-11-20: charging, heartbeat and its recovery, phase switching, connection
+interruption, restarts, guest charging and vehicle changes. That report covers
+no firmware version and no later changes. See the
+[model matrix and test scope](docs/compatibility.md).
 
 Automated validation uses simulated registers, virtual serial RTU and TCP
 connections, and real Home Assistant/SQLite. LAN gateways and service behavior

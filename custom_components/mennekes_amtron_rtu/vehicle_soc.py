@@ -120,6 +120,12 @@ class _Observation:
             return None
         return min(max(0.0, (dt_util.utcnow() - self.soc_reported).total_seconds()), SOC_AGE_LIMIT)
 
+    @property
+    def judged(self) -> float | None:
+        """The level a target may be judged on, as the service judges it: a recent one."""
+        age = self.soc_age
+        return self.soc if age is None or age <= READING_SECONDS else None
+
 
 class _Observations:
     """Fold with the real model, retaining at most two outgoing observations."""
@@ -134,10 +140,11 @@ class _Observations:
         self.latest = _Observation(None, None)
 
     def add(self, observation: _Observation) -> None:
-        self.model.observe(observation.soc, observation.maximum)
+        level = observation.judged
+        self.model.observe(level, observation.maximum)
         if self.model.status != "reached":
             self.reached = None
-        elif observation.soc is not None and observation.soc >= self.model.target_percent:
+        elif level is not None and level >= self.model.target_percent:
             # Also when a raised limit ended the latch and this charge level
             # reached the higher target at once.
             self.reached = observation
@@ -470,11 +477,16 @@ class VehicleSocObserver:
         self._ensure_task()
 
     def _renews(self, observation: _Observation) -> bool:
+        """A newer report renews the level once the service's copy has aged."""
         sent = self._last_sent
+        if sent is None or self._sent_at is None or observation.soc_reported is None:
+            return False
+        if sent.soc_reported is None:
+            # The service took it as reported when it arrived.
+            return self._hass.loop.time() - self._sent_at >= SOC_RENEW_SECONDS
         return (
-            sent is not None and self._sent_at is not None and observation.soc_reported is not None
-            and (sent.soc_reported is None or observation.soc_reported > sent.soc_reported)
-            and self._hass.loop.time() - self._sent_at >= SOC_RENEW_SECONDS
+            observation.soc_reported > sent.soc_reported
+            and (dt_util.utcnow() - sent.soc_reported).total_seconds() >= SOC_RENEW_SECONDS
         )
 
     @callback
@@ -594,7 +606,7 @@ class VehicleSocObserver:
             previous = self._pending
             self._pending = None
             current = self._current()
-            soc, maximum = current.soc, current.maximum
+            soc, maximum = current.judged, current.maximum
             limit = maximum if maximum is not None else self._control.soc_goal.maximum_percent
             if not automatic and value > 0 and value == limit:
                 # Picked at the top of the scale: the car's limit, wherever
@@ -617,7 +629,7 @@ class VehicleSocObserver:
             try:
                 await self._control.async_set_soc_goal(
                     value, source=self.source,
-                    soc=soc, maximum=maximum, soc_age=current.soc_age,
+                    soc=current.soc, maximum=maximum, soc_age=current.soc_age,
                 )
             except BaseException:
                 if self._resolution_pending():

@@ -36,6 +36,21 @@ async def _ready(tmp_path):
     return service
 
 
+@pytest.mark.parametrize(("age", "status"), [(0, "reached"), (960, "active")])
+def test_a_committed_target_is_judged_only_on_a_recent_level(tmp_path, age, status):
+    async def run():
+        service = await _ready(tmp_path)
+        try:
+            token = service.soc_transactions.reserve()
+            target = {**_target(service, token, value=40), "soc_age": age}
+            assert (await service.soc_transactions.commit(target))["outcome"] == "applied"
+            assert service.control.soc_goal.status == status
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
 def test_fenced_unstarted_commit_cannot_run_late(tmp_path):
     async def run():
         service = await _ready(tmp_path)

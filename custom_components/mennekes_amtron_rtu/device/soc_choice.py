@@ -45,6 +45,16 @@ class SocChoice:
         if self._scope() is None:
             self._reading = None
 
+    def level(self, control: AmtronControl) -> float | None:
+        """The car's level the app may judge a target on: one reported lately."""
+        reading = self._reading
+        if (
+            reading is None or reading[0] != control.soc_goal.source or reading[3] != self._scope()
+            or time.monotonic() - reading[2] > READING_SECONDS
+        ):
+            return None
+        return reading[1]
+
     async def configure(self, control: AmtronControl, payload: dict[str, Any]) -> None:
         """The soc_source command."""
         source = payload.get("source")
@@ -80,14 +90,9 @@ class SocChoice:
             if cap is not None and value == cap:
                 # The top of the app's scale: the car's limit, wherever it goes.
                 value = 100
-            reading = self._reading
-            known = (
-                reading is not None and reading[0] == control.soc_goal.source and reading[3] == self._scope()
-                and time.monotonic() - reading[2] <= READING_SECONDS
-            )
             payload = {
                 **payload, "source": control.soc_goal.source, "maximum": control.soc_goal.maximum_percent,
-                "soc": reading[1] if reading is not None and known else None,
+                "soc": self.level(control),
             }
         source = payload.get("source")
         if not isinstance(source, str):
@@ -97,13 +102,16 @@ class SocChoice:
         # Seconds since the car reported this level; a report of another value,
         # such as its limit, does not make the level any newer.
         age = 0.0 if payload.get("soc_age") is None else number(payload["soc_age"], 0, SOC_AGE_LIMIT)
+        # Only a level the car reported lately can reach a target; an older
+        # one still carries the limit, and a target reached before stays so.
+        judged = soc if age <= READING_SECONDS else None
         if command == "soc_observation":
-            await control.async_observe_soc(soc, maximum, source=source)
+            await control.async_observe_soc(judged, maximum, source=source)
         else:
             before = control.soc_goal.snapshot()
             success = False
             try:
-                await control.async_set_soc_goal(number(value, 0, 100), source=source, soc=soc, maximum=maximum)
+                await control.async_set_soc_goal(number(value, 0, 100), source=source, soc=judged, maximum=maximum)
                 success = True
             finally:
                 if success or control.soc_goal.snapshot() != before:

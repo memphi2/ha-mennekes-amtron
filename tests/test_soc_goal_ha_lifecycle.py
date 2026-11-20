@@ -250,6 +250,20 @@ def test_a_target_lowered_in_the_app_is_judged_on_the_cars_unchanged_report(tmp_
                 assert service.control.soc_goal.status == status
                 assert service.control.energy_goal_stop_requested is reached
                 assert vehicle_target(hass, waiting) == status
+                if not reached:
+                    # The car's limit falls; its level is no newer for that.
+                    hass.states.async_set(LIMIT, "85", {"unit_of_measurement": "%"})
+                    await hass.async_block_till_done()
+                    await settle(hass, entry)
+                    assert service.control.soc_goal.maximum_percent == 85
+                    assert service.control.soc_goal.status == "active"
+                    assert service.control.energy_goal_stop_requested is False
+                    # A new report of the level is judged again.
+                    hass.states.async_set(SOC, "80", {"unit_of_measurement": "%"})
+                    await hass.async_block_till_done()
+                    await settle(hass, entry)
+                    assert service.control.soc_goal.status == "reached"
+                    assert service.control.energy_goal_stop_requested is True
                 assert await hass.config_entries.async_unload(entry.entry_id)
             finally:
                 await hass.async_stop()

@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../custom_components/mennekes_amtron_rtu/device');
 const source=fs.readFileSync(path.join(root,'app_charging.js'),'utf8');
-const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_currency:'EUR',cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
+const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,guest_mode:false,energy:{target:10,status:'active'},cost:null,cost_price:0.3,cost_currency:'EUR',cost_price_at:'2026-11-16T05:00:00+00:00',guest_confirmation_required:false,soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active',level_known:true},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,storage_error:false}});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(page='targets',responses=[initial()],language='de'){
  const html=fs.readFileSync(path.join(root,'app_charging.html'),'utf8');
@@ -236,4 +236,15 @@ test('money is shown in the currency Home Assistant reported, and as a bare numb
  const broken=initial();broken.cost_currency='euro';
  h=setup('targets',[broken],'en');await flush();
  assert.match(h.elements.get('notice').textContent,/No current response/);
+});
+
+test('an active vehicle target says when the car\'s level is too old to judge it',async()=>{
+ const old=initial();old.soc.level_known=false;
+ const h=setup('targets',[old],'en');await flush();
+ assert.equal(h.elements.get('soc_status').textContent,'80 % · Active · charge level report too old, judged on the next one');
+ const known=setup('targets',[initial()],'en');await flush();
+ assert.equal(known.elements.get('soc_status').textContent,'80 % · Active');
+ const broken=initial();delete broken.soc.level_known;
+ const b=setup('targets',[broken],'en');await flush();
+ assert.match(b.elements.get('notice').textContent,/No current response/);
 });
