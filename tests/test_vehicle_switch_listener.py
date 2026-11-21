@@ -405,3 +405,67 @@ def test_an_owner_that_fails_to_stop_does_not_keep_the_others_running():
         client.async_close.assert_awaited_once()
 
     asyncio.run(run())
+
+
+def test_a_stop_that_hangs_does_not_keep_the_others_from_stopping(monkeypatch):
+    monkeypatch.setattr(integration, "VEHICLE_STOP_SECONDS", 0.01)
+
+    async def run():
+        withdrawing = asyncio.Event()
+
+        async def withdraw(*, withdraw):
+            withdrawing.set()
+            await asyncio.Event().wait()
+
+        plan = SimpleNamespace(async_stop=withdraw)
+        soc = SimpleNamespace(async_stop=AsyncMock())
+        loss = SimpleNamespace(async_stop=AsyncMock())
+        runtime = SimpleNamespace(
+            vehicle_profile_id="a" * 32, departure_observer=plan, vehicle_soc=soc,
+            charge_loss=loss, vehicle_telemetry=None,
+        )
+        stopping = asyncio.create_task(integration._async_stop_vehicle(runtime, withdraw=True))
+        await withdrawing.wait()
+        # An unload cancels the switch while the old plan's withdrawal hangs.
+        stopping.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stopping
+        soc.async_stop.assert_awaited_once()
+        loss.async_stop.assert_awaited_once()
+        assert runtime.vehicle_soc is None
+        assert runtime.charge_loss is None
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("cancelled_in", ["plan", "soc"])
+def test_a_cancelled_vehicle_stop_waits_until_every_observer_stopped(cancelled_in):
+    async def run():
+        reached, release = asyncio.Event(), asyncio.Event()
+        order = []
+
+        def owner(name):
+            async def stop(**_kwargs):
+                if name == cancelled_in:
+                    reached.set()
+                    await release.wait()
+                order.append(name)
+            return SimpleNamespace(async_stop=stop)
+
+        runtime = SimpleNamespace(
+            vehicle_profile_id="a" * 32, departure_observer=owner("plan"), vehicle_soc=owner("soc"),
+            charge_loss=owner("loss"), vehicle_telemetry=None,
+        )
+        stopping = asyncio.create_task(integration._async_stop_vehicle(runtime, withdraw=True))
+        await reached.wait()
+        # An unload cancels the switch while one of the stops waits, e.g.
+        # for a save; the cancellation waits for every stop to finish.
+        stopping.cancel()
+        await asyncio.sleep(0)
+        assert not stopping.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await stopping
+        assert order == ["plan", "soc", "loss"]
+
+    asyncio.run(run())

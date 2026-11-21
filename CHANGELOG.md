@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- An unload during a vehicle switch could leave the old car's charge level
+  or charging loss observer running; a cancelled switch now waits until all
+  of them have stopped.
+- A rest of less than a minute before a plug-in, or a quick unplug and plug-in,
+  no longer moves energy across the plug-in; the readings around a known
+  plug-in and unplug always stay.
+
 ## 1.0.0b3 — 2026-11-21
 
 Third beta of 1.0.0. Integration and app are both 1.0.0b3 and must be

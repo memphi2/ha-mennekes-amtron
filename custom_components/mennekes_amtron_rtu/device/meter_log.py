@@ -60,6 +60,8 @@ class MeterLog:
     def __init__(self) -> None:
         self._times: list[float] = []
         self._values: list[float] = []
+        # Known plug-ins and unplugs: the readings around them always stay.
+        self.anchors: tuple[float, ...] = ()
 
     @property
     def last_kwh(self) -> float | None:
@@ -84,8 +86,12 @@ class MeterLog:
             return
         if self._values and kwh > self._values[-1]:
             # The meter rose: this reading stands for the ones just before
-            # it, also for the short steps of a meter read faster than it counts.
-            while len(self._times) >= 2 and at - self._times[-2] < _RISING_SPACING_SECONDS:
+            # it, also for the short steps of a meter read faster than it
+            # counts. A reading next to a known plug-in or unplug stays.
+            while (
+                len(self._times) >= 2 and at - self._times[-2] < _RISING_SPACING_SECONDS
+                and not any(moment >= self._times[-2] for moment in self.anchors)
+            ):
                 del self._times[-1], self._values[-1]
         self._times.append(at)
         self._values.append(kwh)
@@ -100,18 +106,21 @@ class MeterLog:
         first. Beside a step of a meter that counts coarsely it goes too, but
         a reading that ends or begins a longer rest stays: interpolating over
         it would move energy into a time the meter showed none, such as before
-        a plug-in or during a pause. Only where no such reading is left does
-        the second oldest go, never the first.
+        a plug-in or during a pause. The readings around a known plug-in or
+        unplug stay too, however short the rest before it. Only where no such
+        reading is left does the oldest other reading go, never the first.
         """
         times, values = self._times, self._values
         target = _MAX_READINGS * 3 // 4
         while len(times) > target:
+            kept = self._anchored(times)
             keep = [True] * len(times)
             left, index = len(times), 1
             while index < len(times) - 1 and left > target:
                 before, at, after = times[index - 1], times[index], times[index + 1]
                 if (
-                    values[index - 1] <= values[index] <= values[index + 1]
+                    index not in kept
+                    and values[index - 1] <= values[index] <= values[index + 1]
                     and values[index - 1] < values[index + 1]
                     and after - before <= MAX_INTERPOLATION_SECONDS
                     and (values[index - 1] < values[index] or at - before <= _STEP_SECONDS)
@@ -128,7 +137,17 @@ class MeterLog:
             values = [kwh for kwh, kept in zip(values, keep, strict=True) if kept]
         self._times, self._values = times, values
         while len(self._times) > _MAX_READINGS:
-            del self._times[1], self._values[1]
+            kept = self._anchored(self._times)
+            index = next((i for i in range(1, len(self._times)) if i not in kept), 1)
+            del self._times[index], self._values[index]
+
+    def _anchored(self, times: list[float]) -> set[int]:
+        """The readings on both sides of each known plug-in and unplug."""
+        kept: set[int] = set()
+        for moment in self.anchors:
+            index = bisect_right(times, moment)
+            kept.update({index - 1, index})
+        return kept
 
     def dump(self) -> list[list[float]]:
         return [[at, kwh] for at, kwh in zip(self._times, self._values, strict=True)]
@@ -221,6 +240,7 @@ class ChargeMeter:
         try:
             self._observe_presence(now, present, charging)
         finally:
+            self._anchor()
             # Only the running and the last cycle are ever measured.
             starts = [at for at in (self.plugged_at, self.last[0] if self.last is not None else None) if at is not None]
             self.log.forget_before(min(starts, default=now) - MAX_INTERPOLATION_SECONDS)
@@ -245,6 +265,9 @@ class ChargeMeter:
         self.present = True
         if charging and self.charging_at is None and self.plugged_at is not None:
             self.charging_at = now
+
+    def _anchor(self) -> None:
+        self.log.anchors = _anchors(self.plugged_at, self.last)
 
     def annotate(self, plugged_at: float, note: str | None) -> bool:
         """Attach a note to the running cycle; False when that cycle is over."""
@@ -275,6 +298,7 @@ class ChargeMeter:
         state = parse_charge_meter({key: raw[key] for key in _KEYS})
         known_at = _moment(raw["known_at"])
         log = MeterLog()
+        log.anchors = _anchors(state["plugged_at"], state["last"])
         log.restore(raw["readings"])
         self.log = log
         self.known_since = state["known_since"]
@@ -282,6 +306,11 @@ class ChargeMeter:
         self.charging_at, self.note = state["charging_at"], state["note"]
         self.last, self.last_note = state["last"], state["last_note"]
         self._gap.resume(known_at)
+
+
+def _anchors(plugged_at: float | None, last: tuple[float, float] | None) -> tuple[float, ...]:
+    """The plug-ins and unplugs whose energy is asked for."""
+    return tuple(at for at in (plugged_at, *(last or ())) if at is not None)
 
 
 def parse_charge_meter(raw: object) -> dict[str, Any]:
