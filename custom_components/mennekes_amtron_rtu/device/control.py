@@ -90,8 +90,6 @@ class AmtronControl:
         options: ControlOptions,
         state: Callable[[], WallboxData],
         request_refresh: Callable[[], Awaitable[None]] | None = None,
-        notify_write_error: Callable[[], None] | None = None,
-        notify_pending: Callable[[], None] | None = None,
         validate_deferred: Callable[[], None] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         monotonic: Callable[[], float] = time.monotonic,
@@ -103,8 +101,6 @@ class AmtronControl:
         self.startup_hold = False
         self._state = state
         self._request_refresh = request_refresh
-        self._notify_write_error = notify_write_error
-        self._notify_pending = notify_pending
         self._validate_deferred = validate_deferred
         self._sleep = sleep
         self._monotonic = monotonic
@@ -141,7 +137,8 @@ class AmtronControl:
         self.queue = CommandQueue(self)
         self.guest_confirmation_required: Callable[[], bool] = lambda: False
         self.time_limit_reached: Callable[[], bool] = lambda: False
-        self.guest_active: Callable[[], bool] = lambda: False
+        # Whether a guest charges now, as guest charging says.
+        self.guest_mode: Callable[[], bool] = lambda: False
 
     @property
     def layout_version(self) -> int:
@@ -179,7 +176,7 @@ class AmtronControl:
         """The active SoC fence, including pending evidence and storage faults."""
         return (
             self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
-            else (not self.guest_active() and self.soc_goal.stop_requested)
+            else (not self.guest_mode() and self.soc_goal.stop_requested)
         )
 
     @property
@@ -256,7 +253,7 @@ class AmtronControl:
 
     @property
     def charging_setpoint(self) -> float | None:
-        """Return the remembered resume target, retained across entry reloads."""
+        """Return the remembered resume target, kept across reconnects and restarts."""
 
         return self._write_state.charging_setpoint
 
@@ -301,7 +298,7 @@ class AmtronControl:
         """Return the highest charging current a user may request.
 
         The device limits anything it is sent anyway; this is the limit the
-        number entity shows, so a user never sees a value the wallbox would
+        service reports, so a user never sees a value the wallbox would
         silently clamp.
         """
 
@@ -366,7 +363,7 @@ class AmtronControl:
         return changed
 
     def _command_cancellation_reason(self, command: PendingCommand) -> str | None:
-        if command.grant_release and not self.guest_active():
+        if command.grant_release and not self.guest_mode():
             return "unknown"
         if command.owner is None:
             return None
@@ -503,7 +500,7 @@ class AmtronControl:
             ))
             return True
 
-    async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
+    async def async_configure_soc(self, source: str | None) -> None:
         if self.soc_goal_controller is None:
             raise validation_error("soc_goal_not_supported")
         await self.soc_goal_controller.async_configure_source(source)
@@ -537,8 +534,6 @@ class AmtronControl:
                 outcome="replaced" if replaced else "cancelled",
                 reason="replaced" if replaced else "energy_goal",
             )
-            if self._notify_pending is not None:
-                self._notify_pending()
 
     async def async_energy_goal_recovery_ready(self) -> bool:
         """Confirm a cleared error before restoring only our own outage pause."""
@@ -578,9 +573,7 @@ class AmtronControl:
         """Discard future work, retaining any pause or setpoint already applied."""
         async with self._current_lock:
             self._require_write_access()
-            changed = self._clear_pending(outcome="cancelled", reason="user_cancelled")
-            if changed and self._notify_pending is not None:
-                self._notify_pending()
+            self._clear_pending(outcome="cancelled", reason="user_cancelled")
 
     async def async_set_limits(self, options: ControlOptions) -> None:
         """Use new limits without a restart; read-only mode still needs one.
@@ -708,8 +701,6 @@ class AmtronControl:
         async with self._current_lock:
             if self._pending is not None and self._pending.owner == owner:
                 self._clear_pending(outcome="cancelled", reason="user_cancelled")
-                if self._notify_pending is not None:
-                    self._notify_pending()
 
     def _resume_current_maximum(self, current_cap: float | None) -> float:
         if current_cap is None:

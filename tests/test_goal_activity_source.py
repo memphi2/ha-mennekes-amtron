@@ -80,7 +80,7 @@ def test_guest_kwh_stop_does_not_claim_the_excluded_vehicle_soc_limit():
         put(h.transport.bank, R.CP_STATE, CpState.B2)
         control.soc_goal.configure_source(SOURCE)
         control.soc_goal.set_target(70, soc=80)
-        control.guest_active = lambda: True
+        control.guest_mode = lambda: True
         control.energy_goal.set_target(1, 100)
         control.energy_goal.observe(101)
         try:
@@ -96,7 +96,7 @@ def test_soc_storage_fault_remains_a_stop_trigger_even_for_a_guest():
     async def run():
         _h, control, energy, soc, _ = await _soc_runner()
         try:
-            control.guest_active = lambda: True
+            control.guest_mode = lambda: True
             soc._storage_unknown = True
             assert control.goal_stop_requested
             await control.async_pause_for_energy_goal()

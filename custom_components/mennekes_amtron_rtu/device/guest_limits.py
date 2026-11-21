@@ -34,7 +34,7 @@ class GuestLimits:
     def configure_control(self, control: AmtronControl) -> None:
         self.ready = False
         self.restore_pending = self._service.client.write_state.guest_permission is not None
-        control.guest_active = lambda: self.mode
+        control.guest_mode = lambda: self.mode
         control.guest_confirmation_required = lambda: self.restore_pending
         control.time_limit_reached = self.time_reached
 

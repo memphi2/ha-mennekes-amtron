@@ -51,7 +51,7 @@ class SocGoalController:
 
     @property
     def stop_requested(self) -> bool:
-        return self._storage_unknown or (not self._control.guest_active() and (self.model.stop_requested or (
+        return self._storage_unknown or (not self._control.guest_mode() and (self.model.stop_requested or (
             self._pending is not None
             and self._pending_generation == self._control.write_state.soc_goal_generation
             and self._pending.stop_requested

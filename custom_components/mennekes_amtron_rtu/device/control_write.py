@@ -32,6 +32,7 @@ from .const import (
     CHARGING_PAUSE_CURRENT,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
     MIN_PHASE_CHANGE_INTERVAL_SECONDS,
+    charging_setpoint_from,
 )
 from .control_types import (
     DepartureCommandCancelledError,
@@ -284,10 +285,9 @@ class WritePath:
             (not preserve_setpoint or self._control.charging_setpoint is None)
             and previous is not None
             and math.isfinite(previous)
-            and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
+            and (setpoint := charging_setpoint_from(previous)) is not None
         ):
-            # More than 32 A is a foreign controller's value, no limit to keep.
-            self._control.charging_setpoint = min(float(previous), 32.0)
+            self._control.charging_setpoint = setpoint
 
     async def async_read_switch(self, spec: RegisterSpec, *, stopping: bool = False) -> int | None:
         """Recheck live state, but a failed read must not prevent a stop."""
@@ -595,8 +595,6 @@ class WritePath:
             self._control._diagnostics.writes_rejected += 1
             if spec != HEARTBEAT:
                 self._control._diagnostics.write_errors.add(spec.key)
-            if self._control._notify_write_error is not None:
-                self._control._notify_write_error()
             raise device_error(
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err
@@ -615,8 +613,6 @@ class WritePath:
                 self._control._command_acknowledged = True
         if spec.key in self._control._diagnostics.write_errors:
             self._control._diagnostics.write_errors.remove(spec.key)
-            if self._control._notify_write_error is not None:
-                self._control._notify_write_error()
         if refresh and self._control._request_refresh is not None:
             await self._control._request_refresh()
 

@@ -32,8 +32,6 @@ def test_cancel_is_readless_idempotent_and_retains_the_remembered_target():
     async def run():
         harness = Harness()
         control = await harness.connect()
-        notified = []
-        control._notify_pending = lambda: notified.append(control.pending_action)
         assert control.pending_action is None
         await control.async_set_charging_current(10)
         await control.async_set_charging_current(14)
@@ -46,12 +44,10 @@ def test_cancel_is_readless_idempotent_and_retains_the_remembered_target():
         assert control.pending_action is None
         assert control.pending_until is None
         assert control.charging_setpoint == 14
-        assert notified == [None]
         assert outcomes(control.events)[-1] == ("cancelled", "set_current", "user_cancelled")
         events = control.events.snapshot()
         await control.async_cancel_pending_change()
         assert control.events.snapshot() == events
-        assert notified == [None]
         if control._flush_task is not None:
             await asyncio.wait_for(control._flush_task, 1)
         assert (harness.transport.reads, harness.transport.writes, harness.refreshes) == before

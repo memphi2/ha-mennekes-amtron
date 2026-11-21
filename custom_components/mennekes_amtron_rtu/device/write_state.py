@@ -1,7 +1,7 @@
-"""Small in-memory write state that survives config-entry reloads.
+"""The service's write state, shared by its replacement clients and controllers.
 
-No clients, tasks or HA entities are retained, and nothing is sent to Recorder.
-A full HA restart deliberately starts a fresh conservative guard period.
+No clients or tasks are retained. The saved intent restores part of it; a
+service restart deliberately starts a fresh conservative guard period.
 """
 
 from __future__ import annotations

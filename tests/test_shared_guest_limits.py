@@ -54,7 +54,7 @@ def test_guest_starts_from_pause_and_keeps_shared_goals(tmp_path, monkeypatch, p
             put(transport.bank, R.EVSE_STATE, 1)
             put(transport.bank, R.CP_STATE, 10)
             await service.refresh()
-            assert not control.guest_active()
+            assert not control.guest_mode()
     asyncio.run(body())
 
 
