@@ -1,5 +1,16 @@
 # Changes
 
+## 1.0.0b2
+
+- Second beta of 1.0.0. Integration and app must both be 1.0.0b2.
+- **API:** `plug_charge_authorize` takes `end_pause`: the grant comes first,
+  and a manual pause ends only after it succeeded. The new command
+  `soc_stop_pause_end` ends only the stop pause the charge target wrote.
+- A resume or unlock is admitted again on the bus right before its write.
+- The meter log keeps the plug-in reading of a long plug-in and holds at most
+  2048 readings.
+- The control state is compared before it is saved, without a thread per poll.
+
 ## 1.0.0b1
 
 - Beta of 1.0.0. Integration and app must both be 1.0.0b1; the API starts again at version 1,
