@@ -27,7 +27,7 @@ the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
 separately. The current requirement is **API 1 and service 1.0.0b1 or newer**,
-whose saved control state carries the unplug and target fields. Raise the minimum
+the first service with API 1 and saved control state format 1. Raise the minimum
 when a newer service feature is required. The published or planned service
 release must satisfy the declared minimum.
 

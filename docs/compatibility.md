@@ -16,7 +16,7 @@ means the owner reported successful operation with the released integration.
 | Model | Recognized article numbers | Hardware test |
 |---|---|---|
 | Amtron 4You 310 7.4 C2 | `1313207205`, `1313207205BK` | Unverified |
-| Amtron 4You 310 11 C2 | `1313201205`, `1313201205BK` | Reported, 2026-11-20 (1.0.0) |
+| Amtron 4You 310 11 C2 | `1313201205`, `1313201205BK` | Reported, 2026-11-20 (the 1.0.0 beta) |
 | Amtron 4You 310 11 T2S | `1313201605`, `1313201605BK` | Unverified |
 | Amtron 4You 310 22 C2 | `1313202205`, `1313202205BK` | Unverified |
 | Amtron 4You 310 11 C2 PV-Bundle | `1313201265`, `1313201265BK` | Unverified |
@@ -29,7 +29,7 @@ means the owner reported successful operation with the released integration.
 | Amtron Start 2.0s 22 | `1331302405` | Unverified |
 | Amtron Start 2.0s 22 T2S | `1331302605` | Unverified |
 
-The hardware report covers 1.0.0 on an Amtron 4You 310 11 C2 over Modbus
+The hardware report covers the 1.0.0 beta on an Amtron 4You 310 11 C2 over Modbus
 RTU. The owner reported that charging, heartbeat and its recovery, phase
 switching, connection interruption, restarts, guest charging and vehicle
 changes worked. Firmware and a long-term Recorder measurement were not

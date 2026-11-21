@@ -372,6 +372,11 @@ attribute of **Charging wait reason**. The integration only
 reads the selected vehicle data; it does not change the car's settings or estimate
 battery capacity from wallbox energy.
 
+A charge level reaches the target only if the car reported it within the last
+**15 minutes**. Home Assistant sends each level with its age; the car's
+limit or a poll does not make an older level current. With an older level the
+target stays active, and a target already reached stays reached.
+
 Enable the separate option to use the car's maximum if you want to use the
 profile's reported charge limit or select a **Vehicle charge limit entity**.
 Only the chosen source's settings appear. Without a charge-limit source,
@@ -423,7 +428,7 @@ are unchanged.
 
 | What is missing? | What happens |
 |---|---|
-| Current vehicle charge level | Charging continues in its present state; the percentage target resumes monitoring when a valid report returns. Use the car's own limit for protection during data outages. |
+| Current vehicle charge level | Charging continues in its present state; the percentage target resumes monitoring when a valid report returns, one at most 15 minutes old. Use the car's own limit for protection during data outages. |
 | First valid optional vehicle maximum | A positive percentage target cannot be set yet. Disable that optional source if you want to choose your own maximum. |
 | A previously valid vehicle maximum | The last valid maximum is retained; a later increase raises only a target at that maximum. |
 | Usable battery capacity | The departure planner cannot calculate a new current; see [departure planning](departure-planning.md). |
