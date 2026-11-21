@@ -592,11 +592,15 @@ async def _async_stop_vehicle(
     observer, soc, loss = runtime.departure_observer, runtime.vehicle_soc, runtime.charge_loss
     runtime.departure_observer = runtime.vehicle_soc = runtime.charge_loss = None
     runtime.vehicle_telemetry = None
-    if observer is not None:
-        await observer.async_stop(withdraw=withdraw)
-    for owner in (soc, loss):
-        if owner is not None:
-            await owner.async_stop()
+    try:
+        if observer is not None:
+            await observer.async_stop(withdraw=withdraw)
+    finally:
+        # The runtime no longer names them: also when an unload cancels the
+        # switch while the plan is withdrawn, nobody else stops them.
+        for owner in (soc, loss):
+            if owner is not None:
+                await owner.async_stop()
 
 
 def _remember_vehicle(entry: MennekesAmtronConfigEntry) -> None:

@@ -405,3 +405,32 @@ def test_an_owner_that_fails_to_stop_does_not_keep_the_others_running():
         client.async_close.assert_awaited_once()
 
     asyncio.run(run())
+
+
+def test_a_cancelled_vehicle_stop_still_stops_the_cars_other_observers():
+    async def run():
+        withdrawing = asyncio.Event()
+
+        async def withdraw(*, withdraw):
+            withdrawing.set()
+            await asyncio.Event().wait()
+
+        plan = SimpleNamespace(async_stop=withdraw)
+        soc = SimpleNamespace(async_stop=AsyncMock())
+        loss = SimpleNamespace(async_stop=AsyncMock())
+        runtime = SimpleNamespace(
+            vehicle_profile_id="a" * 32, departure_observer=plan, vehicle_soc=soc,
+            charge_loss=loss, vehicle_telemetry=None,
+        )
+        stopping = asyncio.create_task(integration._async_stop_vehicle(runtime, withdraw=True))
+        await withdrawing.wait()
+        # An unload cancels the switch while the old plan is withdrawn.
+        stopping.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stopping
+        soc.async_stop.assert_awaited_once()
+        loss.async_stop.assert_awaited_once()
+        assert runtime.vehicle_soc is None
+        assert runtime.charge_loss is None
+
+    asyncio.run(run())
