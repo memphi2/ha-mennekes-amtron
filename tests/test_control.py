@@ -1236,7 +1236,7 @@ def test_a_car_plugged_in_while_a_start_waits_for_the_bus_keeps_the_interval(act
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("since", ["nothing", "manual_pause", "restart"])
+@pytest.mark.parametrize("since", ["nothing", "recovery", "manual_pause", "restart"])
 def test_only_the_charge_targets_own_stop_pause_is_ended_for_it(since):
     """A charge target let go for another car ends its stop pause, no other."""
     harness = Harness(values={"charging_current_ems": 16.0})
@@ -1248,7 +1248,10 @@ def test_only_the_charge_targets_own_stop_pause_is_ended_for_it(since):
         ))
         assert control.soc_stop_paused
         harness.clock[0] += 10
-        if since == "manual_pause":
+        if since == "recovery":
+            # A recovery writes the same pause again: it stays the target's.
+            await control.writes.async_apply_current(CHARGING_PAUSE_CURRENT, recovery=True)
+        elif since == "manual_pause":
             await control.async_pause_charging()
         elif since == "restart":
             control.soc_stop_paused = False
@@ -1256,7 +1259,7 @@ def test_only_the_charge_targets_own_stop_pause_is_ended_for_it(since):
         before = len(harness.written(R.CHARGING_CURRENT_EMS))
         await control.async_end_soc_stop_pause()
         resumed = harness.written(R.CHARGING_CURRENT_EMS)[before:]
-        if since == "nothing":
+        if since in ("nothing", "recovery"):
             assert resumed
             assert control.pause_requested is False
             assert not control.soc_stop_paused

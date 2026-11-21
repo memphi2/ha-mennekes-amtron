@@ -92,25 +92,32 @@ class MeterLog:
     def _thin(self) -> None:
         """Make room without losing the oldest reading, where a plug-in starts.
 
-        Every other reading inside a rise goes, oldest first; the meter rose
-        evenly enough across it. Only where no such reading is left does the
-        second oldest go, never the first.
+        A reading between two others of a rise goes, also beside a step of a
+        meter that counts coarsely, as long as its neighbours are close
+        enough to interpolate; pass after pass, oldest first. Only where no
+        such reading is left does the second oldest go, never the first.
         """
         times, values = self._times, self._values
-        keep = [True] * len(times)
-        left, index = len(times), 1
-        while index < len(times) - 1 and left > _MAX_READINGS * 3 // 4:
-            if (
-                values[index - 1] < values[index] < values[index + 1]
-                and times[index + 1] - times[index - 1] <= MAX_INTERPOLATION_SECONDS
-            ):
-                keep[index] = False
-                left -= 1
-                index += 2
-            else:
-                index += 1
-        self._times = [at for at, kept in zip(times, keep, strict=True) if kept]
-        self._values = [kwh for kwh, kept in zip(values, keep, strict=True) if kept]
+        target = _MAX_READINGS * 3 // 4
+        while len(times) > target:
+            keep = [True] * len(times)
+            left, index = len(times), 1
+            while index < len(times) - 1 and left > target:
+                if (
+                    values[index - 1] <= values[index] <= values[index + 1]
+                    and values[index - 1] < values[index + 1]
+                    and times[index + 1] - times[index - 1] <= MAX_INTERPOLATION_SECONDS
+                ):
+                    keep[index] = False
+                    left -= 1
+                    index += 2
+                else:
+                    index += 1
+            if left == len(times):
+                break
+            times = [at for at, kept in zip(times, keep, strict=True) if kept]
+            values = [kwh for kwh, kept in zip(values, keep, strict=True) if kept]
+        self._times, self._values = times, values
         while len(self._times) > _MAX_READINGS:
             del self._times[1], self._values[1]
 

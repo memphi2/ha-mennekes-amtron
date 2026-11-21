@@ -100,7 +100,9 @@ class VehicleBindingState:
     ) -> None:
         self.cycle = cycle
         self.vehicle = vehicle
-        # Only a report after this can confirm the car again in this cycle.
+        # Only a report after this can confirm the car again in this cycle; a
+        # restart of Home Assistant reports the car anew, and the charge
+        # check then judges it again.
         self.refused_at = refused_at
 
     def snapshot(self) -> dict[str, Any]:

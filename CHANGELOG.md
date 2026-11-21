@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 Second beta of 1.0.0. Integration and app are both 1.0.0b2 and must be
 updated together.
 The saved car confirmation starts again once: a car plugged in during the
-update waits until it reports itself plugged in again.
+update is confirmed again from its next report, normally at the restart.
 
 ### Fixed
 
