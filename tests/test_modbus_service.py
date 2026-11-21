@@ -464,6 +464,31 @@ def test_a_failing_intent_save_keeps_the_wallbox_available(tmp_path, monkeypatch
     asyncio.run(run())
 
 
+def test_an_unchanged_intent_is_saved_without_a_thread(tmp_path, monkeypatch):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            await service.persist()
+            threads = []
+            real = asyncio.to_thread
+
+            async def counted(func, *args, **kwargs):
+                threads.append(func)
+                return await real(func, *args, **kwargs)
+
+            monkeypatch.setattr(asyncio, "to_thread", counted)
+            await service.persist()
+            assert threads == []
+            # A change is saved again.
+            service.client.write_state.pause_requested = not service.client.write_state.pause_requested
+            await service.persist()
+            assert len(threads) == 1
+            monkeypatch.undo()
+        finally:
+            await service.stop()
+    asyncio.run(run())
+
+
 def test_a_command_polls_the_wallbox_once_after_its_write(tmp_path):
     async def run():
         service, transport, clock = await service_fixture(tmp_path)
