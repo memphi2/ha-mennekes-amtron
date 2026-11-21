@@ -385,3 +385,23 @@ def test_an_unload_cancels_and_awaits_a_running_vehicle_switch(monkeypatch):
         assert runtime.vehicle_switch is None
 
     asyncio.run(run())
+
+
+def test_an_owner_that_fails_to_stop_does_not_keep_the_others_running():
+    async def run():
+        failed = SimpleNamespace(async_stop=AsyncMock(side_effect=RuntimeError("broken")))
+        plan = SimpleNamespace(async_stop=AsyncMock())
+        soc = SimpleNamespace(async_stop=AsyncMock())
+        client = SimpleNamespace(async_close=AsyncMock())
+        runtime = SimpleNamespace(
+            vehicle_detection=None, vehicle_binding=None, charge_watch_unsubscribe=None,
+            plug_charge=failed, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
+            cost_goal=None, departure_observer=plan, vehicle_soc=soc, client=client,
+        )
+        with pytest.raises(RuntimeError, match="broken"):
+            await integration._async_stop_runtime(runtime)
+        plan.async_stop.assert_awaited_once_with(withdraw=False)
+        soc.async_stop.assert_awaited_once()
+        client.async_close.assert_awaited_once()
+
+    asyncio.run(run())

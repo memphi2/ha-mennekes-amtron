@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
+from .embedded import is_reloading
 from .entry_types import MennekesAmtronConfigEntry
 from .repair_issues import (
     ISSUE_HEARTBEAT_UNAVAILABLE,
@@ -122,4 +123,7 @@ class HeartbeatRepairMonitor:
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
-        self._set_active(None)
+        if not is_reloading(self._hass, self._entry.entry_id):
+            # Through the integration's own reload a lasting fault stays
+            # reported; the reloaded entry judges it again.
+            self._set_active(None)

@@ -446,6 +446,11 @@ def mark_reloading(hass: HomeAssistant, entry_id: str, reloading: bool) -> None:
     (marks.add if reloading else marks.discard)(entry_id)
 
 
+def is_reloading(hass: HomeAssistant, entry_id: str) -> bool:
+    """The integration reloads this entry itself and takes over at once."""
+    return entry_id in hass.data.get(_RELOADING, ())
+
+
 async def async_release(hass: HomeAssistant, entry_id: str, *, force: bool = False) -> None:
     """Stop the entry's service unless a reload is about to take it over."""
     if not force and entry_id in hass.data.get(_RELOADING, ()):
