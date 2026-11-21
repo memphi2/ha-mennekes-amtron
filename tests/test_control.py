@@ -35,7 +35,7 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceError,
     DeviceValidationError,
 )
-from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
+from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
 
@@ -1194,5 +1194,41 @@ def test_uncertain_paused_recovery_retains_intent_over_fallback_current():
         assert control.charging_setpoint == 8.0
         await control.async_shutdown()
         await harness.client.async_close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("action", ["resume", "unlock"])
+def test_a_car_plugged_in_while_a_start_waits_for_the_bus_keeps_the_interval(action):
+    """"No car" seen before the bus wait does not let a start through."""
+    harness = Harness(
+        values={"evse_state": EvseState.IDLE, "charging_current_ems": 1.0},
+        state_change_interval_seconds=300,
+    )
+    harness.transport.bank[R.CP_STATE.address] = int(CpState.A1)
+    put(harness.transport.bank, R.CHARGING_CURRENT_EMS, 1.0)
+    if action == "unlock":
+        put(harness.transport.bank, R.LOCK_EVSE, 1)
+
+    async def run():
+        control = await harness.connect()
+        control.pause_requested = action == "resume"
+        control._write_state.mode_change_at = harness.clock[0]
+        checked = control.writes.async_check_transition_interval
+
+        async def plug_in_after_check(**kwargs):
+            await checked(**kwargs)
+            harness.transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+            harness.transport.bank[R.CP_STATE.address] = int(CpState.B2)
+
+        control.writes.async_check_transition_interval = plug_in_after_check
+        if action == "resume":
+            await control.async_resume_charging()
+            assert harness.written(R.CHARGING_CURRENT_EMS) == []
+        else:
+            await control.async_set_lock_evse(False)
+            assert harness.written(R.LOCK_EVSE) == []
+        assert control.pending_action == action
+        await control.async_shutdown()
 
     asyncio.run(run())

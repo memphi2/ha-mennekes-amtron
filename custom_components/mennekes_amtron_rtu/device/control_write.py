@@ -105,10 +105,10 @@ class WritePath:
             return False
         return type(cp) is int and cp in (CpState.A1, CpState.A2)
 
-    async def _async_release_off(self) -> bool:
+    async def _async_release_off(self, read: LockedRegisterReader | None = None) -> bool:
         """With 0x0D05 off, a current change switches no charge."""
         try:
-            value = await self._control._client.async_read_register(CHARGING_RELEASE)
+            value = await (read or self._control._client.async_read_register)(CHARGING_RELEASE)
         except AmtronBusError:
             return False
         return type(value) is int and value == 0
@@ -136,6 +136,21 @@ class WritePath:
             spec.address, value, self._control._write_state.mode_change_at,
         )
 
+    async def _async_admit_start(self, read: LockedRegisterReader, *, current_change: bool) -> bool:
+        """Whether a write that may start a charge switches one, decided on the bus.
+
+        The check before the queue sets how long a command waits; this one
+        runs right before the write, so a car plugged in while the write
+        waited for the bus is not let through by an earlier "no car".
+        """
+        switches = not (
+            await self.async_vehicle_absent(read)
+            or (current_change and await self._async_release_off(read))
+        )
+        if switches and (remaining := self._control._mode_change_remaining()) > 0:
+            raise AmtronRateLimitedError("state_change", remaining)
+        return switches
+
     async def async_check_transition_interval(self, *, current_change: bool = False) -> None:
         remaining = self._control._mode_change_remaining()
         if remaining > 0 and (
@@ -157,7 +172,16 @@ class WritePath:
         transition = not recovery and (energy_goal_stop or self._current_transition(value))
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._control._write_state.confirmed_current
-        if transition and not phase_preparation and not energy_goal_stop:
+        judged = transition and not phase_preparation and not energy_goal_stop
+        # A start is admitted again on the bus; a stop keeps the plain write path.
+        starts = judged and not paused
+        switches = True
+
+        async def admit(read: LockedRegisterReader) -> None:
+            nonlocal switches
+            switches = await self._async_admit_start(read, current_change=True)
+
+        if judged:
             await self.async_check_transition_interval(current_change=True)
         if not paused and self._control.energy_goal_stop_requested:
             raise self._control.stop_error()
@@ -165,6 +189,7 @@ class WritePath:
             await self.async_write(
                 CHARGING_CURRENT_EMS, value,
                 min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS, refresh=False,
+                precondition=admit if starts else None,
             )
         except (DeviceError, asyncio.CancelledError) as err:
             if self._control._uncertain(err):
@@ -194,7 +219,8 @@ class WritePath:
             # Without a vehicle or with the release off no charge was switched, so
             # e.g. Plug & Charge can end a pause before its grant without delay.
             if not phase_preparation and (
-                await self.async_vehicle_absent() or await self._async_release_off()
+                not switches if starts
+                else await self.async_vehicle_absent() or await self._async_release_off()
             ):
                 state.mode_change_at = before
         if not recovery and not phase_preparation:
@@ -341,9 +367,16 @@ class WritePath:
     async def _async_apply_lock(self, locked: bool) -> None:
         current = await self.async_read_switch(LOCK_EVSE, stopping=locked)
         changed = current != int(locked)
+
+        async def admit(read: LockedRegisterReader) -> None:
+            await self._async_admit_start(read, current_change=False)
+
         if changed and not (locked and self._repeats_stop(LOCK_EVSE, 1)):
             await self.async_check_transition_interval()
-        await self.async_transition_write(LOCK_EVSE, int(locked), changed=changed)
+        await self.async_transition_write(
+            LOCK_EVSE, int(locked), changed=changed,
+            precondition=admit if changed and not locked else None,
+        )
 
     async def _async_apply_phases(self, phases: int) -> None:
         current = await self.async_read_switch(REQUESTED_PHASES)
