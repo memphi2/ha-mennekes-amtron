@@ -44,12 +44,7 @@ def plug_charge_policy(options: Mapping[str, Any]) -> str:
     permission.
     """
     policy = {
-        key: {
-            "provider": profile.provider_id,
-            "device": profile.device_id,
-            "identity": profile.identity,
-            "detection": profile.detection.as_dict() if profile.detection else None,
-        }
+        key: {**profile.car(), "detection": profile.detection.as_dict() if profile.detection else None}
         for key, profile in profiles(options).items()
     }
     return hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest()

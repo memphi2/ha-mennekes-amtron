@@ -143,8 +143,11 @@ def test_a_recognized_car_keeps_its_loss_settings_after_it_is_deselected(scene):
     assert m.last_cycle(entry).owner == profile(entry, A)
     assert m.loss_vehicle_options(entry)["vehicle_profile_id"] == A
     assert len(scene.sent) == 1
-    # Its profile is edited afterwards: the evidence names a car that is gone.
+    # A new name keeps the car and its measurement.
     entry.options["vehicle_profiles"][A]["name"] = "Renamed"
+    assert m.last_cycle(entry).owner == profile(entry, A)
+    # Another car in the profile: the evidence names a car that is gone.
+    entry.options["vehicle_profiles"][A]["device_id"] = "another-car"
     assert m.owner(entry) is None
     assert "vehicle_profile_id" not in m.loss_vehicle_options(entry)
 
@@ -159,7 +162,7 @@ def test_a_second_name_for_the_same_cycle_makes_it_nobodys(scene, second):
     if second == "other_car":
         scene.confirm(B)
     elif second == "edited":
-        entry.options["vehicle_profiles"][A]["name"] = "Renamed"
+        entry.options["vehicle_profiles"][A]["device_id"] = "another-car"
     elif second == "selected_other":
         entry.options = vehicle_profiles.activate_profile(entry.options, B)
     else:

@@ -161,6 +161,10 @@ class VehicleProfile:
             result["detection"] = self.detection.as_dict()
         return result
 
+    def car(self) -> dict[str, str]:
+        """Which car the profile is: its name and settings may change, the car stays."""
+        return {"provider": self.provider_id, "device": self.device_id, "identity": self.identity}
+
 
 def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
     """Read a bounded valid catalog; malformed catalogs cannot revive old data."""
