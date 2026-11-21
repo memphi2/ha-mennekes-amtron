@@ -8,6 +8,7 @@ focused modules next to it.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from collections.abc import Awaitable, Callable
 from copy import deepcopy
@@ -832,7 +833,7 @@ async def _async_stop_runtime(
         nonlocal failure
         try:
             result = step()
-            if result is not None:
+            if inspect.isawaitable(result):
                 await result
         except Exception as err:  # every owner still stops
             _LOGGER.debug("Stopping a part of the entry failed", exc_info=True)

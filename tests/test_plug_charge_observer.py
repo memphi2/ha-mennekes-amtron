@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from custom_components.mennekes_amtron_rtu import plug_charge as m
+from custom_components.mennekes_amtron_rtu.device.commands import PLAN_HOLDS
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
 from custom_components.mennekes_amtron_rtu.vehicle_sources import types
 from tests.test_vehicle_detection import detection_catalog
@@ -69,9 +70,12 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True
         assert 0 < (deadline - dt_util.utcnow()).total_seconds() <= 10
         control.plug_charge["authorized"] = True
         # The service ends only a manual pause it read back, after the grant.
+        plan = entry.runtime_data.departure_observer
         if (
             end_pause and control.pause_requested is True and control.pending_action is None
             and control.pause_owner == "manual" and control.observed_pause is True
+            # An armed plan decides the start.
+            and (plan is None or plan.status not in PLAN_HOLDS)
         ):
             await control.async_resume_charging()
         coordinator.async_update_listeners()
