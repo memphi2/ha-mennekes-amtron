@@ -30,7 +30,7 @@ from .device.meter_log import moment
 from .device.notice import FailureNotice
 from .device.registers import EVSE_STATE, SESSION_ENERGY
 from .entry_types import MennekesAmtronConfigEntry
-from .model_store import ModelStore
+from .model_store import ModelStore, PendingSaves
 from .vehicle_detection import vehicle_evidence
 from .vehicle_profiles import (
     CONF_VEHICLE_SOC_USE_PROFILE,
@@ -150,6 +150,7 @@ class VehicleBinding:
         self._plausible = False
         self._listeners: list[Callable[[], None]] = []
         self._unsubs: list[CALLBACK_TYPE] = []
+        self._saves = PendingSaves()
 
     async def async_start(self) -> None:
         try:
@@ -166,6 +167,10 @@ class VehicleBinding:
             unsubscribe()
         self._unsubs.clear()
         self._listeners.clear()
+
+    async def async_saved(self) -> None:
+        """Wait for saves already started, before the entry unloads."""
+        await self._saves.async_wait()
 
     @callback
     def subscribe(self, listener: Callable[[], None]) -> CALLBACK_TYPE:
@@ -259,7 +264,7 @@ class VehicleBinding:
                     self._confirmed_at = None
                     changed = True
         if changed:
-            self._hass.async_create_task(self._async_save(), "amtron_vehicle_binding", eager_start=False)
+            self._saves.start(self._hass, self._async_save(), "amtron_vehicle_binding")
         if wallbox is None and self._resting is not None:
             # An unreadable wallbox neither confirms the car nor releases its rules.
             return self._resting

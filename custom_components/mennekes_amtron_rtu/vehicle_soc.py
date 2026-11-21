@@ -33,6 +33,7 @@ from .device.notice import FailureNotice
 from .device.soc_choice import READING_SECONDS, SOC_AGE_LIMIT
 from .device.soc_goal import SocGoal
 from .exceptions import service_validation_error
+from .model_store import PendingSaves
 from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
@@ -195,6 +196,7 @@ class VehicleSocObserver:
     ) -> None:
         self._hass = hass
         self._memory = memory
+        self._saves = PendingSaves()
         # While another car may be plugged in, this car's data has no say.
         self._binding = binding
         self._rest_task: asyncio.Task[None] | None = None
@@ -440,7 +442,7 @@ class VehicleSocObserver:
                 )
             return
         if self._memory_key is not None and self._memory.remember(self._memory_key, goal.chosen_percent):
-            self._hass.async_create_task(self._memory.async_save(), eager_start=False)
+            self._saves.start(self._hass, self._memory.async_save(), "amtron_vehicle_target_memory")
 
     @callback
     def _queue_current(self) -> None:
@@ -690,3 +692,4 @@ class VehicleSocObserver:
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
+        await self._saves.async_wait()

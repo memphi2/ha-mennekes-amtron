@@ -532,3 +532,26 @@ def test_charge_level_jitter_after_a_lower_report_does_not_confirm_the_car(tmp_p
         await hass.async_stop()
 
     asyncio.run(run())
+
+
+def test_a_save_started_before_the_stop_is_finished_by_it(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        entry, coordinator = binding_entry()
+        binding = m.VehicleBinding(hass, entry)
+        await binding.async_start()
+        saved = asyncio.Event()
+
+        async def slow_save(_state):
+            await asyncio.sleep(0.01)
+            saved.set()
+
+        with patch.object(m.VehicleBindingStore, "async_save", side_effect=slow_save):
+            coordinator.plug(False)
+            coordinator.plug(True)
+            binding.stop()
+            await binding.async_saved()
+            assert saved.is_set()
+        await hass.async_stop()
+
+    asyncio.run(run())

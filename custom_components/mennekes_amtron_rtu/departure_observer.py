@@ -36,6 +36,7 @@ from .device.enums import EvseState
 from .device.power_window import car_phases, observed_phases
 from .device.registers import EVSE_STATE
 from .exceptions import home_assistant_error, service_validation_error
+from .model_store import PendingSaves
 from .vehicle_phases import VehiclePhaseMemory
 from .vehicle_profiles import (
     CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
@@ -99,6 +100,7 @@ class DepartureObserver:
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
+        self._saves = PendingSaves()
         self._options = vehicle_options(entry.options)
         self._runtime = entry.runtime_data
         # The trip this car had when another one was selected is still to be given back.
@@ -164,6 +166,7 @@ class DepartureObserver:
             self._task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._task
+        await self._saves.async_wait()
         if withdraw:
             # The service plans this car's trip and ends its own pause.
             try:
@@ -340,9 +343,7 @@ class DepartureObserver:
         if profile is None or phases == self._known_phases:
             return
         self._known_phases = phases
-        self._hass.async_create_task(
-            self._phase_memory().async_remember(profile, phases), "amtron_vehicle_phases",
-        )
+        self._saves.start(self._hass, self._phase_memory().async_remember(profile, phases), "amtron_vehicle_phases")
 
     def _phase_memory(self) -> VehiclePhaseMemory:
         return VehiclePhaseMemory(

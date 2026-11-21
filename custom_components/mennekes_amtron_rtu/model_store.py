@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Coroutine
 from pathlib import Path
 from typing import Any, Protocol, Self
 
@@ -45,6 +46,26 @@ async def _finish_atomic(task: asyncio.Task[None]) -> None:
                 continue
         task.result()
         raise
+
+
+class PendingSaves:
+    """Saves started from a callback, finished before their owner unloads.
+
+    A save that outlived its owner could write a file again after the
+    entry and its files were removed.
+    """
+
+    def __init__(self) -> None:
+        self._tasks: set[asyncio.Task[Any]] = set()
+
+    def start(self, hass: HomeAssistant, save: Coroutine[Any, Any, Any], name: str) -> None:
+        task = hass.async_create_task(save, name, eager_start=False)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def async_wait(self) -> None:
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
 
 
 class ModelStore[Goal: _Model]:

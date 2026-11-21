@@ -808,6 +808,7 @@ async def _async_stop_runtime(
         runtime.vehicle_detection.stop()
     if runtime.vehicle_binding is not None:
         runtime.vehicle_binding.stop()
+        await runtime.vehicle_binding.async_saved()
     if runtime.charge_watch_unsubscribe is not None:
         runtime.charge_watch_unsubscribe()
         runtime.charge_watch_unsubscribe = None
