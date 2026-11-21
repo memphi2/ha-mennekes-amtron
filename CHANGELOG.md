@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b3 — 2026-11-21
+
+Third beta of 1.0.0. Integration and app are both 1.0.0b3 and must be
+updated together; the saved state of 1.0.0b2 is kept.
+
+### Fixed
+
+- A Plug & Charge grant ended a departure plan's pause when Home Assistant
+  showed its plan as failed. The app now knows whose pause is in place and
+  ends only a pause set by hand.
+- Renaming a car's profile, or changing its settings, between unplugging and
+  the car's charging report no longer drops that charge's loss measurement.
+- After an observation gap the app could not bridge, a car report from
+  before the gap no longer confirms the car again.
+- A car that is not confirmed no longer overwrites the selected car's learned
+  phases, which plan its late start.
+- Thinning a long meter log no longer moves energy into a rest before the
+  plug-in or into a pause, which skewed charging losses.
+- While a guest stop holds and a lock waits, the app no longer reads the bus
+  and prepares a save every second.
+- A vehicle switch and an entry unload no longer overlap, one part that
+  fails to stop no longer keeps the others running, and the heartbeat repair
+  stays through the integration's own reload.
+
+### Changed
+
+- The docs name controls as the screens show them.
+
 ## 1.0.0b2 — 2026-11-21
 
 Second beta of 1.0.0. Integration and app are both 1.0.0b2 and must be
