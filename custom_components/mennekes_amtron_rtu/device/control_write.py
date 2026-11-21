@@ -60,6 +60,15 @@ if TYPE_CHECKING:
 _PHASE_PAUSE_TIMEOUT = 30.0
 
 
+
+def pause_owner(active: PendingCommand | None) -> str | None:
+    """Whose pause a command writes: only a pause by hand counts as manual."""
+    if active is None:
+        return None
+    if active.energy_goal_stop:
+        return "soc_stop" if active.source == "soc_goal" else active.source
+    return "manual" if active.source in ("home_assistant", "app") else active.source
+
 class WritePath:
     """Every register write of the control, with its interlocks and write intervals."""
 
@@ -204,8 +213,8 @@ class WritePath:
                 if not recovery:
                     # Recovery is no command: what waits in the queue stays.
                     self._control._clear_pending()
-                if not (recovery and paused):
-                    self._control.soc_stop_paused = False
+                if not ((recovery or phase_preparation) and paused):
+                    self._control.pause_owner = None
                 self._control._write_state.confirmed_current = None
                 if not paused:
                     self._remember(value, recovery)
@@ -218,11 +227,10 @@ class WritePath:
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
         active = self._control._active_command
-        if not (recovery and paused):
-            # A recovery that writes the same pause again keeps whose it is.
-            self._control.soc_stop_paused = (
-                paused and active is not None and active.energy_goal_stop and active.source == "soc_goal"
-            )
+        if not ((recovery or phase_preparation) and paused):
+            # A recovery or a phase switch that writes the pause again keeps
+            # whose it is.
+            self._control.pause_owner = pause_owner(active) if paused else None
         if not paused:
             self._remember(value, recovery)
         else:

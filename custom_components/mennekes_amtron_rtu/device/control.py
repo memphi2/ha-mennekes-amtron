@@ -113,10 +113,10 @@ class AmtronControl:
         self._release_writes = 0
         # When, and on which connection, a goal pause was last read back.
         self._goal_pause_confirmed: tuple[float, int] | None = None
-        # The pause in place is the one the charge target's stop wrote, and no
-        # current was written since. Not kept over a restart: then the pause
-        # counts as anybody's and stays.
-        self.soc_stop_paused = False
+        # Whose pause is in place: "manual", "soc_stop" for the charge
+        # target's stop, or the source that wrote it. Not kept over a
+        # restart: a pause of unknown owner counts as anybody's and stays.
+        self.pause_owner: str | None = None
         self._pending_due = 0.0
         self._pending_until: datetime | None = None
         self._pending_changed = asyncio.Event()
@@ -416,7 +416,10 @@ class AmtronControl:
         that waits is newer intent and keeps the pause too.
         """
         await self._plug_charge.async_authorize(session, deadline)
-        if end_pause and self.pause_requested is True and self._pending is None:
+        if (
+            end_pause and self.pause_requested is True and self._pending is None
+            and self.pause_owner == "manual" and self.is_paused is True
+        ):
             await self.async_resume_charging()
 
     async def async_set_energy_goal(self, value: float) -> None:
@@ -729,7 +732,7 @@ class AmtronControl:
         self._require_write_access()
         async with self._current_lock:
             if soc_stop_only and not (
-                self.soc_stop_paused and self.pause_requested is True
+                self.pause_owner == "soc_stop" and self.pause_requested is True
                 and self._pending is None and not self.energy_goal_stop_requested
             ):
                 return

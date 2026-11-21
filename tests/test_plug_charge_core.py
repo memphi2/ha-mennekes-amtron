@@ -282,9 +282,11 @@ def test_a_grant_keeps_an_existing_pause_without_starting_a_charge():
 @pytest.mark.parametrize("grant_fails", [False, True])
 def test_a_grant_that_ends_a_manual_pause_ends_it_only_after_the_grant(grant_fails):
     async def run():
-        h = Harness()
+        # The wallbox reads back the pause.
+        h = Harness(values={"charging_current_ems": 1.0})
         c = await armed(h)
         c.pause_requested = True
+        c.pause_owner = "manual"
         order = []
         writes = c.writes.async_transition_write
 
@@ -315,11 +317,28 @@ def test_a_grant_that_ends_a_manual_pause_ends_it_only_after_the_grant(grant_fai
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("owner", [None, "departure_plan", "soc_stop", "guest", "plug_charge"])
+def test_a_grant_ends_only_a_pause_by_hand(owner):
+    """The service knows whose pause it is; a plan's, a target's or an unknown one stays."""
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        c.pause_requested = True
+        c.pause_owner = owner
+        c.async_resume_charging = AsyncMock()
+        await c.async_authorize_plug_charge(c.plug_charge["session"], deadline=deadline(), end_pause=True)
+        c.async_resume_charging.assert_not_awaited()
+        assert c.plug_charge["authorized"]
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
 def test_a_grant_does_not_end_a_pause_a_waiting_command_keeps():
     async def run():
         h = Harness()
         c = await armed(h)
         c.pause_requested = True
+        c.pause_owner = "manual"
         c.async_resume_charging = AsyncMock()
         c._pending = object()
         try:

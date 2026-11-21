@@ -422,14 +422,13 @@ class PlugChargeObserver:
     async def _authorize(self, candidate: tuple[str, str]) -> None:
         try:
             if self._selection() == candidate:
-                # A manual pause ends with the grant of a new plug-in, in the
-                # same command and only after the grant succeeded. A restored
-                # session keeps the pause; the grant then only restores the
-                # release at the pause current.
+                # A new plug-in may end a manual pause, in the same command
+                # and only after the grant succeeded. The service knows whose
+                # pause it is and keeps any other. A restored session keeps
+                # the pause; the grant then only restores the release at the
+                # pause current.
                 end_pause = (
-                    candidate[1] == self._fresh_session
-                    and self._control.pause_requested is True and self._control.pending_action is None
-                    and self._plan_status() is None and self._control.observed_pause is True
+                    candidate[1] == self._fresh_session and self._control.pause_requested is True
                 )
                 await self._control.async_authorize_plug_charge(
                     candidate[1], deadline=dt_util.utcnow() + timedelta(seconds=10), end_pause=end_pause,

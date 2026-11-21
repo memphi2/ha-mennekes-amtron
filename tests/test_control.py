@@ -1246,7 +1246,7 @@ def test_only_the_charge_targets_own_stop_pause_is_ended_for_it(since):
         await control.queue.async_observe_command(PendingCommand(
             "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True, source="soc_goal",
         ))
-        assert control.soc_stop_paused
+        assert control.pause_owner == "soc_stop"
         harness.clock[0] += 10
         if since == "recovery":
             # A recovery writes the same pause again: it stays the target's.
@@ -1254,7 +1254,7 @@ def test_only_the_charge_targets_own_stop_pause_is_ended_for_it(since):
         elif since == "manual_pause":
             await control.async_pause_charging()
         elif since == "restart":
-            control.soc_stop_paused = False
+            control.pause_owner = None
         harness.clock[0] += 10
         before = len(harness.written(R.CHARGING_CURRENT_EMS))
         await control.async_end_soc_stop_pause()
@@ -1262,10 +1262,34 @@ def test_only_the_charge_targets_own_stop_pause_is_ended_for_it(since):
         if since in ("nothing", "recovery"):
             assert resumed
             assert control.pause_requested is False
-            assert not control.soc_stop_paused
+            assert control.pause_owner is None
         else:
             assert resumed == []
             assert control.pause_requested is True
         await control.async_shutdown()
 
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("source", "goal_stop", "owner"), [
+    ("home_assistant", False, "manual"),
+    ("app", False, "manual"),
+    ("departure_plan", False, "departure_plan"),
+    ("soc_goal", True, "soc_stop"),
+    ("guest", True, "guest"),
+])
+def test_a_pause_remembers_whose_it_is(source, goal_stop, owner):
+    harness = Harness(values={"charging_current_ems": 16.0})
+
+    async def run():
+        control = await harness.connect()
+        await control.queue.async_observe_command(PendingCommand(
+            "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=goal_stop, source=source,
+        ))
+        assert control.pause_owner == owner
+        harness.clock[0] += 400
+        # A phase switch that writes the pause again keeps whose it is.
+        await control.writes.async_apply_current(CHARGING_PAUSE_CURRENT, phase_preparation=True)
+        assert control.pause_owner == owner
+        await control.async_shutdown()
     asyncio.run(run())
