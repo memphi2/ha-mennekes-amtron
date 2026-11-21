@@ -673,11 +673,8 @@ class ModbusService:
         self.guest.stamp_permission()
         if self._store is not None and not self._intent_rejected:
             async with self._store_lock:
-                original = self.client.write_state
-                if self._store.unchanged(original):
-                    # Most polls change nothing to save: no copy, no thread.
-                    return
                 self._phase = "saving control intent"
+                original = self.client.write_state
                 state = WriteState(
                     guest_permission=original.guest_permission,
                     charging_setpoint=original.charging_setpoint,

@@ -81,12 +81,8 @@ class IntentStore:
         state.unplug_release = unplug_release
         self._last = payload
 
-    def unchanged(self, state: WriteState) -> bool:
-        """Whether the last save already holds this state; cheap enough for every poll."""
-        return self._last is not None and self._payload(state) == self._last
-
-    def _payload(self, state: WriteState) -> dict[str, Any]:
-        return {
+    def save(self, state: WriteState) -> None:
+        payload = {
             "version": 1,
             "identity": self.identity,
             "pause_requested": state.pause_requested,
@@ -98,9 +94,6 @@ class IntentStore:
             "plug_charge": state.plug_charge.durable(),
             "unplug_release": state.unplug_release.snapshot(),
         }
-
-    def save(self, state: WriteState) -> None:
-        payload = self._payload(state)
         if payload == self._last:
             return
         try:
