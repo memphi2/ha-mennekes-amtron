@@ -348,3 +348,18 @@ def test_thinning_keeps_rests_at_zero_and_the_plug_in_whole(plug_in) -> None:
     assert log.energy_between(0, plug_in) == 0
     assert log.energy_between(*pause) == 0
     assert log.energy_between(plug_in, end) == pytest.approx(round(kwh, 3), abs=0.002)
+
+
+def test_a_quick_unplug_and_plug_in_keep_their_readings() -> None:
+    """Read every 5 s: unplugged at 45 s, plugged in again at 50 s."""
+    meter = ChargeMeter()
+    meter.observe(0, present=False, reading=0.0)
+    for at in range(5, 45, 5):
+        meter.observe(at, present=True, charging=True, reading=(at - 5) * 0.0015)
+    meter.observe(45, present=False, reading=0.060)
+    meter.observe(50, present=True, reading=0.060)
+    meter.observe(55, present=True, charging=True, reading=0.075)
+    assert meter.last == (5, 45)
+    assert meter.log.energy_between(5, 45) == pytest.approx(0.060)
+    assert meter.log.energy_between(45, 50) == 0
+    assert meter.log.energy_between(50, 55) == pytest.approx(0.015)

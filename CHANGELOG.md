@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- An unload during a vehicle switch, while the old car's departure plan was
-  withdrawn, left that car's charge level and charging loss observers running.
-- A rest of less than a minute before a plug-in no longer moves energy before
-  the plug-in when a long meter log is thinned; the readings around a known
+- An unload during a vehicle switch could leave the old car's charge level
+  or charging loss observer running; a cancelled switch now waits until all
+  of them have stopped.
+- A rest of less than a minute before a plug-in, or a quick unplug and plug-in,
+  no longer moves energy across the plug-in; the readings around a known
   plug-in and unplug always stay.
 
 ## 1.0.0b3 — 2026-11-21

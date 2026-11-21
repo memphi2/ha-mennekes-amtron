@@ -86,8 +86,12 @@ class MeterLog:
             return
         if self._values and kwh > self._values[-1]:
             # The meter rose: this reading stands for the ones just before
-            # it, also for the short steps of a meter read faster than it counts.
-            while len(self._times) >= 2 and at - self._times[-2] < _RISING_SPACING_SECONDS:
+            # it, also for the short steps of a meter read faster than it
+            # counts. A reading next to a known plug-in or unplug stays.
+            while (
+                len(self._times) >= 2 and at - self._times[-2] < _RISING_SPACING_SECONDS
+                and not any(moment >= self._times[-2] for moment in self.anchors)
+            ):
                 del self._times[-1], self._values[-1]
         self._times.append(at)
         self._values.append(kwh)
