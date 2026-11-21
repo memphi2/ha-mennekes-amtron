@@ -28,10 +28,15 @@ def exact_plug_order(monkeypatch):
 
 
 class Coordinator:
+    """Polls of a service whose plug cycle follows the wallbox."""
+
     def __init__(self):
         self.last_update_success = True
         self.data = WallboxData(values={})
         self.listeners = []
+        self.present = None
+        self.known_since = None
+        self.plugged_at = None
 
     def current_data(self):
         return self.data
@@ -40,21 +45,51 @@ class Coordinator:
         self.listeners.append(listener)
         return lambda: self.listeners.remove(listener)
 
-    def charge(self, energy):
-        self.data = WallboxData(values={
-            "evse_state": int(EvseState.CHARGING), "cp_state": int(CpState.C2),
-            "session_energy": energy,
-        })
+    def _observe(self, present):
+        now = dt_util.utcnow().timestamp()
+        if self.known_since is None:
+            self.known_since = now
+        if not present:
+            self.plugged_at = None
+        elif self.present is False:
+            self.plugged_at = now
+        self.present = present
+
+    def meter(self):
+        return {
+            "known_since": self.known_since, "present": self.present, "plugged_at": self.plugged_at,
+            "charging_at": None, "note": None, "last": None, "last_note": None,
+        }
+
+    def _publish(self, values):
+        self.data = WallboxData(values=values, charge_meter=self.meter())
         for listener in list(self.listeners):
             listener()
 
+    def charge(self, energy):
+        self._observe(True)
+        self._publish({
+            "evse_state": int(EvseState.CHARGING), "cp_state": int(CpState.C2),
+            "session_energy": energy,
+        })
+
     def plug(self, connected):
-        self.data = WallboxData(values={
+        self._observe(connected)
+        self._publish({
             "evse_state": int(EvseState.EV_CONNECTED if connected else EvseState.IDLE),
             "cp_state": int(CpState.B1 if connected else CpState.A1),
         })
-        for listener in list(self.listeners):
-            listener()
+
+    def unseen_replug(self):
+        """The service saw an unplug and a new plug-in that no poll here showed."""
+        self.plugged_at = dt_util.utcnow().timestamp()
+        self._publish(self.data.values)
+
+    def gap(self):
+        """The service lost track of presence long enough to hide another car."""
+        self.known_since = dt_util.utcnow().timestamp()
+        self.plugged_at = None
+        self._publish(self.data.values)
 
 
 def binding_entry(*, selected=A):
@@ -229,9 +264,12 @@ def test_a_car_still_reporting_itself_plugged_in_is_called_stale(tmp_path, caplo
 
 
 @pytest.mark.parametrize("raw", [
-    None, {"absent_at": None}, {"absent_at": None, "vehicle": ""},
-    {"absent_at": 1, "vehicle": None}, {"absent_at": "never", "vehicle": None},
-    {"absent_at": "2026-01-01T00:00:00", "vehicle": None},
+    None, {"cycle": None, "vehicle": None},
+    {"cycle": None, "vehicle": "", "refused_at": None},
+    {"cycle": [1.0], "vehicle": None, "refused_at": None},
+    {"cycle": "1", "vehicle": None, "refused_at": None},
+    {"cycle": [1.0, "never"], "vehicle": None, "refused_at": None},
+    {"cycle": None, "vehicle": None, "refused_at": float("nan")},
 ])
 def test_invalid_saved_bindings_are_rejected(raw):
     with pytest.raises(ValueError, match="vehicle binding"):
@@ -258,9 +296,53 @@ def test_storage_problems_only_forget_the_binding(tmp_path, caplog):
 
 
 def test_a_saved_binding_round_trips():
-    for state in (m.VehicleBindingState(None, A), m.VehicleBindingState(dt_util.utcnow(), None)):
+    for state in (
+        m.VehicleBindingState(None, A), m.VehicleBindingState((1.0, None), None, 5.0),
+        m.VehicleBindingState((1.0, 2.0), A),
+    ):
         restored = m.VehicleBindingState.restore(state.snapshot())
-        assert (restored.absent_at, restored.vehicle) == (state.absent_at, state.vehicle)
+        assert (restored.cycle, restored.vehicle, restored.refused_at) == (
+            state.cycle, state.vehicle, state.refused_at,
+        )
+
+
+@pytest.mark.parametrize("change", ["replug", "gap"])
+def test_a_plug_in_this_process_did_not_see_ends_the_binding(tmp_path, change):
+    """The service saw the other car arrive while Home Assistant was away."""
+
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        entry, coordinator = binding_entry()
+        report(hass, plugged=False, name="second")
+        binding = m.VehicleBinding(hass, entry)
+        await binding.async_start()
+        coordinator.plug(False)
+        await settle(hass)
+        coordinator.plug(True)
+        report(hass)
+        await settle(hass)
+        assert not binding.resting
+        binding.stop()
+        await settle(hass)
+        # No empty poll reaches the restarted binding.
+        if change == "replug":
+            coordinator.unseen_replug()
+        else:
+            # Across a gap the plug-in time is unknown: the car's own
+            # unplug report keeps it from confirming the car that came.
+            report(hass, plugged=False)
+            coordinator.gap()
+        restarted = m.VehicleBinding(hass, entry)
+        await restarted.async_start()
+        assert restarted.resting
+        # Only the car's own report after that plug-in confirms it again.
+        report(hass)
+        await settle(hass)
+        assert not restarted.resting
+        restarted.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
 
 
 async def confirmed_binding(hass, caplog):

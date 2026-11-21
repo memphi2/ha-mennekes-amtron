@@ -208,8 +208,8 @@ A profile with detection signals stays selected, manually or
 automatically, while the car is away: you can set its charge target and
 departure in advance. Its rules, i.e. the **Vehicle charge target**, the
 departure plan and the learned phases, apply only after the car confirms the
-plug-in. The car confirms it by reporting itself **plugged in at home after the
-wallbox was last seen empty**. Until then:
+plug-in. The car confirms it by reporting itself **plugged in at home during
+the current plug-in**, as the service saw it. Until then:
 
 - The departure plan shows **Car not confirmed**. A pause the plan set earlier
   ends, so another car is not held until a late start.
@@ -234,8 +234,10 @@ climate or balancing, and does nothing while there is no charge level. Only a
 new plug-in report confirms the car again.
 This catches a car that keeps reporting itself plugged in after it left.
 
-The confirmation survives an HA restart. A car swapped while HA is not running
-is not noticed. A car that only reports changes may not report again after a
+The confirmation lasts for the plug-in the service saw, also across restarts
+of Home Assistant or the app. It ends with an unplug, also one while Home
+Assistant was not running, and with a gap in the service's observation long
+enough to hide one. A car that only reports changes may not report again after a
 quick unplug and replug; its rules then rest until its next report. Your car
 charging at a second wallbox at home while another car is plugged in here
 cannot be told apart from your car being plugged in here.
