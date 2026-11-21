@@ -8,8 +8,8 @@ last charging state, including a deliberate pause, independently of HA.
 
 **Open Web UI** starts on an overview of the wallbox and the app's recent
 commands. Further pages set up the USB or LAN connection, show every register,
-change polling intervals without a restart and record the Modbus traffic for ten
-minutes. They need a Home Assistant administrator and Supervisor **2026.10.4 or
+change polling intervals without a restart and record the Modbus traffic while
+the log page is open, ending at most ten minutes after it is closed. They need a Home Assistant administrator and Supervisor **2026.10.4 or
 newer**. See [Web pages](DOCS.md#daily-use).
 
 **Charging** shows the energy target, cost target, target time and optional

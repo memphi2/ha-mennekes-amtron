@@ -29,7 +29,7 @@ scripts, packages, custom wallbox card or card-mod are required.
 3. Check IDs under **Settings → Devices & services → Entities**. The examples use
    `mennekes_amtron` and translated names. HA chooses IDs when entities are created;
    changing the UI language later does not rename them. Adjust IDs for your device,
-   earlier names or multiple wallboxes.
+   renamed entities or multiple wallboxes.
 4. **Edit dashboard → Add card → Manual**, paste the complete YAML and save.
    Its root is `vertical-stack`; `masonry` belongs to a dashboard view instead.
 5. Leave edit mode to check conditional visibility. HA shows conditional cards

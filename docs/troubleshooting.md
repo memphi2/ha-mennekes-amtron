@@ -417,12 +417,12 @@ when permission was granted.
 | Symptom | Meaning and next step |
 |---|---|
 | Setting 80% did not start charging | A percentage target only limits charging. Resume explicitly, or configure a timed departure plan. |
-| A paused car resumed while a departure was active | The timed plan is allowed to lift a manual pause. Clear Next departure when you want the pause to remain. |
+| A paused car resumed while a departure was active | The timed plan is allowed to lift a manual pause. Clear **Target time** when you want the pause to remain. |
 | No Vehicle charge target entity | Enable its SoC source under Vehicle and select the correct profile/source. Check write permission for control availability. |
 | No positive target can be set with the vehicle maximum enabled | Wait for its first valid maximum report, or disable that optional source and choose your own maximum. |
 | SoC disappeared but charging continued | This is the configured behavior. Monitoring resumes on valid data; use the vehicle's own limit for protection during data outages. |
 | The planner does not adjust current | Check SoC, usable capacity, target and a future departure time. Missing data leaves the current charging state unchanged. Current adjustments also have their own minimum spacing. |
-| Calendar time changed but Next departure did not | The button copied one event. Press it again or use the calendar blueprint to select the next trip. |
+| Calendar time changed but Target time did not | The button copied one event. Press it again or use the calendar blueprint to select the next trip. |
 | The BMW departure button found no time | Enable the selected car's timer action/hour/minute entities. The action must be active; recurring timers also need configured weekdays. Check vehicle time zone. |
 | Climate did not start | Importing a departure time does not operate climate. Configure the preconditioning blueprint and your vehicle action/script; inspect that automation's trace. |
 | A target was reached but the car is still briefly drawing power | Meter/vehicle reports and commands take time. Check pending state, power and pause confirmation. These targets are not instantaneous cutoffs. |

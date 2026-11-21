@@ -61,7 +61,7 @@ HA OS discovery supplies the service URL and token automatically.
 |---|---|
 | Current and pause | HA wallbox controls; **0 A removes the limit**, it does not pause. |
 | Add dashboard cards | [Templates in five languages](https://github.com/memphi2/ha-mennekes-amtron/blob/v1.0.0b2/docs/app-from-home-assistant.md#dashboard-with-mushroom-cards) |
-| Targets, next departure or guest charging | **Open Web UI → Charging**; saved choices are shared with HA |
+| Targets, target time or guest charging | **Open Web UI → Charging**; saved choices are shared with HA; departure planning is set up in HA |
 | Current cap, polling and waits | **Settings → Runtime**: preview and confirm; no restart |
 | USB or LAN settings | **Settings → Connection**: save and restart app |
 | Read-only | Native **Configuration**: save and restart app; this also controls HA write access |
