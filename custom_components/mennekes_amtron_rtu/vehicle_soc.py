@@ -66,6 +66,8 @@ class SocControl(Protocol):
         soc: float | None = None, maximum: float | None = None, soc_age: float | None = None,
     ) -> None: ...
 
+    async def async_end_soc_stop_pause(self) -> None: ...
+
 
 @runtime_checkable
 class TransactionalSocControl(Protocol):
@@ -382,8 +384,9 @@ class VehicleSocObserver:
         """Let a reached target not stop a car that may be another one.
 
         Setting the same target again without a charge level ends the reach;
-        the stop pause it caused ends too. The target is reached again once
-        the confirmed car reports its charge level.
+        the stop pause it wrote ends too, unless a current was set since, a
+        pause by hand included. The target is reached again once the
+        confirmed car reports its charge level.
         """
         goal = self._control.soc_goal
         if self.source is None or goal.source != self.source or goal.status != "reached":
@@ -392,9 +395,8 @@ class VehicleSocObserver:
         try:
             # The chosen value again, which a pressing limit leaves in place.
             await self.async_set_target(goal.chosen_percent, automatic=True)
-            resume = getattr(self._control, "async_resume_charging", None)
-            if stopped and resume is not None and getattr(self._control, "pause_requested", None) is True:
-                await resume()
+            if stopped:
+                await self._control.async_end_soc_stop_pause()
         except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
             _LOGGER.debug("Reached charge target not released: %s", err)
             return

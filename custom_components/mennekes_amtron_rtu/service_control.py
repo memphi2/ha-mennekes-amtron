@@ -241,9 +241,11 @@ class ServiceControl:
             self._notify_pending()
 
     @ha_command
-    async def async_authorize_plug_charge(self, session: str, *, deadline: datetime) -> None:
+    async def async_authorize_plug_charge(
+        self, session: str, *, deadline: datetime, end_pause: bool = False,
+    ) -> None:
         await self._command(
-            "plug_charge_authorize", session=session, deadline=deadline.isoformat(),
+            "plug_charge_authorize", session=session, deadline=deadline.isoformat(), end_pause=end_pause,
         )
 
     @ha_command
@@ -471,6 +473,10 @@ class ServiceControl:
     @ha_command
     async def async_pause_charging(self) -> None:
         await self._command("pause")
+
+    @ha_command
+    async def async_end_soc_stop_pause(self) -> None:
+        await self._command("soc_stop_pause_end")
 
     @ha_command
     async def async_resume_charging(self, *, current_cap: float | None = None) -> None:

@@ -50,6 +50,8 @@ class Control:
         self.async_configure_soc = AsyncMock(side_effect=self.configure)
         self.async_observe_soc = AsyncMock(side_effect=self.observe)
         self.async_set_soc_goal = AsyncMock(side_effect=self.set_goal)
+        # Whose pause it is, the service decides.
+        self.async_end_soc_stop_pause = AsyncMock()
 
     async def configure(self, source, *, maximum_required=False):
         self.maximum_required = maximum_required

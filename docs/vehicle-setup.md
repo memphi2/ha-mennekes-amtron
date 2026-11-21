@@ -215,7 +215,8 @@ the current plug-in**, as the service saw it. Until then:
   ends, so another car is not held until a late start.
 - The percentage target is not reached from this car's charge level. A target
   already reached is set again without a charge level, and the stop pause it
-  caused ends.
+  wrote ends, unless the current was set since, for example by a pause by
+  hand. After a restart of the service the pause stays: resume by hand.
 - Virtual Plug & Charge grants nothing.
 
 Nothing is deselected, neither at plug-in nor at unplug. A car that confirms a
@@ -287,8 +288,10 @@ needed before permission is granted.
 
 The grant belongs to that observed connection. A manual pause
 ends when a recognized vehicle is granted: plugging it in means it should charge.
-The pause is lifted while the charging release is still off, so the release
-follows immediately without the state-change interval. Only a
+Grant and end of the pause are one command: the release is granted first, at
+the pause current, and the pause ends only after that succeeded, so a refused
+grant leaves the pause as it was. The start that follows keeps the
+state-change interval. Only a
 plug-in that HA observed after the car was unplugged counts: after an HA or app
 restart, update or reconnect with the car still connected, the grant returns
 without lifting the pause or replacing the percentage target.

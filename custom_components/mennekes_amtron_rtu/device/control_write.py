@@ -196,6 +196,7 @@ class WritePath:
                 if not recovery:
                     # Recovery is no command: what waits in the queue stays.
                     self._control._clear_pending()
+                self._control.soc_stop_paused = False
                 self._control._write_state.confirmed_current = None
                 if not paused:
                     self._remember(value, recovery)
@@ -207,6 +208,10 @@ class WritePath:
             raise
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
+        active = self._control._active_command
+        self._control.soc_stop_paused = (
+            paused and active is not None and active.energy_goal_stop and active.source == "soc_goal"
+        )
         if not paused:
             self._remember(value, recovery)
         else:

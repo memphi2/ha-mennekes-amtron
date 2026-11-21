@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -200,7 +199,6 @@ def test_an_unconfirmed_car_neither_reaches_nor_keeps_a_reached_target(tmp_path,
         hass.config.config_dir = str(tmp_path)
         control, coordinator, binding = Control(), Coordinator(), Binding()
         control.pause_requested = None
-        control.async_resume_charging = AsyncMock()
         hass.states.async_set("sensor.first", "50", {"unit_of_measurement": "%"})
         hass.states.async_set("number.limit", "90", {"unit_of_measurement": "%"})
         observer = VehicleSocObserver(
@@ -217,7 +215,7 @@ def test_an_unconfirmed_car_neither_reaches_nor_keeps_a_reached_target(tmp_path,
             binding.set(True)
             await hass.async_block_till_done()
             assert control.soc_goal.status == "active"
-            control.async_resume_charging.assert_awaited_once()
+            control.async_end_soc_stop_pause.assert_awaited_once()
             assert "Vehicle charge target: reached target released" in caplog.text
             assert observer.latest_soc is None
             # The resting car's reports change nothing.
@@ -227,19 +225,18 @@ def test_an_unconfirmed_car_neither_reaches_nor_keeps_a_reached_target(tmp_path,
             # A second rest finds nothing to release.
             binding.set(True)
             await hass.async_block_till_done()
-            control.async_resume_charging.assert_awaited_once()
+            control.async_end_soc_stop_pause.assert_awaited_once()
             # The confirmed car's charge level counts again.
             binding.set(False)
             await hass.async_block_till_done()
             assert control.soc_goal.status == "reached"
-            # Without a stop pause, releasing the reach resumes nothing; a
-            # rest reported twice in a row releases it once.
-            control.pause_requested = False
+            # A rest reported twice in a row releases the reach once; whether
+            # a pause is the target's own to end, the service decides.
             binding.set(True)
             binding.set(True)
             await hass.async_block_till_done()
             assert control.soc_goal.status == "active"
-            control.async_resume_charging.assert_awaited_once()
+            assert control.async_end_soc_stop_pause.await_count == 2
             binding.set(False)
             await hass.async_block_till_done()
             # A failed release is only logged at debug level.
@@ -262,7 +259,6 @@ def test_a_start_with_an_unconfirmed_car_releases_a_reached_target(tmp_path):
         hass.config.config_dir = str(tmp_path)
         control, coordinator, binding = Control(), Coordinator(), Binding()
         control.pause_requested = True
-        control.async_resume_charging = AsyncMock()
         source = "sensor.first|number.limit"
         control.soc_goal.configure_source(source)
         control.soc_goal.set_target(80, 85, 90)
@@ -276,7 +272,7 @@ def test_a_start_with_an_unconfirmed_car_releases_a_reached_target(tmp_path):
             await observer.async_start()
             await hass.async_block_till_done()
             assert control.soc_goal.status == "active"
-            control.async_resume_charging.assert_awaited_once()
+            control.async_end_soc_stop_pause.assert_awaited_once()
         finally:
             await observer.async_stop()
             await hass.async_stop()
@@ -290,7 +286,6 @@ def test_a_release_keeps_a_chosen_value_that_the_limit_fell_onto(tmp_path):
         hass.config.config_dir = str(tmp_path)
         control, coordinator, binding = Control(), Coordinator(), Binding()
         control.pause_requested = False
-        control.async_resume_charging = AsyncMock()
         hass.states.async_set("sensor.first", "50", {"unit_of_measurement": "%"})
         hass.states.async_set("number.limit", "90", {"unit_of_measurement": "%"})
         memory = VehicleTargetMemory(hass, "entry", "serial")

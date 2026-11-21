@@ -279,6 +279,58 @@ def test_a_grant_keeps_an_existing_pause_without_starting_a_charge():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("grant_fails", [False, True])
+def test_a_grant_that_ends_a_manual_pause_ends_it_only_after_the_grant(grant_fails):
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        c.pause_requested = True
+        order = []
+        writes = c.writes.async_transition_write
+
+        async def transition(spec, value, **kwargs):
+            order.append(spec.key)
+            if grant_fails:
+                raise DeviceValidationError("plug_charge_blocked")
+            await writes(spec, value, **kwargs)
+
+        resume = c.async_resume_charging
+
+        async def resumed(**kwargs):
+            order.append("resume")
+            await resume(**kwargs)
+
+        c.writes.async_transition_write = transition
+        c.async_resume_charging = resumed
+        if grant_fails:
+            with pytest.raises(DeviceValidationError):
+                await c.async_authorize_plug_charge(c.plug_charge["session"], deadline=deadline(), end_pause=True)
+            # The pause stays when the grant fails.
+            assert order == ["charging_release"]
+            assert c.pause_requested is True
+        else:
+            await c.async_authorize_plug_charge(c.plug_charge["session"], deadline=deadline(), end_pause=True)
+            assert order == ["charging_release", "resume"]
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
+def test_a_grant_does_not_end_a_pause_a_waiting_command_keeps():
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        c.pause_requested = True
+        c.async_resume_charging = AsyncMock()
+        c._pending = object()
+        try:
+            await c.async_authorize_plug_charge(c.plug_charge["session"], deadline=deadline(), end_pause=True)
+        finally:
+            c._pending = None
+        c.async_resume_charging.assert_not_awaited()
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("reason", ["release", "lock", "rfid", "error", "unsupported", "goal"])
 def test_independent_stops_prevent_automatic_release(reason):
     async def run():

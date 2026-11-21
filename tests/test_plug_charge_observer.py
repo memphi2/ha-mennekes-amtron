@@ -64,10 +64,13 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True
                      "session": None if plugged_in else "first-session", "authorized": False},
     )
 
-    async def authorize(session, *, deadline):
+    async def authorize(session, *, deadline, end_pause=False):
         assert session == control.plug_charge["session"]
         assert 0 < (deadline - dt_util.utcnow()).total_seconds() <= 10
         control.plug_charge["authorized"] = True
+        # The service ends the manual pause after the grant, in the same command.
+        if end_pause:
+            await control.async_resume_charging()
         coordinator.async_update_listeners()
 
     control.async_authorize_plug_charge = AsyncMock(side_effect=authorize)
@@ -301,7 +304,7 @@ def test_inflight_authorization_cancels_on_unload_or_source_change_but_not_own_a
         async with observer_harness(tmp_path, monkeypatch) as h:
             started, cancelled, done = asyncio.Event(), asyncio.Event(), asyncio.Event()
 
-            async def waiting(_session, *, deadline):
+            async def waiting(_session, *, deadline, end_pause=False):
                 started.set()
                 try:
                     await done.wait()
@@ -390,21 +393,17 @@ async def plug_in_paused(h, *, pending=None, plan=None, goal_stop=False, paused=
     await report(h)
 
 
-def test_recognized_plug_in_ends_a_manual_pause_before_the_grant(tmp_path, monkeypatch):
+def test_recognized_plug_in_ends_a_manual_pause_with_the_grant(tmp_path, monkeypatch):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
-            order = []
-            h.control.async_resume_charging.side_effect = None
             await plug_in_paused(h)
             assert h.observer.status == "waiting_release"
             assert h.observer.blocked_reason is None
-            h.control.async_resume_charging.side_effect = lambda: order.append("resume")
-            h.control.async_authorize_plug_charge.side_effect = (
-                lambda session, *, deadline: order.append("authorize")
-            )
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()
-            assert order == ["resume", "authorize"]
+            # One command: Home Assistant sends no resume of its own.
+            assert h.control.async_authorize_plug_charge.await_args.kwargs["end_pause"] is True
+            h.control.async_resume_charging.assert_awaited_once()
     asyncio.run(run())
 
 
@@ -485,15 +484,16 @@ def test_a_queued_resume_is_awaited_instead_of_repeated(tmp_path, monkeypatch):
     asyncio.run(run())
 
 
-def test_a_failed_resume_defers_the_grant(tmp_path, monkeypatch):
+def test_a_failed_grant_keeps_the_manual_pause(tmp_path, monkeypatch):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
             await plug_in_paused(h)
-            h.control.async_resume_charging.side_effect = DeviceValidationError("write_rate_limited")
+            h.control.async_authorize_plug_charge.side_effect = DeviceValidationError("write_rate_limited")
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()
-            h.control.async_resume_charging.assert_awaited_once()
-            h.control.async_authorize_plug_charge.assert_not_awaited()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
+            h.control.async_resume_charging.assert_not_awaited()
+            assert h.control.pause_requested is True
     asyncio.run(run())
 
 

@@ -17,10 +17,12 @@ from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
+from custom_components.mennekes_amtron_rtu.device.const import CHARGING_PAUSE_CURRENT
 from custom_components.mennekes_amtron_rtu.device.control import (
     AmtronControl,
     ControlOptions,
 )
+from custom_components.mennekes_amtron_rtu.device.control_types import PendingCommand
 from custom_components.mennekes_amtron_rtu.device.data import (
     DeviceIdentity,
     WriteDiagnostics,
@@ -1229,6 +1231,38 @@ def test_a_car_plugged_in_while_a_start_waits_for_the_bus_keeps_the_interval(act
             await control.async_set_lock_evse(False)
             assert harness.written(R.LOCK_EVSE) == []
         assert control.pending_action == action
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("since", ["nothing", "manual_pause", "restart"])
+def test_only_the_charge_targets_own_stop_pause_is_ended_for_it(since):
+    """A charge target let go for another car ends its stop pause, no other."""
+    harness = Harness(values={"charging_current_ems": 16.0})
+
+    async def run():
+        control = await harness.connect()
+        await control.queue.async_observe_command(PendingCommand(
+            "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True, source="soc_goal",
+        ))
+        assert control.soc_stop_paused
+        harness.clock[0] += 10
+        if since == "manual_pause":
+            await control.async_pause_charging()
+        elif since == "restart":
+            control.soc_stop_paused = False
+        harness.clock[0] += 10
+        before = len(harness.written(R.CHARGING_CURRENT_EMS))
+        await control.async_end_soc_stop_pause()
+        resumed = harness.written(R.CHARGING_CURRENT_EMS)[before:]
+        if since == "nothing":
+            assert resumed
+            assert control.pause_requested is False
+            assert not control.soc_stop_paused
+        else:
+            assert resumed == []
+            assert control.pause_requested is True
         await control.async_shutdown()
 
     asyncio.run(run())
