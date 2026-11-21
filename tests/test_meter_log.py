@@ -57,10 +57,11 @@ def test_a_meter_that_goes_back_or_a_clock_step_starts_the_log_again() -> None:
 
 def test_the_log_is_bounded_and_keeps_its_oldest_reading(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(meter_log, "_MAX_READINGS", 3)
-    # Readings inside a rise go first, pass after pass, down to the target.
+    # Readings inside a rise go first, pass after pass, down to the target;
+    # the end of a rest stays.
     log = filled((0, 1), (100, 1), (200, 1), (300, 2))
     log.observe(400, 3)
-    assert log._times == [0, 400]
+    assert log._times == [0, 200, 400]
     # Too far apart to interpolate: the second oldest goes, never the first.
     log = filled((0, 1), (1000, 2), (2000, 3), (3000, 4))
     assert log._times == [0, 2000, 3000]
@@ -309,3 +310,21 @@ def test_a_long_saved_rise_is_thinned_without_losing_its_start() -> None:
     log.restore(raw)
     assert len(log._times) <= meter_log._MAX_READINGS
     assert log.energy_between(0, 3600) == pytest.approx(1.0, abs=0.01)
+
+
+def test_thinning_keeps_rests_at_zero_and_the_plug_in_whole() -> None:
+    """Read every 20 s: rest, plug-in at 11 kW, a pause, then 1.4 kW for 30 h."""
+    log = MeterLog()
+    kwh, at = 0.0, 0.0
+    plug_in = 300.0
+    pause = (plug_in + 3600.0, plug_in + 3900.0)
+    end = plug_in + 30 * 3600.0
+    while at <= end + 300:
+        log.observe(at, round(kwh, 3))
+        at += 20
+        if plug_in < at <= end and not pause[0] < at <= pause[1]:
+            kwh += (11.0 if at <= pause[0] else 1.4) * 20 / 3600
+    assert len(log._times) <= meter_log._MAX_READINGS
+    assert log.energy_between(0, plug_in) == 0
+    assert log.energy_between(*pause) == 0
+    assert log.energy_between(plug_in, end) == pytest.approx(round(kwh, 3), abs=0.002)
