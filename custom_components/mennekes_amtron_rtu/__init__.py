@@ -581,6 +581,10 @@ async def _async_start_vehicle(
     runtime.vehicle_profile_id = options.get(CONF_VEHICLE_PROFILE_ID)
 
 
+# How long a cancelled vehicle switch waits for the old car's observers.
+VEHICLE_STOP_SECONDS = 30.0
+
+
 async def _async_stop_vehicle(
     runtime: MennekesAmtronRuntimeData, *, withdraw: bool = False,
 ) -> None:
@@ -592,15 +596,32 @@ async def _async_stop_vehicle(
     observer, soc, loss = runtime.departure_observer, runtime.vehicle_soc, runtime.charge_loss
     runtime.departure_observer = runtime.vehicle_soc = runtime.charge_loss = None
     runtime.vehicle_telemetry = None
+
+    async def stop_all() -> None:
+        try:
+            if observer is not None:
+                await observer.async_stop(withdraw=withdraw)
+        finally:
+            try:
+                if soc is not None:
+                    await soc.async_stop()
+            finally:
+                if loss is not None:
+                    await loss.async_stop()
+
+    # The runtime no longer names them, so nobody else would stop them: an
+    # unload that cancels the switch waits until all of them have stopped.
+    # A stop that hangs is cancelled after a while; the ones after it still run.
+    stopping = asyncio.create_task(stop_all(), name="amtron_vehicle_stop")
     try:
-        if observer is not None:
-            await observer.async_stop(withdraw=withdraw)
-    finally:
-        # The runtime no longer names them: also when an unload cancels the
-        # switch while the plan is withdrawn, nobody else stops them.
-        for owner in (soc, loss):
-            if owner is not None:
-                await owner.async_stop()
+        await asyncio.shield(stopping)
+    except asyncio.CancelledError:
+        if not (await asyncio.wait({stopping}, timeout=VEHICLE_STOP_SECONDS))[0]:
+            stopping.cancel()
+            await asyncio.wait({stopping})
+        if not stopping.cancelled() and (error := stopping.exception()) is not None:
+            _LOGGER.debug("Stopping the previous car failed", exc_info=error)
+        raise
 
 
 def _remember_vehicle(entry: MennekesAmtronConfigEntry) -> None:
