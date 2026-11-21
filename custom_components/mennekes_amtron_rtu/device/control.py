@@ -428,21 +428,27 @@ class AmtronControl:
             raise validation_error("energy_goal_not_supported")
         await self.goal_controller.async_set_target(value)
 
-    async def async_pause_for_energy_goal(self) -> None:
-        """Enforce a latched energy stop, retaining only the current-write floor."""
+    async def async_pause_for_energy_goal(self) -> bool:
+        """Enforce a latched energy stop, retaining only the current-write floor.
+
+        Returns whether it may have changed what is saved: a stop that holds
+        and was read back a moment ago changes nothing.
+        """
         async with self._current_lock:
             if not self.energy_goal_stop_requested:
-                return
+                return False
+            changed = False
             if self.foreign_stop_requested and self.goal_controller is not None:
                 # Another limit stops the charge. A pause for a missing meter
                 # is no longer the energy goal's to end: lifting this limit
                 # later must not start a charge.
-                self.goal_controller.drop_recovery()
+                changed = self.goal_controller.drop_recovery()
             self._require_write_access()
             confirmed = self._goal_pause_confirmed
             polled = self._state().fresh(CHARGING_CURRENT_EMS.key)
             if (
-                confirmed is not None and self._pending is None
+                # A waiting stop stays queued anyway and changes nothing here.
+                confirmed is not None and (self._pending is None or self._pending.action in STOPS)
                 and confirmed[1] == self._client.connection_generation
                 and 0 <= self._monotonic() - confirmed[0] < _GOAL_PAUSE_RECHECK_SECONDS
                 and isinstance(polled, (int, float)) and not isinstance(polled, bool)
@@ -451,11 +457,11 @@ class AmtronControl:
                 # A latched stop stays for hours. The pause was read back a
                 # moment ago on this connection, and this poll still reads it;
                 # a reboot or fallback shows up in the poll or the reconnect.
-                return
+                return changed
             if await self.writes.async_vehicle_absent():
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
-                return
+                return changed
             if self._pending is not None and self._pending.action not in STOPS:
                 # The stop replaces a start that waited for the current. A
                 # waiting stop stays, a pause included: this stop's latch may
@@ -483,7 +489,7 @@ class AmtronControl:
                         self._goal_pause_confirmed = (
                             self._monotonic(), self._client.connection_generation,
                         )
-                        return
+                        return True
                 else:
                     self._write_state.confirmed_current = None
             reason = self._stop_reason()
@@ -495,6 +501,7 @@ class AmtronControl:
                 "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True,
                 source=source, completion_reason=reason,
             ))
+            return True
 
     async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
         if self.soc_goal_controller is None:

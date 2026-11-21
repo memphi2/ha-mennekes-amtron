@@ -6,6 +6,7 @@ import asyncio
 import struct
 from datetime import UTC, datetime, timedelta
 
+from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
 from custom_components.mennekes_amtron_rtu.device.plug_cycle import PlugCycle
@@ -85,10 +86,19 @@ def test_a_waiting_lock_outlasts_a_latched_stop():
         h.clock[0] += 20
         await control.async_set_lock_evse(True)
         assert control.pending_action == "lock"
-        # The stop is enforced again with every poll.
+        # The stop is enforced again with every tick; once read back, a
+        # stop that holds reads nothing more while the lock waits.
+        await control.async_pause_for_energy_goal()
+        # The next poll reads the pause too.
+        h.snapshot = WallboxData(values={
+            **h.snapshot.values, "charging_current_ems": 1.0,
+            "current_write_generation": control._write_state.current_write_generation,
+        })
+        reads = len(h.transport.reads)
         for _ in range(3):
             h.clock[0] += 5
-            await control.async_pause_for_energy_goal()
+            assert await control.async_pause_for_energy_goal() is False
+        assert len(h.transport.reads) == reads
         assert control.pending_action == "lock"
         assert ("cancelled", "lock") not in events(control)
         h.clock[0] += 300

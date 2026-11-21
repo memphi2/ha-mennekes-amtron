@@ -184,6 +184,32 @@ def test_guest_time_stop_keeps_write_floor_without_state_change_delay(tmp_path, 
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("changed", [False, True])
+def test_a_guest_stop_that_holds_is_not_saved_every_second(tmp_path, changed):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, _transport, clock):
+            await service.control.async_pause_charging()
+            clock[0] += 1000
+            await service.command({"command":"guest_start", "expected_serial_number":service.identity.serial_number,
+                                   "expected_guest_revision":service.guest.revision})
+            await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
+            saves = []
+            persist = service.persist
+
+            async def counted():
+                saves.append(1)
+                await persist()
+
+            async def enforce():
+                return changed
+
+            service.persist = counted
+            service.control.async_pause_for_energy_goal = enforce
+            await service.guest.tick()
+            assert len(saves) == int(changed)
+    asyncio.run(run())
+
+
 def test_time_stop_retains_five_second_floor_and_clearing_does_not_leave_a_pause_queued(tmp_path, monkeypatch):
     from custom_components.mennekes_amtron_rtu.device.client_errors import (
         AmtronRateLimitedError,

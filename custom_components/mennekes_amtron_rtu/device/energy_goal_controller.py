@@ -296,17 +296,20 @@ class EnergyGoalController:
         self._control.cancel_goal_resume()
         self._notify_changed()
 
-    def drop_recovery(self) -> None:
+    def drop_recovery(self) -> bool:
         """Another limit stopped the charge: the outage pause stays paused.
 
         Nothing is saved or cancelled here; the stop that calls this runs at
-        every tick. The grant does not survive a restart anyway.
+        every tick. The grant does not survive a restart anyway. Returns
+        whether there was one to drop.
         """
         if self.model.resume_on_recovery or (self._pending is not None and self._pending.resume_on_recovery):
             self.model.resume_on_recovery = False
             if self._pending is not None:
                 self._pending.resume_on_recovery = False
             self._dirty = True
+            return True
+        return False
 
     async def async_cancel_recovery_locked(self) -> None:
         """A deliberate command revokes permission to resume our outage pause."""
