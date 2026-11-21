@@ -143,6 +143,21 @@ def test_the_log_keeps_only_what_the_running_and_the_last_cycle_need() -> None:
     assert meter.log._times[0] == 8500
 
 
+
+def test_the_plug_cycle_anchors_the_log_also_after_a_restart() -> None:
+    meter = ChargeMeter()
+    meter.observe(0, present=False, reading=10)
+    meter.observe(40, present=True, reading=10)
+    assert meter.log.anchors == (40,)
+    meter.observe(100, present=False, reading=11)
+    assert meter.log.anchors == (40, 100)
+    meter.observe(200, present=True, reading=11)
+    assert meter.log.anchors == (200, 40, 100)
+    restarted = ChargeMeter()
+    restarted.restore(meter.dump())
+    assert restarted.log.anchors == (200, 40, 100)
+
+
 def test_a_clock_that_moves_back_ends_the_cycle_unmeasured() -> None:
     meter = ChargeMeter()
     meter.observe(1000, present=False, reading=10)
@@ -312,13 +327,18 @@ def test_a_long_saved_rise_is_thinned_without_losing_its_start() -> None:
     assert log.energy_between(0, 3600) == pytest.approx(1.0, abs=0.01)
 
 
-def test_thinning_keeps_rests_at_zero_and_the_plug_in_whole() -> None:
-    """Read every 20 s: rest, plug-in at 11 kW, a pause, then 1.4 kW for 30 h."""
+@pytest.mark.parametrize("plug_in", [300.0, 40.0])
+def test_thinning_keeps_rests_at_zero_and_the_plug_in_whole(plug_in) -> None:
+    """Read every 20 s: rest, plug-in at 11 kW, a pause, then 1.4 kW for 30 h.
+
+    A rest of 40 s before the plug-in is too short to tell from a coarse
+    meter's step; the known plug-in keeps its readings anyway.
+    """
     log = MeterLog()
     kwh, at = 0.0, 0.0
-    plug_in = 300.0
     pause = (plug_in + 3600.0, plug_in + 3900.0)
     end = plug_in + 30 * 3600.0
+    log.anchors = (plug_in, end)
     while at <= end + 300:
         log.observe(at, round(kwh, 3))
         at += 20
