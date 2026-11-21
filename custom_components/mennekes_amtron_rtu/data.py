@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -56,6 +57,9 @@ class MennekesAmtronRuntimeData:
     vehicle_selection: dict[str, Any] = field(default_factory=dict)
     vehicle_profile_id: str | None = None
     vehicle_switching: bool = False
+    # The task running an in-place vehicle switch; an unload cancels and
+    # awaits it.
+    vehicle_switch: asyncio.Task[Any] | None = None
     heartbeat: ServiceHeartbeat | None = None
     vehicle_soc: VehicleSocObserver | None = None
     vehicle_telemetry: VehicleTelemetrySource | None = None

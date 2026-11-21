@@ -613,8 +613,23 @@ async def _async_switch_vehicle(
     """Apply a pure vehicle selection change without reloading entities.
 
     Returns False when anything else changed or the switch failed; the caller
-    then reloads the entry, which retries the new vehicle's setup.
+    then reloads the entry, which retries the new vehicle's setup. An unload
+    cancels the task running the switch and waits for it before it stops the
+    runtime the switch is starting observers on.
     """
+    runtime = entry.runtime_data
+    task = asyncio.current_task()
+    runtime.vehicle_switch = task
+    try:
+        return await _async_switch_vehicle_now(hass, entry)
+    finally:
+        if runtime.vehicle_switch is task:
+            runtime.vehicle_switch = None
+
+
+async def _async_switch_vehicle_now(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry,
+) -> bool:
     runtime = entry.runtime_data
     if (
         _service_intent_rejected(runtime.client)
@@ -656,7 +671,8 @@ async def _async_switch_vehicle(
     except asyncio.CancelledError:
         # A cancelled switch leaves the observers half stopped and its caller
         # never sees the result: only a reload brings the car's rules back.
-        # An unload or HA shutdown cancels it too; those must stay down.
+        # An unload cancels it too, and so may HA's shutdown; those must
+        # stay down.
         if entry.state is ConfigEntryState.LOADED and not hass.is_stopping:
             hass.async_create_task(
                 async_reload_entry(hass, entry, force=True), "amtron_reload"
@@ -767,6 +783,11 @@ async def async_unload_entry(
     """Tear down one wallbox."""
 
     runtime_data = entry.runtime_data
+    switch = runtime_data.vehicle_switch
+    if switch is not None and not switch.done() and switch is not asyncio.current_task():
+        # A vehicle switch must not start observers on a runtime that stops.
+        switch.cancel()
+        await asyncio.wait({switch})
     unloaded = await hass.config_entries.async_unload_platforms(
         entry, runtime_data.loaded_platforms
     )
