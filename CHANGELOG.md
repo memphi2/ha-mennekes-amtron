@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b2 — 2026-11-21
+
+Second beta of 1.0.0. Integration and app are both 1.0.0b2 and must be
+updated together.
+The saved car confirmation starts again once: a car plugged in during the
+update is confirmed again from its next report, normally at the restart.
+
+### Fixed
+
+- A car swapped while Home Assistant was not running, or while the app was
+  unreachable, kept the confirmed car's charge target, departure plan and
+  Plug & Charge grant. The confirmation now belongs to the plug-in the app
+  measured and ends with any unplug or observation gap it saw.
+- A refused Plug & Charge grant no longer ends a manual pause: grant and end
+  of the pause are one command, and the pause ends only after the grant.
+- A charge target let go for an unconfirmed car ends only the stop pause it
+  wrote; a pause set by hand afterwards stays.
+- A resume or unlock that found no car before waiting for the bus no longer
+  skips the state-change interval when a car was plugged in meanwhile.
+- A car plugged in for days no longer pushes its plug-in out of the meter
+  log, so its charging losses are still measured; the log file is smaller.
+- A poll that read the car is no longer counted as unknown when a later step
+  of the same round fails.
+- Saves started just before an unload finish first, and a closed connection
+  no longer reports to its old runtime.
+
+### Changed
+
+- The docs explain the 15-minute rule for a charge level in Home Assistant
+  and list the charge level and pause commands of the API.
+
 ## 1.0.0b1 — 2026-11-21
 
 Beta of 1.0.0, the first stable version, compared with 0.10.0. Integration

@@ -129,7 +129,7 @@ The service API's identity precondition and its limits are documented in the
 
 ## What this assessment does not prove
 
-The owner reported successful operation of 1.0.0 on an **Amtron 4You 310 11
+The owner reported successful operation of the 1.0.0 beta on an **Amtron 4You 310 11
 C2** over Modbus RTU on 2026-11-20: charging, heartbeat and its recovery, phase
 switching, connection interruption, restarts, guest charging and vehicle
 changes. That report did not record a firmware version or a long-term Recorder

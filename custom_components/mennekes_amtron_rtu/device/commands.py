@@ -76,9 +76,15 @@ async def _unplug_release_config(service: ModbusService, _control: AmtronControl
 
 async def _plug_charge_authorize(_service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
     session, deadline = payload.get("session"), payload.get("deadline")
-    if not isinstance(session, str) or not isinstance(deadline, str) or len(deadline) > 64:
+    end_pause = payload.get("end_pause", False)
+    if (
+        not isinstance(session, str) or not isinstance(deadline, str) or len(deadline) > 64
+        or type(end_pause) is not bool
+    ):
         raise ValueError("invalid Plug & Charge authorization")
-    await control.async_authorize_plug_charge(session, deadline=datetime.fromisoformat(deadline))
+    await control.async_authorize_plug_charge(
+        session, deadline=datetime.fromisoformat(deadline), end_pause=end_pause,
+    )
 
 
 async def _cancel_pending(_service: ModbusService, control: AmtronControl, _payload: dict[str, Any]) -> None:
@@ -145,6 +151,10 @@ async def _phases(_service: ModbusService, control: AmtronControl, payload: dict
     await control.async_set_requested_phases(RequestedPhases(integer(payload.get("value"), 0, 1)))
 
 
+async def _end_soc_stop_pause(_service: ModbusService, control: AmtronControl, _payload: dict[str, Any]) -> None:
+    await control.async_end_soc_stop_pause()
+
+
 async def _recover(_service: ModbusService, control: AmtronControl, _payload: dict[str, Any]) -> None:
     await control.async_recover_from_error()
 
@@ -189,8 +199,9 @@ COMMANDS: dict[str, Command] = {
         _fields("source", "soc", "soc_age", "maximum", "expected_soc_revision"), _soc, wallbox=False,
     ),
     "soc_goal_choice": Command(_fields("value", "expected_choice_revision"), _soc),
+    "soc_stop_pause_end": Command(run=_end_soc_stop_pause),
     "plug_charge_config": Command(_fields("value", "policy"), _plug_charge_config),
-    "plug_charge_authorize": Command(_fields("session", "deadline"), _plug_charge_authorize),
+    "plug_charge_authorize": Command(_fields("session", "deadline", "end_pause"), _plug_charge_authorize),
     "unplug_release_config": Command(_fields("value"), _unplug_release_config, wallbox=False),
     "acknowledge_intent_reset": Command(run=_acknowledge, reset=True),
     "guest_start": Command(_fields("expected_guest_revision"), direct=_guest_start),

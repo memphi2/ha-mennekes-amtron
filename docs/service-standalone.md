@@ -6,7 +6,7 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-Run service **1.0.0b1 or newer** (API 1) with this integration, and
+Run service **1.0.0b2 or newer** (API 1) with this integration, and
 update the service first. See [Updates](#operation-and-updates). The app's web
 pages, including guest charging, are part of the Home Assistant app and need
 Supervisor Ingress; a standalone service offers the same guest charging through
@@ -189,6 +189,11 @@ Use the HA controls for daily charging and the service configuration for write
 permission and Modbus polling. Keep the state directory across restarts and
 updates. A Core restart leaves the service running; a service update interrupts
 its heartbeat briefly. Do not run the old and new service together on the bus.
+
+Keep the clocks of the service host and Home Assistant in sync, for example
+with NTP. The service reports when a car was plugged in by its own clock, and
+Home Assistant compares that with the car's report; more than two minutes
+apart, a car may not be confirmed for its plug-in.
 
 Update the service and the integration together. Replace the service first,
 retaining its data directory, and wait for initialization. Then update the

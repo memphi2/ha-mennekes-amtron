@@ -14,10 +14,11 @@ from typing import Any
 
 from .presence_gap import PresenceGap
 
-_MAX_READINGS = 8192
-# While the meter rises, one reading per this span is kept: a long charge at
-# a short poll interval must not push its own plug-in out of the log. Where a
-# rise begins or ends, the readings stay exact.
+_MAX_READINGS = 2048
+# A saved log longer than this is refused as damaged.
+_MAX_STORED = 8192
+# While the meter rises, one reading per this span is kept. Where a rise
+# begins or ends, the readings stay exact.
 _RISING_SPACING_SECONDS = 20.0
 # Two readings further apart than this, with energy between them, cannot
 # place a boundary: nobody saw when that energy flowed.
@@ -86,14 +87,46 @@ class MeterLog:
         self._times.append(at)
         self._values.append(kwh)
         if len(self._times) > _MAX_READINGS:
-            del self._times[0], self._values[0]
+            self._thin()
+
+    def _thin(self) -> None:
+        """Make room without losing the oldest reading, where a plug-in starts.
+
+        A reading between two others of a rise goes, also beside a step of a
+        meter that counts coarsely, as long as its neighbours are close
+        enough to interpolate; pass after pass, oldest first. Only where no
+        such reading is left does the second oldest go, never the first.
+        """
+        times, values = self._times, self._values
+        target = _MAX_READINGS * 3 // 4
+        while len(times) > target:
+            keep = [True] * len(times)
+            left, index = len(times), 1
+            while index < len(times) - 1 and left > target:
+                if (
+                    values[index - 1] <= values[index] <= values[index + 1]
+                    and values[index - 1] < values[index + 1]
+                    and times[index + 1] - times[index - 1] <= MAX_INTERPOLATION_SECONDS
+                ):
+                    keep[index] = False
+                    left -= 1
+                    index += 2
+                else:
+                    index += 1
+            if left == len(times):
+                break
+            times = [at for at, kept in zip(times, keep, strict=True) if kept]
+            values = [kwh for kwh, kept in zip(values, keep, strict=True) if kept]
+        self._times, self._values = times, values
+        while len(self._times) > _MAX_READINGS:
+            del self._times[1], self._values[1]
 
     def dump(self) -> list[list[float]]:
         return [[at, kwh] for at, kwh in zip(self._times, self._values, strict=True)]
 
     def restore(self, raw: object) -> None:
         """Take saved readings; anything out of order is refused as a whole."""
-        if not isinstance(raw, list) or len(raw) > _MAX_READINGS:
+        if not isinstance(raw, list) or len(raw) > _MAX_STORED:
             raise ValueError("invalid meter log")
         times: list[float] = []
         values: list[float] = []
@@ -106,6 +139,8 @@ class MeterLog:
             times.append(at)
             values.append(kwh)
         self._times, self._values = times, values
+        if len(times) > _MAX_READINGS:
+            self._thin()
 
     def _at(self, moment: float) -> float | None:
         index = bisect_right(self._times, moment)

@@ -55,10 +55,43 @@ def test_a_meter_that_goes_back_or_a_clock_step_starts_the_log_again() -> None:
     assert log._values == [5]
 
 
-def test_the_log_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_log_is_bounded_and_keeps_its_oldest_reading(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(meter_log, "_MAX_READINGS", 3)
-    log = filled((0, 1), (100, 2), (200, 3), (300, 4))
-    assert log._times == [100, 200, 300]
+    # Readings inside a rise go first, pass after pass, down to the target.
+    log = filled((0, 1), (100, 1), (200, 1), (300, 2))
+    log.observe(400, 3)
+    assert log._times == [0, 400]
+    # Too far apart to interpolate: the second oldest goes, never the first.
+    log = filled((0, 1), (1000, 2), (2000, 3), (3000, 4))
+    assert log._times == [0, 2000, 3000]
+
+
+def test_a_car_plugged_in_for_days_keeps_its_plug_in_reading() -> None:
+    log = MeterLog()
+    log.observe(0, 100)
+    log.observe(1000, 100)
+    plugged_at, kwh, at = 1000.0, 100.0, 1000.0
+    # Two weeks plugged in, four hours of charging a day, read every 5 s.
+    for _day in range(14):
+        for _ in range(4 * 720):
+            at += 5
+            kwh += 0.01
+            log.observe(at, round(kwh, 3))
+        at += 20 * 3600
+        log.observe(at, round(kwh, 3))
+    assert len(log._times) <= meter_log._MAX_READINGS
+    assert log._times[0] == 0
+    assert log.energy_between(plugged_at, at) == pytest.approx(round(kwh, 3) - 100)
+    # Between two readings of a thinned rise the meter is still interpolated.
+    assert log.energy_between(plugged_at, 1000 + 3600) == pytest.approx(7.2, abs=0.05)
+
+
+def test_a_saved_log_longer_than_the_bound_is_thinned_on_restore() -> None:
+    raw = [[float(at), 1 + at / 1000] for at in range(0, 3 * meter_log._MAX_READINGS * 10, 10)]
+    log = MeterLog()
+    log.restore(raw)
+    assert len(log._times) <= meter_log._MAX_READINGS
+    assert log._times[0] == 0
 
 
 def test_a_long_charge_at_a_short_poll_interval_keeps_its_plug_in() -> None:
@@ -253,6 +286,26 @@ def test_a_saved_charge_meter_is_checked_as_a_whole(changes) -> None:
 
 
 def test_more_saved_readings_than_the_log_holds_are_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(meter_log, "_MAX_READINGS", 1)
+    monkeypatch.setattr(meter_log, "_MAX_STORED", 1)
     with pytest.raises(ValueError, match="meter log"):
         meter_log.MeterLog().restore([[1, 1], [2, 2]])
+
+
+def test_a_slow_charge_with_a_coarse_meter_keeps_its_start_measurable() -> None:
+    """1.4 kW, read every 10 s, a meter counting in 0.01 kWh: steps with flat pairs."""
+    log = MeterLog()
+    log.observe(0, 0.0)
+    log.observe(1, 0.0)
+    for step in range(1, 30 * 360):
+        at = 1 + step * 10
+        log.observe(at, int(at * 1.4 / 3600 * 100) / 100)
+    assert len(log._times) <= meter_log._MAX_READINGS
+    assert log.energy_between(1, 3600) == pytest.approx(1.4, abs=0.05)
+
+
+def test_a_long_saved_rise_is_thinned_without_losing_its_start() -> None:
+    raw = [[float(at), at / 3600] for at in range(0, 8192 * 20, 20)]
+    log = MeterLog()
+    log.restore(raw)
+    assert len(log._times) <= meter_log._MAX_READINGS
+    assert log.energy_between(0, 3600) == pytest.approx(1.0, abs=0.01)

@@ -3,7 +3,11 @@
 The selection itself never changes here. A car that plugs in without the
 selected car reporting itself plugged in afterwards is not that car: the
 selected car's rules, i.e. its charge target, departure plan and learned
-phases, rest until it confirms. An empty wallbox ends every binding.
+phases, rest until it confirms.
+
+Which plug-in is running is the service's to say: a binding holds for the
+plug cycle the service reports, across restarts of either side, and ends
+with it, at an unplug or a gap long enough to hide one.
 
 A confirmation can still be wrong when a car keeps reporting itself plugged in
 after it left. While charging, the car must then contradict itself: it reports
@@ -22,11 +26,11 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
 from .device.enums import EvseState
+from .device.meter_log import moment
 from .device.notice import FailureNotice
 from .device.registers import EVSE_STATE, SESSION_ENERGY
-from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
-from .model_store import ModelStore
+from .model_store import ModelStore, PendingSaves
 from .vehicle_detection import vehicle_evidence
 from .vehicle_profiles import (
     CONF_VEHICLE_SOC_USE_PROFILE,
@@ -67,37 +71,59 @@ class _ChargeCheck:
         self.due_at: datetime | None = None
 
 
-class VehicleBindingState:
-    """When the wallbox was last seen empty, and which car confirmed since."""
+type Cycle = tuple[float | None, float | None]
 
-    def __init__(self, absent_at: datetime | None = None, vehicle: str | None = None) -> None:
-        self.absent_at = absent_at
+
+def _cycle(meter: dict[str, Any]) -> Cycle:
+    """The service's plug cycle: since when presence is known, and the plug-in.
+
+    The plug-in alone is unknown for a car that was there before presence
+    was known; then the time since presence is known tells cycles apart.
+    """
+    return meter["known_since"], meter["plugged_at"]
+
+
+def _time(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return moment(value)
+    except ValueError as err:
+        raise ValueError("invalid saved vehicle binding") from err
+
+
+class VehicleBindingState:
+    """The plug cycle this belongs to, the car confirmed in it, and a refusal."""
+
+    def __init__(
+        self, cycle: Cycle | None = None, vehicle: str | None = None, refused_at: float | None = None,
+    ) -> None:
+        self.cycle = cycle
         self.vehicle = vehicle
+        # Only a report after this can confirm the car again in this cycle; a
+        # restart of Home Assistant reports the car anew, and the charge
+        # check then judges it again.
+        self.refused_at = refused_at
 
     def snapshot(self) -> dict[str, Any]:
         return {
-            "absent_at": self.absent_at.isoformat() if self.absent_at is not None else None,
+            "cycle": list(self.cycle) if self.cycle is not None else None,
             "vehicle": self.vehicle,
+            "refused_at": self.refused_at,
         }
 
     @classmethod
     def restore(cls, raw: object) -> Self:
-        if not isinstance(raw, dict) or raw.keys() != {"absent_at", "vehicle"}:
+        if not isinstance(raw, dict) or raw.keys() != {"cycle", "vehicle", "refused_at"}:
             raise ValueError("invalid saved vehicle binding")
-        absent_at, vehicle = raw["absent_at"], raw["vehicle"]
+        cycle, vehicle = raw["cycle"], raw["vehicle"]
         if vehicle is not None and (not isinstance(vehicle, str) or not 0 < len(vehicle) <= 64):
             raise ValueError("invalid saved vehicle binding")
-        if absent_at is None:
-            return cls(None, vehicle)
-        if not isinstance(absent_at, str) or len(absent_at) > 64:
-            raise ValueError("invalid saved vehicle binding")
-        try:
-            parsed = datetime.fromisoformat(absent_at)
-        except ValueError as err:
-            raise ValueError("invalid saved vehicle binding") from err
-        if parsed.tzinfo is None or parsed.utcoffset() is None:
-            raise ValueError("invalid saved vehicle binding")
-        return cls(parsed, vehicle)
+        if cycle is not None:
+            if not isinstance(cycle, list) or len(cycle) != 2:
+                raise ValueError("invalid saved vehicle binding")
+            cycle = (_time(cycle[0]), _time(cycle[1]))
+        return cls(cycle, vehicle, _time(raw["refused_at"]))
 
 
 class VehicleBindingStore(ModelStore[VehicleBindingState]):
@@ -117,8 +143,6 @@ class VehicleBinding:
         runtime = entry.runtime_data
         self._store = VehicleBindingStore(hass, entry.entry_id, runtime.identity.serial_number or "")
         self._state = VehicleBindingState()
-        # The latest empty poll; the persisted time is updated at plug-in.
-        self._last_empty: datetime | None = None
         self._first_empty: datetime | None = None
         self._stale_notice = FailureNotice(_LOGGER, "Vehicle")
         self._resting: bool | None = None
@@ -128,6 +152,7 @@ class VehicleBinding:
         self._plausible = False
         self._listeners: list[Callable[[], None]] = []
         self._unsubs: list[CALLBACK_TYPE] = []
+        self._saves = PendingSaves()
 
     async def async_start(self) -> None:
         try:
@@ -145,6 +170,10 @@ class VehicleBinding:
         self._unsubs.clear()
         self._listeners.clear()
 
+    async def async_saved(self) -> None:
+        """Wait for saves already started, before the entry unloads."""
+        await self._saves.async_wait()
+
     @callback
     def subscribe(self, listener: Callable[[], None]) -> CALLBACK_TYPE:
         """Call the listener whenever the selected car's rules start or stop resting."""
@@ -159,8 +188,11 @@ class VehicleBinding:
 
     @property
     def plugged_at(self) -> datetime | None:
-        """About when the car at the wallbox arrived; None without a car."""
-        return self._state.absent_at if self._wallbox_connected() is True else None
+        """When the service saw the car at the wallbox arrive; None if unknown or without a car."""
+        meter = self._meter()
+        if meter is None or meter["present"] is not True or meter["plugged_at"] is None:
+            return None
+        return dt_util.utc_from_timestamp(meter["plugged_at"])
 
     @property
     def resting(self) -> bool:
@@ -179,34 +211,36 @@ class VehicleBinding:
     def _changed(self, _event: object = None) -> None:
         self._update()
 
-    def _wallbox_connected(self) -> bool | None:
-        runtime = self._entry.runtime_data
-        if not runtime.coordinator.last_update_success:
+    def _meter(self) -> dict[str, Any] | None:
+        coordinator = self._entry.runtime_data.coordinator
+        if not coordinator.last_update_success:
             return None
-        data = runtime.coordinator.current_data()
-        return snapshot_vehicle_connected(data.get, runtime.identity.layout_version)
+        return coordinator.current_data().charge_meter
 
     def _update(self) -> bool:
         now = dt_util.utcnow()
-        wallbox = self._wallbox_connected()
+        meter = self._meter()
+        wallbox = meter["present"] if meter is not None else None
         profile = active_profile(self._entry.options)
         changed = False
         if wallbox is False:
-            self._last_empty = now
             if self._first_empty is None:
                 self._first_empty = now
-            if self._state.vehicle is not None:
-                _LOGGER.debug("Vehicle binding ended: the wallbox is empty")
-                self._state.vehicle = None
+            if self._state.cycle is not None or self._state.vehicle is not None:
+                if self._state.vehicle is not None:
+                    _LOGGER.debug("Vehicle binding ended: the wallbox is empty")
+                self._state = VehicleBindingState()
                 changed = True
             self._confirmed_at = None
             self._warn_stale(profile, now)
-        elif wallbox is True:
+        elif wallbox is True and meter is not None:
             self._first_empty = None
             self._warn_stale(profile, now)
-            if self._last_empty is not None:
-                self._state.absent_at = self._last_empty
-                self._last_empty = None
+            if self._state.cycle != (cycle := _cycle(meter)):
+                if self._state.vehicle is not None:
+                    _LOGGER.debug("Vehicle binding ended: another plug-in")
+                self._state = VehicleBindingState(cycle)
+                self._confirmed_at = None
                 changed = True
             if (
                 profile is not None and profile.detection is not None
@@ -227,13 +261,12 @@ class VehicleBinding:
                         profile.name, reason,
                     )
                     self._state.vehicle = None
-                    # Only a report after this one can confirm the car again;
-                    # the comparison allows PLUG_WINDOW before this time.
-                    self._state.absent_at = now + PLUG_WINDOW
+                    # Only a report after this one can confirm the car again.
+                    self._state.refused_at = now.timestamp()
                     self._confirmed_at = None
                     changed = True
         if changed:
-            self._hass.async_create_task(self._async_save(), "amtron_vehicle_binding", eager_start=False)
+            self._saves.start(self._hass, self._async_save(), "amtron_vehicle_binding")
         if wallbox is None and self._resting is not None:
             # An unreadable wallbox neither confirms the car nor releases its rules.
             return self._resting
@@ -255,11 +288,17 @@ class VehicleBinding:
         return resting
 
     def _fresh(self, profile_id: str) -> bool:
+        """The car reported itself plugged in at home during this plug cycle."""
         evidence = self._evidence.snapshot(profile_id)
-        absent_at = self._state.absent_at
-        if evidence.at_home(absent_at) is not True or evidence.connected_at is None:
+        plugged_at = self.plugged_at
+        if evidence.at_home(plugged_at) is not True or evidence.connected_at is None:
             return False
-        return absent_at is None or evidence.connected_at >= absent_at - PLUG_WINDOW
+        floors = []
+        if plugged_at is not None:
+            floors.append(plugged_at - PLUG_WINDOW)
+        if self._state.refused_at is not None:
+            floors.append(dt_util.utc_from_timestamp(self._state.refused_at))
+        return not floors or evidence.connected_at >= max(floors)
 
     def _reset_check(self, now: datetime) -> None:
         self._confirmed_at = now
@@ -344,6 +383,7 @@ class VehicleBinding:
 
     async def _async_save(self) -> None:
         try:
-            await self._store.async_save(VehicleBindingState(self._state.absent_at, self._state.vehicle))
+            state = self._state
+            await self._store.async_save(VehicleBindingState(state.cycle, state.vehicle, state.refused_at))
         except OSError as err:
             _LOGGER.warning("Vehicle: binding not saved (%s)", err)

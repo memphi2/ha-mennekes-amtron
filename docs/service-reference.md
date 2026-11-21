@@ -328,6 +328,23 @@ may have made the safe defaults visible on disk. HA exposes this through
 **Settings → System → Repairs**. Repeated acknowledgements after a successful
 reset leave the current intent unchanged.
 
+### Charge level and pause commands
+
+Home Assistant hands the car's charge level to the service with these
+commands. `soc_age` is the number of seconds since the car reported that
+level, at most seven days, `0` when omitted. The service judges a target only
+on a level at most 15 minutes old; an older level still carries the limit,
+and a target reached before stays reached.
+
+| Command | Additional fields | Behavior |
+|---|---|---|
+| `soc_source` | `source`: the charge-level source or `null`; `maximum_required`: boolean or `null` | Binds the percentage target to a source. No bus access. |
+| `soc_observation` | `source`, `soc`, `soc_age`, `maximum` (percent or `null`), `expected_soc_revision` | A new report of the car. No bus access. |
+| `soc_goal` | `value` (percent), `source`, `soc`, `soc_age`, `maximum` | Sets the percentage target with the level it is judged on. `POST /v1/soc-goal/commit` takes the same fields plus the reserved `token`. |
+| `soc_goal_choice` | `value` (percent), `expected_choice_revision` | The app's choice; the service adds its own last level of the bound source. |
+| `soc_stop_pause_end` | none | Ends the pause the percentage target's stop wrote, and only while no current was written since; any other pause stays. The service does not keep this across a restart. |
+| `plug_charge_authorize` | `session`, `deadline` (ISO timestamp at most 30 s ahead), optional `end_pause`: boolean | Grants Plug & Charge for the current plug-in. With `end_pause`, a manual pause ends after the grant succeeded, unless a command waits. |
+
 ### Command activity metadata
 
 Command requests may carry `origin`. It is an allowlisted diagnostic
@@ -369,7 +386,6 @@ so the vehicle planner cannot take over. `control.guest_revision` binds an expli
 start to the current choices and physical connection.
 `control.guest_confirmation_required` means restart evidence is missing or
 inconsistent: charging stops until a fresh guest start or confirmed unplug.
-There is no `control.orders`.
 
 `control.operation` summarizes all controllers of the service for a reader. It
 is derived from their published state and decides nothing:
@@ -453,7 +469,7 @@ HA restore values.
 Read `control.guest_active`, `control.guest_mode` and `control.guest_revision` in `GET /v1/state`.
 Start with `POST /v1/command` naming `command: guest_start`,
 `expected_serial_number` and `expected_guest_revision`. A stale revision or a
-different wallbox is rejected. There is no `/v1/jobs` or `/api/jobs` route.
+different wallbox is rejected.
 
 The command uses the existing energy baseline and selected time. It grants release
 for this connection and lifts manual pause, while preserving locks, faults and

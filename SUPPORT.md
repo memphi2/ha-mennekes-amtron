@@ -89,7 +89,7 @@ tests still run there. This does not claim catalog acceptance or a browser test.
 
 - AMTRON 4You 310 11 C2, article `1313201205`, 11 kW, fixed cable, 16 A.
 
-The owner reported successful operation of 1.0.0 over Modbus RTU on
+The owner reported successful operation of the 1.0.0 beta over Modbus RTU on
 2026-11-20: charging, heartbeat and its recovery, phase switching, connection
 interruption, restarts, guest charging and vehicle changes. That report covers
 no firmware version and no later changes. See the

@@ -107,7 +107,8 @@ manual. This project does not reproduce that mapping, because getting it
 backwards would set 63 A where 16 A was meant.
 
 Whatever you set, read it back afterwards:
-`sensor.*_max_current_house` reports what the wallbox understood.
+the `max_current_house` attribute of `sensor.*_wallbox_settings` reports what
+the wallbox understood.
 
 ### §14a EnWG downgrade — bank S2, DIP 4+5
 

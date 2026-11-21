@@ -139,6 +139,7 @@ def test_auth_failure_starts_real_ha_reauth_and_preserves_entities(
                 assert not hass.config_entries.flow.async_progress_by_handler(DOMAIN)
                 assert not old_runtime.client.connected
                 assert old_runtime.client.on_auth_failed is None
+                assert old_runtime.client.on_update is None
                 assert not [address for address, _ in transport.writes if address != R.HEARTBEAT.address]
                 assert not any(secret in caplog.text for secret in (TOKEN, NEW_TOKEN))
         finally:

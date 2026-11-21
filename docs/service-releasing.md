@@ -26,9 +26,10 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 1 and service 1.0.0b1 or newer**,
-whose saved control state carries the unplug and target fields. Raise the minimum
-when a newer service feature is required. The published or planned service
+separately. The current requirement is **API 1 and service 1.0.0b2 or newer**,
+the first service whose Plug & Charge grant can end a pause and which ends
+only the charge target's own stop pause. Raise the minimum when a newer
+service feature is required. The published or planned service
 release must satisfy the declared minimum.
 
 PR checks run minimum/latest stable HA and native amd64/aarch64 container tests.

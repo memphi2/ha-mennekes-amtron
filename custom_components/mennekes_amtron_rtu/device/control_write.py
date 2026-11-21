@@ -52,6 +52,7 @@ from .registers import (
     RegisterSpec,
 )
 from .runtime_events import EventType
+from .vehicle import ABSENT_CP_STATES, vehicle_connected
 
 if TYPE_CHECKING:
     from .control import AmtronControl
@@ -91,24 +92,31 @@ class WritePath:
         target_paused = 0 < value < CHARGING_CURRENT_MINIMUM
         return paused is None or paused != target_paused
 
-    async def async_vehicle_absent(self, read: LockedRegisterReader | None = None) -> bool:
-        """Grant an exception only from fresh, consistent EVSE and CP readings."""
-        if self._control._identity.layout_version < CP_STATE.min_layout:
+    async def async_vehicle_absent(
+        self, read: LockedRegisterReader | None = None, *, cp_required: bool = True,
+    ) -> bool:
+        """Whether fresh readings prove no car, by the one rule of ``vehicle_connected``.
+
+        An exception to an interlock needs the CP state as well; without
+        ``cp_required`` an older wallbox's idle EVSE state is all it can say.
+        """
+        cp_supported = self._control._identity.layout_version >= CP_STATE.min_layout
+        if cp_required and not cp_supported:
             return False
         read = read or self._control._client.async_read_register
         try:
             state = await read(EVSE_STATE)
             if type(state) is not int or state != EvseState.IDLE:
                 return False
-            cp = await read(CP_STATE)
+            cp = await read(CP_STATE) if cp_supported else None
         except AmtronBusError:
             return False
-        return type(cp) is int and cp in (CpState.A1, CpState.A2)
+        return vehicle_connected(state, cp, cp_supported=cp_supported) is False
 
-    async def _async_release_off(self) -> bool:
+    async def _async_release_off(self, read: LockedRegisterReader | None = None) -> bool:
         """With 0x0D05 off, a current change switches no charge."""
         try:
-            value = await self._control._client.async_read_register(CHARGING_RELEASE)
+            value = await (read or self._control._client.async_read_register)(CHARGING_RELEASE)
         except AmtronBusError:
             return False
         return type(value) is int and value == 0
@@ -136,6 +144,21 @@ class WritePath:
             spec.address, value, self._control._write_state.mode_change_at,
         )
 
+    async def _async_admit_start(self, read: LockedRegisterReader, *, current_change: bool) -> bool:
+        """Whether a write that may start a charge switches one, decided on the bus.
+
+        The check before the queue sets how long a command waits; this one
+        runs right before the write, so a car plugged in while the write
+        waited for the bus is not let through by an earlier "no car".
+        """
+        switches = not (
+            await self.async_vehicle_absent(read)
+            or (current_change and await self._async_release_off(read))
+        )
+        if switches and (remaining := self._control._mode_change_remaining()) > 0:
+            raise AmtronRateLimitedError("state_change", remaining)
+        return switches
+
     async def async_check_transition_interval(self, *, current_change: bool = False) -> None:
         remaining = self._control._mode_change_remaining()
         if remaining > 0 and (
@@ -157,7 +180,16 @@ class WritePath:
         transition = not recovery and (energy_goal_stop or self._current_transition(value))
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._control._write_state.confirmed_current
-        if transition and not phase_preparation and not energy_goal_stop:
+        judged = transition and not phase_preparation and not energy_goal_stop
+        # A start is admitted again on the bus; a stop keeps the plain write path.
+        starts = judged and not paused
+        switches = True
+
+        async def admit(read: LockedRegisterReader) -> None:
+            nonlocal switches
+            switches = await self._async_admit_start(read, current_change=True)
+
+        if judged:
             await self.async_check_transition_interval(current_change=True)
         if not paused and self._control.energy_goal_stop_requested:
             raise self._control.stop_error()
@@ -165,12 +197,15 @@ class WritePath:
             await self.async_write(
                 CHARGING_CURRENT_EMS, value,
                 min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS, refresh=False,
+                precondition=admit if starts else None,
             )
         except (DeviceError, asyncio.CancelledError) as err:
             if self._control._uncertain(err):
                 if not recovery:
                     # Recovery is no command: what waits in the queue stays.
                     self._control._clear_pending()
+                if not (recovery and paused):
+                    self._control.soc_stop_paused = False
                 self._control._write_state.confirmed_current = None
                 if not paused:
                     self._remember(value, recovery)
@@ -182,6 +217,12 @@ class WritePath:
             raise
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
+        active = self._control._active_command
+        if not (recovery and paused):
+            # A recovery that writes the same pause again keeps whose it is.
+            self._control.soc_stop_paused = (
+                paused and active is not None and active.energy_goal_stop and active.source == "soc_goal"
+            )
         if not paused:
             self._remember(value, recovery)
         else:
@@ -194,7 +235,8 @@ class WritePath:
             # Without a vehicle or with the release off no charge was switched, so
             # e.g. Plug & Charge can end a pause before its grant without delay.
             if not phase_preparation and (
-                await self.async_vehicle_absent() or await self._async_release_off()
+                not switches if starts
+                else await self.async_vehicle_absent() or await self._async_release_off()
             ):
                 state.mode_change_at = before
         if not recovery and not phase_preparation:
@@ -341,9 +383,16 @@ class WritePath:
     async def _async_apply_lock(self, locked: bool) -> None:
         current = await self.async_read_switch(LOCK_EVSE, stopping=locked)
         changed = current != int(locked)
+
+        async def admit(read: LockedRegisterReader) -> None:
+            await self._async_admit_start(read, current_change=False)
+
         if changed and not (locked and self._repeats_stop(LOCK_EVSE, 1)):
             await self.async_check_transition_interval()
-        await self.async_transition_write(LOCK_EVSE, int(locked), changed=changed)
+        await self.async_transition_write(
+            LOCK_EVSE, int(locked), changed=changed,
+            precondition=admit if changed and not locked else None,
+        )
 
     async def _async_apply_phases(self, phases: int) -> None:
         current = await self.async_read_switch(REQUESTED_PHASES)
@@ -403,7 +452,7 @@ class WritePath:
                 cp = await read(CP_STATE)
             except AmtronBusError as err:
                 raise validation_error("phase_pause_state_unknown") from err
-            if type(cp) is not int or cp not in (CpState.A1, CpState.A2):
+            if type(cp) is not int or cp not in ABSENT_CP_STATES:
                 raise validation_error("phase_pause_state_unknown")
 
     async def _async_confirm_phase_pause(
@@ -426,7 +475,7 @@ class WritePath:
             if type(cp) is not int or cp not in CpState or cp in (CpState.INIT, CpState.E, CpState.F):
                 raise validation_error("phase_pause_state_unknown")
             paused = paused and (
-                cp in (CpState.A1, CpState.A2) if state == EvseState.IDLE else cp == CpState.B1
+                cp in ABSENT_CP_STATES if state == EvseState.IDLE else cp == CpState.B1
             )
         now = self._control._monotonic()
         if paused and state == EvseState.IDLE:

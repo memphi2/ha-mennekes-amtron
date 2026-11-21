@@ -208,14 +208,15 @@ A profile with detection signals stays selected, manually or
 automatically, while the car is away: you can set its charge target and
 departure in advance. Its rules, i.e. the **Vehicle charge target**, the
 departure plan and the learned phases, apply only after the car confirms the
-plug-in. The car confirms it by reporting itself **plugged in at home after the
-wallbox was last seen empty**. Until then:
+plug-in. The car confirms it by reporting itself **plugged in at home during
+the current plug-in**, as the service saw it. Until then:
 
 - The departure plan shows **Car not confirmed**. A pause the plan set earlier
   ends, so another car is not held until a late start.
 - The percentage target is not reached from this car's charge level. A target
   already reached is set again without a charge level, and the stop pause it
-  caused ends.
+  wrote ends, unless the current was set since, for example by a pause by
+  hand. After a restart of the service the pause stays: resume by hand.
 - Virtual Plug & Charge grants nothing.
 
 Nothing is deselected, neither at plug-in nor at unplug. A car that confirms a
@@ -234,8 +235,10 @@ climate or balancing, and does nothing while there is no charge level. Only a
 new plug-in report confirms the car again.
 This catches a car that keeps reporting itself plugged in after it left.
 
-The confirmation survives an HA restart. A car swapped while HA is not running
-is not noticed. A car that only reports changes may not report again after a
+The confirmation lasts for the plug-in the service saw, also across restarts
+of Home Assistant or the app. It ends with an unplug, also one while Home
+Assistant was not running, and with a gap in the service's observation long
+enough to hide one. A car that only reports changes may not report again after a
 quick unplug and replug; its rules then rest until its next report. Your car
 charging at a second wallbox at home while another car is plugged in here
 cannot be told apart from your car being plugged in here.
@@ -285,8 +288,10 @@ needed before permission is granted.
 
 The grant belongs to that observed connection. A manual pause
 ends when a recognized vehicle is granted: plugging it in means it should charge.
-The pause is lifted while the charging release is still off, so the release
-follows immediately without the state-change interval. Only a
+Grant and end of the pause are one command: the release is granted first, at
+the pause current, and the pause ends only after that succeeded, so a refused
+grant leaves the pause as it was. The start that follows keeps the
+state-change interval. Only a
 plug-in that HA observed after the car was unplugged counts: after an HA or app
 restart, update or reconnect with the car still connected, the grant returns
 without lifting the pause or replacing the percentage target.
@@ -367,6 +372,11 @@ attribute of **Charging wait reason**. The integration only
 reads the selected vehicle data; it does not change the car's settings or estimate
 battery capacity from wallbox energy.
 
+A charge level reaches the target only if the car reported it within the last
+**15 minutes**. Home Assistant sends each level with its age; the car's
+limit or a poll does not make an older level current. With an older level the
+target stays active, and a target already reached stays reached.
+
 Enable the separate option to use the car's maximum if you want to use the
 profile's reported charge limit or select a **Vehicle charge limit entity**.
 Only the chosen source's settings appear. Without a charge-limit source,
@@ -418,7 +428,7 @@ are unchanged.
 
 | What is missing? | What happens |
 |---|---|
-| Current vehicle charge level | Charging continues in its present state; the percentage target resumes monitoring when a valid report returns. Use the car's own limit for protection during data outages. |
+| Current vehicle charge level | Charging continues in its present state; the percentage target resumes monitoring when a valid report returns, one at most 15 minutes old. Use the car's own limit for protection during data outages. |
 | First valid optional vehicle maximum | A positive percentage target cannot be set yet. Disable that optional source if you want to choose your own maximum. |
 | A previously valid vehicle maximum | The last valid maximum is retained; a later increase raises only a target at that maximum. |
 | Usable battery capacity | The departure planner cannot calculate a new current; see [departure planning](departure-planning.md). |

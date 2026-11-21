@@ -52,10 +52,8 @@ from .plug_cycle import PlugChange
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
-    CP_STATE,
     ENERGY_TOTAL,
     ERROR_CODE,
-    EVSE_STATE,
     HEARTBEAT,
     SOLAR_CHARGING_MODE,
     SYSTEM_RESTART,
@@ -115,6 +113,10 @@ class AmtronControl:
         self._release_writes = 0
         # When, and on which connection, a goal pause was last read back.
         self._goal_pause_confirmed: tuple[float, int] | None = None
+        # The pause in place is the one the charge target's stop wrote, and no
+        # current was written since. Not kept over a restart: then the pause
+        # counts as anybody's and stays.
+        self.soc_stop_paused = False
         self._pending_due = 0.0
         self._pending_until: datetime | None = None
         self._pending_changed = asyncio.Event()
@@ -404,8 +406,18 @@ class AmtronControl:
     async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:
         await self._plug_charge.async_configure(enabled, policy)
 
-    async def async_authorize_plug_charge(self, session: str, *, deadline: datetime) -> None:
+    async def async_authorize_plug_charge(
+        self, session: str, *, deadline: datetime, end_pause: bool = False,
+    ) -> None:
+        """Grant the plug-in; with ``end_pause`` a manual pause ends after the grant.
+
+        The grant comes first, written at the pause current, so it starts no
+        charge: a grant that fails leaves the pause as it was. A command
+        that waits is newer intent and keeps the pause too.
+        """
         await self._plug_charge.async_authorize(session, deadline)
+        if end_pause and self.pause_requested is True and self._pending is None:
+            await self.async_resume_charging()
 
     async def async_set_energy_goal(self, value: float) -> None:
         """Change the energy ceiling without starting or resuming charging."""
@@ -707,9 +719,20 @@ class AmtronControl:
         """Grant release and resume as one deferred, connection-bound request."""
         await self._async_resume(current_cap, grant_release=True)
 
-    async def _async_resume(self, current_cap: float | None, *, grant_release: bool) -> None:
+    async def async_end_soc_stop_pause(self) -> None:
+        """End the pause the charge target's stop wrote; any other pause stays."""
+        await self._async_resume(None, grant_release=False, soc_stop_only=True)
+
+    async def _async_resume(
+        self, current_cap: float | None, *, grant_release: bool, soc_stop_only: bool = False,
+    ) -> None:
         self._require_write_access()
         async with self._current_lock:
+            if soc_stop_only and not (
+                self.soc_stop_paused and self.pause_requested is True
+                and self._pending is None and not self.energy_goal_stop_requested
+            ):
+                return
             maximum = self._resume_current_maximum(current_cap)
             target = self.charging_setpoint
             if target is None:
@@ -906,13 +929,7 @@ class AmtronControl:
 
         An older wallbox has no CP state; its idle EVSE state is all it can say.
         """
-        if self._identity.layout_version >= CP_STATE.min_layout:
-            return await self.writes.async_vehicle_absent()
-        try:
-            state = await self._client.async_read_register(EVSE_STATE)
-        except AmtronBusError:
-            return False
-        return type(state) is int and state == EvseState.IDLE
+        return await self.writes.async_vehicle_absent(cp_required=False)
 
     async def async_close_release(self, source: str) -> None:
         """Switch the release off for a rule of the service itself.

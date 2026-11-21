@@ -82,3 +82,35 @@ def test_a_number_that_is_not_permitted_is_refused_by_name(tmp_path, payload, er
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_a_grant_that_ends_a_pause_takes_only_a_true_or_false(tmp_path):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path)
+        try:
+            for end_pause in ("yes", 1, None):
+                with pytest.raises(ValueError, match="invalid Plug & Charge authorization"):
+                    await service.command({
+                        "command": "plug_charge_authorize", "session": "a" * 32,
+                        "deadline": "2026-01-01T00:00:00+00:00", "end_pause": end_pause,
+                        "expected_serial_number": SERIAL,
+                    })
+            assert not current_writes(transport)
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_ending_the_targets_stop_pause_leaves_any_other_pause(tmp_path):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path)
+        try:
+            service.control.pause_requested = True
+            await service.command({"command": "soc_stop_pause_end", "expected_serial_number": SERIAL})
+            assert service.control.pause_requested is True
+            assert not current_writes(transport)
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

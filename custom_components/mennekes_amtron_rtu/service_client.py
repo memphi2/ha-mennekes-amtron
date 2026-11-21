@@ -141,6 +141,8 @@ class ServiceClient:
         self._connected = False
         self.on_auth_failed = None
         self.on_auth_error = None
+        # A late snapshot of a closed client reaches no runtime.
+        self.on_update = None
 
     def _mark_unavailable(self, reason: ServiceFailure | None = None) -> None:
         """Publish a failed connection immediately, including command failures."""
