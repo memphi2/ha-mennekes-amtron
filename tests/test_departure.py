@@ -440,6 +440,16 @@ def test_the_selected_car_remembers_its_detected_phases(monkeypatch: pytest.Monk
         await asyncio.sleep(0)
         assert remembered == []
         control.data.values["evse_state"] = EvseState.CHARGING
+        # Another car charges while the selected one is not confirmed: its
+        # phases are not the selected car's.
+        observer._runtime.vehicle_binding = SimpleNamespace(resting=True)
+        control.data.values["detected_ev_phases"] = 3
+        assert observer._phases() == 3
+        await asyncio.sleep(0)
+        assert remembered == []
+        assert observer._known_phases == 2
+        observer._runtime.vehicle_binding = SimpleNamespace(resting=False)
+        control.data.values["detected_ev_phases"] = 1
         assert observer._phases() == 1
         assert observer._phases() == 1
         await asyncio.sleep(0)
