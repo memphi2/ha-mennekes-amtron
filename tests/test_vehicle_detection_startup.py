@@ -36,7 +36,7 @@ def setup_case(tmp_path, monkeypatch):
     # The fake HA has no event bus to watch the vehicle's reports on.
     monkeypatch.setattr(
         integration, "VehicleBinding",
-        lambda *_: Mock(async_start=AsyncMock(), stop=Mock(), resting=False),
+        lambda *_: Mock(async_start=AsyncMock(), stop=Mock(), async_saved=AsyncMock(), resting=False),
     )
     return real, hass, entry, transport
 

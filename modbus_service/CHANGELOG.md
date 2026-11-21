@@ -9,7 +9,6 @@
 - A resume or unlock is admitted again on the bus right before its write.
 - The meter log keeps the plug-in reading of a long plug-in and holds at most
   2048 readings.
-- The control state is compared before it is saved, without a thread per poll.
 
 ## 1.0.0b1
 

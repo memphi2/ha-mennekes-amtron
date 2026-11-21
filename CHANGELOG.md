@@ -33,8 +33,6 @@ update waits until it reports itself plugged in again.
 
 ### Changed
 
-- The app saves its control state only when it changed, without a worker
-  thread on every poll.
 - The docs explain the 15-minute rule for a charge level in Home Assistant
   and list the charge level and pause commands of the API.
 
