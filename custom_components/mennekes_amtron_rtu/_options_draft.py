@@ -6,11 +6,11 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from .departure_const import CONF_DEPARTURE_RESET_PENDING
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
-    RESET_PENDING,
     VehicleProfile,
     profile_options,
     profiles,
@@ -57,7 +57,7 @@ class OptionsDraft:
             original = profile_options(self.original, profile_id)
             if not self._selected:
                 # Only the selected car has a trip to invalidate.
-                keys = keys - {RESET_PENDING}
+                keys = keys - {CONF_DEPARTURE_RESET_PENDING}
         for key in keys:
             if (key in live) != (key in original) or live.get(
                 key
@@ -67,7 +67,7 @@ class OptionsDraft:
         options = merged if profile_id is None else merged[CONF_VEHICLE_PROFILES][profile_id]["options"]
         for key in keys:
             # A profile owns feature settings; invalidating the trip is global.
-            target = merged if key == RESET_PENDING else options
+            target = merged if key == CONF_DEPARTURE_RESET_PENDING else options
             if key in self.values:
                 target[key] = deepcopy(self.values[key])
             else:

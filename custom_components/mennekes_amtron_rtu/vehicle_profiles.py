@@ -9,6 +9,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Final
 
+from .departure_const import CONF_DEPARTURE_RESET_PENDING
+
 CONF_VEHICLE_PROFILES: Final = "vehicle_profiles"
 CONF_ACTIVE_VEHICLE_PROFILE: Final = "active_vehicle_profile"
 CONF_VEHICLE_AUTO_SELECTION: Final = "vehicle_auto_selection"
@@ -27,7 +29,6 @@ CONF_VEHICLE_LIMIT_USE_PROFILE: Final = "vehicle_limit_use_profile"
 CONF_DEPARTURE_USE_VEHICLE_CAPACITY: Final = "departure_use_vehicle_capacity"
 MAX_VEHICLE_PROFILES: Final = 8
 MAX_CONNECTED_STATES: Final = 8
-RESET_PENDING: Final = "departure_reset_pending"
 PROFILE_OPTION_KEYS: Final = frozenset(
     {
         "vehicle_soc_entity",
@@ -278,7 +279,7 @@ def activate_profile(raw: Mapping[str, Any], profile_id: str | None) -> dict[str
     result = deepcopy(dict(raw))
     if result.get(CONF_ACTIVE_VEHICLE_PROFILE) != profile_id:
         result[CONF_ACTIVE_VEHICLE_PROFILE] = profile_id
-        result[RESET_PENDING] = True
+        result[CONF_DEPARTURE_RESET_PENDING] = True
         result[CONF_VEHICLE_PROFILE_SELECTED_AT] = time.time()
     return result
 
@@ -289,7 +290,7 @@ SELECTION_KEYS: Final = frozenset(
         CONF_ACTIVE_VEHICLE_PROFILE,
         CONF_VEHICLE_PROFILE_SELECTED_AT,
         CONF_VEHICLE_AUTO_SELECTION,
-        RESET_PENDING,
+        CONF_DEPARTURE_RESET_PENDING,
     }
 )
 

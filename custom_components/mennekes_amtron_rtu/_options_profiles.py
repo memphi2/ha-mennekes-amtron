@@ -17,6 +17,7 @@ from .config_schemas import (
     vehicle_profile_choice_schema,
     vehicle_profile_details_schema,
 )
+from .departure_const import CONF_DEPARTURE_RESET_PENDING
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
     CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
@@ -29,7 +30,6 @@ from .vehicle_profiles import (
     CONF_VEHICLE_SOC_USE_PROFILE,
     MAX_VEHICLE_PROFILES,
     PROFILE_OPTION_KEYS,
-    RESET_PENDING,
     VehicleDetectionConfig,
     VehicleProfile,
     activate_profile,
@@ -50,7 +50,7 @@ _PROFILE_KEYS = {
     CONF_ACTIVE_VEHICLE_PROFILE,
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
-    RESET_PENDING,
+    CONF_DEPARTURE_RESET_PENDING,
 } | set(PROFILE_OPTION_KEYS)
 
 
@@ -353,7 +353,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
         if CONF_ACTIVE_VEHICLE_PROFILE not in draft.values:
             draft.values = activate_profile(draft.values, key)
         elif not same_identity and draft.values.get(CONF_ACTIVE_VEHICLE_PROFILE) == key:
-            draft.values[RESET_PENDING] = True
+            draft.values[CONF_DEPARTURE_RESET_PENDING] = True
             draft.values[CONF_VEHICLE_PROFILE_SELECTED_AT] = time.time()
         return await self._finish_section()
 
