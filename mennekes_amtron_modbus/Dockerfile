@@ -1,2 +1,2 @@
-FROM ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:c581a584745710c15f25c76c05393d4f40427b015541368c1119ebe44db20dd2
+FROM ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:db7d878ba634f01e51015ebe7ab94e80d27c62b7f86a13baa4d3966dcbf138e0
 USER root
