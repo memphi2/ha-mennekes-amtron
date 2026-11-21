@@ -343,7 +343,7 @@ and a target reached before stays reached.
 | `soc_goal` | `value` (percent), `source`, `soc`, `soc_age`, `maximum` | Sets the percentage target with the level it is judged on. `POST /v1/soc-goal/commit` takes the same fields plus the reserved `token`. |
 | `soc_goal_choice` | `value` (percent), `expected_choice_revision` | The app's choice; the service adds its own last level of the bound source. |
 | `soc_stop_pause_end` | none | Ends the pause the percentage target's stop wrote, and only while no current was written since; any other pause stays. The service does not keep this across a restart. |
-| `plug_charge_authorize` | `session`, `deadline` (ISO timestamp at most 30 s ahead), optional `end_pause`: boolean | Grants Plug & Charge for the current plug-in. With `end_pause`, a pause set by hand (from HA or the app, not from a plan, target or guest limit, and not one restored after a restart) ends after the grant succeeded, unless a command waits. |
+| `plug_charge_authorize` | `session`, `deadline` (ISO timestamp at most 30 s ahead), optional `end_pause`: boolean | Grants Plug & Charge for the current plug-in. With `end_pause`, a pause set by hand (from HA or the app, not from a plan, target or guest limit, and not one restored after a restart) ends after the grant succeeded, unless a command waits or an armed departure plan decides the start. |
 
 ### Command activity metadata
 

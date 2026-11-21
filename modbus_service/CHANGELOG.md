@@ -6,7 +6,7 @@
 - **API:** `plug_charge_authorize` with `end_pause` ends only a pause set by
   hand, from Home Assistant or the app, that the wallbox reads back; a pause
   of a plan, a target or guest charging stays, and so does one restored
-  after a restart.
+  after a restart or one an armed departure plan keeps until its start.
 - Thinning the meter log keeps the ends of a rest, so no energy moves into it.
 - A guest stop that holds reads the bus and saves only when something changed.
 

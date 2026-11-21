@@ -114,3 +114,30 @@ def test_ending_the_targets_stop_pause_leaves_any_other_pause(tmp_path):
             await service.stop()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(("status", "ends"), [
+    ("paused_until_start", False), ("queued", False), ("charging", False), ("error", False),
+    ("waiting_for_soc", True), ("disabled", True),
+])
+def test_an_armed_plan_keeps_a_pause_a_grant_would_end(tmp_path, monkeypatch, status, ends):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            monkeypatch.setattr(service.planner.controller, "status", status)
+            seen = []
+
+            async def authorize(session, *, deadline, end_pause):
+                seen.append(end_pause)
+
+            monkeypatch.setattr(service.control, "async_authorize_plug_charge", authorize)
+            await service.command({
+                "command": "plug_charge_authorize", "session": "a" * 32,
+                "deadline": "2026-01-01T00:00:00+00:00", "end_pause": True,
+                "expected_serial_number": SERIAL,
+            })
+            assert seen == [ends]
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

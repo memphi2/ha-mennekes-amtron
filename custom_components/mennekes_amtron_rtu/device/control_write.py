@@ -188,6 +188,9 @@ class WritePath:
         # freshly confirmed. Treat its write as a possible transition even if
         # the old cached snapshot still says "paused".
         transition = not recovery and (energy_goal_stop or self._current_transition(value))
+        # A pause written again keeps whose it is; one a phase switch starts
+        # belongs to the switch's command.
+        keeps_owner = recovery or (phase_preparation and self._control.pause_requested is True)
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._control._write_state.confirmed_current
         judged = transition and not phase_preparation and not energy_goal_stop
@@ -214,7 +217,7 @@ class WritePath:
                 if not recovery:
                     # Recovery is no command: what waits in the queue stays.
                     self._control._clear_pending()
-                if not ((recovery or phase_preparation) and paused):
+                if not (keeps_owner and paused):
                     self._control.pause_owner = None
                 self._control._write_state.confirmed_current = None
                 if not paused:
@@ -228,7 +231,7 @@ class WritePath:
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
         active = self._control._active_command
-        if not ((recovery or phase_preparation) and paused):
+        if not (keeps_owner and paused):
             # A recovery or a phase switch that writes the pause again keeps
             # whose it is.
             self._control.pause_owner = pause_owner(active) if paused else None
