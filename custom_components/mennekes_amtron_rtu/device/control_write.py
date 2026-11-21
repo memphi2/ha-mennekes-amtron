@@ -32,6 +32,7 @@ from .const import (
     CHARGING_PAUSE_CURRENT,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
     MIN_PHASE_CHANGE_INTERVAL_SECONDS,
+    charging_setpoint_from,
 )
 from .control_types import (
     DepartureCommandCancelledError,
@@ -59,6 +60,15 @@ if TYPE_CHECKING:
 
 _PHASE_PAUSE_TIMEOUT = 30.0
 
+
+
+def pause_owner(active: PendingCommand | None) -> str | None:
+    """Whose pause a command writes: only a pause by hand counts as manual."""
+    if active is None:
+        return None
+    if active.energy_goal_stop:
+        return "soc_stop" if active.source == "soc_goal" else active.source
+    return "manual" if active.source in ("home_assistant", "app") else active.source
 
 class WritePath:
     """Every register write of the control, with its interlocks and write intervals."""
@@ -178,6 +188,9 @@ class WritePath:
         # freshly confirmed. Treat its write as a possible transition even if
         # the old cached snapshot still says "paused".
         transition = not recovery and (energy_goal_stop or self._current_transition(value))
+        # A pause written again keeps whose it is; one a phase switch starts
+        # belongs to the switch's command.
+        keeps_owner = recovery or (phase_preparation and self._control.pause_requested is True)
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._control._write_state.confirmed_current
         judged = transition and not phase_preparation and not energy_goal_stop
@@ -204,8 +217,8 @@ class WritePath:
                 if not recovery:
                     # Recovery is no command: what waits in the queue stays.
                     self._control._clear_pending()
-                if not (recovery and paused):
-                    self._control.soc_stop_paused = False
+                if not (keeps_owner and paused):
+                    self._control.pause_owner = None
                 self._control._write_state.confirmed_current = None
                 if not paused:
                     self._remember(value, recovery)
@@ -218,11 +231,10 @@ class WritePath:
         self._control._write_state.confirmed_current = value
         self._control.pause_requested = paused
         active = self._control._active_command
-        if not (recovery and paused):
-            # A recovery that writes the same pause again keeps whose it is.
-            self._control.soc_stop_paused = (
-                paused and active is not None and active.energy_goal_stop and active.source == "soc_goal"
-            )
+        if not (keeps_owner and paused):
+            # A recovery or a phase switch that writes the pause again keeps
+            # whose it is.
+            self._control.pause_owner = pause_owner(active) if paused else None
         if not paused:
             self._remember(value, recovery)
         else:
@@ -276,10 +288,9 @@ class WritePath:
             (not preserve_setpoint or self._control.charging_setpoint is None)
             and previous is not None
             and math.isfinite(previous)
-            and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
+            and (setpoint := charging_setpoint_from(previous)) is not None
         ):
-            # More than 32 A is a foreign controller's value, no limit to keep.
-            self._control.charging_setpoint = min(float(previous), 32.0)
+            self._control.charging_setpoint = setpoint
 
     async def async_read_switch(self, spec: RegisterSpec, *, stopping: bool = False) -> int | None:
         """Recheck live state, but a failed read must not prevent a stop."""
@@ -587,8 +598,6 @@ class WritePath:
             self._control._diagnostics.writes_rejected += 1
             if spec != HEARTBEAT:
                 self._control._diagnostics.write_errors.add(spec.key)
-            if self._control._notify_write_error is not None:
-                self._control._notify_write_error()
             raise device_error(
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err
@@ -607,8 +616,6 @@ class WritePath:
                 self._control._command_acknowledged = True
         if spec.key in self._control._diagnostics.write_errors:
             self._control._diagnostics.write_errors.remove(spec.key)
-            if self._control._notify_write_error is not None:
-                self._control._notify_write_error()
         if refresh and self._control._request_refresh is not None:
             await self._control._request_refresh()
 

@@ -423,8 +423,9 @@ the bus write. Cancelling its HA HTTP task is not a remote revocation of a
 request already accepted by the service.
 
 Charging permission composes with existing current, pause, lock and goal
-guards. HA can lift a manual pause for a fresh observed plug-in before granting
-release. Restored grants preserve the pause; an armed plan decides its own
+guards. For a fresh observed plug-in HA asks the service to end a pause after
+the grant; the service ends it only when the pause was set by hand, since it
+records whose pause is in place. Restored grants preserve the pause; an armed plan decides its own
 start. Reached targets remain effective, and error recovery does not bypass
 the gate. A cloud-data interruption
 alone does not revoke an already granted physical connection. Enabling the gate

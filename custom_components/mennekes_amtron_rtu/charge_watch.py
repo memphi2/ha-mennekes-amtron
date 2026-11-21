@@ -46,10 +46,8 @@ class PlugCycle:
 
 
 def note_for(profile: VehicleProfile, *, automatic: bool) -> str:
-    """The profile as it is now: an edited profile is no longer the same car."""
-    digest = hashlib.sha256(
-        json.dumps(profile.as_dict(), sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
+    """Which car the profile is: a new name or other settings keep the car."""
+    digest = hashlib.sha256(json.dumps(profile.car(), sort_keys=True).encode()).hexdigest()[:16]
     return f"{'a' if automatic else 'm'}:{digest}:{profile.id}"
 
 

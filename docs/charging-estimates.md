@@ -37,7 +37,7 @@ unknown; a previous result is not passed off as the new one.
 |---|---|---|
 | Disabled | Nothing | No charging-loss entities or vehicle subscriptions. |
 | Vehicle charging history | The selected vehicle profile | The car's newest complete charging record, against the meter over that record's own time span; currently implemented for BavarianData. |
-| Vehicle energy sensor | An existing sensor for battery energy from the last charge | The sensor's value, assigned explicitly or by an optional new-value heuristic, against the meter between plug-in and unplug. |
+| Charging losses from a sensor | An existing sensor for battery energy from the last charge | The sensor's value, assigned explicitly or by an optional new-value heuristic, against the meter between plug-in and unplug. |
 
 The two sensors are **Estimated charging loss, last charge** and **Average
 estimated charging loss**. The average weights each accepted charge by energy:
@@ -69,8 +69,9 @@ creates long-term statistics.
 
 ### BavarianData
 
-Configure the BavarianData car once under **Vehicle**, select its profile, then
-choose **Use the selected vehicle's charging history** in **Charging losses**.
+Configure the BavarianData car once under **Name and vehicle source** of its
+profile, select the profile, then choose **Use this profile's charging history**
+in **Charging losses**.
 This selection saves immediately and enables history matching for that profile.
 The history belongs
 to the same active car used by the profile's other features.  The integration reads
@@ -97,7 +98,8 @@ See [BavarianData charging history](https://justchr.github.io/BavarianData/docs/
 
 ### Only a “last charge kWh” sensor
 
-Select **Vehicle energy sensor** and choose the existing entity. It must report
+Select **Charging losses from a sensor** and choose the existing entity for
+**Vehicle battery energy, last charge**. It must report
 `kWh` or `Wh`. After unplugging, wait for the vehicle integration to update, then
 run the `mennekes_amtron_rtu.assign_vehicle_charge` action (**Assign vehicle
 charge energy**). Check that the value belongs to this charge before assigning
@@ -212,7 +214,7 @@ use a sensor supplying the complete price instead. The data is attributed
 to Par14a-Database (the78mole), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 The network operator's original price sheet governs. Choose **Import for HA
 Home** again whenever you want to retrieve the current published values.
-**Automatic yearly refresh** is a separate optional switch in the Module 3
+**Refresh Module 3 tariff automatically at the new year** is a separate optional switch in the Module 3
 tariff form. It can be enabled after either manual entry or an initial import.
 It uses HA Home coordinates again and can replace manually entered prices and
 time windows with the new published tariff. Keep it off if you want to manage

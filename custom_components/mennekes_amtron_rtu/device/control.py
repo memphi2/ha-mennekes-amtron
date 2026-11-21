@@ -90,8 +90,6 @@ class AmtronControl:
         options: ControlOptions,
         state: Callable[[], WallboxData],
         request_refresh: Callable[[], Awaitable[None]] | None = None,
-        notify_write_error: Callable[[], None] | None = None,
-        notify_pending: Callable[[], None] | None = None,
         validate_deferred: Callable[[], None] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         monotonic: Callable[[], float] = time.monotonic,
@@ -103,8 +101,6 @@ class AmtronControl:
         self.startup_hold = False
         self._state = state
         self._request_refresh = request_refresh
-        self._notify_write_error = notify_write_error
-        self._notify_pending = notify_pending
         self._validate_deferred = validate_deferred
         self._sleep = sleep
         self._monotonic = monotonic
@@ -113,10 +109,10 @@ class AmtronControl:
         self._release_writes = 0
         # When, and on which connection, a goal pause was last read back.
         self._goal_pause_confirmed: tuple[float, int] | None = None
-        # The pause in place is the one the charge target's stop wrote, and no
-        # current was written since. Not kept over a restart: then the pause
-        # counts as anybody's and stays.
-        self.soc_stop_paused = False
+        # Whose pause is in place: "manual", "soc_stop" for the charge
+        # target's stop, or the source that wrote it. Not kept over a
+        # restart: a pause of unknown owner counts as anybody's and stays.
+        self.pause_owner: str | None = None
         self._pending_due = 0.0
         self._pending_until: datetime | None = None
         self._pending_changed = asyncio.Event()
@@ -141,7 +137,8 @@ class AmtronControl:
         self.queue = CommandQueue(self)
         self.guest_confirmation_required: Callable[[], bool] = lambda: False
         self.time_limit_reached: Callable[[], bool] = lambda: False
-        self.guest_active: Callable[[], bool] = lambda: False
+        # Whether a guest charges now, as guest charging says.
+        self.guest_mode: Callable[[], bool] = lambda: False
 
     @property
     def layout_version(self) -> int:
@@ -179,7 +176,7 @@ class AmtronControl:
         """The active SoC fence, including pending evidence and storage faults."""
         return (
             self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
-            else (not self.guest_active() and self.soc_goal.stop_requested)
+            else (not self.guest_mode() and self.soc_goal.stop_requested)
         )
 
     @property
@@ -256,7 +253,7 @@ class AmtronControl:
 
     @property
     def charging_setpoint(self) -> float | None:
-        """Return the remembered resume target, retained across entry reloads."""
+        """Return the remembered resume target, kept across reconnects and restarts."""
 
         return self._write_state.charging_setpoint
 
@@ -301,7 +298,7 @@ class AmtronControl:
         """Return the highest charging current a user may request.
 
         The device limits anything it is sent anyway; this is the limit the
-        number entity shows, so a user never sees a value the wallbox would
+        service reports, so a user never sees a value the wallbox would
         silently clamp.
         """
 
@@ -366,7 +363,7 @@ class AmtronControl:
         return changed
 
     def _command_cancellation_reason(self, command: PendingCommand) -> str | None:
-        if command.grant_release and not self.guest_active():
+        if command.grant_release and not self.guest_mode():
             return "unknown"
         if command.owner is None:
             return None
@@ -416,7 +413,10 @@ class AmtronControl:
         that waits is newer intent and keeps the pause too.
         """
         await self._plug_charge.async_authorize(session, deadline)
-        if end_pause and self.pause_requested is True and self._pending is None:
+        if (
+            end_pause and self.pause_requested is True and self._pending is None
+            and self.pause_owner == "manual" and self.is_paused is True
+        ):
             await self.async_resume_charging()
 
     async def async_set_energy_goal(self, value: float) -> None:
@@ -425,21 +425,27 @@ class AmtronControl:
             raise validation_error("energy_goal_not_supported")
         await self.goal_controller.async_set_target(value)
 
-    async def async_pause_for_energy_goal(self) -> None:
-        """Enforce a latched energy stop, retaining only the current-write floor."""
+    async def async_pause_for_energy_goal(self) -> bool:
+        """Enforce a latched energy stop, retaining only the current-write floor.
+
+        Returns whether it may have changed what is saved: a stop that holds
+        and was read back a moment ago changes nothing.
+        """
         async with self._current_lock:
             if not self.energy_goal_stop_requested:
-                return
+                return False
+            changed = False
             if self.foreign_stop_requested and self.goal_controller is not None:
                 # Another limit stops the charge. A pause for a missing meter
                 # is no longer the energy goal's to end: lifting this limit
                 # later must not start a charge.
-                self.goal_controller.drop_recovery()
+                changed = self.goal_controller.drop_recovery()
             self._require_write_access()
             confirmed = self._goal_pause_confirmed
             polled = self._state().fresh(CHARGING_CURRENT_EMS.key)
             if (
-                confirmed is not None and self._pending is None
+                # A waiting stop stays queued anyway and changes nothing here.
+                confirmed is not None and (self._pending is None or self._pending.action in STOPS)
                 and confirmed[1] == self._client.connection_generation
                 and 0 <= self._monotonic() - confirmed[0] < _GOAL_PAUSE_RECHECK_SECONDS
                 and isinstance(polled, (int, float)) and not isinstance(polled, bool)
@@ -448,11 +454,11 @@ class AmtronControl:
                 # A latched stop stays for hours. The pause was read back a
                 # moment ago on this connection, and this poll still reads it;
                 # a reboot or fallback shows up in the poll or the reconnect.
-                return
+                return changed
             if await self.writes.async_vehicle_absent():
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
-                return
+                return changed
             if self._pending is not None and self._pending.action not in STOPS:
                 # The stop replaces a start that waited for the current. A
                 # waiting stop stays, a pause included: this stop's latch may
@@ -480,7 +486,7 @@ class AmtronControl:
                         self._goal_pause_confirmed = (
                             self._monotonic(), self._client.connection_generation,
                         )
-                        return
+                        return True
                 else:
                     self._write_state.confirmed_current = None
             reason = self._stop_reason()
@@ -492,8 +498,9 @@ class AmtronControl:
                 "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True,
                 source=source, completion_reason=reason,
             ))
+            return True
 
-    async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
+    async def async_configure_soc(self, source: str | None) -> None:
         if self.soc_goal_controller is None:
             raise validation_error("soc_goal_not_supported")
         await self.soc_goal_controller.async_configure_source(source)
@@ -527,8 +534,6 @@ class AmtronControl:
                 outcome="replaced" if replaced else "cancelled",
                 reason="replaced" if replaced else "energy_goal",
             )
-            if self._notify_pending is not None:
-                self._notify_pending()
 
     async def async_energy_goal_recovery_ready(self) -> bool:
         """Confirm a cleared error before restoring only our own outage pause."""
@@ -568,9 +573,7 @@ class AmtronControl:
         """Discard future work, retaining any pause or setpoint already applied."""
         async with self._current_lock:
             self._require_write_access()
-            changed = self._clear_pending(outcome="cancelled", reason="user_cancelled")
-            if changed and self._notify_pending is not None:
-                self._notify_pending()
+            self._clear_pending(outcome="cancelled", reason="user_cancelled")
 
     async def async_set_limits(self, options: ControlOptions) -> None:
         """Use new limits without a restart; read-only mode still needs one.
@@ -698,8 +701,6 @@ class AmtronControl:
         async with self._current_lock:
             if self._pending is not None and self._pending.owner == owner:
                 self._clear_pending(outcome="cancelled", reason="user_cancelled")
-                if self._notify_pending is not None:
-                    self._notify_pending()
 
     def _resume_current_maximum(self, current_cap: float | None) -> float:
         if current_cap is None:
@@ -729,7 +730,7 @@ class AmtronControl:
         self._require_write_access()
         async with self._current_lock:
             if soc_stop_only and not (
-                self.soc_stop_paused and self.pause_requested is True
+                self.pause_owner == "soc_stop" and self.pause_requested is True
                 and self._pending is None and not self.energy_goal_stop_requested
             ):
                 return

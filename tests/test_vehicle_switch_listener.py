@@ -192,7 +192,7 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
             charge_watch_unsubscribe=None,
             plug_charge=None, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
             cost_goal=None, departure_observer=timed, vehicle_soc=None,
-            client=SimpleNamespace(async_close=AsyncMock()),
+            client=SimpleNamespace(async_close=AsyncMock()), vehicle_switch=None,
         )
         options = {**detection_catalog(), "active_vehicle_profile": selected}
         options["vehicle_profiles"]["a" * 32]["options"]["departure_enabled"] = planning
@@ -330,3 +330,78 @@ def test_options_saved_back_against_the_applied_switch_reload(tmp_path, monkeypa
         reload.assert_awaited_once()
 
     _listening(tmp_path, monkeypatch, body)
+
+
+def test_an_unload_cancels_and_awaits_a_running_vehicle_switch(monkeypatch):
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.mennekes_amtron_rtu.vehicle_profiles import without_selection
+
+    async def run():
+        options = {"active_vehicle_profile": "b" * 32}
+        runtime = SimpleNamespace(
+            client=SimpleNamespace(snapshot={}, async_close=AsyncMock()), entry_data={},
+            vehicle_base_options=without_selection(options),
+            vehicle_selection={"previous": True}, vehicle_profile_id=None,
+            coordinator=SimpleNamespace(retry_soc_goal=None), vehicle_switching=False,
+            vehicle_switch=None, loaded_platforms=[], retain_cost_on_unload=False,
+            vehicle_detection=None, vehicle_binding=None, charge_watch_unsubscribe=None,
+            plug_charge=None, charge_loss=None, charging_cost=None, cost_goal=None,
+            departure_observer=None, vehicle_soc=None,
+        )
+        entry = SimpleNamespace(
+            entry_id="entry", data={}, options=options, runtime_data=runtime,
+            state=ConfigEntryState.UNLOAD_IN_PROGRESS,
+        )
+        parked = asyncio.Event()
+        order = []
+
+        async def park(_hass, _entry):
+            parked.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                order.append("switch cancelled")
+                raise
+
+        async def unload_platforms(_entry, _platforms):
+            order.append("platforms unloaded")
+            return True
+
+        monkeypatch.setattr(integration, "_async_park_trip", park)
+        monkeypatch.setattr(integration, "async_release", AsyncMock())
+        hass = SimpleNamespace(
+            is_stopping=False, data={},
+            async_create_task=lambda target, _name: asyncio.create_task(target),
+            config_entries=SimpleNamespace(async_unload_platforms=unload_platforms),
+        )
+        switching = asyncio.create_task(integration._async_switch_vehicle(hass, entry))
+        await parked.wait()
+        assert await integration.async_unload_entry(hass, entry)
+        # The switch ended before anything of the runtime was stopped.
+        assert order == ["switch cancelled", "platforms unloaded"]
+        with pytest.raises(asyncio.CancelledError):
+            await switching
+        assert runtime.vehicle_switch is None
+
+    asyncio.run(run())
+
+
+def test_an_owner_that_fails_to_stop_does_not_keep_the_others_running():
+    async def run():
+        failed = SimpleNamespace(async_stop=AsyncMock(side_effect=RuntimeError("broken")))
+        plan = SimpleNamespace(async_stop=AsyncMock())
+        soc = SimpleNamespace(async_stop=AsyncMock())
+        client = SimpleNamespace(async_close=AsyncMock())
+        runtime = SimpleNamespace(
+            vehicle_detection=None, vehicle_binding=None, charge_watch_unsubscribe=None,
+            plug_charge=failed, coordinator=SimpleNamespace(), charge_loss=None, charging_cost=None,
+            cost_goal=None, departure_observer=plan, vehicle_soc=soc, client=client,
+        )
+        with pytest.raises(RuntimeError, match="broken"):
+            await integration._async_stop_runtime(runtime)
+        plan.async_stop.assert_awaited_once_with(withdraw=False)
+        soc.async_stop.assert_awaited_once()
+        client.async_close.assert_awaited_once()
+
+    asyncio.run(run())

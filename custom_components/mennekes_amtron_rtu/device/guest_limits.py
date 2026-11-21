@@ -34,7 +34,7 @@ class GuestLimits:
     def configure_control(self, control: AmtronControl) -> None:
         self.ready = False
         self.restore_pending = self._service.client.write_state.guest_permission is not None
-        control.guest_active = lambda: self.mode
+        control.guest_mode = lambda: self.mode
         control.guest_confirmation_required = lambda: self.restore_pending
         control.time_limit_reached = self.time_reached
 
@@ -160,10 +160,13 @@ class GuestLimits:
             if (control is None or not self.ready or self._service.stopping or not self._service.is_available()
                     or not (self.time_reached() or self.restore_pending)):
                 return
+            # A stop that holds changes nothing to save; this runs every second.
+            changed = True
             try:
-                await control.async_pause_for_energy_goal()
+                changed = await control.async_pause_for_energy_goal()
             finally:
-                await self._service.persist()
+                if changed:
+                    await self._service.persist()
 
     async def loop(self) -> None:
         while True:

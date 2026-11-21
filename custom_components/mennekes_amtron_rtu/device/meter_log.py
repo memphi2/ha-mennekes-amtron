@@ -20,6 +20,9 @@ _MAX_STORED = 8192
 # While the meter rises, one reading per this span is kept. Where a rise
 # begins or ends, the readings stay exact.
 _RISING_SPACING_SECONDS = 20.0
+# The longest a coarse meter shows no step while a car charges at the least
+# current; a rest that lasts longer is a rest, and thinning keeps its ends.
+_STEP_SECONDS = 60.0
 # Two readings further apart than this, with energy between them, cannot
 # place a boundary: nobody saw when that energy flowed.
 MAX_INTERPOLATION_SECONDS = 600.0
@@ -92,10 +95,13 @@ class MeterLog:
     def _thin(self) -> None:
         """Make room without losing the oldest reading, where a plug-in starts.
 
-        A reading between two others of a rise goes, also beside a step of a
-        meter that counts coarsely, as long as its neighbours are close
-        enough to interpolate; pass after pass, oldest first. Only where no
-        such reading is left does the second oldest go, never the first.
+        A reading between two others of a rise goes, as long as its
+        neighbours are close enough to interpolate; pass after pass, oldest
+        first. Beside a step of a meter that counts coarsely it goes too, but
+        a reading that ends or begins a longer rest stays: interpolating over
+        it would move energy into a time the meter showed none, such as before
+        a plug-in or during a pause. Only where no such reading is left does
+        the second oldest go, never the first.
         """
         times, values = self._times, self._values
         target = _MAX_READINGS * 3 // 4
@@ -103,10 +109,13 @@ class MeterLog:
             keep = [True] * len(times)
             left, index = len(times), 1
             while index < len(times) - 1 and left > target:
+                before, at, after = times[index - 1], times[index], times[index + 1]
                 if (
                     values[index - 1] <= values[index] <= values[index + 1]
                     and values[index - 1] < values[index + 1]
-                    and times[index + 1] - times[index - 1] <= MAX_INTERPOLATION_SECONDS
+                    and after - before <= MAX_INTERPOLATION_SECONDS
+                    and (values[index - 1] < values[index] or at - before <= _STEP_SECONDS)
+                    and (values[index] < values[index + 1] or after - at <= _STEP_SECONDS)
                 ):
                     keep[index] = False
                     left -= 1

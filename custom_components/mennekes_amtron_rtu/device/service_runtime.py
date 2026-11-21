@@ -23,6 +23,11 @@ from .client_errors import AmtronBusError
 from .command_events import SOURCES, attributed, command_source
 from .commands import COMMANDS, ENVELOPE, needs_wallbox
 from .connection_sample import connection_sample
+from .const import (
+    CHARGING_CURRENT_MINIMUM,
+    ERROR_CODE_EMS_UNAVAILABLE,
+    charging_setpoint_from,
+)
 from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
 from .departure_plan import DepartureController
@@ -278,11 +283,9 @@ class ModbusService:
         if control.charging_setpoint is None:
             current = self.data.get("charging_current_ems")
             if isinstance(current, (int, float)):
-                # A foreign controller may have written more than this
-                # wallbox is ever asked for; that is no limit to remember.
-                control.charging_setpoint = (
-                    min(float(current), 32.0) if current == 0 or current >= 6 else 6.0
-                )
+                # A pause found on the wallbox resumes at the least current.
+                found = charging_setpoint_from(float(current))
+                control.charging_setpoint = CHARGING_CURRENT_MINIMUM if found is None else found
         await self.save_intent()
         self.control = control
         self.goal = goal
@@ -613,7 +616,7 @@ class ModbusService:
             self.control is None
             or self.control.read_only
             or self.heartbeat.healthy is not True
-            or self.data.get("error_code") != 200
+            or self.data.get("error_code") != ERROR_CODE_EMS_UNAVAILABLE
             or self._attempts >= 3
             or time.monotonic() < self._retry_at
         ):

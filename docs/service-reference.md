@@ -87,7 +87,7 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/`, `GET /api/overview` | Overview page and its read-only snapshot |
 | `/connection`, `/api/config`, `/api/adapter` | Connection settings and LAN-adapter setup |
 | `/log`, `/api/modbus-debug` | Live log, in RAM only |
-| `/registers`, `GET /api/registers` | Register page below the overview, from passive observations |
+| `/registers`, `GET /api/registers` | Register page under **Diagnostics**, from passive observations |
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
 | `/charging`, `/api/charging` | Targets and explicit guest start |
 
@@ -343,7 +343,7 @@ and a target reached before stays reached.
 | `soc_goal` | `value` (percent), `source`, `soc`, `soc_age`, `maximum` | Sets the percentage target with the level it is judged on. `POST /v1/soc-goal/commit` takes the same fields plus the reserved `token`. |
 | `soc_goal_choice` | `value` (percent), `expected_choice_revision` | The app's choice; the service adds its own last level of the bound source. |
 | `soc_stop_pause_end` | none | Ends the pause the percentage target's stop wrote, and only while no current was written since; any other pause stays. The service does not keep this across a restart. |
-| `plug_charge_authorize` | `session`, `deadline` (ISO timestamp at most 30 s ahead), optional `end_pause`: boolean | Grants Plug & Charge for the current plug-in. With `end_pause`, a manual pause ends after the grant succeeded, unless a command waits. |
+| `plug_charge_authorize` | `session`, `deadline` (ISO timestamp at most 30 s ahead), optional `end_pause`: boolean | Grants Plug & Charge for the current plug-in. With `end_pause`, a pause set by hand (from HA or the app, not from a plan, target or guest limit, and not one restored after a restart) ends after the grant succeeded, unless a command waits or an armed departure plan decides the start. |
 
 ### Command activity metadata
 
@@ -393,7 +393,7 @@ is derived from their published state and decides nothing:
 | Field | Meaning |
 |---|---|
 | `controller` | `unavailable`, `guest`, `departure_plan` or `direct`. Guest permission takes priority over a vehicle departure plan |
-| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, then the controller's reason (`meter_unavailable`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
+| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `vehicle_unconfirmed` (a guest charge waiting for its confirmation), `release_off`, `plug_charge_waiting`, `meter_unavailable` (also after a meter reset, for every controller), then the controller's reason (`vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
 | `next` | `event` (`none`, `queued_command`, `plan_start`, `target_reached`, `departure`) and `at`, an ISO timestamp that is `null` exactly for `none`. A queued command is named when it comes first |
 | `target` | `kind` (`none`, `level` in percent, `energy` in kWh), `value` and `deadline` (ISO timestamp or `null`) |
 | `vehicle` | `unknown`, `none`, `connected`, or `confirmed` once Home Assistant confirmed its car for this plug-in |

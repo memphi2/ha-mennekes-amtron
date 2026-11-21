@@ -225,7 +225,9 @@ def test_a_car_that_never_reported_an_unplug_is_confirmed_once(tmp_path):
         report(hass, plugged=False, name="second")
         binding = m.VehicleBinding(hass, entry)
         await binding.async_start()
-        # The first start after an update knows no empty wallbox yet.
+        # The first start after an update knows no empty wallbox yet; the
+        # service watched the wallbox since before the car's report.
+        coordinator.known_since = dt_util.utcnow().timestamp() - 600
         coordinator.plug(True)
         await settle(hass)
         assert not binding.resting
@@ -306,9 +308,10 @@ def test_a_saved_binding_round_trips():
         )
 
 
-@pytest.mark.parametrize("change", ["replug", "gap"])
-def test_a_plug_in_this_process_did_not_see_ends_the_binding(tmp_path, change):
-    """The service saw the other car arrive while Home Assistant was away."""
+@pytest.mark.parametrize("restart", [True, False])
+@pytest.mark.parametrize("change", ["replug", "gap", "gap_without_report"])
+def test_a_plug_in_this_process_did_not_see_ends_the_binding(tmp_path, change, restart):
+    """The service saw another car arrive, or lost track, while nobody looked."""
 
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -322,24 +325,29 @@ def test_a_plug_in_this_process_did_not_see_ends_the_binding(tmp_path, change):
         report(hass)
         await settle(hass)
         assert not binding.resting
-        binding.stop()
-        await settle(hass)
-        # No empty poll reaches the restarted binding.
+        if restart:
+            binding.stop()
+            await settle(hass)
+        # No empty poll reaches the binding.
         if change == "replug":
             coordinator.unseen_replug()
         else:
-            # Across a gap the plug-in time is unknown: the car's own
-            # unplug report keeps it from confirming the car that came.
-            report(hass, plugged=False)
+            if change == "gap":
+                # The car's own unplug report keeps it from confirming too.
+                report(hass, plugged=False)
+            # Across a gap the plug-in time is unknown: the car's report from
+            # before the gap may be of another plug-in.
             coordinator.gap()
-        restarted = m.VehicleBinding(hass, entry)
-        await restarted.async_start()
-        assert restarted.resting
-        # Only the car's own report after that plug-in confirms it again.
+        if restart:
+            binding = m.VehicleBinding(hass, entry)
+            await binding.async_start()
+        await settle(hass)
+        assert binding.resting
+        # Only the car's own report after that confirms it again.
         report(hass)
         await settle(hass)
-        assert not restarted.resting
-        restarted.stop()
+        assert not binding.resting
+        binding.stop()
         await hass.async_stop()
 
     asyncio.run(run())

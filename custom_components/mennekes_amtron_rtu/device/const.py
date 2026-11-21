@@ -65,6 +65,15 @@ MAX_PHASE_SWITCH_GRACE_SECONDS: Final = 30
 CHARGING_CURRENT_MINIMUM: Final = 6.0
 CHARGING_CURRENT_UNLIMITED: Final = 0.0
 CHARGING_PAUSE_CURRENT: Final = 1.0
+# More than this is a foreign controller's value, no limit to remember.
+CHARGING_SETPOINT_MAXIMUM: Final = 32.0
+
+
+def charging_setpoint_from(current: float) -> float | None:
+    """The current found on the wallbox as a limit to resume with; None for a pause."""
+    if current == CHARGING_CURRENT_UNLIMITED or current >= CHARGING_CURRENT_MINIMUM:
+        return min(float(current), CHARGING_SETPOINT_MAXIMUM)
+    return None
 
 HEARTBEAT_VALUE: Final = 0x55AA
 SYSTEM_RESTART_VALUE: Final = 0xBB

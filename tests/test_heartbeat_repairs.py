@@ -427,3 +427,23 @@ def test_a_failing_heartbeat_listener_fails_neither_the_poll_nor_the_others(monk
         await client.async_close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("reloading", [True, False])
+def test_a_lasting_fault_stays_reported_through_the_integrations_reload(monkeypatch, reloading):
+    from custom_components.mennekes_amtron_rtu.embedded import mark_reloading
+
+    async def run():
+        hass, entry, _transport, registry, monitor = await _setup(monkeypatch)
+        _set_healthy(entry, False)
+        _expire(monitor)
+        issue_id = _issue(entry, ISSUE_HEARTBEAT_UNAVAILABLE)
+        assert issue_id in registry.created
+        registry.deleted.clear()
+        mark_reloading(hass, entry.entry_id, reloading)
+        monitor.stop()
+        assert (issue_id in registry.deleted) is not reloading
+        mark_reloading(hass, entry.entry_id, False)
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())

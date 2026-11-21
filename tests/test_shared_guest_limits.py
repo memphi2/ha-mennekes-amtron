@@ -54,7 +54,7 @@ def test_guest_starts_from_pause_and_keeps_shared_goals(tmp_path, monkeypatch, p
             put(transport.bank, R.EVSE_STATE, 1)
             put(transport.bank, R.CP_STATE, 10)
             await service.refresh()
-            assert not control.guest_active()
+            assert not control.guest_mode()
     asyncio.run(body())
 
 
@@ -181,6 +181,32 @@ def test_guest_time_stop_keeps_write_floor_without_state_change_delay(tmp_path, 
             assert service.control.pending_action is None
             assert not service.guest.active
             assert service.snapshot()["control"]["operation"]["waiting"] == "target_reached"
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_a_guest_stop_that_holds_is_not_saved_every_second(tmp_path, changed):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, _transport, clock):
+            await service.control.async_pause_charging()
+            clock[0] += 1000
+            await service.command({"command":"guest_start", "expected_serial_number":service.identity.serial_number,
+                                   "expected_guest_revision":service.guest.revision})
+            await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
+            saves = []
+            persist = service.persist
+
+            async def counted():
+                saves.append(1)
+                await persist()
+
+            async def enforce():
+                return changed
+
+            service.persist = counted
+            service.control.async_pause_for_energy_goal = enforce
+            await service.guest.tick()
+            assert len(saves) == int(changed)
     asyncio.run(run())
 
 

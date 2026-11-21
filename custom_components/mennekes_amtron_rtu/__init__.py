@@ -8,8 +8,9 @@ focused modules next to it.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from copy import deepcopy
 from typing import Any, NoReturn
 
@@ -613,8 +614,23 @@ async def _async_switch_vehicle(
     """Apply a pure vehicle selection change without reloading entities.
 
     Returns False when anything else changed or the switch failed; the caller
-    then reloads the entry, which retries the new vehicle's setup.
+    then reloads the entry, which retries the new vehicle's setup. An unload
+    cancels the task running the switch and waits for it before it stops the
+    runtime the switch is starting observers on.
     """
+    runtime = entry.runtime_data
+    task = asyncio.current_task()
+    runtime.vehicle_switch = task
+    try:
+        return await _async_switch_vehicle_now(hass, entry)
+    finally:
+        if runtime.vehicle_switch is task:
+            runtime.vehicle_switch = None
+
+
+async def _async_switch_vehicle_now(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry,
+) -> bool:
     runtime = entry.runtime_data
     if (
         _service_intent_rejected(runtime.client)
@@ -656,7 +672,8 @@ async def _async_switch_vehicle(
     except asyncio.CancelledError:
         # A cancelled switch leaves the observers half stopped and its caller
         # never sees the result: only a reload brings the car's rules back.
-        # An unload or HA shutdown cancels it too; those must stay down.
+        # An unload cancels it too, and so may HA's shutdown; those must
+        # stay down.
         if entry.state is ConfigEntryState.LOADED and not hass.is_stopping:
             hass.async_create_task(
                 async_reload_entry(hass, entry, force=True), "amtron_reload"
@@ -767,6 +784,11 @@ async def async_unload_entry(
     """Tear down one wallbox."""
 
     runtime_data = entry.runtime_data
+    switch = runtime_data.vehicle_switch
+    if switch is not None and not switch.done() and switch is not asyncio.current_task():
+        # A vehicle switch must not start observers on a runtime that stops.
+        switch.cancel()
+        await asyncio.wait({switch})
     unloaded = await hass.config_entries.async_unload_platforms(
         entry, runtime_data.loaded_platforms
     )
@@ -802,30 +824,45 @@ async def _async_stop_runtime(
     """Release the same owners after partial setup and ordinary unloading.
 
     Detach source and polling listeners before their consumers; the client
-    is closed last.
+    is closed last. One owner that fails to stop does not keep the others
+    running; the first failure is raised after all of them stopped.
     """
-    if runtime.vehicle_detection is not None:
-        runtime.vehicle_detection.stop()
-    if runtime.vehicle_binding is not None:
-        runtime.vehicle_binding.stop()
-        await runtime.vehicle_binding.async_saved()
+    failure: Exception | None = None
+
+    async def stop(step: Callable[[], Awaitable[object] | None]) -> None:
+        nonlocal failure
+        try:
+            result = step()
+            if inspect.isawaitable(result):
+                await result
+        except Exception as err:  # every owner still stops
+            _LOGGER.debug("Stopping a part of the entry failed", exc_info=True)
+            failure = failure or err
+
+    if (detection := runtime.vehicle_detection) is not None:
+        await stop(detection.stop)
+    if (binding := runtime.vehicle_binding) is not None:
+        await stop(binding.stop)
+        await stop(binding.async_saved)
     if runtime.charge_watch_unsubscribe is not None:
-        runtime.charge_watch_unsubscribe()
+        await stop(runtime.charge_watch_unsubscribe)
         runtime.charge_watch_unsubscribe = None
-    if runtime.plug_charge is not None:
-        await runtime.plug_charge.async_stop()
+    if (gate := runtime.plug_charge) is not None:
+        await stop(gate.async_stop)
     runtime.coordinator.observe_estimates = None
-    if runtime.charge_loss is not None:
-        await runtime.charge_loss.async_stop()
-    if runtime.charging_cost is not None and not retain_cost:
-        await runtime.charging_cost.async_stop()
-    if runtime.cost_goal is not None:
-        await runtime.cost_goal.async_stop()
-    if runtime.departure_observer is not None:
-        await runtime.departure_observer.async_stop(withdraw=withdraw_plan)
-    if runtime.vehicle_soc is not None:
-        await runtime.vehicle_soc.async_stop()
+    if (loss := runtime.charge_loss) is not None:
+        await stop(loss.async_stop)
+    if (cost := runtime.charging_cost) is not None and not retain_cost:
+        await stop(cost.async_stop)
+    if (goal := runtime.cost_goal) is not None:
+        await stop(goal.async_stop)
+    if (plan := runtime.departure_observer) is not None:
+        await stop(lambda: plan.async_stop(withdraw=withdraw_plan))
+    if (soc := runtime.vehicle_soc) is not None:
+        await stop(soc.async_stop)
     await runtime.client.async_close()
+    if failure is not None:
+        raise failure
 
 
 async def async_reload_entry(

@@ -31,13 +31,13 @@ visible and shows:
   whether Home Assistant confirmed the car. Home Assistant shows the same
   summary as [Charging wait reason](entities.md#charging-wait-reason) and its
   attributes.
-- the **observed charging state** read from the wallbox, and why the app holds
+- **Charging now**: the charging state read from the wallbox, and why the app holds
   a pause or a stop, for example a reached target or a switched-off release
 - power, session energy and the current limit read back from the wallbox;
   **0 A means unlimited**, not paused
 - whether writes are enabled and whether the heartbeat is confirmed
 - the **next queued action** and its earliest time; queued does not mean done
-- **Charge targets**: the saved energy, cost and vehicle charge target and the
+- **Targets**: the saved energy, cost and vehicle charge target and the
   target time, with one link to the page that changes them; they are targets,
   not progress
 - up to 32 recent command results since the app started, newest first
@@ -51,7 +51,7 @@ or replaced command includes the reason. For example, a Plug & Charge release is
 distinct from a current change sent through Home Assistant. A Home Assistant
 source can be a control or an automation; it does not identify a person.
 The requested amperes are a setting, not the current actually drawn by the car.
-Check the observed charging state and power above for the physical result.
+Check **Charging now** and the power above for the physical result.
 
 The time beside each result is the original command-event time. For a longer
 timeline together with plug-in, charging and fault changes, use **Home Assistant

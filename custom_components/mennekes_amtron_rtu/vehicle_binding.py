@@ -288,17 +288,26 @@ class VehicleBinding:
         return resting
 
     def _fresh(self, profile_id: str) -> bool:
-        """The car reported itself plugged in at home during this plug cycle."""
+        """The car reported itself plugged in at home during this plug cycle.
+
+        Without a known plug-in, the cycle begins when the service began to
+        watch it, at its first start or after a gap it could not bridge: a
+        report from before that may be of another plug-in.
+        """
         evidence = self._evidence.snapshot(profile_id)
         plugged_at = self.plugged_at
         if evidence.at_home(plugged_at) is not True or evidence.connected_at is None:
             return False
-        floors = []
+        cycle = self._state.cycle
         if plugged_at is not None:
-            floors.append(plugged_at - PLUG_WINDOW)
+            floors = [plugged_at - PLUG_WINDOW]
+        elif cycle is not None and cycle[0] is not None:
+            floors = [dt_util.utc_from_timestamp(cycle[0])]
+        else:
+            return False
         if self._state.refused_at is not None:
             floors.append(dt_util.utc_from_timestamp(self._state.refused_at))
-        return not floors or evidence.connected_at >= max(floors)
+        return evidence.connected_at >= max(floors)
 
     def _reset_check(self, now: datetime) -> None:
         self._confirmed_at = now

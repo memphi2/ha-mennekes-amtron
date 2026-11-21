@@ -105,7 +105,7 @@ usable battery capacity, charging history for losses and detection signals.
 You do not choose those entities yourself; the guided setup shows them, and
 you can switch any area to a manual entity. The charge limit is only taken
 over while the car reports a value, because an empty limit would refuse every
-percentage target; turn it on later in **Charge level**. Departure planning
+percentage target; turn it on later in **Charge level and charge limit**. Departure planning
 stays off until you set it up:
 
 | Item | What it is for |
@@ -290,7 +290,10 @@ The grant belongs to that observed connection. A manual pause
 ends when a recognized vehicle is granted: plugging it in means it should charge.
 Grant and end of the pause are one command: the release is granted first, at
 the pause current, and the pause ends only after that succeeded, so a refused
-grant leaves the pause as it was. The start that follows keeps the
+grant leaves the pause as it was. Only a pause set by hand in HA or the app
+ends this way; a pause of the departure plan, the charge target or guest
+charging stays, and so does a pause the service restored after a restart.
+The start that follows keeps the
 state-change interval. Only a
 plug-in that HA observed after the car was unplugged counts: after an HA or app
 restart, update or reconnect with the car still connected, the grant returns

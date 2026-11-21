@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from custom_components.mennekes_amtron_rtu import plug_charge as m
+from custom_components.mennekes_amtron_rtu.device.commands import PLAN_HOLDS
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
 from custom_components.mennekes_amtron_rtu.vehicle_sources import types
 from tests.test_vehicle_detection import detection_catalog
@@ -55,7 +56,7 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True
     options["active_vehicle_profile"] = selected
     coordinator, timers = Coordinator(), []
     control = SimpleNamespace(
-        read_only=False, pause_requested=False, is_paused=False, observed_pause=False,
+        read_only=False, pause_requested=False, is_paused=False, observed_pause=False, pause_owner=None,
         charging_release_requested=None,
         energy_goal_stop_requested=False, pending_action=None, supports_soc_goal=True,
         soc_goal=SimpleNamespace(target_percent=0.0, stop_requested=False),
@@ -68,8 +69,14 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True
         assert session == control.plug_charge["session"]
         assert 0 < (deadline - dt_util.utcnow()).total_seconds() <= 10
         control.plug_charge["authorized"] = True
-        # The service ends the manual pause after the grant, in the same command.
-        if end_pause:
+        # The service ends only a manual pause it read back, after the grant.
+        plan = entry.runtime_data.departure_observer
+        if (
+            end_pause and control.pause_requested is True and control.pending_action is None
+            and control.pause_owner == "manual" and control.observed_pause is True
+            # An armed plan decides the start.
+            and (plan is None or plan.status not in PLAN_HOLDS)
+        ):
             await control.async_resume_charging()
         coordinator.async_update_listeners()
 
@@ -382,6 +389,9 @@ async def plug_in_paused(h, *, pending=None, plan=None, goal_stop=False, paused=
     h.control.observed_pause = paused
     h.control.pending_action = pending
     h.control.energy_goal_stop_requested = goal_stop
+    # Only the plan's own pause belongs to it; a plan still waiting for its
+    # inputs leaves a manual pause manual.
+    h.control.pause_owner = "departure_plan" if plan == "paused_until_start" else "manual"
     if plan is not None:
         arm_plan(h, plan)
 

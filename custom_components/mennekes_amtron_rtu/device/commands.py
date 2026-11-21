@@ -12,9 +12,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from .departure_plan import PLAN_CHARGING, PLAN_DECIDING, PLAN_PAUSED
 from .enums import RequestedPhases, SolarChargingMode
 from .errors import validation_error
 from .service_config import integer
+
+# Plan states in which the plan, not a plug-in, decides when charging starts.
+PLAN_HOLDS = PLAN_DECIDING | PLAN_CHARGING | {PLAN_PAUSED, "error"}
 
 if TYPE_CHECKING:
     from .control import AmtronControl
@@ -74,7 +78,7 @@ async def _unplug_release_config(service: ModbusService, _control: AmtronControl
     service.client.write_state.unplug_release.configure(payload.get("value"))
 
 
-async def _plug_charge_authorize(_service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
+async def _plug_charge_authorize(service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:
     session, deadline = payload.get("session"), payload.get("deadline")
     end_pause = payload.get("end_pause", False)
     if (
@@ -82,6 +86,11 @@ async def _plug_charge_authorize(_service: ModbusService, control: AmtronControl
         or type(end_pause) is not bool
     ):
         raise ValueError("invalid Plug & Charge authorization")
+    plan = service.departure
+    if plan is not None and plan.status in PLAN_HOLDS:
+        # An armed plan decides the start, also over a pause it found in
+        # place and kept instead of writing its own.
+        end_pause = False
     await control.async_authorize_plug_charge(
         session, deadline=datetime.fromisoformat(deadline), end_pause=end_pause,
     )

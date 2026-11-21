@@ -329,8 +329,13 @@ class DepartureObserver:
     def _phases(self) -> int:
         data = self._runtime.coordinator.current_data()
         car = car_phases(data.fresh)
-        if car is not None and data.fresh(EVSE_STATE.key) == EvseState.CHARGING:
-            # Only a drawing car proves the reading is its own.
+        binding = getattr(self._runtime, "vehicle_binding", None)
+        if (
+            car is not None and data.fresh(EVSE_STATE.key) == EvseState.CHARGING
+            and not (binding is not None and binding.resting)
+        ):
+            # Only a drawing car proves the reading is its own, and only the
+            # car confirmed at the wallbox is the selected one.
             self._remember_phases(car)
         # Detection is zero while the car draws no current, i.e. all the time
         # before a late start. The car's last detected phases then decide, and
