@@ -255,3 +255,39 @@ def test_the_polling_loop_checks_the_cap_after_recovery(tmp_path, monkeypatch):
             await service.stop()
         assert calls == ["refresh", "_recover", "_enforce_current_cap", "persist"]
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("failing", ["_recover", "refresh"])
+def test_a_round_that_failed_after_its_poll_keeps_what_the_poll_saw(tmp_path, monkeypatch, failing):
+    class StopLoopError(Exception):
+        pass
+
+    async def run():
+        service, _transport = await console_fixture(tmp_path)
+        seen = []
+        try:
+            real_observe = service._observe_plug
+
+            def observe(data, **kwargs):
+                seen.append(data is not None)
+                real_observe(data, **kwargs)
+
+            monkeypatch.setattr(service, "_observe_plug", observe)
+            if failing == "_recover":
+                # The poll read the car; a later step of the round fails.
+                monkeypatch.setattr(service, "_recover", AsyncMock(side_effect=ValueError("late")))
+            else:
+                # Nothing was read: the car is unknown.
+                monkeypatch.setattr(service, "refresh", AsyncMock(side_effect=OSError("before the poll")))
+
+            async def stop(_delay):
+                raise StopLoopError
+
+            monkeypatch.setattr(runtime.asyncio, "sleep", stop)
+            with pytest.raises(StopLoopError):
+                await service._polling_loop()
+        finally:
+            monkeypatch.undo()
+            await service.stop()
+        assert seen == ([True] if failing == "_recover" else [False])
+    asyncio.run(run())

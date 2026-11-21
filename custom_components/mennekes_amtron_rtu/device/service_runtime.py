@@ -134,6 +134,7 @@ class ModbusService:
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._heartbeat_started = asyncio.Event()
         self._success = False
+        self._plug_observed = False
         self._attempts = 0
         self._retry_at = 0.0
         self._cap_retry_at = 0.0
@@ -376,6 +377,8 @@ class ModbusService:
 
     async def _polling_loop(self) -> None:
         while True:
+            # Whether a poll of this round told the plug cycle what it saw.
+            self._plug_observed = False
             try:
                 if self.control is None:
                     await self._initialize()
@@ -393,7 +396,10 @@ class ModbusService:
                 self.failure = err
                 if self.control is None:
                     self._startup_error = err
-                self._observe_plug(None)
+                if not self._plug_observed:
+                    # Nothing was read this round: the car is unknown, not
+                    # present. A poll that read it keeps what it read.
+                    self._observe_plug(None)
                 unreadable = self._phase == "loading saved control intent" and not isinstance(err, AmtronBusError)
                 self._wallbox_notice.failed(
                     ("saved intent unreadable, check the file's owner and mode" if unreadable
@@ -541,6 +547,8 @@ class ModbusService:
                 raise DeviceError("service_unavailable")
             goal_generation = self.client.write_state.energy_goal_generation
             observed_at = datetime.now(UTC)
+            # Either way below, this poll tells the plug cycle itself.
+            self._plug_observed = True
             try:
                 self.data = await self._poller.async_poll(
                     self.data, last_success=self._success
