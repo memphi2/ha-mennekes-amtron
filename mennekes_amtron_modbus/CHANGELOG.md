@@ -1,5 +1,15 @@
 # Changes
 
+## 1.0.0b3
+
+- Third beta of 1.0.0. Integration and app must both be 1.0.0b3.
+- **API:** `plug_charge_authorize` with `end_pause` ends only a pause set by
+  hand, from Home Assistant or the app, that the wallbox reads back; a pause
+  of a plan, a target or guest charging stays, and so does one restored
+  after a restart or one an armed departure plan keeps until its start.
+- Thinning the meter log keeps the ends of a rest, so no energy moves into it.
+- A guest stop that holds reads the bus and saves only when something changed.
+
 ## 1.0.0b2
 
 - Second beta of 1.0.0. Integration and app must both be 1.0.0b2.
