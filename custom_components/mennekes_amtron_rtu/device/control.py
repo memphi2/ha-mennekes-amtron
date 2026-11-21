@@ -52,10 +52,8 @@ from .plug_cycle import PlugChange
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
-    CP_STATE,
     ENERGY_TOTAL,
     ERROR_CODE,
-    EVSE_STATE,
     HEARTBEAT,
     SOLAR_CHARGING_MODE,
     SYSTEM_RESTART,
@@ -931,13 +929,7 @@ class AmtronControl:
 
         An older wallbox has no CP state; its idle EVSE state is all it can say.
         """
-        if self._identity.layout_version >= CP_STATE.min_layout:
-            return await self.writes.async_vehicle_absent()
-        try:
-            state = await self._client.async_read_register(EVSE_STATE)
-        except AmtronBusError:
-            return False
-        return type(state) is int and state == EvseState.IDLE
+        return await self.writes.async_vehicle_absent(cp_required=False)
 
     async def async_close_release(self, source: str) -> None:
         """Switch the release off for a rule of the service itself.

@@ -52,6 +52,7 @@ from .registers import (
     RegisterSpec,
 )
 from .runtime_events import EventType
+from .vehicle import ABSENT_CP_STATES, vehicle_connected
 
 if TYPE_CHECKING:
     from .control import AmtronControl
@@ -91,19 +92,26 @@ class WritePath:
         target_paused = 0 < value < CHARGING_CURRENT_MINIMUM
         return paused is None or paused != target_paused
 
-    async def async_vehicle_absent(self, read: LockedRegisterReader | None = None) -> bool:
-        """Grant an exception only from fresh, consistent EVSE and CP readings."""
-        if self._control._identity.layout_version < CP_STATE.min_layout:
+    async def async_vehicle_absent(
+        self, read: LockedRegisterReader | None = None, *, cp_required: bool = True,
+    ) -> bool:
+        """Whether fresh readings prove no car, by the one rule of ``vehicle_connected``.
+
+        An exception to an interlock needs the CP state as well; without
+        ``cp_required`` an older wallbox's idle EVSE state is all it can say.
+        """
+        cp_supported = self._control._identity.layout_version >= CP_STATE.min_layout
+        if cp_required and not cp_supported:
             return False
         read = read or self._control._client.async_read_register
         try:
             state = await read(EVSE_STATE)
             if type(state) is not int or state != EvseState.IDLE:
                 return False
-            cp = await read(CP_STATE)
+            cp = await read(CP_STATE) if cp_supported else None
         except AmtronBusError:
             return False
-        return type(cp) is int and cp in (CpState.A1, CpState.A2)
+        return vehicle_connected(state, cp, cp_supported=cp_supported) is False
 
     async def _async_release_off(self, read: LockedRegisterReader | None = None) -> bool:
         """With 0x0D05 off, a current change switches no charge."""
@@ -441,7 +449,7 @@ class WritePath:
                 cp = await read(CP_STATE)
             except AmtronBusError as err:
                 raise validation_error("phase_pause_state_unknown") from err
-            if type(cp) is not int or cp not in (CpState.A1, CpState.A2):
+            if type(cp) is not int or cp not in ABSENT_CP_STATES:
                 raise validation_error("phase_pause_state_unknown")
 
     async def _async_confirm_phase_pause(
@@ -464,7 +472,7 @@ class WritePath:
             if type(cp) is not int or cp not in CpState or cp in (CpState.INIT, CpState.E, CpState.F):
                 raise validation_error("phase_pause_state_unknown")
             paused = paused and (
-                cp in (CpState.A1, CpState.A2) if state == EvseState.IDLE else cp == CpState.B1
+                cp in ABSENT_CP_STATES if state == EvseState.IDLE else cp == CpState.B1
             )
         now = self._control._monotonic()
         if paused and state == EvseState.IDLE:
