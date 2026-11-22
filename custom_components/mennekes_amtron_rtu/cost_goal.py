@@ -67,7 +67,7 @@ class CostGoalObserver:
         goal = self._entry.runtime_data.control.energy_goal
         if goal.cost is None:
             return "disabled"
-        if goal.status == "active" and (self._price() is None or goal.cost.currency not in (None, self._hass.config.currency)):
+        if goal.status == "active" and (self._price() is None or goal.cost.currency != self._hass.config.currency):
             return "price_unknown"
         return goal.status
 
@@ -99,7 +99,7 @@ class CostGoalObserver:
         # A running amount shows the price it really has: one that came while
         # its goal was stopped is told again once the goal runs.
         goal = control.energy_goal
-        if goal.cost is not None and goal.cost.currency not in (None, self._hass.config.currency):
+        if goal.cost is not None and goal.cost.currency != self._hass.config.currency:
             return
         running = goal.cost is not None and goal.status == "active"
         known = goal.cost.price if running and goal.cost is not None else control.cost_price
@@ -117,12 +117,12 @@ class CostGoalObserver:
         self._told_at = time.monotonic()
         # A command refreshes the poll that is running now: send it after.
         self._task = self._entry.async_create_background_task(
-            self._hass, self._tell(price), "mennekes_amtron_rtu_cost_price",
+            self._hass, self._tell(price, self._hass.config.currency), "mennekes_amtron_rtu_cost_price",
         )
 
-    async def _tell(self, price: float) -> None:
+    async def _tell(self, price: float, currency: str) -> None:
         try:
-            await self._entry.runtime_data.control.async_set_cost_price(price, self._hass.config.currency)
+            await self._entry.runtime_data.control.async_set_cost_price(price, currency)
         except (AmtronBusError, HomeAssistantError):
             self._notice.failed("new price not passed on", "retrying at a later poll")
         else:

@@ -60,7 +60,7 @@ def test_the_charging_page_uses_every_field_the_service_sends(tmp_path):
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             await hand_over(service)
             await service.command({
-                "command": "cost_goal", "value": 10, "price": 0.3,
+                "command": "cost_goal", "value": 10, "price": 0.3, "currency": "EUR",
                 "expected_serial_number": service.identity.serial_number,
             })
             payload = Console("supervisor-fixture", TOKEN, service=service)._choices()

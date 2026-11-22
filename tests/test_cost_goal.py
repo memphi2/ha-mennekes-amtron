@@ -40,7 +40,7 @@ class Control:
             self.cost_price = price
         if amount:
             self.energy_goal.set_target(33.3, 100.0)
-            self.energy_goal.cost = CostPart(amount, 0.0, price)
+            self.energy_goal.cost = CostPart(amount, 0.0, price, currency=currency)
         else:
             self.energy_goal.set_target(0, 0)
 

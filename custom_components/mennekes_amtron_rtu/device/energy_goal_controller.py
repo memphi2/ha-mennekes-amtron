@@ -123,12 +123,13 @@ class EnergyGoalController:
         cost = self.model.cost
         return self._price_currency if cost is None else cost.currency
 
-    def _currency_for(self, currency: object) -> str | None:
+    def _currency_for(self, currency: object) -> str:
         unit = checked_currency(currency)
         cost = self.model.cost
-        if unit is not None and cost is not None and unit != cost.currency:
+        unit = unit or self.currency
+        if unit is None or (cost is not None and unit != cost.currency):
             raise validation_error("cost_goal_price_unknown")
-        return self.currency if unit is None else unit
+        return unit
 
     async def async_set_cost_target(self, amount: object, price: object = None, *, currency: object = None) -> None:
         """Arm an amount of money at ``price``; zero ends it with its target.

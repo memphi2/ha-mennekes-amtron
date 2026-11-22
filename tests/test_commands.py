@@ -63,7 +63,7 @@ def test_a_command_refuses_fields_that_are_not_its_own(tmp_path):
 @pytest.mark.parametrize(("payload", "error"), [
     ({"command": "energy_goal", "value": 2000}, "energy_goal_invalid"),
     ({"command": "energy_goal", "value": -1}, "energy_goal_invalid"),
-    ({"command": "cost_goal", "value": 0.05, "price": 0.3}, "cost_goal_invalid"),
+    ({"command": "cost_goal", "value": 0.05, "price": 0.3, "currency": "EUR"}, "cost_goal_invalid"),
     ({"command": "set_current", "value": -1}, "charging_current_invalid"),
     ({"command": "set_current", "value": 3}, "charging_current_invalid"),
 ])
@@ -150,6 +150,8 @@ def test_rejected_cost_change_keeps_the_amount_price_and_currency(tmp_path):
             async def command(name, **fields):
                 return await service.command({"command": name, "expected_serial_number": SERIAL, **fields})
 
+            with pytest.raises(DeviceValidationError, match="cost_goal_price_unknown"):
+                await command("cost_goal", value=10, price=0.25)
             await command("cost_goal", value=10, price=0.25, currency="EUR")
             goal = service.control.energy_goal
             original = goal.snapshot()
