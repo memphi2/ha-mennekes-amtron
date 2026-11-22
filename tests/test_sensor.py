@@ -258,6 +258,7 @@ def test_the_waiting_reason_carries_who_controls_and_what_comes_next() -> None:
 def _loss(available: bool = True) -> SimpleNamespace:
     statistics = SimpleNamespace(
         last_loss_percent=12.345, average_loss_percent=10.04, sample_count=4, association="vehicle",
+        status="matched",
     )
     return SimpleNamespace(statistics=statistics, available=available)
 
@@ -276,7 +277,7 @@ def test_the_charging_loss_exists_with_a_loss_source_and_reports_its_samples() -
         assert average.available
         assert last.native_value == 12.3
         assert average.native_value == 10.0
-        assert last.extra_state_attributes == {"sample_count": 4, "association": "vehicle"}
+        assert last.extra_state_attributes == {"sample_count": 4, "association": "vehicle", "status": "matched"}
         assert average.extra_state_attributes == {"sample_count": 4}
         # A kept value of a finished charge stays while the wallbox is away.
         last.runtime.coordinator.last_update_success = False

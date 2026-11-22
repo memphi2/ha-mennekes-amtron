@@ -172,7 +172,7 @@ does not send a charging command.
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
 | `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
-| `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
+| `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. With a car plugged in, the wallbox closes **Charging release** itself with the pause; resuming opens it again, unless it was switched off by hand. |
 | `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. With Virtual Plug & Charge enabled, switching it on releases the current or next connection by hand for any car until the next unplug; switching it off stops the current connection, also for a recognized car, until the next unplug. |
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | `all_available` or `single_phase`. A change while charging first pauses; resume separately after the waiting interval. The `switched` attribute is the wallbox's answer: the phases it will use when it next closes the relay. |
@@ -235,6 +235,7 @@ entity's *Attributes* panel and reachable with `state_attr()` in templates.
 | `sensor.*_signaled_current` | Signaled current | A | current | layout v01.03 | What the wallbox offers the vehicle on the pilot line. This is the number that should follow your charging-current limit. |
 | `sensor.*_charging_status` | Charging status | | enum | always | What the wallbox is doing; see [Charging status](#charging-status). |
 | `sensor.*_charging_wait_reason` | Charging wait reason | | enum | always | Why the car does not charge yet; see [Charging wait reason](#charging-wait-reason). |
+| `sensor.*_target_progress` | Target progress | % | | layout v01.02 | How much of the running **Energy target** or **Cost target** is used, in whole percent: the energy charged since it was set against the target, or what that cost so far against the amount. 100 once reached; unknown without a target or while the meter cannot be read. Attributes: `target` (`energy` or `cost`) and `target_value` (kWh or the amount), fixed while the target runs. |
 
 ## Diagnostic sensors
 
@@ -381,7 +382,7 @@ wallbox is set up.
 
 | Entity | Name | Unit | Needs | Meaning |
 |---|---|---|---|---|
-| `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | vehicle profile with an energy source | Last matched charge; unknown when the newest completed charge cannot be matched. The `association` attribute says how it was matched (`history`, `changed_value` or `manual`). |
+| `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | vehicle profile with an energy source | Last matched charge; unknown when the newest completed charge cannot be matched. The `association` attribute says how it was matched (`history`, `changed_value` or `manual`); `status` says why it has a value or none (see [Charging losses](charging-estimates.md#bavariandata)). |
 | `sensor.*_average_estimated_charging_loss` | Average estimated charging loss | % | vehicle profile with an energy source | Energy-weighted average of accepted matches; `sample_count` counts accepted charges. |
 | `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | HA currency | fixed or dynamic price configured; enable the entity | Disabled by default to reduce Recorder writes. Running cost estimate: 0.00 from the plug-in, 0.00 again after the unplug. An incomplete observation shows the priced part with `complete` false. |
 | `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | HA currency | fixed or dynamic price configured | Taken over from the current charge whenever charging stops and at the unplug; retained across restarts. |

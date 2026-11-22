@@ -152,13 +152,13 @@ def test_history_adapter_preserves_statistics_identity_and_cleans_up_local_subsc
             hass.bus.async_fire("bavariandata_charging_stopped", {"unrelated": "car"})
             await hass.async_block_till_done()
             changed.assert_called_once_with()
-            found = ChargeRecord(10, 20, 18)
-            with patch(f"{ADAPTER}.async_read_latest", return_value=found) as read:
-                assert await source.async_latest(since=5, until=30) == found
+            found = (ChargeRecord(10, 20, 30, 60),)
+            with patch(f"{ADAPTER}.async_read_records", return_value=found) as read:
+                assert await source.async_records(since=5, until=30) == found
                 read.assert_awaited_once_with(hass, "car", since=5, until=30, expected_vin=VIN)
                 hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "WBA98765432109876")})
                 assert not source.available
-                assert await source.async_latest(since=5, until=30) is None
+                assert await source.async_records(since=5, until=30) is None
                 assert read.await_count == 1
         finally:
             unsub()

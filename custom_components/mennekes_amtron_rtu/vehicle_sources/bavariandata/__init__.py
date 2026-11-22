@@ -9,7 +9,7 @@ from homeassistant.helpers import device_registry as dr
 from custom_components.mennekes_amtron_rtu.vehicle_sources.types import ChargeRecord
 
 from .departure import read_bavarian_departure
-from .history import async_read_latest
+from .history import async_read_records
 from .identity import BavarianVehicleBinding
 
 
@@ -38,10 +38,10 @@ class BavarianDepartureSource(BavarianVehicleBinding):
 class BavarianChargeHistorySource(BavarianVehicleBinding):
     """Read public local history without exposing VINs to charging observers."""
 
-    async def async_latest(self, *, since: float, until: float) -> ChargeRecord | None:
+    async def async_records(self, *, since: float, until: float) -> tuple[ChargeRecord, ...] | None:
         if not self.available:
             return None
-        return await async_read_latest(
+        return await async_read_records(
             self._hass, self._device_id, since=since, until=until, expected_vin=self._vin,
         )
 

@@ -429,11 +429,12 @@ class WritePath:
             ):
                 raise validation_error("phase_pause_state_unknown")
             if state != EvseState.IDLE:
+                opened = await self.async_read_switch(CHARGING_RELEASE, stopping=True) == 1
                 # Preparation physically pauses charging. Discard the older
                 # command before that write, including if persistence fails.
                 self._control._clear_pending()
                 await self.async_apply_current(CHARGING_PAUSE_CURRENT, phase_preparation=True)
-                change = PhaseChange(self._control._monotonic() + _PHASE_PAUSE_TIMEOUT)
+                change = PhaseChange(self._control._monotonic() + _PHASE_PAUSE_TIMEOUT, release_open=opened)
                 self._control._phase_change = change
         if change is not None:
             await self._async_confirm_phase_pause(change)
@@ -447,6 +448,45 @@ class WritePath:
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
             precondition=lambda read: self._async_check_phase_write(change, read),
         )
+        if change is not None and change.release_open and not change.unplug_confirmed:
+            # The car left during the switch: the release stays as it is.
+            await self._async_reopen_release()
+
+    async def _async_reopen_release(self, *, starting: bool = False) -> None:
+        """Open the release again that the wallbox closed with a pause.
+
+        Opened while the pause current still holds the car, so the release
+        starts nothing by itself. A stop, a release withdrawn by hand or a
+        closed Plug & Charge gate keeps it closed. Before a start the current
+        that follows must be writable now: otherwise the whole start waits,
+        and nothing is opened for a start that may never come.
+        """
+        if self._control.charging_release_requested is False or self._control.energy_goal_stop_requested:
+            return
+        if await self.async_read_switch(CHARGING_RELEASE, stopping=True) != 0:
+            return
+        try:
+            self._control._plug_charge.check_release()
+        except DeviceError:
+            return
+        if starting:
+            if await self.async_vehicle_absent():
+                # Without a car the wallbox closes nothing with a pause.
+                return
+            try:
+                held = await self._control._client.async_read_register(CHARGING_CURRENT_EMS)
+            except AmtronBusError:
+                return
+            if not isinstance(held, (int, float)) or not 0 < held < CHARGING_CURRENT_MINIMUM:
+                # Only a release the pause closed is opened ahead of the
+                # current; above the pause current it would start the charge.
+                return
+            if (remaining := self._control._mode_change_remaining()) > 0:
+                raise AmtronRateLimitedError("state_change", remaining)
+            self._control._client.check_write_interval(
+                CHARGING_CURRENT_EMS, min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
+            )
+        await self.async_apply_release(True)
 
     async def _async_check_phase_write(
         self, change: PhaseChange | None, read: LockedRegisterReader,
@@ -477,7 +517,9 @@ class WritePath:
             # An observed unplug ends this vehicle's phase operation. A later
             # connection may be another car and cannot inherit its grace bypass.
             raise validation_error("phase_pause_state_unknown")
-        paused = state in (EvseState.IDLE, EvseState.EV_CONNECTED)
+        # A wallbox that closes the release with the pause reports its
+        # preconditions as valid instead of the car as connected.
+        paused = state in (EvseState.IDLE, EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID)
         if self._control._identity.layout_version >= CP_STATE.min_layout:
             try:
                 cp = await read(CP_STATE)
@@ -524,6 +566,15 @@ class WritePath:
         elif command.action in ("set_current", "resume"):
             if command.grant_release:
                 await self._async_grant_release_for_start()
+            elif not 0 < command.value < CHARGING_CURRENT_MINIMUM and (
+                command.action == "resume" or self._current_transition(command.value)
+            ):
+                # A start from a pause: with a car plugged in, the wallbox
+                # closed the release with the pause and does not open it
+                # again by itself.
+                await self._async_reopen_release(starting=True)
+                # Its reads took time: a plan's command may be over meanwhile.
+                self._control._check_command_context()
             # A configuration change can lower the available current while
             # an accepted request is waiting. Reapply the active limit.
             await self.async_apply_current(min(command.value, self._control.max_charging_current))

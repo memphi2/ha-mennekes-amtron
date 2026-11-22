@@ -346,3 +346,31 @@ def test_a_reached_amount_is_saved_with_its_money_and_shown_after_a_restart():
         assert EnergyGoal.restore(saved[-1]).cost_spent == pytest.approx(3.0)
         await runner.async_stop()
     asyncio.run(run())
+
+
+def test_progress_follows_the_meter_for_energy_and_money():
+    goal = EnergyGoal()
+    assert goal.progress(100.0) is None
+    goal.set_target(10, 100.0)
+    assert goal.progress(100.0) == 0
+    assert goal.progress(102.5) == pytest.approx(0.25)
+    # Until the goal latches it stays below a full target.
+    assert goal.progress(109.96) == 0.99
+    assert goal.progress(120.0) == 0.99
+    # No usable reading, or a meter below the baseline: no progress.
+    for reading in (None, "x", float("nan"), True, 99.0):
+        assert goal.progress(reading) is None
+    goal.cost = CostPart(5.0, 1.0, 0.5, 2.0)
+    # 1.00 for the first 2 kWh, then 0.50 per kWh: 4 kWh cost 2.00 of 5.00.
+    assert goal.progress(104.0) == pytest.approx(0.4)
+    # Below the booked energy the booked money still counts.
+    assert goal.progress(101.0) == pytest.approx(0.2)
+    goal.cost = CostPart(5.0, 1.0, -0.5, 2.0)
+    assert goal.progress(110.0) == 0
+    goal.observe(None)
+    assert goal.status == "meter_unavailable"
+    assert goal.progress(104.0) is None
+    goal.cost = None
+    goal.observe(110.0)
+    assert goal.status == "reached"
+    assert goal.progress(None) == 1.0

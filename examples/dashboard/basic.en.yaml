@@ -1,11 +1,34 @@
-# Check entity IDs before use.
+# One manual card with built-in HA cards. Check entity IDs before use.
 type: vertical-stack
 cards:
 - type: entities
   title: Wallbox
   show_header_toggle: false
   entities:
+  - sensor.mennekes_amtron_charging_status
+  - sensor.mennekes_amtron_total_power
+  - sensor.mennekes_amtron_session_energy
   - number.mennekes_amtron_charging_current_limit
   - switch.mennekes_amtron_charging_paused
-  - sensor.mennekes_amtron_total_power
+  - switch.mennekes_amtron_charging_release
+  - number.mennekes_amtron_energy_target
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_cost_target
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_cost_target
+  - datetime.mennekes_amtron_target_time
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_vehicle_charge_target
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_vehicle_charge_target
+  - type: conditional
+    conditions:
+    - entity: binary_sensor.mennekes_amtron_guest_charging
+      state: "off"
+    row:
+      entity: button.mennekes_amtron_start_guest_charging
   - sensor.mennekes_amtron_total_energy

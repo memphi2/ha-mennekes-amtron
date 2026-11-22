@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b4 — 2026-11-22
+
+Fourth beta of 1.0.0. Integration and app go to 1.0.0b4; the integration
+still works with app 1.0.0b3, but the fixes for resuming, phase switching and
+the meter readings around a plug-in are in the app and need 1.0.0b4.
+The saved state of 1.0.0b3 is kept.
+
+### Added
+
+- **Target progress** shows in whole percent how much of a running energy
+  or cost target is used.
+
+### Changed
+
+- Charging losses from the vehicle charging history use the car's rise in
+  charge level times the profile's usable capacity instead of BavarianData's
+  `energy_kwh`, which lags behind a changed charging current. A charge needs
+  a rise of at least 20 points. Every new record is measured, also behind a
+  newer one from elsewhere, and the history is read again after an unplug and
+  for up to six hours. The last-loss sensor's `status` attribute says why it
+  has no value. The average of this source starts anew.
+- The dashboard examples show the cost target and the estimated cost so far,
+  and the Mushroom card the requested phases and a pending change to cancel.
+  The basic card lists status, controls and every target.
+
+### Fixed
+
+- Resuming a pause with a car plugged in charges again, and so does a
+  departure plan or a new current that starts the charge after a pause: the
+  wallbox closes the charging release itself with the pause and never opens
+  it again, so every start from a pause now opens it first, unless it was
+  switched off by hand, a charge target stopped the charge or Plug & Charge
+  keeps it closed. A start that has to wait opens nothing until it runs.
+- Phase switching while charging works on wallboxes that close the charging
+  release themselves with the pause: their `preconditions_valid` with CP `b1`
+  counts as a confirmed pause, and the release opens again after the switch.
+- An unload during a vehicle switch could leave the old car's charge level
+  or charging loss observer running; a cancelled switch now waits until all
+  of them have stopped.
+- A rest of less than a minute before a plug-in, or a quick unplug and plug-in,
+  no longer moves energy across the plug-in; the readings around a known
+  plug-in and unplug always stay.
+
 ## 1.0.0b3 — 2026-11-21
 
 Third beta of 1.0.0. Integration and app are both 1.0.0b3 and must be

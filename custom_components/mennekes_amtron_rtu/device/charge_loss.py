@@ -13,8 +13,11 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 LOSS_ASSOCIATIONS = ("changed_value", "manual", "history")
+# Why the last charge has no loss: what the car reported could not be one.
+LOSS_REJECTIONS = ("too_small", "no_capacity", "above_wallbox")
 LOSS_STATES = (
     "disabled", "waiting_for_session", "waiting_for_vehicle", "invalid", "matched",
+    *LOSS_REJECTIONS,
 )
 _KEYS = {
     "source", "previous_wallbox_kwh", "previous_vehicle_kwh", "previous_count",
@@ -130,6 +133,12 @@ class LossStatistics:
     def vehicle_kwh(self) -> float | None:
         return self._last_match.vehicle_kwh if self.status == "matched" and self._last_match is not None else None
 
+    @property
+    def accounted_end(self) -> float | None:
+        """Where the newest charge taken into account ended."""
+        charge = self._current_session or (self._last_match.session if self._last_match is not None else None)
+        return charge.end if charge is not None else None
+
     def known(self, start: float, end: float) -> Charge | None:
         """The charge of that span, if it is the one already accounted for."""
         for charge in (self._current_session, self._last_match.session if self._last_match is not None else None):
@@ -205,7 +214,8 @@ class LossStatistics:
             self.status = "invalid"
             return before != self.snapshot()
         if energy > session.wallbox_kwh:
-            self.status = "invalid"
+            # More in the battery than the wallbox delivered is no loss.
+            self.status = "above_wallbox"
             return before != self.snapshot()
         match = _Match(session, energy, association)
         previous_wallbox = self._previous_wallbox_kwh
@@ -227,6 +237,24 @@ class LossStatistics:
         self._previous_count = previous_count
         self._last_match = match
         self.status = "matched"
+        return before != self.snapshot()
+
+    def reject(self, session: Charge, reason: str) -> bool:
+        """Take the charge as the newest one, without a loss, and say why.
+
+        A charge already counted keeps its measurement.
+        """
+        if self.source is None:
+            return False
+        if reason not in LOSS_REJECTIONS:
+            raise ValueError("invalid loss rejection")
+        before = self.snapshot()
+        self.observe_charge(session)
+        if self._current_session != session or (
+            self._last_match is not None and self._last_match.session == session
+        ):
+            return before != self.snapshot()
+        self.status = reason
         return before != self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:

@@ -89,6 +89,9 @@
           "degraded": "mdi:alert-circle-outline"
         }
       },
+      "target_progress": {
+        "default": "mdi:progress-check"
+      },
       "last_charging_loss": {
         "default": "mdi:battery-minus-outline"
       },

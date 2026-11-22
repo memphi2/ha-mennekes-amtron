@@ -22,6 +22,9 @@ class PhaseChange:
     confirmation_deadline: float
     ready_at: float | None = None
     unplug_confirmed: bool = False
+    # The release was open before the pause: some wallboxes close it
+    # themselves with the pause, and the switch opens it again.
+    release_open: bool = False
 
 
 class PhaseWaitError(Exception):

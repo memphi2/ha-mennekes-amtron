@@ -6,13 +6,16 @@ cards:
     primary: "AMTRON · {{ states('sensor.mennekes_amtron_potenza_totale', with_unit=True) if has_value('sensor.mennekes_amtron_potenza_totale') else '—' }}"
     secondary: >-
       {%- set p = namespace(l=[]) -%}
+      {%- set c = states('number.mennekes_amtron_obiettivo_di_costo') | float(0) -%}
       {%- set e = states('number.mennekes_amtron_obiettivo_energetico') | float(0) -%}
-      {%- if e > 0 %}{% set p.l = p.l + ['%g kWh' % e] %}{% endif -%}
+      {%- set g = ' (%d %%)' % (states('sensor.mennekes_amtron_avanzamento_obiettivo') | int) if has_value('sensor.mennekes_amtron_avanzamento_obiettivo') else '' -%}
+      {%- if c > 0 %}{% set p.l = p.l + [states('number.mennekes_amtron_obiettivo_di_costo', with_unit=True) ~ g] %}{% elif e > 0 %}{% set p.l = p.l + ['%g kWh' % e ~ g] %}{% endif -%}
       {%- if has_value('datetime.mennekes_amtron_orario_obiettivo') %}{% set p.l = p.l + ['fino alle ' ~ as_local(as_datetime(states('datetime.mennekes_amtron_orario_obiettivo'))).strftime('%H:%M')] %}{% endif -%}
       {%- set s = states('number.mennekes_amtron_obiettivo_di_carica_del_veicolo') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
       {%- set t = state_attr('sensor.mennekes_amtron_motivo_di_attesa_della_ricarica', 'departure_plan') -%}
       {{ 'In attesa della prima lettura' if is_state(entity, 'unknown') else 'Connessione interrotta' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energia_della_sessione', with_unit=True) if has_value('sensor.mennekes_amtron_energia_della_sessione') else '—' }}
+      {%- if has_value('sensor.mennekes_amtron_costo_di_ricarica_stimato_ricarica_attuale') %} · {{ states('sensor.mennekes_amtron_costo_di_ricarica_stimato_ricarica_attuale', with_unit=True) }}{% endif %}
 
       {{ 'Obiettivi: ' ~ p.l | join(' · ') if p.l else 'Nessun obiettivo' }}
       {%- if t not in [none, 'disabled'] %} · Pianificazione: {{ state_attr_translated('sensor.mennekes_amtron_motivo_di_attesa_della_ricarica', 'departure_plan') }}{% endif %}
@@ -72,6 +75,33 @@ cards:
       - type: conditional
         conditions:
           - condition: state
+            entity: select.mennekes_amtron_fasi_richieste
+            state_not: [unknown, unavailable]
+        chip:
+          type: template
+          entity: select.mennekes_amtron_fasi_richieste
+          content: "{{ '1 fase' if is_state(entity, 'single_phase') else 'Tutte le fasi' }}"
+          icon: mdi:sine-wave
+          tap_action:
+            action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.mennekes_amtron_annulla_modifica_in_attesa
+            state_not: unavailable
+        chip:
+          type: template
+          content: "Annulla modifica"
+          icon: mdi:close-circle-outline
+          icon_color: amber
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.mennekes_amtron_annulla_modifica_in_attesa
+      - type: conditional
+        conditions:
+          - condition: state
             entity: switch.mennekes_amtron_ricarica_in_pausa
             state_not: [unknown, unavailable]
         chip:
@@ -105,6 +135,20 @@ cards:
         icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
         tap_action:
           action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: number.mennekes_amtron_obiettivo_di_costo
+            state_not: unavailable
+        chip:
+          type: template
+          entity: number.mennekes_amtron_obiettivo_di_costo
+          content: >-
+            {{ states(entity, with_unit=True) if states(entity) | float(0) > 0 else 'Obiettivo di costo' }}
+          icon: mdi:cash
+          icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
+          tap_action:
+            action: more-info
       - type: template
         entity: datetime.mennekes_amtron_orario_obiettivo
         content: >-

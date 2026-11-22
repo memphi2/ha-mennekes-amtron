@@ -92,7 +92,12 @@ def test_reached_goal_during_bus_or_identity_wait_never_sends_start(goal, wait, 
             else:
                 await control.async_set_soc_goal(0, source=SOURCE)
             await command()
-            assert len(harness.transport.writes) == 1
+            # A start from the pause first opens the release it closed.
+            assert [address for address, _ in harness.transport.writes] == (
+                [R.CHARGING_RELEASE.address, R.CHARGING_CURRENT_EMS.address]
+                if action in ("resume", "current", "unlimited")
+                else [harness.transport.writes[0][0]]
+            )
             assert harness.slept == []
         finally:
             release.set()

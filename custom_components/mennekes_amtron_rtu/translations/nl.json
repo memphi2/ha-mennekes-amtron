@@ -473,6 +473,21 @@
           }
         }
       },
+      "target_progress": {
+        "name": "Voortgang doel",
+        "state_attributes": {
+          "target": {
+            "name": "Doel",
+            "state": {
+              "energy": "Energie",
+              "cost": "Kosten"
+            }
+          },
+          "target_value": {
+            "name": "Doelwaarde"
+          }
+        }
+      },
       "last_charging_loss": {
         "name": "Geschat laadverlies, laatste laadsessie",
         "state_attributes": {
@@ -486,6 +501,19 @@
           },
           "sample_count": {
             "name": "Meegetelde laadsessies"
+          },
+          "status": {
+            "name": "Laatste laadbeurt",
+            "state": {
+              "disabled": "Uit",
+              "waiting_for_session": "Nog geen laadbeurt",
+              "waiting_for_vehicle": "Wacht op de waarde van de auto",
+              "invalid": "Waarde van de auto onbruikbaar",
+              "matched": "Gemeten",
+              "too_small": "Te weinig geladen om te meten",
+              "no_capacity": "Bruikbare capaciteit onbekend",
+              "above_wallbox": "Meer in de accu dan geleverd"
+            }
           }
         }
       },

@@ -92,12 +92,12 @@ def test_loss_entities_round_values_and_publish_no_per_poll_timestamps():
         assert average.available
         assert last.native_value is None
         assert average.native_value is None
-        assert last.extra_state_attributes == {"sample_count": 0}
+        assert last.extra_state_attributes == {"sample_count": 0, "status": "waiting_for_session"}
         first = Charge(10, 60, 10)
         observer.statistics.apply(first, 9.123, association="manual")
         assert last.native_value == average.native_value == 8.8
         assert last.native_unit_of_measurement == "%"
-        assert last.extra_state_attributes == {"sample_count": 1, "association": "manual"}
+        assert last.extra_state_attributes == {"sample_count": 1, "association": "manual", "status": "matched"}
         assert average.extra_state_attributes == {"sample_count": 1}
         stable = last.native_value, last.extra_state_attributes
         observer.statistics.apply(first, 9.124, association="manual")
@@ -106,11 +106,11 @@ def test_loss_entities_round_values_and_publish_no_per_poll_timestamps():
         observer.statistics.apply(second, 16.789, association="history")
         assert last.native_value == 16.1
         assert average.native_value == 13.6
-        assert last.extra_state_attributes == {"sample_count": 2, "association": "history"}
+        assert last.extra_state_attributes == {"sample_count": 2, "association": "history", "status": "matched"}
         observer.statistics.observe_charge(Charge(210, 260, 10))
         assert last.native_value is None
         assert average.native_value == 13.6
-        assert last.extra_state_attributes == {"sample_count": 2}
+        assert last.extra_state_attributes == {"sample_count": 2, "status": "waiting_for_vehicle"}
         observer.available = False
         assert not last.available
         assert not average.available

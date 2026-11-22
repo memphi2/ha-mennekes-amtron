@@ -11,6 +11,7 @@ setting, ``none`` means nothing applies right now.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -166,6 +167,22 @@ def _waiting_details(runtime: Runtime) -> dict[str, Any]:
     return details
 
 
+def _target_progress(runtime: Runtime) -> StateType:
+    """Whole percent, rounded down: 100 only once the target is reached."""
+    progress = runtime.control.energy_goal.progress(_energy_total(runtime))
+    return None if progress is None else math.floor(progress * 100 + 1e-9)
+
+
+def _target_details(runtime: Runtime) -> dict[str, Any]:
+    """Which target and its value; fixed while it runs, never a ticking counter."""
+    goal = runtime.control.energy_goal
+    if not goal.target_kwh:
+        return {}
+    if goal.cost is not None:
+        return {"target": "cost", "target_value": goal.cost.amount}
+    return {"target": "energy", "target_value": goal.target_kwh}
+
+
 def _connection_details(runtime: Runtime) -> dict[str, Any]:
     healthy = runtime.heartbeat.healthy if runtime.heartbeat is not None else None
     return {"heartbeat": None if healthy is None else "ok" if healthy else "problem"}
@@ -189,6 +206,8 @@ def _loss_details(last: bool) -> Callable[[Runtime], dict[str, Any]]:
         return {
             "sample_count": statistics.sample_count,
             "association": statistics.association if last else None,
+            # Why the last charge has a loss or has none.
+            "status": statistics.status if last else None,
         }
 
     return read
@@ -287,6 +306,12 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
         offline=True,
         ready=lambda runtime: runtime.client.connected and runtime.control.operation is not None,
         attributes=_waiting_details,
+    ),
+    AmtronSensorDescription(
+        key="target_progress", capability="energy_total", value=_target_progress,
+        ready=lambda runtime: runtime.control.supports_energy_goal,
+        native_unit_of_measurement="%", suggested_display_precision=0,
+        attributes=_target_details,
     ),
     # --- Estimates. No state class: a per-charge value is neither a counter
     # nor an instantaneous measurement for long-term statistics.

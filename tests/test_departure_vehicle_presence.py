@@ -342,7 +342,8 @@ def test_gateway_configuration_during_departure_guard_prevents_stale_write(rollb
         original_read = harness.transport.read_holding_registers
 
         async def read(address, **kwargs):
-            if address == R.SERIAL_NUMBER.address:
+            # The identity check of the write itself, not of a read before it.
+            if address == R.SERIAL_NUMBER.address and control._command_write_started:
                 reading.set()
                 await finish_read.wait()
             return await original_read(address, **kwargs)

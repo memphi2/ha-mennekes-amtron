@@ -208,26 +208,24 @@ def test_idle_with_conflicting_cp_never_skips_phase_preparation(cp):
 
 
 @pytest.mark.parametrize("release", [0, 1])
-def test_release_off_current_changes_skip_and_keep_the_long_guard(release):
+def test_resuming_keeps_the_long_guard_whatever_the_release(release):
     async def run():
         harness = Harness(state_change_interval_seconds=300)
         control = await harness.connect()
         put(harness.transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
         put(harness.transport.bank, R.CP_STATE, CpState.B1)
         put(harness.transport.bank, R.CHARGING_RELEASE, release)
+        put(harness.transport.bank, R.CHARGING_CURRENT_EMS, 1.0)
         control._write_state.confirmed_current = 1
         control.pause_requested = True
         armed = harness.clock[0] - 100
         control._write_state.mode_change_at = armed
         await control.async_resume_charging()
-        if release:
-            # A closed relay would start a charge: the guard still applies.
-            assert control.pending_action == "resume"
-            assert harness.transport.writes == []
-        else:
-            assert len(harness.transport.writes) == 1
-            assert control.pause_requested is False
-            assert control._write_state.mode_change_at == armed
+        # A release the wallbox closed with the pause opens again with the
+        # resume: either way a charge starts, so the guard applies.
+        assert control.pending_action == "resume"
+        assert harness.transport.writes == []
+        assert control._write_state.mode_change_at == armed
         await control.async_shutdown()
 
     asyncio.run(run())

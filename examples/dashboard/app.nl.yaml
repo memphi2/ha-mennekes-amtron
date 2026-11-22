@@ -6,13 +6,16 @@ cards:
     primary: "AMTRON · {{ states('sensor.mennekes_amtron_totaal_vermogen', with_unit=True) if has_value('sensor.mennekes_amtron_totaal_vermogen') else '—' }}"
     secondary: >-
       {%- set p = namespace(l=[]) -%}
+      {%- set c = states('number.mennekes_amtron_kostendoel') | float(0) -%}
       {%- set e = states('number.mennekes_amtron_energiedoel') | float(0) -%}
-      {%- if e > 0 %}{% set p.l = p.l + ['%g kWh' % e] %}{% endif -%}
+      {%- set g = ' (%d %%)' % (states('sensor.mennekes_amtron_voortgang_doel') | int) if has_value('sensor.mennekes_amtron_voortgang_doel') else '' -%}
+      {%- if c > 0 %}{% set p.l = p.l + [states('number.mennekes_amtron_kostendoel', with_unit=True) ~ g] %}{% elif e > 0 %}{% set p.l = p.l + ['%g kWh' % e ~ g] %}{% endif -%}
       {%- if has_value('datetime.mennekes_amtron_doeltijd') %}{% set p.l = p.l + ['tot ' ~ as_local(as_datetime(states('datetime.mennekes_amtron_doeltijd'))).strftime('%H:%M')] %}{% endif -%}
       {%- set s = states('number.mennekes_amtron_laaddoel_van_voertuig') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
       {%- set t = state_attr('sensor.mennekes_amtron_wachtreden_bij_het_laden', 'departure_plan') -%}
       {{ 'Wachten op eerste meting' if is_state(entity, 'unknown') else 'Verbinding verbroken' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_laadsessie', with_unit=True) if has_value('sensor.mennekes_amtron_energie_laadsessie') else '—' }}
+      {%- if has_value('sensor.mennekes_amtron_geschatte_laadkosten_huidige_laadsessie') %} · {{ states('sensor.mennekes_amtron_geschatte_laadkosten_huidige_laadsessie', with_unit=True) }}{% endif %}
 
       {{ 'Doelen: ' ~ p.l | join(' · ') if p.l else 'Geen doel' }}
       {%- if t not in [none, 'disabled'] %} · Planning: {{ state_attr_translated('sensor.mennekes_amtron_wachtreden_bij_het_laden', 'departure_plan') }}{% endif %}
@@ -72,6 +75,33 @@ cards:
       - type: conditional
         conditions:
           - condition: state
+            entity: select.mennekes_amtron_aangevraagde_fasen
+            state_not: [unknown, unavailable]
+        chip:
+          type: template
+          entity: select.mennekes_amtron_aangevraagde_fasen
+          content: "{{ '1 fase' if is_state(entity, 'single_phase') else 'Alle fasen' }}"
+          icon: mdi:sine-wave
+          tap_action:
+            action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.mennekes_amtron_wachtende_wijziging_annuleren
+            state_not: unavailable
+        chip:
+          type: template
+          content: "Wijziging annuleren"
+          icon: mdi:close-circle-outline
+          icon_color: amber
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.mennekes_amtron_wachtende_wijziging_annuleren
+      - type: conditional
+        conditions:
+          - condition: state
             entity: switch.mennekes_amtron_laden_gepauzeerd
             state_not: [unknown, unavailable]
         chip:
@@ -105,6 +135,20 @@ cards:
         icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
         tap_action:
           action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: number.mennekes_amtron_kostendoel
+            state_not: unavailable
+        chip:
+          type: template
+          entity: number.mennekes_amtron_kostendoel
+          content: >-
+            {{ states(entity, with_unit=True) if states(entity) | float(0) > 0 else 'Kostendoel' }}
+          icon: mdi:cash
+          icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
+          tap_action:
+            action: more-info
       - type: template
         entity: datetime.mennekes_amtron_doeltijd
         content: >-

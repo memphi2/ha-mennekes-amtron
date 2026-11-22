@@ -2,15 +2,15 @@
 
 Protocol verified against JustChr/BavarianData commit
 275cefb923af4efc998707caede27038a77fa514 (service_read.py and history/models.py).
-``energy_kwh`` estimates battery-side energy from the recorded stream;
-``grid_kwh`` is a different measurement and must never substitute for it.
+Only the span and the charge levels of a record are used. ``energy_kwh``
+integrates the car's power reports, which lag behind a changed charging
+current by up to half an hour, and ``grid_kwh`` is a different measurement.
 """
 
 from __future__ import annotations
 
 import asyncio
 import math
-from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from homeassistant.core import HomeAssistant, SupportsResponse
@@ -22,16 +22,7 @@ from .identity import DOMAIN, bavarian_vehicle_vin
 HISTORY_SERVICE = "get_charging_sessions"
 HISTORY_LIMIT = 50
 HISTORY_TIMEOUT_SECONDS = 10.0
-# Below this a span is too short for the wallbox meter's reading interval.
-MIN_VEHICLE_KWH = 1.0
 _MAX_EPOCH = 253402300799.0
-
-
-@dataclass(frozen=True, slots=True)
-class _Record:
-    start: float
-    end: float
-    energy: float
 
 
 def _epoch(value: object) -> float:
@@ -46,16 +37,13 @@ def _epoch(value: object) -> float:
     return epoch
 
 
-def _energy(value: object) -> float:
+def _level(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError("invalid vehicle charging energy")
-    try:
-        energy = float(value)
-    except OverflowError as err:
-        raise ValueError("vehicle charging energy is out of range") from err
-    if not math.isfinite(energy) or energy <= 0:
-        raise ValueError("vehicle charging energy is out of range")
-    return energy
+        raise ValueError("invalid vehicle charge level")
+    level = float(value)
+    if not math.isfinite(level) or not 0 <= level <= 100:
+        raise ValueError("vehicle charge level is out of range")
+    return level
 
 
 def _query_time(value: float) -> str:
@@ -64,9 +52,9 @@ def _query_time(value: float) -> str:
 
 def _record(
     raw: dict[str, object], start: float, end: float, *, home_zone: str | None,
-) -> _Record:
+) -> ChargeRecord:
     if raw.get("late_start") is not False or raw.get("interrupted") is not False:
-        raise ValueError("charging-history energy is incomplete")
+        raise ValueError("charging-history record is incomplete")
     if raw.get("charge_method") not in (None, "ac"):
         raise ValueError("charging-history method is not supported")
     assumed = raw.get("location_assumed", False)
@@ -81,20 +69,23 @@ def _record(
             not isinstance(zone, str) or zone.strip().casefold() != home_zone.strip().casefold()
         ):
             raise ValueError("charging history is located outside the configured home zone")
-    return _Record(start, end, _energy(raw.get("energy_kwh")))
+    first, last = _level(raw.get("soc_start")), _level(raw.get("soc_end"))
+    if not first < last:
+        raise ValueError("charging-history record charged nothing")
+    return ChargeRecord(start, end, first, last)
 
 
-def _latest(
+def _records(
     response: object, *, home_zone: str | None, expected_vin: str,
-) -> ChargeRecord | None:
-    """The newest record that can be measured; unusable ones are passed over."""
+) -> tuple[ChargeRecord, ...] | None:
+    """The complete charges, oldest first; unusable ones are passed over."""
     if not isinstance(response, dict):
         return None
     rows = response.get("sessions")
     # The public service does not prove whether a full page was truncated.
-    if not isinstance(rows, list) or not rows or len(rows) >= HISTORY_LIMIT:
+    if not isinstance(rows, list) or len(rows) >= HISTORY_LIMIT:
         return None
-    latest: _Record | None = None
+    found: list[ChargeRecord] = []
     for raw in rows:
         if not isinstance(raw, dict):
             return None
@@ -106,26 +97,24 @@ def _latest(
             start, end = _epoch(raw.get("start")), _epoch(raw.get("end"))
             if end <= start:
                 continue
-            item = _record(raw, start, end, home_zone=home_zone)
+            found.append(_record(raw, start, end, home_zone=home_zone))
         except (ValueError, OverflowError, OSError):
-            # Interrupted, without battery energy, elsewhere: not this one.
+            # Interrupted, without charge levels, elsewhere: not this one.
             continue
-        if item.energy >= MIN_VEHICLE_KWH and (latest is None or item.end > latest.end):
-            latest = item
-    return None if latest is None else ChargeRecord(latest.start, latest.end, latest.energy)
+    return tuple(sorted(found, key=lambda record: record.end))
 
 
-async def async_read_latest(
+async def async_read_records(
     hass: HomeAssistant, device_id: str, *, since: float, until: float,
     home_zone: str | None = None,
     expected_vin: str | None = None,
-) -> ChargeRecord | None:
+) -> tuple[ChargeRecord, ...] | None:
     """Read one bounded local history page; callers handle service/timeout errors.
 
-    Returns the newest complete AC record of the selected vehicle with its
-    own time span and battery energy. A record that is interrupted, started
-    late, lacks battery energy or is too small to measure is passed over.
-    Missing optional location evidence neither proves nor disproves location.
+    Returns the complete AC records of the selected vehicle, oldest first,
+    with their own time span and charge levels. A record that is interrupted,
+    started late or lacks charge levels is passed over. Missing optional
+    location evidence neither proves nor disproves location.
     """
     selected_vin = bavarian_vehicle_vin(hass, device_id)
     if selected_vin is None or (expected_vin is not None and expected_vin != selected_vin):
@@ -151,4 +140,4 @@ async def async_read_latest(
         )
     if bavarian_vehicle_vin(hass, device_id) != selected_vin:
         return None
-    return _latest(response, home_zone=home_zone, expected_vin=selected_vin)
+    return _records(response, home_zone=home_zone, expected_vin=selected_vin)

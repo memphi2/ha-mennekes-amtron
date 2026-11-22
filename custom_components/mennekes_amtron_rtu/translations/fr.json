@@ -473,6 +473,21 @@
           }
         }
       },
+      "target_progress": {
+        "name": "Progression de la cible",
+        "state_attributes": {
+          "target": {
+            "name": "Cible",
+            "state": {
+              "energy": "Énergie",
+              "cost": "Coût"
+            }
+          },
+          "target_value": {
+            "name": "Valeur cible"
+          }
+        }
+      },
       "last_charging_loss": {
         "name": "Perte de charge estimée, dernière charge",
         "state_attributes": {
@@ -486,6 +501,19 @@
           },
           "sample_count": {
             "name": "Charges prises en compte"
+          },
+          "status": {
+            "name": "Dernière charge",
+            "state": {
+              "disabled": "Désactivé",
+              "waiting_for_session": "Pas encore de charge",
+              "waiting_for_vehicle": "En attente de la valeur du véhicule",
+              "invalid": "Valeur du véhicule inutilisable",
+              "matched": "Mesuré",
+              "too_small": "Trop peu chargé pour mesurer",
+              "no_capacity": "Capacité utile inconnue",
+              "above_wallbox": "Plus dans la batterie que fourni"
+            }
           }
         }
       },

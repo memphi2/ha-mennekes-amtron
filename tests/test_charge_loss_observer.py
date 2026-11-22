@@ -25,6 +25,9 @@ from custom_components.mennekes_amtron_rtu.charge_loss_observer import (
     ChargeLossObserver,
 )
 from custom_components.mennekes_amtron_rtu.charge_watch import PlugCycle, note_for
+from custom_components.mennekes_amtron_rtu.departure_const import (
+    CONF_DEPARTURE_CAPACITY_KWH,
+)
 from custom_components.mennekes_amtron_rtu.device.charge_loss import Charge
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
@@ -40,11 +43,21 @@ from custom_components.mennekes_amtron_rtu.device.registers import (
     EVSE_STATE,
 )
 from custom_components.mennekes_amtron_rtu.loss_plug_cycle import vehicle_energy
-from custom_components.mennekes_amtron_rtu.vehicle_profiles import VehicleProfile
+from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
+    CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
+    VehicleProfile,
+)
 from custom_components.mennekes_amtron_rtu.vehicle_sources.types import ChargeRecord
 from tests.test_bavarian_history import VIN, vehicle_registry
 
-READ = "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_latest"
+READ = "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_records"
+# The usable capacity of the test car: one percent is 0.2 kWh.
+CAPACITY = 20.0
+
+
+def charged(start, end, vehicle_kwh):
+    """The car's record of a charge that put this much into the battery."""
+    return ChargeRecord(start, end, 20.0, 20.0 + vehicle_kwh / CAPACITY * 100)
 LATER = "custom_components.mennekes_amtron_rtu.loss_record.async_call_later"
 
 
@@ -108,13 +121,13 @@ class Coordinator:
 
     def record(self, vehicle_kwh=8):
         """What the vehicle recorded for the last charge."""
-        return ChargeRecord(*self.span, vehicle_kwh) if self.span is not None else None
+        return (charged(*self.span, vehicle_kwh),) if self.span is not None else ()
 
     def reader(self, vehicle_kwh=8):
         return AsyncMock(side_effect=lambda *_args, **_kwargs: self.record(vehicle_kwh))
 
 
-def build(hass, mode="sensor", *, auto=False):
+def build(hass, mode="sensor", *, auto=False, capacity=CAPACITY, telemetry_capacity=True):
     if mode == "vehicle_history":
         hass.data.setdefault(dr.DATA_REGISTRY, vehicle_registry())
     coordinator = Coordinator()
@@ -134,6 +147,10 @@ def build(hass, mode="sensor", *, auto=False):
         entry.options.update({
             "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "car-device",
         })
+        if capacity is not None:
+            entry.options[CONF_DEPARTURE_CAPACITY_KWH] = capacity
+        elif telemetry_capacity:
+            entry.options[CONF_DEPARTURE_USE_VEHICLE_CAPACITY] = True
     return ChargeLossObserver(hass, entry), coordinator
 
 
@@ -250,7 +267,7 @@ def test_history_measures_the_vehicle_record_retries_and_does_not_call_on_each_p
                 assert [delay for delay, _ in callbacks] == [60, 60]
                 observer.source._schedule_retry()
                 assert len(callbacks) == 2
-                for expected in (300, 1800):
+                for expected in (240, 1500):
                     callbacks[-1][1](None)
                     await hass.async_block_till_done()
                     assert callbacks[-1][0] == expected
@@ -261,8 +278,14 @@ def test_history_measures_the_vehicle_record_retries_and_does_not_call_on_each_p
                 assert observer.statistics.last_loss_percent == pytest.approx(20)
                 assert observer.statistics.wallbox_kwh == pytest.approx(10)
                 assert observer.statistics.association == "history"
-                observer.source._schedule_retry()
-                assert len(callbacks) == 4
+                # Asked again after a booking too: the record of the latest
+                # charge can come hours late. Two more tries, then none.
+                assert callbacks[-1][0] == 5400
+                for _ in range(3):
+                    observer.source._retry = None
+                    observer.source._schedule_retry()
+                assert [delay for delay, _ in callbacks[-2:]] == [5400, 14400]
+                assert len(callbacks) == 6
                 coordinator.async_update_listeners()
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
@@ -294,7 +317,7 @@ def test_history_measures_the_vehicle_record_retries_and_does_not_call_on_each_p
                 observer.source.asked_at = float("-inf")
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
-                assert observer.statistics.status == "invalid"
+                assert observer.statistics.status == "above_wallbox"
                 assert observer.statistics.last_loss_percent is None
                 assert observer.statistics.average_loss_percent == pytest.approx(10)
             finally:
@@ -331,7 +354,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                 assert observer.available
                 poll(1040, 500, EvseState.CHARGING)
                 poll(1100, 506, EvseState.CHARGING)
-                read.return_value = ChargeRecord(1035, 1130, 5.4)
+                read.return_value = (charged(1035, 1130, 5.4),)
                 poll(1120, 506, EvseState.IDLE)
                 await hass.async_block_till_done()
                 # The reading after the record's end is still to come.
@@ -352,7 +375,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                 assert observer.statistics.vehicle_kwh == pytest.approx(5.4)
                 assert observer.statistics.last_loss_percent == pytest.approx(10)
                 # A record of a span without delivered energy measures nothing.
-                read.return_value = ChargeRecord(1125, 1145, 2)
+                read.return_value = (charged(1125, 1145, 5),)
                 observer.source.asked_at = float("-inf")
                 hass.bus.async_fire("bavariandata_charging_stopped", {})
                 await hass.async_block_till_done()
@@ -361,7 +384,7 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                 # A record from before this plug-in was charged elsewhere,
                 # whatever another car drew here meanwhile; so was one of a
                 # plug-in the service did not see.
-                for plugged[0], record in ((1400, ChargeRecord(1200, 1390, 3)), (None, ChargeRecord(1410, 1490, 3))):
+                for plugged[0], record in ((1400, (charged(1200, 1390, 5),)), (None, (charged(1410, 1490, 5),))):
                     for at, kwh in ((1200, 506), (1390, 510), (1410, 510), (1490, 514), (1500, 514)):
                         meter.observe(at, kwh)
                     read.return_value = record
@@ -1091,3 +1114,184 @@ def test_a_failed_save_recovers_even_when_the_cars_record_is_gone(tmp_path, fail
                 await hass.async_stop()
 
     asyncio.run(run())
+
+
+def _history_case(tmp_path, records, *, capacity=CAPACITY):
+    """Book one charge here, answer with these records, return the statistics."""
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history", capacity=capacity)
+        with patch(READ, new=AsyncMock(return_value=())) as read, patch(LATER, return_value=lambda: None):
+            try:
+                await observer.async_start()
+                coordinator.complete()
+                await hass.async_block_till_done()
+                read.return_value = records(coordinator.span)
+                observer.source.asked_at = float("-inf")
+                hass.bus.async_fire("bavariandata_charging_stopped", {})
+                await hass.async_block_till_done()
+                return observer.statistics
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    return asyncio.run(run())
+
+
+def test_records_already_taken_into_account_are_not_measured_again(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        with patch(READ, new=AsyncMock(return_value=())) as read, patch(LATER, return_value=lambda: None):
+            try:
+                await observer.async_start()
+                coordinator.complete()
+                await hass.async_block_till_done()
+                start, end = coordinator.span
+                read.return_value = (charged(start - 500, start - 400, 8), charged(start, end, 8))
+                for _ in range(2):
+                    observer.source.asked_at = float("-inf")
+                    hass.bus.async_fire("bavariandata_charging_stopped", {})
+                    await hass.async_block_till_done()
+                assert observer.statistics.sample_count == 1
+                assert observer.statistics.last_loss_percent == pytest.approx(20)
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_a_newer_record_from_elsewhere_does_not_hide_the_charge_here(tmp_path):
+    later = time.time() + 1000
+    statistics = _history_case(tmp_path, lambda span: (charged(*span, 8), charged(later, later + 600, 8)))
+    assert statistics.last_loss_percent == pytest.approx(20)
+    assert statistics.status == "matched"
+
+
+@pytest.mark.parametrize(("records", "capacity", "status"), [
+    # 15 points of the car's whole percent are too few to measure one charge.
+    (lambda span: (ChargeRecord(*span, 30, 45),), CAPACITY, "too_small"),
+    (lambda span: (charged(*span, 8),), None, "no_capacity"),
+])
+def test_a_charge_without_a_loss_says_why(tmp_path, records, capacity, status):
+    statistics = _history_case(tmp_path, records, capacity=capacity)
+    assert statistics.status == status
+    assert statistics.last_loss_percent is None
+    assert statistics.sample_count == 0
+
+
+def test_the_charge_levels_and_capacity_give_the_battery_energy(tmp_path):
+    # 30 % to 50 % of 60 kWh are 12 kWh, against 10 kWh delivered here.
+    statistics = _history_case(tmp_path, lambda span: (ChargeRecord(*span, 30, 50),), capacity=60.0)
+    assert statistics.status == "above_wallbox"
+    statistics = _history_case(tmp_path / "b", lambda span: (ChargeRecord(*span, 40, 60),), capacity=45.0)
+    assert statistics.vehicle_kwh == pytest.approx(9)
+    assert statistics.last_loss_percent == pytest.approx(10)
+
+
+def test_an_unplug_asks_the_car_again(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        with patch(READ, new=AsyncMock(return_value=())) as read, patch(LATER, return_value=lambda: None):
+            try:
+                await observer.async_start()
+                await hass.async_block_till_done()
+                asked = read.await_count
+                meter = {
+                    "known_since": None, "present": True, "plugged_at": 1000.0, "charging_at": None,
+                    "note": None, "last": None, "last_note": None,
+                }
+                coordinator.data.charge_meter = meter
+                coordinator.async_update_listeners()
+                await hass.async_block_till_done()
+                assert read.await_count == asked
+                coordinator.data.charge_meter = {**meter, "present": False, "plugged_at": None, "last": (1000.0, 2000.0)}
+                coordinator.async_update_listeners()
+                await hass.async_block_till_done()
+                assert read.await_count == asked + 1
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    asyncio.run(run())
+
+
+def _history_run(tmp_path, act, *, capacity=CAPACITY):
+    """Book one charge here, then let ``act`` change and ask; returns its result."""
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history", capacity=capacity)
+        with patch(READ, new=AsyncMock(return_value=())) as read, patch(LATER, return_value=lambda: None):
+            try:
+                await observer.async_start()
+                coordinator.complete()
+                await hass.async_block_till_done()
+                result = act(observer, coordinator, read)
+                observer.source.asked_at = float("-inf")
+                hass.bus.async_fire("bavariandata_charging_stopped", {})
+                await hass.async_block_till_done()
+                return observer.statistics, result
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    return asyncio.run(run())
+
+
+def test_a_record_the_meter_log_cannot_cover_does_not_block_a_newer_one(tmp_path):
+    def act(_observer, coordinator, read):
+        start, end = coordinator.span
+        gap = charged(start, start + 10, 4)
+        read.return_value = (gap, charged(start + 20, end, 4))
+        measure = coordinator.client.async_energy_between.side_effect
+        coordinator.client.async_energy_between.side_effect = (
+            lambda first, last: None if first == gap.start else measure(first, last)
+        )
+
+    statistics, _ = _history_run(tmp_path, act)
+    assert statistics.status == "matched"
+    assert statistics.sample_count == 1
+
+
+def test_a_failed_save_stops_before_a_newer_record(tmp_path):
+    def act(observer, coordinator, read):
+        start, end = coordinator.span
+        read.return_value = (charged(start, start + 40, 4), charged(start + 50, end, 4))
+        commit = AsyncMock(return_value=False)
+        observer.ledger.commit = commit
+        return commit
+
+    _statistics, commit = _history_run(tmp_path, act)
+    commit.assert_awaited_once()
+
+
+def test_the_cars_own_capacity_comes_from_its_profile(tmp_path):
+    telemetry = SimpleNamespace(snapshot=SimpleNamespace(capacity_kwh=CAPACITY))
+
+    def act(_observer, coordinator, read):
+        read.return_value = coordinator.record(8)
+
+    with patch(
+        "custom_components.mennekes_amtron_rtu.loss_record.resolve_telemetry_source", return_value=telemetry,
+    ) as resolve:
+        statistics, _ = _history_run(tmp_path, act, capacity=None)
+    assert resolve.call_args.args[1][CONF_DEPARTURE_USE_VEHICLE_CAPACITY] is True
+    assert statistics.last_loss_percent == pytest.approx(20)
+
+
+def test_an_unanswered_meter_query_lets_no_newer_record_pass(tmp_path):
+    def act(_observer, coordinator, read):
+        start, end = coordinator.span
+        older = charged(start, start + 40, 2)
+        read.return_value = (older, charged(start + 50, end, 2))
+        measure = coordinator.client.async_energy_between.side_effect
+
+        def answer(first, last):
+            if first == older.start:
+                raise AmtronConnectionError("app unreachable")
+            return measure(first, last)
+
+        coordinator.client.async_energy_between.side_effect = answer
+
+    statistics, _ = _history_run(tmp_path, act)
+    # Neither counts yet; the retry measures both in order.
+    assert statistics.sample_count == 0
+    assert statistics.accounted_end is None
