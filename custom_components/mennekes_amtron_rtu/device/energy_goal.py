@@ -232,6 +232,28 @@ class EnergyGoal:
             return None
         return cost.spent + (self._delivered(cost) - cost.booked_kwh) * cost.price
 
+    def progress(self, total_kwh: object) -> float | None:
+        """How much of the running goal is used, 0 to 1, at this meter reading.
+
+        Energy above the baseline against the target, or for an amount of
+        money what it cost so far against the amount. A reached goal is
+        used up; without a goal or a usable reading there is none.
+        """
+        if self._status == "reached":
+            return 1.0
+        baseline = self._baseline_kwh
+        total = finite_number(total_kwh)
+        if self._status != "active" or baseline is None or total is None or total < baseline:
+            return None
+        delivered = total - baseline
+        cost = self.cost
+        if cost is None:
+            share = delivered / self._target_kwh
+        else:
+            spent = cost.spent + (max(cost.booked_kwh, delivered) - cost.booked_kwh) * cost.price
+            share = spent / cost.amount
+        return min(1.0, max(0.0, share))
+
     def take_cost(self, other: EnergyGoal) -> None:
         """Adopt the repriced target and amount of the same goal's copy."""
         self._target_kwh = other._target_kwh

@@ -166,6 +166,22 @@ def _waiting_details(runtime: Runtime) -> dict[str, Any]:
     return details
 
 
+def _target_progress(runtime: Runtime) -> StateType:
+    """Whole percent: at most a hundred history rows for one target."""
+    progress = runtime.control.energy_goal.progress(_energy_total(runtime))
+    return None if progress is None else round(progress * 100)
+
+
+def _target_details(runtime: Runtime) -> dict[str, Any]:
+    """Which target and its value; fixed while it runs, never a ticking counter."""
+    goal = runtime.control.energy_goal
+    if not goal.target_kwh:
+        return {}
+    if goal.cost is not None:
+        return {"target": "cost", "target_value": goal.cost.amount}
+    return {"target": "energy", "target_value": goal.target_kwh}
+
+
 def _connection_details(runtime: Runtime) -> dict[str, Any]:
     healthy = runtime.heartbeat.healthy if runtime.heartbeat is not None else None
     return {"heartbeat": None if healthy is None else "ok" if healthy else "problem"}
@@ -289,6 +305,12 @@ SENSORS: tuple[AmtronSensorDescription, ...] = (
         offline=True,
         ready=lambda runtime: runtime.client.connected and runtime.control.operation is not None,
         attributes=_waiting_details,
+    ),
+    AmtronSensorDescription(
+        key="target_progress", capability="energy_total", value=_target_progress,
+        ready=lambda runtime: runtime.control.supports_energy_goal,
+        native_unit_of_measurement="%", suggested_display_precision=0,
+        attributes=_target_details,
     ),
     # --- Estimates. No state class: a per-charge value is neither a counter
     # nor an instantaneous measurement for long-term statistics.

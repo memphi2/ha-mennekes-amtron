@@ -8,7 +8,8 @@ cards:
       {%- set p = namespace(l=[]) -%}
       {%- set c = states('number.mennekes_amtron_obiettivo_di_costo') | float(0) -%}
       {%- set e = states('number.mennekes_amtron_obiettivo_energetico') | float(0) -%}
-      {%- if c > 0 %}{% set p.l = p.l + [states('number.mennekes_amtron_obiettivo_di_costo', with_unit=True)] %}{% elif e > 0 %}{% set p.l = p.l + ['%g kWh' % e] %}{% endif -%}
+      {%- set g = ' (%d %%)' % (states('sensor.mennekes_amtron_avanzamento_obiettivo') | int) if has_value('sensor.mennekes_amtron_avanzamento_obiettivo') else '' -%}
+      {%- if c > 0 %}{% set p.l = p.l + [states('number.mennekes_amtron_obiettivo_di_costo', with_unit=True) ~ g] %}{% elif e > 0 %}{% set p.l = p.l + ['%g kWh' % e ~ g] %}{% endif -%}
       {%- if has_value('datetime.mennekes_amtron_orario_obiettivo') %}{% set p.l = p.l + ['fino alle ' ~ as_local(as_datetime(states('datetime.mennekes_amtron_orario_obiettivo'))).strftime('%H:%M')] %}{% endif -%}
       {%- set s = states('number.mennekes_amtron_obiettivo_di_carica_del_veicolo') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}

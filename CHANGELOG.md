@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- **Target progress** shows in whole percent how much of a running energy
+  or cost target is used.
+
 ### Changed
 
 - Charging losses from the vehicle charging history use the car's rise in

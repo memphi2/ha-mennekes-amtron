@@ -42,9 +42,10 @@ One status tile and two rows of chips, so it fits next to other tiles:
 
 1. **Tile:** `AMTRON · power`, then charging state, session energy and, with
    charging costs configured, the estimated cost so far; then the active
-   targets, for example `Targets: 10 kWh · until 07:30 · 80 %`, and the
-   planning state when vehicle planning is configured. A cost target replaces
-   the energy it carries, for example `Targets: 5.00 € · until 07:30`. Green means charging;
+   targets, for example `Targets: 10 kWh (40 %) · until 07:30 · 80 %`, and the
+   planning state when vehicle planning is configured. The percentage in
+   brackets is **Target progress**. A cost target replaces the energy it
+   carries, for example `Targets: 5.00 € (20 %) · until 07:30`. Green means charging;
    grey means initialization or status checking. Amber means paused, missing
    readings or an ambiguous state; red means a wallbox fault or a lost connection.
    Read the status text for the specific reason.

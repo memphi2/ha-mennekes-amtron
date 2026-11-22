@@ -235,6 +235,7 @@ entity's *Attributes* panel and reachable with `state_attr()` in templates.
 | `sensor.*_signaled_current` | Signaled current | A | current | layout v01.03 | What the wallbox offers the vehicle on the pilot line. This is the number that should follow your charging-current limit. |
 | `sensor.*_charging_status` | Charging status | | enum | always | What the wallbox is doing; see [Charging status](#charging-status). |
 | `sensor.*_charging_wait_reason` | Charging wait reason | | enum | always | Why the car does not charge yet; see [Charging wait reason](#charging-wait-reason). |
+| `sensor.*_target_progress` | Target progress | % | | layout v01.02 | How much of the running **Energy target** or **Cost target** is used, in whole percent: the energy charged since it was set against the target, or what that cost so far against the amount. 100 once reached; unknown without a target or while the meter cannot be read. Attributes: `target` (`energy` or `cost`) and `target_value` (kWh or the amount), fixed while the target runs. |
 
 ## Diagnostic sensors
 

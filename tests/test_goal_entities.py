@@ -12,6 +12,7 @@ from aiohttp import ClientSession
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.energy_goal import CostPart
 from custom_components.mennekes_amtron_rtu.number import (
     async_setup_entry as setup_numbers,
 )
@@ -45,9 +46,16 @@ def test_goal_entities_never_start_charging_or_override_pause():
         assert waiting.available
         assert target.native_value == 0
         assert status() == "disabled"
+        progress = sensors["target_progress"]
+        assert progress.native_value is None
+        assert progress.extra_state_attributes is None
         await target.async_set_native_value(12)
         assert target.native_value == 12
         assert status() == "active"
+        assert progress.native_value == 0
+        assert progress.extra_state_attributes == {"target": "energy", "target_value": 12}
+        entry.runtime_data.control.energy_goal.cost = CostPart(5.0, 0.0, 0.3, 0.0)
+        assert progress.extra_state_attributes == {"target": "cost", "target_value": 5.0}
         assert control.pause_requested is True
         assert transport.writes == []
         # The service keeps the goal across its own restart.
@@ -70,6 +78,7 @@ def test_old_layouts_do_not_get_an_unusable_goal():
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
         assert "energy_goal" not in numbers
         assert "energy_target" not in sensors["operation_waiting"].extra_state_attributes
+        assert "target_progress" not in sensors
 
     asyncio.run(run())
 

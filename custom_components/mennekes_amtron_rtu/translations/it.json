@@ -473,6 +473,21 @@
           }
         }
       },
+      "target_progress": {
+        "name": "Avanzamento obiettivo",
+        "state_attributes": {
+          "target": {
+            "name": "Obiettivo",
+            "state": {
+              "energy": "Energia",
+              "cost": "Costo"
+            }
+          },
+          "target_value": {
+            "name": "Valore obiettivo"
+          }
+        }
+      },
       "last_charging_loss": {
         "name": "Perdita di ricarica stimata, ultima ricarica",
         "state_attributes": {
