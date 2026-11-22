@@ -329,7 +329,8 @@ timers.
 
 ## Phase switching leaves charging paused
 
-This is expected when switching during charging. Resume explicitly after the
+With a vehicle connected, the preparatory pause stays active even if the car
+was only waiting to charge. Resume explicitly after the
 phase change has actually run. The integration uses the configurable state-change interval and queues early
 requests. Check the `pending` attribute of **Charging wait reason** before requesting resume: a new resume
 request replaces a phase change that is still waiting. Check your vehicle's

@@ -44,8 +44,8 @@ Look up a detail when you need it: [models](compatibility.md), [wiring](hardware
 [Architecture](architecture.md) · [Service API](service-reference.md) ·
 [Standalone deployment](service-standalone.md) · [Modbus registers](modbus-registers.md) ·
 [Validation](validation.md) · [Control conflicts](charging-conflict-matrix.md) ·
-[Recorder validation](recorder-validation.md) · [Release process](service-releasing.md) ·
-[Repository settings](repository-settings.md) · [HA compatibility](ha-2026-11-validation.md) ·
+[Release process](service-releasing.md) ·
+[Repository settings](repository-settings.md) ·
 [Quality scale](quality-scale.md) · [Legal](legal.md)
 
 </details>

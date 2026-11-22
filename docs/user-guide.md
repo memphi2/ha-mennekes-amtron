@@ -186,9 +186,11 @@ keeps its last price.
 
 ## Phase switching
 
-If the wallbox supports it, select single phase or all available phases. During
-charging, the controller first requests a pause, waits for confirmation and the
-configured grace, then switches. Some wallboxes close **Charging release**
+If the wallbox supports it, select single phase or all available phases. With a car connected, the controller requests a pause even when the car is
+waiting to charge. This keeps the car from starting while the change is being
+prepared. After the wallbox confirms the pause and the configured grace time
+has elapsed, the controller requests the new phase count. With no car connected,
+it skips the preparatory pause. Some wallboxes close **Charging release**
 themselves with the pause; the switch then opens it again, unless it was
 switched off by hand, a target stopped the charge or Plug & Charge keeps it
 closed. Failed confirmation leaves the charge paused.

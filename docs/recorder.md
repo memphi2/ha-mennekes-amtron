@@ -177,9 +177,7 @@ repeated checks replace it. Check the sensor's unit and test the notification.
 
 ## Measured load
 
-Replay results, retention checks and compatibility evidence are in
-[Recorder validation and measurements](recorder-validation.md). These are
-controlled test results with stated limits, not storage guarantees.
+For reproducible measurements, see [Recorder checks](validation.md#recorder-checks).
 
 ### Shared charging controls
 

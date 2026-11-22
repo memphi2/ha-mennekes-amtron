@@ -163,6 +163,35 @@ even when the test fails. With `--json-output`, checkpoints are written directly
 to the artifact path so they also survive interruption of the runner itself.
 A partial report cannot pass validation.
 
+## Recorder checks
+
+Use disposable SQLite databases to compare the same simulated charging day with
+different history settings. Pass a fresh output directory for each run.
+
+```bash
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-full --scenario charging --profile full
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-lean --scenario charging --profile lean
+```
+
+Compare the JSON state-row and attribute counts. To compare measurement intervals,
+keep the scenario and profile fixed and vary `--measurement-interval`. The replay
+accelerates polling time. The [resource measurements](#resource-measurements)
+exercise reconnects, queue growth and repacking in real time.
+
+```bash
+.venv/bin/python -m pytest tests/test_recorder_service_plans.py tests/test_statistics.py tests/test_recorder_retention.py
+```
+
+These tests check three separate effects:
+
+- Repeated departure and guest updates leave charging status, wait reason and guest history unchanged and generate no extra Modbus reads.
+- Hourly statistics retain energy increments and power averages under the configured exclusion profiles.
+- Purging and repacking remove old state history while preserving long-term energy statistics and SQLite integrity.
+
+See [Recorder settings](recorder.md) for user configuration and the
+[archived measurements](https://github.com/memphi2/ha-mennekes-amtron/blob/v1.0.0b6/docs/recorder-validation.md)
+for the earlier comparison tables.
+
 ## AppArmor enforcement
 
 The Supervisor app includes a custom AppArmor profile. Syntax validation and
