@@ -70,6 +70,7 @@ class EnergyGoalController:
         self._storage_unknown = False
         self._dirty = False
         self._monotonic = monotonic
+        self._price_candidate: EnergyGoal | None = None
         self._priced_at = -math.inf
         # The last price Home Assistant reported, per kWh.
         self._price: float | None = None
@@ -83,6 +84,11 @@ class EnergyGoalController:
     def model(self) -> EnergyGoal:
         """Return the current shared goal, including restored or replaced state."""
         return self._control.energy_goal
+
+    @property
+    def goal_to_save(self) -> EnergyGoal:
+        """The proposed price is visible to storage while polls still see the committed goal."""
+        return self._price_candidate or self.model
 
     @property
     def stop_requested(self) -> bool:
@@ -187,28 +193,45 @@ class EnergyGoalController:
         async with self._control.energy_goal_guard:
             if self._stopping:
                 raise validation_error("energy_goal_unavailable")
-            self._price_currency = self._currency_for(currency)
-            self._price = unit
-            self.price_at = datetime.now(UTC)
-            self._notify_changed()
+            denomination = self._currency_for(currency)
             cost = self.model.cost
             if (
-                cost is None or abs(unit - cost.price) < PRICE_TOLERANCE
-                or self._monotonic() - self._priced_at < PRICE_INTERVAL_SECONDS
+                cost is not None and abs(unit - cost.price) >= PRICE_TOLERANCE
+                and self._monotonic() - self._priced_at >= PRICE_INTERVAL_SECONDS
             ):
-                return
-            state = self._client.write_state
-            pending = self._pending if self._pending_generation == state.energy_goal_generation else None
-            newest = pending or self.model
-            if newest.stop_requested or not newest.reprice(unit):
-                # Nothing changed, so this opens no waiting minute either.
-                return
-            self._priced_at = self._monotonic()
-            if pending is not None:
-                self.model.take_cost(pending)
-            self._dirty = True
-            await self._save_state()
+                pending = self._pending if self._pending_generation == self._client.write_state.energy_goal_generation else None
+                candidate = copy(pending or self.model)
+                if candidate.reprice(unit):
+                    await self._save_price(candidate, unit, denomination)
+                    return
+            self._remember_price(unit, denomination)
+
+    def _remember_price(self, unit: float, currency: str | None) -> None:
+        self._price, self._price_currency = unit, currency
+        self.price_at = datetime.now(UTC)
         self._notify_changed()
+
+    async def _save_price(self, candidate: EnergyGoal, unit: float, currency: str | None) -> None:
+        self._price_candidate = candidate
+        try:
+            await finish_goal_save(self._save_state())
+        except (asyncio.CancelledError, StorageCommitUncertainError, StorageStateUnknownError):
+            # Replacement completed, or its outcome is unknown and starts are fenced.
+            self._apply_price(candidate, unit, currency)
+            if self._storage_unknown:
+                self.observe(None)
+            raise
+        else:
+            self._apply_price(candidate, unit, currency)
+        finally:
+            self._price_candidate = None
+
+    def _apply_price(self, candidate: EnergyGoal, unit: float, currency: str | None) -> None:
+        self.model.take_cost(candidate)
+        if self._pending is not None and self._pending_generation == self._client.write_state.energy_goal_generation:
+            self._pending.take_cost(candidate)
+        self._priced_at = self._monotonic()
+        self._remember_price(unit, currency)
 
     async def async_set_target(self, value: object, *, cost: CostPart | None = None) -> None:
         """Persist a new ceiling before it can affect subsequent commands.

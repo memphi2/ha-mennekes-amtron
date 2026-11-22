@@ -678,12 +678,13 @@ class ModbusService:
             async with self._store_lock:
                 self._phase = "saving control intent"
                 original = self.client.write_state
+                goal = self.goal.goal_to_save if self.goal is not None else original.energy_goal
                 state = WriteState(
                     guest_permission=original.guest_permission,
                     charging_setpoint=original.charging_setpoint,
                     pause_requested=original.pause_requested,
                     charging_release_requested=original.charging_release_requested,
-                    energy_goal=EnergyGoal.restore(original.energy_goal.snapshot()),
+                    energy_goal=EnergyGoal.restore(goal.snapshot()),
                     soc_goal=SocGoal.restore(original.soc_goal.snapshot()),
                     plug_charge=replace(original.plug_charge, authorized=False),
                     unplug_release=replace(original.unplug_release),

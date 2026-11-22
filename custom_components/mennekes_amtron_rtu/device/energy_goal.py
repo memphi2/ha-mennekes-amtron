@@ -272,6 +272,12 @@ class EnergyGoal:
         """Adopt the repriced target and amount of the same goal's copy."""
         self._target_kwh = other._target_kwh
         self.cost = other.cost
+        # A poll may have crossed either ceiling during the durable save.
+        if self._last_total_kwh is not None:
+            if self._status == "active":
+                self.observe(self._last_total_kwh)
+            elif self._status == "reached" and self.cost is not None:
+                self.cost = self._booked(self.cost, self.cost.price)
 
     def reprice(self, price: float) -> bool:
         """Book the energy so far at the old price and aim the rest at ``price``.

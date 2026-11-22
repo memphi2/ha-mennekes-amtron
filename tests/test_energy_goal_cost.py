@@ -387,3 +387,35 @@ def test_a_cached_price_cannot_arm_a_target_in_another_currency():
         await runner.async_stop()
 
     asyncio.run(run())
+
+
+def test_failed_repricing_keeps_the_same_ceiling_on_disk_and_after_restart(tmp_path, monkeypatch):
+    from tests.test_modbus_service import service_fixture
+
+    async def run():
+        service, _, clock = await service_fixture(tmp_path)
+        try:
+            goal = service.goal
+            goal._monotonic = lambda: clock[0]
+            await goal.async_set_cost_target(10, 0.25, currency="EUR")
+            clock[0] += 61
+
+            def fail(_state):
+                raise OSError("disk full before replacement")
+
+            with monkeypatch.context() as patch:
+                patch.setattr(service._store, "save", fail)
+                with pytest.raises(OSError, match="disk full"):
+                    await goal.async_set_price(0.50, currency="EUR")
+            assert (goal.model.target_kwh, goal.price) == (40, 0.25)
+            restarted, _, _ = await service_fixture(tmp_path)
+            try:
+                assert (restarted.goal.model.target_kwh, restarted.goal.price) == (40, 0.25)
+            finally:
+                await restarted.stop()
+            await goal.async_set_price(0.50, currency="EUR")
+            assert goal.model.target_kwh == 20
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
