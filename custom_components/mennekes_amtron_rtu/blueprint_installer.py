@@ -110,6 +110,8 @@ def install_blueprints(source: Path, target: Path) -> InstallReport:
         except OSError, UnicodeError:
             report.failed.append(name)
 
+    if recorded == manifest:
+        return report
     try:
         _atomic_write(
             manifest_path, json.dumps(recorded, indent=2, sort_keys=True) + "\n"

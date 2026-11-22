@@ -99,8 +99,10 @@ def test_installing_into_an_empty_configuration(tmp_path: Path) -> None:
     assert set(manifest) == EXPECTED
 
 
-def test_installing_twice_changes_nothing(tmp_path: Path) -> None:
+def test_installing_twice_changes_nothing(tmp_path: Path, monkeypatch) -> None:
     install_blueprints(SOURCE_DIR, tmp_path)
+    monkeypatch.setattr("custom_components.mennekes_amtron_rtu.blueprint_installer._atomic_write",
+                        lambda *_: pytest.fail("unchanged setup wrote a file"))
     report = install_blueprints(SOURCE_DIR, tmp_path)
 
     assert not report.changed
