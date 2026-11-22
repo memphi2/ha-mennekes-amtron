@@ -142,9 +142,9 @@ class AmtronNumber(AmtronEntity, NumberEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        # Money is in Home Assistant's currency, as the price it reports.
         if self.entity_description.device_class is NumberDeviceClass.MONETARY:
-            return self.hass.config.currency
+            cost = self.runtime.control.energy_goal.cost
+            return (cost.currency if cost else None) or self.hass.config.currency
         return self.entity_description.native_unit_of_measurement
 
     @property

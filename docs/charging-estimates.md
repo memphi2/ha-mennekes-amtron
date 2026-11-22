@@ -149,7 +149,7 @@ sensor for the **current electricity price**. Its unit must name that currency
 per kWh or MWh, for example `EUR/kWh` or `CHF/MWh`; with euros, `€/kWh`,
 `ct/kWh` and `€/MWh` also work. Negative prices are supported. Another
 currency or a missing unit is not guessed. Costs, the cost target and the
-app's Charging page all show that currency. The network price modules follow
+app's Charging page all show that currency. An active cost target keeps its original currency, including after a restart. If you change the HA currency, clear the cost target before entering a new amount. The network price modules follow
 German rules and are priced in euros: they are offered, imported, renewed and
 applied only while Home Assistant is set to Germany and euros.
 

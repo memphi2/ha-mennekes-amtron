@@ -374,3 +374,16 @@ def test_progress_follows_the_meter_for_energy_and_money():
     goal.observe(110.0)
     assert goal.status == "reached"
     assert goal.progress(None) == 1.0
+
+
+def test_a_cached_price_cannot_arm_a_target_in_another_currency():
+    async def run():
+        _, _, runner, _, _ = await _cost_runner()
+        await runner.async_set_price(0.30, currency="EUR")
+        with pytest.raises(DeviceValidationError, match="cost_goal_price_unknown"):
+            await runner.async_set_cost_target(10, currency="CHF")
+        assert runner.model.cost is None
+        assert (runner.price, runner.currency) == (0.30, "EUR")
+        await runner.async_stop()
+
+    asyncio.run(run())

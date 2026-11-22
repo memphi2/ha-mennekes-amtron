@@ -67,7 +67,7 @@ class CostGoalObserver:
         goal = self._entry.runtime_data.control.energy_goal
         if goal.cost is None:
             return "disabled"
-        if goal.status == "active" and self._price() is None:
+        if goal.status == "active" and (self._price() is None or goal.cost.currency not in (None, self._hass.config.currency)):
             return "price_unknown"
         return goal.status
 
@@ -99,6 +99,8 @@ class CostGoalObserver:
         # A running amount shows the price it really has: one that came while
         # its goal was stopped is told again once the goal runs.
         goal = control.energy_goal
+        if goal.cost is not None and goal.cost.currency not in (None, self._hass.config.currency):
+            return
         running = goal.cost is not None and goal.status == "active"
         known = goal.cost.price if running and goal.cost is not None else control.cost_price
         if (

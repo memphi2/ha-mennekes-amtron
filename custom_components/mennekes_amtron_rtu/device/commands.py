@@ -121,11 +121,11 @@ async def _cost(_service: ModbusService, control: AmtronControl, payload: dict[s
     if control.goal_controller is None or not control.supports_energy_goal:
         raise validation_error("energy_goal_not_supported")
     price = payload.get("price")
-    control.goal_controller.note_currency(payload.get("currency"))
+    currency = payload.get("currency")
     if payload["command"] == "cost_goal":
-        await control.goal_controller.async_set_cost_target(_real(payload.get("value")), price)
+        await control.goal_controller.async_set_cost_target(_real(payload.get("value")), price, currency=currency)
     else:
-        await control.goal_controller.async_set_price(price)
+        await control.goal_controller.async_set_price(price, currency=currency)
 
 
 async def _soc_source(service: ModbusService, control: AmtronControl, payload: dict[str, Any]) -> None:

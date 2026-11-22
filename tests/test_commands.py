@@ -141,3 +141,30 @@ def test_an_armed_plan_keeps_a_pause_a_grant_would_end(tmp_path, monkeypatch, st
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_rejected_cost_change_keeps_the_amount_price_and_currency(tmp_path):
+    async def run():
+        service, _, _ = await service_fixture(tmp_path)
+        try:
+            async def command(name, **fields):
+                return await service.command({"command": name, "expected_serial_number": SERIAL, **fields})
+
+            await command("cost_goal", value=10, price=0.25, currency="EUR")
+            goal = service.control.energy_goal
+            original = goal.snapshot()
+            with pytest.raises(DeviceValidationError):
+                await command("cost_goal", value=0.05, price=0.50, currency="CHF")
+            assert service.goal.currency == "EUR"
+            with pytest.raises(DeviceValidationError):
+                await command("cost_price", price=0.50, currency="CHF")
+            assert goal.snapshot() == original
+            assert service.goal.price == 0.25
+            assert goal.restore(original).cost.currency == "EUR"
+            await command("cost_goal", value=0, currency="CHF")
+            await command("cost_price", price=0.50, currency="CHF")
+            assert service.goal.currency == "CHF"
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
