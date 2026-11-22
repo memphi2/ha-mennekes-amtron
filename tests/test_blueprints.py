@@ -99,13 +99,30 @@ def test_installing_into_an_empty_configuration(tmp_path: Path) -> None:
     assert set(manifest) == EXPECTED
 
 
-def test_installing_twice_changes_nothing(tmp_path: Path) -> None:
+def test_installing_twice_changes_nothing(tmp_path: Path, monkeypatch) -> None:
     install_blueprints(SOURCE_DIR, tmp_path)
+    monkeypatch.setattr("custom_components.mennekes_amtron_rtu.blueprint_installer._atomic_write",
+                        lambda *_: pytest.fail("unchanged setup wrote a file"))
     report = install_blueprints(SOURCE_DIR, tmp_path)
 
     assert not report.changed
     assert report.installed == []
     assert report.updated == []
+
+
+def test_identical_user_blueprint_is_never_adopted(tmp_path):
+    source, target = tmp_path / "source", tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    shipped, local = source / "custom.yaml", target / "custom.yaml"
+    shipped.write_text("original")
+    local.write_text("original")
+    install_blueprints(source, target)
+    shipped.write_text("update")
+    assert install_blueprints(source, target).kept == ["custom.yaml"]
+    shipped.unlink()
+    install_blueprints(source, target)
+    assert local.read_text() == "original"
 
 
 def test_an_edited_blueprint_is_left_alone(tmp_path: Path) -> None:

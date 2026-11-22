@@ -95,8 +95,8 @@ therefore not measured. The average adds up all measured charges, so these
 rounding errors largely cancel out.
 
 Every record not yet measured is taken into account, oldest first. DC
-charges and interrupted or late-start records are passed over; a truncated
-history is not used. A record counts only when its span lies in a plug cycle
+charges and interrupted or late-start records are passed over; full pages are read again in smaller time windows. If the complete
+result cannot be obtained within the request limit, that lookup is skipped. A record counts only when its span lies in a plug cycle
 the service saw at this wallbox from the plug-in on, and with vehicle profiles
 only in a cycle of that car; a charge elsewhere is passed over. The history is
 read when a charge stops, when the car is unplugged and when BavarianData

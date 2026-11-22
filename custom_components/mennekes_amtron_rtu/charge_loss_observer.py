@@ -78,7 +78,7 @@ class ChargeLossObserver:
         self._unsubscribers.append(self._coordinator.async_add_listener(self._updated))
         self._unsubscribers.extend(self.source.subscribe())
         self._updated(initial=True)
-        if self._task is not None:
+        if isinstance(self.source, PlugCycleLoss) and self._task is not None:
             await asyncio.shield(self._task)
 
     @callback

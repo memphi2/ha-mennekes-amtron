@@ -7,7 +7,7 @@ import logging
 import threading
 import time
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import atomicwrites
 import pytest
@@ -401,6 +401,35 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
     asyncio.run(run())
 
 
+def test_new_history_event_replaces_an_old_retry(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        coordinator.complete()
+        timers = []
+        def schedule(_hass, delay, callback):
+            cancel = Mock()
+            timers.append((delay, callback, cancel))
+            return cancel
+        with patch(READ, new=AsyncMock(return_value=None)), patch(LATER, side_effect=schedule):
+            try:
+                await observer.async_start()
+                await hass.async_block_till_done()
+                timers[-1][1](None)
+                await hass.async_block_till_done()
+                delay, _, old_cancel = timers[-1]
+                assert delay == 240
+                observer.source.asked_at -= 31
+                hass.bus.async_fire("bavariandata_charging_stopped", {})
+                await hass.async_block_till_done()
+                old_cancel.assert_called_once()
+                assert timers[-1][0] == 60
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    asyncio.run(run())
+
+
 def test_provider_exception_during_setup_does_not_block_wallbox_and_retries(tmp_path, caplog):
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -413,7 +442,7 @@ def test_provider_exception_during_setup_does_not_block_wallbox_and_retries(tmp_
             return lambda: None
 
         with (
-            patch(READ, new=AsyncMock(side_effect=[ValueError("private vehicle data"), coordinator.record(8)])),
+            patch(READ, new=AsyncMock(side_effect=[ValueError("private vehicle data"), ValueError(), coordinator.record(8)])),
             patch(LATER, side_effect=schedule),
         ):
             try:
@@ -421,9 +450,14 @@ def test_provider_exception_during_setup_does_not_block_wallbox_and_retries(tmp_
                 assert observer.statistics.last_loss_percent is None
                 assert callbacks[0][0] == 60
                 assert "ValueError" in caplog.text
-                assert "private vehicle data" not in caplog.text
+                caplog.set_level("INFO")
                 callbacks[0][1](None)
                 await hass.async_block_till_done()
+                assert caplog.text.count("vehicle charging history failed") == 1
+                assert "private vehicle data" not in caplog.text
+                callbacks[1][1](None)
+                await hass.async_block_till_done()
+                assert caplog.text.count("vehicle charging history available again") == 1
                 assert observer.statistics.last_loss_percent == pytest.approx(20)
             finally:
                 await observer.async_stop()
@@ -1251,16 +1285,42 @@ def test_a_record_the_meter_log_cannot_cover_does_not_block_a_newer_one(tmp_path
     assert statistics.sample_count == 1
 
 
-def test_a_failed_save_stops_before_a_newer_record(tmp_path):
-    def act(observer, coordinator, read):
-        start, end = coordinator.span
-        read.return_value = (charged(start, start + 40, 4), charged(start + 50, end, 4))
-        commit = AsyncMock(return_value=False)
-        observer.ledger.commit = commit
-        return commit
+@pytest.mark.parametrize("stop_before_reply", [False, True])
+def test_history_starts_in_background_and_saves_one_batch(tmp_path, stop_before_reply):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        end = time.time()
+        start = end - 86400
+        coordinator.cycle(start, end)
+        records = tuple(charged(start + n * 1200, start + n * 1200 + 600, 8) for n in range(51))
+        entered, reply = asyncio.Event(), asyncio.Event()
 
-    _statistics, commit = _history_run(tmp_path, act)
-    commit.assert_awaited_once()
+        async def read(*args, **kwargs):
+            entered.set()
+            await reply.wait()
+            return records
+
+        coordinator.client.async_energy_between = AsyncMock(return_value=10)
+        with patch(READ, side_effect=read), patch.object(
+            observer.ledger.store, "async_save", wraps=observer.ledger.store.async_save,
+        ) as save:
+            try:
+                await asyncio.wait_for(observer.async_start(), timeout=2)
+                await asyncio.wait_for(entered.wait(), timeout=2)
+                if stop_before_reply:
+                    await observer.async_stop()
+                reply.set()
+                await hass.async_block_till_done()
+                assert save.await_count == (0 if stop_before_reply else 1)
+                assert coordinator.client.async_energy_between.await_count == (0 if stop_before_reply else 51)
+                assert observer.statistics.sample_count == (0 if stop_before_reply else 51)
+                if not stop_before_reply:
+                    assert (await observer.ledger.store.async_load()).sample_count == 51
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    asyncio.run(run())
 
 
 def test_the_cars_own_capacity_comes_from_its_profile(tmp_path):

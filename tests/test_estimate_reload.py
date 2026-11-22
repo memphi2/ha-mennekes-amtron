@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components import mennekes_amtron_rtu as integration
@@ -205,6 +206,8 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
 
 def test_short_transport_reconnect_keeps_estimate_continuity(tmp_path, monkeypatch):
     async def run():
+        # HA formats the coordinator outage through its runtime translation cache.
+        core = HomeAssistant(str(tmp_path))
         hass, entry, transport = setup_owners(tmp_path, monkeypatch)
         await _setup(hass, entry)
         runtime = entry.runtime_data
@@ -220,6 +223,9 @@ def test_short_transport_reconnect_keeps_estimate_continuity(tmp_path, monkeypat
             await poll(EvseState.IDLE, 120)
             assert runtime.charging_cost.last.result.complete
         finally:
-            await _unload(hass, entry)
+            try:
+                await _unload(hass, entry)
+            finally:
+                await core.async_stop()
 
     asyncio.run(run())

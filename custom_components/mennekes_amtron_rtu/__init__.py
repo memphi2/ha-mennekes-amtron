@@ -541,10 +541,6 @@ async def _async_start_vehicle(
     if _service_intent_rejected(runtime.client):
         return
     control, coordinator, client = runtime.control, runtime.coordinator, runtime.client
-    loss_enabled = loss_vehicle_options(entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
-    if loss_enabled:
-        runtime.charge_loss = ChargeLossObserver(hass, entry)
-        await runtime.charge_loss.async_start()
     validate_vehicle_selection()
     runtime.vehicle_telemetry = resolve_telemetry_source(hass, options)
     if vehicle_soc_is_configured(options) or control.soc_goal.source is not None:
@@ -578,6 +574,10 @@ async def _async_start_vehicle(
             ) from err
         except (AmtronBusError, HomeAssistantError) as err:
             _raise_optional_setup_error(client, err, "departure_unavailable")
+    loss_enabled = loss_vehicle_options(entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+    if loss_enabled:
+        runtime.charge_loss = ChargeLossObserver(hass, entry)
+        await runtime.charge_loss.async_start()
     runtime.vehicle_profile_id = options.get(CONF_VEHICLE_PROFILE_ID)
 
 

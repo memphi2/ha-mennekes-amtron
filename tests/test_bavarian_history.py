@@ -156,6 +156,31 @@ def test_full_history_page_cannot_prove_that_it_was_not_truncated(count):
     assert query([record()] * count) is None
 
 
+@pytest.mark.parametrize("count", [50, 51])
+def test_full_history_windows_include_boundary_session_once(count):
+    rows = [record(start=iso(BASE + i * 20), end=iso(BASE + i * 20 + 10)) for i in range(count)]
+    hass = fake_hass({})
+    def page(_domain, _service, data, **_kwargs):
+        return {"sessions": [row for row in reversed(rows)
+                             if data["from"] <= row["start"] <= data["to"]][:data["limit"]]}
+    hass.services.async_call.side_effect = page
+    result = read(hass)
+    assert [r.start for r in result] == [BASE + i * 20 for i in range(count)]
+    assert hass.services.async_call.await_count == 3
+
+
+def test_full_history_with_foreign_vehicle_stops_before_subdivision():
+    hass = fake_hass({"sessions": [record()] * 49 + [record(vin="OTHER")]})
+    assert read(hass) is None
+    assert hass.services.async_call.await_count == 1
+
+
+def test_full_history_at_timestamp_resolution_stops():
+    hass = fake_hass({"sessions": [record()] * 50})
+    assert read(hass, since=BASE, until=BASE + 0.000001) is None
+    assert hass.services.async_call.await_count == 1
+
+
 def test_every_complete_record_comes_oldest_first():
     early = record(end=iso(BASE + 400), soc_start=20, soc_end=30)
     late = record(start=iso(BASE + 500), soc_start=30, soc_end=55.5)

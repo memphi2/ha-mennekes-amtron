@@ -21,6 +21,7 @@ from .identity import DOMAIN, bavarian_vehicle_vin
 
 HISTORY_SERVICE = "get_charging_sessions"
 HISTORY_LIMIT = 50
+_MAX_PAGE_REQUESTS = 15
 HISTORY_TIMEOUT_SECONDS = 10.0
 _MAX_EPOCH = 253402300799.0
 
@@ -75,6 +76,11 @@ def _record(
     return ChargeRecord(start, end, first, last)
 
 
+def _matches_vehicle(row: object, expected_vin: str) -> bool:
+    vin = row.get("vin") if isinstance(row, dict) else None
+    return isinstance(vin, str) and vin.strip().upper() == expected_vin
+
+
 def _records(
     response: object, *, home_zone: str | None, expected_vin: str,
 ) -> tuple[ChargeRecord, ...] | None:
@@ -87,11 +93,7 @@ def _records(
         return None
     found: list[ChargeRecord] = []
     for raw in rows:
-        if not isinstance(raw, dict):
-            return None
-        vin = raw.get("vin")
-        # Another car in the answer means the selection is not what it seems.
-        if not isinstance(vin, str) or vin.strip().upper() != expected_vin:
+        if not isinstance(raw, dict) or not _matches_vehicle(raw, expected_vin):
             return None
         try:
             start, end = _epoch(raw.get("start")), _epoch(raw.get("end"))
@@ -109,7 +111,7 @@ async def async_read_records(
     home_zone: str | None = None,
     expected_vin: str | None = None,
 ) -> tuple[ChargeRecord, ...] | None:
-    """Read one bounded local history page; callers handle service/timeout errors.
+    """Read bounded local history windows; callers handle service/timeout errors.
 
     Returns the complete AC records of the selected vehicle, oldest first,
     with their own time span and charge levels. A record that is interrupted,
@@ -126,18 +128,37 @@ async def async_read_records(
         or hass.services.supports_response(DOMAIN, HISTORY_SERVICE) is SupportsResponse.NONE
     ):
         return None
+    windows = [(since, until)]
+    found: set[ChargeRecord] = set()
     async with asyncio.timeout(HISTORY_TIMEOUT_SECONDS):
-        response = await hass.services.async_call(
-            DOMAIN, HISTORY_SERVICE,
-            {
-                "device_id": device_id,
-                "vin": selected_vin,
-                "from": _query_time(since),
-                "to": _query_time(until),
-                "limit": HISTORY_LIMIT,
-            },
-            blocking=True, return_response=True,
-        )
-    if bavarian_vehicle_vin(hass, device_id) != selected_vin:
-        return None
-    return _records(response, home_zone=home_zone, expected_vin=selected_vin)
+        for _ in range(_MAX_PAGE_REQUESTS):
+            lower, upper = windows.pop()
+            response = await hass.services.async_call(
+                DOMAIN, HISTORY_SERVICE,
+                {
+                    "device_id": device_id, "vin": selected_vin,
+                    "from": _query_time(lower), "to": _query_time(upper),
+                    "limit": HISTORY_LIMIT,
+                },
+                blocking=True, return_response=True,
+            )
+            if bavarian_vehicle_vin(hass, device_id) != selected_vin:
+                return None
+            rows = response.get("sessions") if isinstance(response, dict) else None
+            if isinstance(rows, list) and len(rows) == HISTORY_LIMIT:
+                if any(not _matches_vehicle(row, selected_vin) for row in rows):
+                    return None
+                # The provider filters on inclusive session start times.
+                # A boundary session can occur twice and counts only once.
+                middle = (lower + upper) / 2
+                if _query_time(middle) in (_query_time(lower), _query_time(upper)):
+                    return None
+                windows.extend(((middle, upper), (lower, middle)))
+                continue
+            records = _records(response, home_zone=home_zone, expected_vin=selected_vin)
+            if records is None:
+                return None
+            found.update(records)
+            if not windows:
+                return tuple(sorted(found, key=lambda record: (record.end, record.start)))
+    return None
