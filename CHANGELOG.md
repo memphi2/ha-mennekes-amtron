@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b6 — 2026-11-22
+
+- Cost targets retain their currency across restarts. A failed tariff save leaves the previous charging limit in effect. An amount saved by an earlier beta without a currency keeps its kWh limit. Clear it and enter the amount again to use dynamic prices.
+- Direct and app connections report a busy service consistently. Status requests time out cleanly while a command is blocked.
+- Guest charging controls and dashboard examples explain how to combine a kWh or money limit with an end time.
+- **App users:** update the beta Modbus app to **1.0.0b5** before updating the integration. Direct connections need only the integration update.
+
 ## 1.0.0b5 — 2026-11-22
 
 This beta updates the HACS integration. The Modbus app stays at **1.0.0b4**.
