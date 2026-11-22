@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.0b5
+
+- Use with integration 1.0.0b6. Update the app first.
+- Preserve the cost target’s currency and the committed kWh limit when tariff updates fail.
+- Bound status waits during long commands and return structured service errors.
+- Clarify guest energy, cost and time limits on the charging page.
+
 ## 1.0.0b4
 
 - Fourth beta of 1.0.0. Works with integration 1.0.0b3 and 1.0.0b4.
