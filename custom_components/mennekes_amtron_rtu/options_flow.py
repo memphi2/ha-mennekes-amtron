@@ -27,6 +27,7 @@ from .const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_PAUSE_BEFORE_PHASE_SWITCH,
     CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_RELEASE_OFF_ON_UNPLUG,
     CONF_SCAN_INTERVAL_SECONDS,
@@ -80,6 +81,7 @@ WALLBOX_KEYS = {
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_PAUSE_BEFORE_PHASE_SWITCH,
     CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
@@ -190,6 +192,8 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                     if key in user_input
                 }
             )
+            if CONF_PAUSE_BEFORE_PHASE_SWITCH in user_input:
+                draft.values[CONF_PAUSE_BEFORE_PHASE_SWITCH] = user_input[CONF_PAUSE_BEFORE_PHASE_SWITCH]
             return await self._finish_section()
         identity = getattr(
             getattr(self.config_entry, "runtime_data", None), "identity", None

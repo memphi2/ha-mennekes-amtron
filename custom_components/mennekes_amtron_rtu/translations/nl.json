@@ -1194,11 +1194,13 @@
         "data": {
           "measurement_interval_seconds": "Meetinterval",
           "state_change_interval_seconds": "Minimale tijd tussen statuswijzigingen",
+          "pause_before_phase_switch": "Pauzeren vóór fasewisseling",
           "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen"
         },
         "data_description": {
           "measurement_interval_seconds": "Vermogen, spanning, stroom en sessiewaarden: 30 seconden vermindert de databasebelasting. Bij statuswijzigingen worden metingen direct vernieuwd. Zonder voertuig geldt minimaal 60 seconden. Het statusinterval bepaalt de kortst mogelijke tijd tussen uitlezingen.",
           "state_change_interval_seconds": "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen.",
+          "pause_before_phase_switch": "Schakel dit in als een voertuig vóór de fasewisseling moet pauzeren. Zet dit alleen uit als alle voertuigen direct kunnen omschakelen.",
           "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
         },
         "description": "De standaardwaarden combineren snelle statusupdates, minder opgeslagen metingen en rustige toestandswisselingen. Home Assistant toont de resterende wachttijd van geplande opdrachten. Deze intervallen vertragen de onafhankelijke heartbeat niet."

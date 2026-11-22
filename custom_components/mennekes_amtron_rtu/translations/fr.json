@@ -1194,11 +1194,13 @@
         "data": {
           "measurement_interval_seconds": "Intervalle des mesures",
           "state_change_interval_seconds": "Délai minimal entre changements d’état",
+          "pause_before_phase_switch": "Mettre en pause avant de changer de phases",
           "phase_switch_grace_seconds": "Attente supplémentaire avant changement de phases"
         },
         "data_description": {
           "measurement_interval_seconds": "Puissance, tension, courant et données de session : un intervalle de 30 secondes réduit la charge de la base de données. Un changement d’état déclenche une actualisation immédiate. Sans véhicule, l’intervalle est d’au moins 60 secondes. L’intervalle de lecture de l’état fixe la fréquence maximale des lectures.",
           "state_change_interval_seconds": "Délai minimal en secondes entre les démarrages, les pauses et les changements d’autorisation de charge, de verrouillage ou de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé.",
+          "pause_before_phase_switch": "Activez cette option si un véhicule doit interrompre la charge avant la commutation. Désactivez-la uniquement si tous vos véhicules acceptent une commutation directe.",
           "phase_switch_grace_seconds": "Secondes d’attente supplémentaires entre la confirmation de la pause de charge par le véhicule et le changement de phases (5 par défaut, de 0 à 30). La valeur 0 supprime uniquement cette attente supplémentaire ; la confirmation de la pause reste obligatoire."
         },
         "description": "Les valeurs par défaut équilibrent des états rapides, moins de mesures enregistrées et des changements progressifs. Home Assistant affiche le délai restant des commandes en attente. Ces intervalles ne ralentissent pas le heartbeat indépendant."

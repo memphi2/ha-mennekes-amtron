@@ -19,6 +19,7 @@ DEFAULT_SCAN_INTERVAL_SECONDS: Final = 5
 MIN_SCAN_INTERVAL_SECONDS: Final = 2
 MAX_SCAN_INTERVAL_SECONDS: Final = 300
 CONF_STATE_CHANGE_INTERVAL_SECONDS: Final = "state_change_interval_seconds"
+CONF_PAUSE_BEFORE_PHASE_SWITCH: Final = "pause_before_phase_switch"
 CONF_PHASE_SWITCH_GRACE_SECONDS: Final = "phase_switch_grace_seconds"
 CHARGING_CURRENT_STEP: Final = 0.1
 # Decimals the charging-current entity may report. The register is a float32,

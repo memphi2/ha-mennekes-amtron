@@ -5,8 +5,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 const test = require("node:test");
 const source = readFileSync(path.join(__dirname,"../custom_components/mennekes_amtron_rtu/device/app_runtime.js"),"utf8");
-const names=["scan_interval","measurement_interval","current_cap","state_change_interval_seconds","phase_switch_grace_seconds"];
-const fields={scan_interval:5,measurement_interval:30,current_cap:16,state_change_interval_seconds:300,phase_switch_grace_seconds:5};
+const names=["scan_interval","measurement_interval","current_cap","state_change_interval_seconds","phase_switch_grace_seconds","pause_before_phase_switch"];
+const fields={scan_interval:5,measurement_interval:30,current_cap:16,state_change_interval_seconds:300,phase_switch_grace_seconds:5,pause_before_phase_switch:true};
 function payload(extra={}) {return {schema:1,active:{...fields},saved:{...fields},proposed:{...fields},changes:[],restart_fields:[],restart_required:false,revision:"r",csrf:"c",write_blocked:false,...extra};}
 class Element {
   constructor(){this.hidden=false;this.disabled=false;this.value="";this.textContent="";this.children=[];this.listeners={};}
@@ -30,12 +30,13 @@ async function harness(responses=[payload()], language="de") {
 
 test("initial load is read-only and displays saved and effective values",async()=>{
   const h=await harness();assert.equal(h.calls.length,1);assert.equal(h.calls[0].url,"./api/runtime");assert.equal(h.calls[0].options.method,undefined);
-  assert.equal(h.el("runtime_values").children.length,5);assert.equal(h.el("current_cap").value,"16");assert.equal(h.el("runtime_save").disabled,true);
+  assert.equal(h.el("runtime_values").children.length,6);assert.equal(h.el("pause_before_phase_switch").checked,true);assert.equal(h.el("current_cap").value,"16");assert.equal(h.el("runtime_save").disabled,true);
 });
 test("preview requires explicit confirmation and input changes invalidate it",async()=>{
-  const h=await harness();h.el("scan_interval").value="10";
+  const h=await harness();h.el("scan_interval").value="10";h.el("pause_before_phase_switch").checked=false;
   h.responses.push(payload({changes:[{key:"scan_interval",effective:5,proposed:10,effect:"next_cycle"}]}));
   await h.el("runtime_form").emit("submit");assert.equal(h.calls.length,2);assert.equal(h.calls[1].url,"./api/runtime/preview");assert.equal(h.calls[1].options.headers["X-Amtron-CSRF"],"c");assert.equal(h.el("runtime_save").disabled,false);
+  assert.equal(JSON.parse(h.calls[1].options.body).changes.pause_before_phase_switch,false);
   await h.el("runtime_form").emit("input");assert.equal(h.el("runtime_save").disabled,true);await h.el("runtime_save").emit("click");assert.equal(h.calls.length,2);
 });
 test("fields and confirmation are disabled while a request is in flight",async()=>{
@@ -88,7 +89,7 @@ test("restart notes use the page language set by the server",async()=>{
 test("saved values that are not in use yet point to saving them here",async()=>{
   for(const [language,start] of [["en","Some saved values"],["de","Einige gespeicherte Werte"],["fr","Certaines valeurs"],["nl","Sommige opgeslagen"],["it","Alcuni valori"]]){
     const h=await harness([payload({saved:{...fields,current_cap:8}})],language);
-    assert.ok(h.el("runtime_notice").textContent.startsWith(start));assert.equal(h.el("current_cap").value,"8");
+    assert.ok(h.el("runtime_notice").textContent.startsWith(start));assert.equal(h.el("pause_before_phase_switch").checked,true);assert.equal(h.el("current_cap").value,"8");
   }
   const h=await harness([payload({saved:{...fields,current_cap:8},write_blocked:true})]);assert.match(h.el("runtime_notice").textContent,/ungewissen/);
 });

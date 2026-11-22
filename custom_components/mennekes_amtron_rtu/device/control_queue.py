@@ -35,7 +35,7 @@ class CommandQueue:
     def __init__(self, control: AmtronControl) -> None:
         self._control = control
 
-    async def async_observe_command(self, command: PendingCommand, *, deferred: bool = False) -> None:
+    async def async_observe_command(self, command: PendingCommand, *, deferred: bool = False) -> PendingCommand | None:
         """Report the bus outcome independently of status/persistence callbacks."""
         self._control._active_command = command
         self._control._keep_pending = self._outlasts(command)
@@ -46,9 +46,10 @@ class CommandQueue:
             self._control._check_command_context()
             if deferred and self._control._validate_deferred is not None:
                 self._control._validate_deferred()
-            await self._control.writes.async_apply_command(command)
+            followup = await self._control.writes.async_apply_command(command)
         except DepartureCommandCancelledError as err:
             self._control.events.record("cancelled", command.action, err.reason, source=command.source, requested_value=command.value)
+            return None
         except (PhaseWaitError, AmtronRateLimitedError):
             raise
         except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError, asyncio.CancelledError) as err:
@@ -70,6 +71,7 @@ class CommandQueue:
         else:
             self._control._record_replaced(command)
             self._control.events.record("executed", command.action, command.completion_reason, source=command.source, requested_value=command.value)
+            return followup
         finally:
             self._control._active_command = None
             self._control._keep_pending = False
@@ -119,7 +121,7 @@ class CommandQueue:
                 MIN_CURRENT_WRITE_INTERVAL_SECONDS,
             ))
         try:
-            await self.async_observe_command(command)
+            followup = await self.async_observe_command(command)
         except PhaseWaitError as err:
             await self._async_queue(command, err.retry_after, preserve_deadline=err.preserve_deadline)
             return
@@ -152,7 +154,9 @@ class CommandQueue:
                 if had_pending:
                     await self._async_publish_pending()
             raise
-        if not kept:
+        if followup is not None:
+            await self._async_queue(followup, self._control._mode_change_remaining())
+        elif not kept:
             await self.async_cancel_pending()
 
     async def _async_queue(
@@ -236,7 +240,7 @@ class CommandQueue:
                         delay = MIN_CURRENT_WRITE_INTERVAL_SECONDS
                     if delay <= 0:
                         try:
-                            await self.async_observe_command(command, deferred=True)
+                            followup = await self.async_observe_command(command, deferred=True)
                         except PhaseWaitError as err:
                             await self._async_queue(
                                 command, err.retry_after, preserve_deadline=err.preserve_deadline,
@@ -268,6 +272,9 @@ class CommandQueue:
                                 await self._async_publish_pending()
                                 return
                         else:
+                            if followup is not None:
+                                await self._async_queue(followup, self._control._mode_change_remaining())
+                                continue
                             await self.async_cancel_pending()
                             return
                     self._control._pending_changed.clear()

@@ -1304,6 +1304,6 @@ def test_a_phase_switch_while_charging_owns_the_pause_it_leaves():
         control._active_command = PendingCommand("single_phase", 1, source="home_assistant")
         harness.clock[0] += 400
         await control.writes.async_apply_current(CHARGING_PAUSE_CURRENT, phase_preparation=True)
-        assert control.pause_owner == "manual"
+        assert control.pause_owner == "phase_switch"
         await control.async_shutdown()
     asyncio.run(run())

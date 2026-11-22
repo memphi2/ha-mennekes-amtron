@@ -259,6 +259,7 @@ class ModbusService:
                 self.config.read_only,
                 self.config.current_cap,
                 state_change_interval_seconds=self.config.state_change_interval_seconds,
+                pause_before_phase_switch=self.config.pause_before_phase_switch,
                 phase_switch_grace_seconds=self.config.phase_switch_grace_seconds,
             ),
             state=lambda: self.data,
@@ -798,6 +799,7 @@ class ModbusService:
                 "intent_rejected": self._intent_rejected,
                 "current_cap": self.config.current_cap,
                 "state_change_interval_seconds": self.config.state_change_interval_seconds,
+                "pause_before_phase_switch": self.config.pause_before_phase_switch,
                 "phase_switch_grace_seconds": self.config.phase_switch_grace_seconds,
                 "pending_action": control.pending_action if control else None,
                 "pending_until": (
@@ -845,6 +847,7 @@ class ModbusService:
         options = ControlOptions(
             control.options.read_only, cap,
             state_change_interval_seconds=candidate.state_change_interval_seconds,
+            pause_before_phase_switch=candidate.pause_before_phase_switch,
             phase_switch_grace_seconds=candidate.phase_switch_grace_seconds,
         )
         measurement = number(candidate.measurement_interval, 2, 300)
@@ -859,6 +862,7 @@ class ModbusService:
             self.config, scan_interval=scan, measurement_interval=measurement,
             current_cap=cap, cap_from_wallbox=candidate.cap_from_wallbox,
             state_change_interval_seconds=options.state_change_interval_seconds,
+            pause_before_phase_switch=options.pause_before_phase_switch,
             phase_switch_grace_seconds=options.phase_switch_grace_seconds,
         )
 

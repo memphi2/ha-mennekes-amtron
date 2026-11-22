@@ -1194,11 +1194,13 @@
         "data": {
           "measurement_interval_seconds": "Messwertintervall",
           "state_change_interval_seconds": "Mindestabstand zwischen Zustandswechseln",
+          "pause_before_phase_switch": "Vor dem Phasenwechsel pausieren",
           "phase_switch_grace_seconds": "Zusätzliche Wartezeit vor Phasenwechseln"
         },
         "data_description": {
           "measurement_interval_seconds": "Leistung, Spannung, Strom und Sitzungswerte: 30 Sekunden reduzieren die Datenbanklast. Statuswechsel aktualisieren sofort. Ohne Fahrzeug mindestens 60 Sekunden. Das Statusintervall bestimmt die kürzeste mögliche Abfragezeit.",
           "state_change_interval_seconds": "Mindestabstand in Sekunden zwischen Start, Pause, Freigabe-, Sperr- und Phasenwechseln (Standard 300). Zu frühe Befehle werden vorgemerkt; der neueste ersetzt den vorherigen. Der Schreibabstand von fünf Sekunden für den Ladestrom bleibt bestehen. Mit 0 entfällt die längere Wartezeit.",
+          "pause_before_phase_switch": "Aktivieren, wenn ein Fahrzeug vor dem Phasenwechsel eine Ladepause benötigt. Nur ausschalten, wenn alle Fahrzeuge an dieser Wallbox direkt umschalten können.",
           "phase_switch_grace_seconds": "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden."
         },
         "description": "Die Standardwerte verbinden schnelle Statusmeldungen mit weniger gespeicherten Messwerten und schonenden Zustandswechseln. Bei vorgemerkten Befehlen zeigt Home Assistant die verbleibende Wartezeit. Der unabhängige Heartbeat wird dadurch nicht langsamer."

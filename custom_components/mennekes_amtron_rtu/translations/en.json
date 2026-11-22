@@ -1194,11 +1194,13 @@
         "data": {
           "measurement_interval_seconds": "Measurement interval",
           "state_change_interval_seconds": "Minimum time between state changes",
+          "pause_before_phase_switch": "Pause before switching phases",
           "phase_switch_grace_seconds": "Extra wait before phase changes"
         },
         "data_description": {
           "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
           "state_change_interval_seconds": "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval.",
+          "pause_before_phase_switch": "Enable for vehicles that need a charging pause before switching phases. Disable only if all vehicles using this wallbox support a direct change.",
           "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required."
         },
         "description": "The defaults balance quick status updates, fewer stored measurements and gentle switching. A queued command shows its remaining wait in Home Assistant. These intervals do not slow the independent heartbeat."

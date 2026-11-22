@@ -544,16 +544,15 @@ One pending-command slot and worker coordinate both short current-write delays
 and longer state-change waits. A newer command supersedes older pending work.
 Pause/resume, phase changes, both release directions and lock/unlock share the
 transition clock; the current-write floor also remains. A stop request replaces
-an older pending start and can itself wait in that slot. A phase command's pause
+an older pending start and can itself wait in that slot. When preparation is enabled, a phase command's pause
 and phase write form one operation. Before sending the phase write, live status
 checks must confirm that charging has paused within a bounded 30-second wait.
-For a connected vehicle, layouts v01.02 and newer require EVSE state 2 and CP
-state B1; v01.01 uses EVSE state 2 because it has no CP-state register.
+For a connected vehicle, layouts v01.02 and newer require EVSE state 2 or 3 and CP
+state B1; v01.01 uses EVSE state 2 or 3 because it has no CP-state register.
 The separate `phase_switch_grace_seconds` setting defaults to 5 and accepts
 0–30 seconds. After this additional wait, status is rechecked before the phase
 write. A read failure or timeout aborts the phase command and retains the pause.
-Zero grace time skips only the additional delay. The operation leaves charging
-paused afterward. With no vehicle and an idle EVSE, confirmation and grace time
+Zero grace time skips only the additional delay. A successful switch queues a resume only for the same previously charging plug-in. Direct switches write only the phase register. With no vehicle and an idle EVSE, confirmation and grace time
 are unnecessary. Fresh EVSE Idle and CP A1/A2 reads also exempt commands from
 the shared transition guard. Missing CP support or unreadable/inconsistent
 status never grants that exception. The transition timestamp is still retained,

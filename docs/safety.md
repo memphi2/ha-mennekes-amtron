@@ -180,7 +180,7 @@ option 2. Even there:
 
 - the manufacturer warns that a phase switch can abort the charging session;
 - some vehicles need the charging current set to the pause value **before**
-  the phase count changes. The integration requests this pause whenever a car
+  the phase count changes. By default the integration requests this pause whenever a car
   is connected, including while it is waiting or ready to charge;
 - After requesting a pause, the integration waits
   up to 30 seconds for live confirmation that charging has paused. A separate
@@ -190,8 +190,7 @@ option 2. Even there:
   the pause. Zero grace time does not disable confirmation or the shared
   state-change interval. An idle wallbox with no vehicle does not need pause
   confirmation or the extra wait;
-- the integration leaves charging paused after this sequence. Resume
-  explicitly after the waiting interval;
+- after a successful switch, only a previously active charge on the same plug-in can resume automatically after the waiting interval. Disable preparation only for vehicles that support switching while charging;
 - not every vehicle tolerates phase switching at all. Check your vehicle's
   documentation before you automate it.
 

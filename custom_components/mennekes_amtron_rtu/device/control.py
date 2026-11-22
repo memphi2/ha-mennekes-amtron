@@ -363,6 +363,16 @@ class AmtronControl:
         return changed
 
     def _command_cancellation_reason(self, command: PendingCommand) -> str | None:
+        if command.phase_scope is not None:
+            cycle = self.write_state.plug_cycle
+            if (
+                cycle.present is not True or cycle.scope != command.phase_scope
+                or self.charging_release_requested is False or self.pause_owner != "phase_switch"
+            ):
+                return "unknown"
+            gate = self._plug_charge.state
+            if gate.enabled and not (gate.manual or gate.authorized):
+                return "permission_denied"
         if command.grant_release and not self.guest_mode():
             return "unknown"
         if command.owner is None:

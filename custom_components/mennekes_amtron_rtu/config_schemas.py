@@ -61,6 +61,7 @@ from .const import (
     CONF_FRAME,
     CONF_HOST,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_PAUSE_BEFORE_PHASE_SWITCH,
     CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_PORT,
     CONF_RELEASE_OFF_ON_UNPLUG,
@@ -301,6 +302,9 @@ def advanced_schema(current: dict[str, Any], *, phase_switch: bool) -> probatio.
         ): _seconds_selector(0, MAX_STATE_CHANGE_INTERVAL_SECONDS),
     }
     if phase_switch:
+        fields[probatio.Required(
+            CONF_PAUSE_BEFORE_PHASE_SWITCH, default=current.get(CONF_PAUSE_BEFORE_PHASE_SWITCH, True),
+        )] = BooleanSelector()
         fields[
             probatio.Required(
                 CONF_PHASE_SWITCH_GRACE_SECONDS,

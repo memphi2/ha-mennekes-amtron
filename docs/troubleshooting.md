@@ -329,19 +329,9 @@ timers.
 
 ## Phase switching leaves charging paused
 
-With a vehicle connected, the preparatory pause stays active even if the car
-was only waiting to charge. Resume explicitly after the
-phase change has actually run. The integration uses the configurable state-change interval and queues early
-requests. Check the `pending` attribute of **Charging wait reason** before requesting resume: a new resume
-request replaces a phase change that is still waiting. Check your vehicle's
-support; some vehicles abort the session after a phase change. The selector
-exists only on capable wallbox hardware.
+Check **Charging wait reason** first. If **Resume** is pending, the previous charge will continue after the state-change interval. A new command can replace it. A car already paused or waiting before the switch stays paused. If the release was withdrawn, a target was reached, or the same plug-in could not be verified, check the reason before resuming by hand.
 
-The phase command is sent only after live status confirms
-that the vehicle has paused. If confirmation fails or times out, the requested
-pause remains and no phase command is sent. Check the wallbox connection and
-vehicle state before trying again; a pause command being accepted does not by
-itself confirm that the vehicle has stopped charging.
+With **Pause before switching phases** enabled, the vehicle must confirm its pause before the phase command runs. A timeout or failed read leaves the pause in place. Check the connection and vehicle state before retrying.
 
 A confirmed pause is the car connected without a charging signal: CP `b1`
 with the wallbox state `ev_connected`, or `preconditions_valid` on wallboxes

@@ -138,3 +138,24 @@ def test_malformed_optional_service_grace_invalidates_snapshot(tmp_path, value):
             await service.stop()
 
     asyncio.run(run())
+
+
+def test_preparatory_pause_defaults_on_for_every_bus_owner():
+    assert ControlOptions().pause_before_phase_switch is True
+    assert ServerConfig.from_dict(SERVICE_OPTIONS).pause_before_phase_switch is True
+    assert embedded_config(FakeConfigEntry()).pause_before_phase_switch is True
+    assert advanced_schema({}, phase_switch=True)({})["pause_before_phase_switch"] is True
+    assert embedded_config(FakeConfigEntry(options={"pause_before_phase_switch": False})).pause_before_phase_switch is False
+
+
+def test_wallbox_without_switching_has_no_phase_pause_option():
+    async def run():
+        flow = Flow(FakeConfigEntry())
+        await flow.async_step_wallbox()
+        form = await flow.async_step_wallbox_advanced()
+        submitted = form["data_schema"]({})
+        assert "pause_before_phase_switch" not in submitted
+        result = await flow.async_step_wallbox_advanced(submitted)
+        assert "pause_before_phase_switch" not in result["data"]
+
+    asyncio.run(run())

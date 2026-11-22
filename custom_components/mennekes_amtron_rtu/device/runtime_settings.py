@@ -7,14 +7,14 @@ from typing import Any
 from .service_config import ServerConfig
 
 RUNTIME_FIELDS = (
-    "scan_interval", "measurement_interval", "current_cap",
+    "scan_interval", "measurement_interval", "current_cap", "pause_before_phase_switch",
     "state_change_interval_seconds", "phase_switch_grace_seconds",
 )
 # When a saved change takes effect; every runtime field applies without a restart.
 EFFECTS = {
     "scan_interval": "next_cycle", "measurement_interval": "next_cycle",
     "current_cap": "immediate", "state_change_interval_seconds": "immediate",
-    "phase_switch_grace_seconds": "next_switch",
+    "pause_before_phase_switch": "next_switch", "phase_switch_grace_seconds": "next_switch",
 }
 # The Supervisor schema stores these as whole seconds.
 INTEGER_FIELDS = frozenset({
@@ -24,8 +24,11 @@ INTEGER_FIELDS = frozenset({
 
 
 def runtime_values(config: ServerConfig) -> dict[str, float]:
-    """Publish only these numeric settings, never a connection or credential."""
-    return {key: float(getattr(config, key)) for key in RUNTIME_FIELDS}
+    """Publish the editable runtime settings without connection details or credentials."""
+    return {
+        key: config.pause_before_phase_switch if key == "pause_before_phase_switch" else float(getattr(config, key))
+        for key in RUNTIME_FIELDS
+    }
 
 
 def runtime_candidate(

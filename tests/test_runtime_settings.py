@@ -30,7 +30,7 @@ def test_candidate_preserves_unrelated_options_and_never_projects_credentials():
     assert candidate.connection == SerialConfig("/dev/fake")
     result = runtime_values(candidate)
     assert set(result) == set(RUNTIME_FIELDS)
-    assert all(type(value) is float for value in result.values())
+    assert result["pause_before_phase_switch"] is True
     assert "credential" not in str(result)
 
 
@@ -43,6 +43,8 @@ def test_scope_is_narrow_and_not_an_alternate_connection_editor(changes):
 @pytest.mark.parametrize("field", RUNTIME_FIELDS)
 @pytest.mark.parametrize("value", [None, True, -1, float("nan"), float("inf"), "10"])
 def test_invalid_values_fail_before_a_save(field, value):
+    if field == "pause_before_phase_switch" and value is True:
+        value = 1
     with pytest.raises(ValueError, match=field):
         runtime_candidate(SAVED, {field: value}, token=TOKEN)
 
@@ -93,6 +95,6 @@ def test_seconds_match_the_supervisor_integer_schema(field, value):
 
 
 def test_the_current_cap_keeps_tenths_of_an_ampere():
-    assert set(RUNTIME_FIELDS) - {"current_cap"} == INTEGER_FIELDS
+    assert set(RUNTIME_FIELDS) - {"current_cap", "pause_before_phase_switch"} == INTEGER_FIELDS
     _, candidate = runtime_candidate(SAVED, {"current_cap": 10.5}, token=TOKEN)
     assert candidate.current_cap == 10.5

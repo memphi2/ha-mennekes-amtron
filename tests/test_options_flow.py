@@ -157,9 +157,10 @@ def test_wallbox_independent_basic_advanced_and_back_discard():
         advanced = await flow.async_step_wallbox_advanced()
         assert advanced["last_step"] is True
         result = await flow.async_step_wallbox_advanced(
-            advanced["data_schema"]({"state_change_interval_seconds": 175})
+            advanced["data_schema"]({"state_change_interval_seconds": 175, "pause_before_phase_switch": False})
         )
         assert result["data"]["current_limit"] == 10
+        assert result["data"]["pause_before_phase_switch"] is False
         assert result["data"]["state_change_interval_seconds"] == 175
         await flow.async_step_wallbox()
         await flow.async_step_wallbox_basic()

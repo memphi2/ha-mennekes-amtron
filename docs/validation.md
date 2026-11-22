@@ -48,13 +48,15 @@ repeated identical commands, newer requests superseding pending work, a queued
 stop replacing a pending start, and same-intent recovery while the longer
 interval is active.
 
-Phase-switch tests must prove that the pause command alone does not authorize
+Direct-switch tests must verify that only the phase request is written. A prepared switch must resume only a previously active charge on the same authorized plug-in.
+
+With preparation enabled, tests must prove that the pause command alone does not authorize
 the phase write: live status must first confirm the paused state. Cover delayed
 confirmation, invalid or failed reads, timeout and cancellation without a phase
 write or automatic resume. Verify the configurable grace time (default 5 seconds,
 range 0–30), the live recheck after that wait and the independence of the shared
 state-change interval. Zero grace time must not skip pause confirmation.
-Connected vehicles require EVSE state 2 and, when the layout provides it, CP
+Connected vehicles require EVSE state 2 or 3 and, when the layout provides it, CP
 state B1. An idle EVSE without a vehicle needs neither confirmation nor grace
 time. Test the corresponding register-layout and idle paths. The long-interval
 exception requires fresh Idle plus CP A1/A2, never cached state alone. Cover
