@@ -25,15 +25,16 @@ from .device.errors import DeviceError
 from .device.registers import EVSE_STATE
 from .loss_ledger import LossLedger
 from .vehicle_profiles import CONF_VEHICLE_PROFILE_ID
-from .vehicle_sources import resolve_history_source
+from .vehicle_sources import resolve_history_source, resolve_telemetry_source
 from .vehicle_sources.types import ChargeRecord
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
-# The car's record follows the end of a charge by a while, at times by hours.
-_RETRY_DELAYS = (60, 300, 1800, 7200, 21600)
+# The car's record follows the end of a charge by a while, at times by hours:
+# asked again 1, 5 and 30 minutes and 2 and 6 hours after a trigger.
+_RETRY_DELAYS = (60, 240, 1500, 5400, 14400)
 # A change of the car's history is not asked for more often than this.
 _QUERY_SECONDS = 30
 # The car reports whole percent: below this many points the loss of one
@@ -65,6 +66,8 @@ class RecordLoss:
         self._options = options
         self._profile_id: str | None = options.get(CONF_VEHICLE_PROFILE_ID)
         self._history = resolve_history_source(hass, options)
+        # This car's own capacity, also while another profile is active.
+        self._telemetry = resolve_telemetry_source(hass, options)
         self._ready = False
         self._was_available = self.available
         self._charging = False
@@ -149,7 +152,6 @@ class RecordLoss:
                 # the same bounded retry policy applies to this provider.
                 # Do not log exception messages that may contain VINs.
                 _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
-        booked = False
         for record in records or ():
             statistics = self._ledger.statistics
             accounted = statistics.accounted_end
@@ -166,21 +168,23 @@ class RecordLoss:
                 try:
                     wallbox = await self._entry.runtime_data.client.async_energy_between(record.start, record.end)
                 except (AmtronConnectionError, DeviceError):
-                    wallbox = None
-                if wallbox is None or wallbox <= 0:
-                    # The meter reading after its end is still to come.
+                    # The app could not answer: a newer record must not pass
+                    # this one by. The retry asks again.
                     break
+                if wallbox is None or wallbox <= 0:
+                    # Its end is not logged yet, or the log has a gap: a
+                    # newer one may still be measurable.
+                    continue
                 charge = Charge(record.start, record.end, wallbox)
-                booked = True
-            await self._book(charge, record)
-        if not booked:
-            # No record of a new charge yet.
-            self._schedule_retry()
+            if not await self._book(charge, record):
+                # Not saved: nothing newer may pass it by.
+                break
+        # The record of the latest charge can follow hours later; later
+        # tries also correct a charge whose capacity was not known yet.
+        self._schedule_retry()
 
-    async def _book(self, charge: Charge, record: ChargeRecord) -> None:
-        capacity = vehicle_capacity(
-            self._hass, getattr(self._entry.runtime_data, "vehicle_telemetry", None), self._options,
-        )
+    async def _book(self, charge: Charge, record: ChargeRecord) -> bool:
+        capacity = vehicle_capacity(self._hass, self._telemetry, self._options)
         points = record.soc_end - record.soc_start
 
         def book(statistics: LossStatistics) -> None:
@@ -192,8 +196,7 @@ class RecordLoss:
                 statistics.apply(charge, points / 100 * capacity, association="history")
 
         async with self._ledger.lock:
-            if not self._ledger.closed:
-                await self._ledger.commit(book)
+            return not self._ledger.closed and await self._ledger.commit(book)
 
     def _schedule_retry(self) -> None:
         if self._retry is not None or self._attempt >= len(_RETRY_DELAYS):

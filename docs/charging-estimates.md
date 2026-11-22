@@ -72,7 +72,9 @@ creates long-term statistics.
 Configure the BavarianData car once under **Name and vehicle source** of its
 profile, select the profile, then choose **Use this profile's charging history**
 in **Charging losses**. The profile's **usable capacity**, the same one
-departure planning uses, must be set.
+departure planning uses, must be known: the car's own report, the default when
+the car reports one, or the **Battery capacity source** under **Next departure
+→ Configure departure planning**. Disabling departure planning keeps it.
 This selection saves immediately and enables history matching for that profile.
 The history belongs
 to the same active car used by the profile's other features.  The integration reads
