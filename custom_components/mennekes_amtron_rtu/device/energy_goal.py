@@ -39,7 +39,7 @@ PRICE_INTERVAL_SECONDS: Final = 60.0
 # No real tariff comes near; it keeps every booking finite.
 MAX_PRICE: Final = 100.0
 
-type EnergyGoalSnapshot = dict[str, float | str | dict[str, float] | None]
+type EnergyGoalSnapshot = dict[str, float | str | dict[str, float | str] | None]
 
 
 def finite_number(value: object) -> float | None:
@@ -51,6 +51,14 @@ def finite_number(value: object) -> float | None:
     except OverflowError:
         return None
     return number if math.isfinite(number) else None
+
+
+def checked_currency(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) != 3 or not (value.isascii() and value.isalpha() and value.isupper()):
+        raise ValueError("currency must be a three-letter code")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +73,7 @@ class CostPart:
     spent: float
     price: float
     booked_kwh: float = 0.0
+    currency: str | None = None
 
     def __post_init__(self) -> None:
         if any(finite_number(value) is None for value in (self.amount, self.spent, self.price, self.booked_kwh)):
@@ -74,14 +83,17 @@ class CostPart:
         if self.booked_kwh < 0:
             raise ValueError("cost booked energy must not be negative")
 
-    def snapshot(self) -> dict[str, float]:
-        return {"amount": self.amount, "spent": self.spent, "price": self.price, "booked_kwh": self.booked_kwh}
+    def snapshot(self) -> dict[str, float | str]:
+        result: dict[str, float | str] = {"amount": self.amount, "spent": self.spent, "price": self.price, "booked_kwh": self.booked_kwh}
+        if self.currency is not None:
+            result["currency"] = self.currency
+        return result
 
     @classmethod
     def restore(cls, raw: object) -> CostPart:
-        if not isinstance(raw, dict) or raw.keys() != _COST_KEYS:
+        if not isinstance(raw, dict) or raw.keys() - {"currency"} != _COST_KEYS:
             raise ValueError("invalid cost target fields")
-        return cls(raw["amount"], raw["spent"], raw["price"], raw["booked_kwh"])
+        return cls(raw["amount"], raw["spent"], raw["price"], raw["booked_kwh"], checked_currency(raw.get("currency")))
 
 
 def energy_for(amount: float, price: float) -> float:
@@ -260,6 +272,12 @@ class EnergyGoal:
         """Adopt the repriced target and amount of the same goal's copy."""
         self._target_kwh = other._target_kwh
         self.cost = other.cost
+        # A poll may have crossed either ceiling during the durable save.
+        if self._last_total_kwh is not None:
+            if self._status == "active":
+                self.observe(self._last_total_kwh)
+            elif self._status == "reached" and self.cost is not None:
+                self.cost = self._booked(self.cost, self.cost.price)
 
     def reprice(self, price: float) -> bool:
         """Book the energy so far at the old price and aim the rest at ``price``.
@@ -282,7 +300,7 @@ class EnergyGoal:
     def _booked(self, cost: CostPart, price: float) -> CostPart:
         """The energy so far booked at the running price; ``price`` applies beyond."""
         delivered = self._delivered(cost)
-        return CostPart(cost.amount, cost.spent + (delivered - cost.booked_kwh) * cost.price, price, delivered)
+        return CostPart(cost.amount, cost.spent + (delivered - cost.booked_kwh) * cost.price, price, delivered, cost.currency)
 
     def snapshot(self) -> EnergyGoalSnapshot:
         """Return bounded durable state, excluding ordinary meter progress."""

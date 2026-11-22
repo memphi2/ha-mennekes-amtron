@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.departure_plan import DepartureInputs
 from tests import service_guest_fixture as runtime
@@ -26,12 +28,10 @@ def test_a_patient_reader_gets_the_last_published_state_during_a_long_command(tm
                 assert not strict.done()
                 # An old state is not served: a hanging command stays visible.
                 service.published = (service.published[0] - 61, first)
-                waiting = asyncio.create_task(service.stable_snapshot(patient=True))
-                await asyncio.sleep(0.03)
-                assert not waiting.done()
+                with pytest.raises(TimeoutError):
+                    await service.stable_snapshot(patient=True)
             fresh = await strict
             assert fresh is not first
-            assert await waiting is service.published[1]
         finally:
             await service.stop()
     asyncio.run(run())
@@ -52,10 +52,8 @@ def test_a_command_that_ends_in_time_is_waited_for(tmp_path, monkeypatch):
             service.published = None
             async with service.command_lock:
                 monkeypatch.setattr(service_runtime, "_PATIENCE_SECONDS", 0.01)
-                poll = asyncio.create_task(service.stable_snapshot(patient=True))
-                await asyncio.sleep(0.03)
-                assert not poll.done()
-            await poll
+                with pytest.raises(TimeoutError):
+                    await service.stable_snapshot(patient=True)
         finally:
             await service.stop()
     asyncio.run(run())

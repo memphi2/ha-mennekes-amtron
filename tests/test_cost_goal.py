@@ -40,7 +40,7 @@ class Control:
             self.cost_price = price
         if amount:
             self.energy_goal.set_target(33.3, 100.0)
-            self.energy_goal.cost = CostPart(amount, 0.0, price)
+            self.energy_goal.cost = CostPart(amount, 0.0, price, currency=currency)
         else:
             self.energy_goal.set_target(0, 0)
 
@@ -232,4 +232,18 @@ def test_a_price_that_came_while_the_goal_was_stopped_is_told_again(tmp_path, mo
         await observe(observer)
         assert len(control.calls) == 3
         await hass.async_stop(force=True)
+    asyncio.run(run())
+
+
+def test_new_ha_currency_does_not_reprice_a_running_amount(tmp_path, monkeypatch):
+    async def run():
+        hass, control, _cost, _, observer = setup(tmp_path, monkeypatch)
+        await observer.async_set_target(10)
+        control.energy_goal.cost = CostPart(10, 0, 0.30, currency="EUR")
+        hass.config.currency = "CHF"
+        assert observer.status == "price_unknown"
+        await observe(observer)
+        assert control.calls == [("goal", 10, 0.30)]
+        await hass.async_stop(force=True)
+
     asyncio.run(run())

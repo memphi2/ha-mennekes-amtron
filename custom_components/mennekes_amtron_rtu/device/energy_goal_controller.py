@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from copy import copy
 from datetime import UTC, datetime
+from typing import Protocol
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError, AmtronRateLimitedError
@@ -21,6 +22,7 @@ from .energy_goal import (
     PRICE_TOLERANCE,
     CostPart,
     EnergyGoal,
+    checked_currency,
     energy_for,
     finite_number,
 )
@@ -36,6 +38,10 @@ from .registers import ENERGY_TOTAL
 _LOGGER = logging.getLogger(__name__)
 
 
+class _SaveGoal(Protocol):
+    def __call__(self, candidate: EnergyGoal | None = None, /) -> Awaitable[None]: ...
+
+
 class EnergyGoalController:
     """Observe real meter reads and serialize stop decisions with commands.
 
@@ -49,7 +55,7 @@ class EnergyGoalController:
         self,
         control: AmtronControl,
         client: MennekesModbusClient,
-        persist: Callable[[], Awaitable[None]],
+        persist: _SaveGoal,
         notify: Callable[[], None] | None = None,
         *,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -74,7 +80,7 @@ class EnergyGoalController:
         self._price: float | None = None
         self.price_at: datetime | None = None
         # The currency of that price, as Home Assistant names it.
-        self.currency: str | None = None
+        self._price_currency: str | None = None
         control.goal_controller = self
         self.model.resume_on_recovery = False
 
@@ -92,10 +98,13 @@ class EnergyGoalController:
             and self._pending.stop_requested
         )
 
-    async def _save_state(self) -> None:
+    async def _save_state(self, candidate: EnergyGoal | None = None) -> None:
         """Fence an unknown disk state until any later save succeeds."""
         try:
-            await self._persist()
+            if candidate is None:
+                await self._persist()
+            else:
+                await self._persist(candidate)
         except StorageStateUnknownError:
             self._storage_unknown = True
             # A pause required by an unknown store cannot grant automatic
@@ -111,17 +120,20 @@ class EnergyGoalController:
         self._storage_unknown = False
         self._dirty = False
 
-    def note_currency(self, currency: object) -> None:
-        """Remember the currency a price or an amount came in; None keeps it."""
-        if currency is None:
-            return
-        if not isinstance(currency, str) or len(currency) != 3 or not (currency.isascii() and currency.isalpha() and currency.isupper()):
-            raise ValueError("currency must be a three-letter code")
-        if currency != self.currency:
-            self.currency = currency
-            self._notify_changed()
+    @property
+    def currency(self) -> str | None:
+        cost = self.model.cost
+        return self._price_currency if cost is None else cost.currency
 
-    async def async_set_cost_target(self, amount: object, price: object = None) -> None:
+    def _currency_for(self, currency: object) -> str:
+        unit = checked_currency(currency)
+        cost = self.model.cost
+        unit = unit or self.currency
+        if unit is None or (cost is not None and unit != cost.currency):
+            raise validation_error("cost_goal_price_unknown")
+        return unit
+
+    async def async_set_cost_target(self, amount: object, price: object = None, *, currency: object = None) -> None:
         """Arm an amount of money at ``price``; zero ends it with its target.
 
         Without a price the last one Home Assistant reported applies, so the
@@ -131,24 +143,30 @@ class EnergyGoalController:
         if value is None:
             raise validation_error("cost_goal_invalid")
         if value == 0:
+            checked_currency(currency)
             if self.model.cost is not None:
                 await self.async_set_target(0)
             return
+        denomination = self._currency_for(currency)
+        if price is None and denomination != self.currency:
+            raise validation_error("cost_goal_price_unknown")
         unit = self.price if price is None else finite_number(price)
         if unit is None or abs(unit) > MAX_PRICE:
             raise validation_error("cost_goal_price_unknown")
         try:
-            cost = CostPart(value, 0.0, unit)
+            cost = CostPart(value, 0.0, unit, currency=denomination)
         except ValueError as err:
             raise validation_error("cost_goal_invalid") from err
-        if price is not None:
-            # A price that came with the amount is the newest one known, also
-            # when saving the amount then fails after it took effect.
-            self._price, self.price_at = unit, datetime.now(UTC)
-            self._notify_changed()
-        await self.async_set_target(energy_for(cost.amount, cost.price), cost=cost)
-        # The price came with the amount.
-        self._priced_at = self._monotonic()
+        try:
+            await self.async_set_target(energy_for(cost.amount, cost.price), cost=cost)
+        finally:
+            # A directory sync error can follow a committed replacement.
+            if self.model.cost is cost:
+                if price is not None:
+                    self._price, self.price_at = unit, datetime.now(UTC)
+                self._price_currency = denomination
+                self._priced_at = self._monotonic()
+                self._notify_changed()
 
     @property
     def price(self) -> float | None:
@@ -162,7 +180,7 @@ class EnergyGoalController:
         cost = self.model.cost
         return None if cost is None else cost.price
 
-    async def async_set_price(self, price: object) -> None:
+    async def async_set_price(self, price: object, *, currency: object = None) -> None:
         """Remember a new price; a running amount books the energy so far.
 
         The running goal keeps its baseline, status, generation and latches;
@@ -175,30 +193,45 @@ class EnergyGoalController:
             raise validation_error("cost_goal_price_unknown")
         # Remembered for an amount armed later, also from the app; it is not
         # saved: after a restart Home Assistant tells it again.
-        self._price = unit
-        self.price_at = datetime.now(UTC)
-        self._notify_changed()
         async with self._control.energy_goal_guard:
             if self._stopping:
                 raise validation_error("energy_goal_unavailable")
+            denomination = self._currency_for(currency)
             cost = self.model.cost
             if (
-                cost is None or abs(unit - cost.price) < PRICE_TOLERANCE
-                or self._monotonic() - self._priced_at < PRICE_INTERVAL_SECONDS
+                cost is not None and abs(unit - cost.price) >= PRICE_TOLERANCE
+                and self._monotonic() - self._priced_at >= PRICE_INTERVAL_SECONDS
             ):
-                return
-            state = self._client.write_state
-            pending = self._pending if self._pending_generation == state.energy_goal_generation else None
-            newest = pending or self.model
-            if newest.stop_requested or not newest.reprice(unit):
-                # Nothing changed, so this opens no waiting minute either.
-                return
-            self._priced_at = self._monotonic()
-            if pending is not None:
-                self.model.take_cost(pending)
-            self._dirty = True
-            await self._save_state()
+                pending = self._pending if self._pending_generation == self._client.write_state.energy_goal_generation else None
+                candidate = copy(pending or self.model)
+                if candidate.reprice(unit):
+                    await finish_goal_save(self._save_price(candidate, unit, denomination))
+                    return
+            self._remember_price(unit, denomination)
+
+    def _remember_price(self, unit: float, currency: str | None) -> None:
+        self._price, self._price_currency = unit, currency
+        self.price_at = datetime.now(UTC)
         self._notify_changed()
+
+    async def _save_price(self, candidate: EnergyGoal, unit: float, currency: str | None) -> None:
+        try:
+            await self._save_state(candidate)
+        except (StorageCommitUncertainError, StorageStateUnknownError):
+            # Replacement completed, or its outcome is unknown and starts are fenced.
+            self._apply_price(candidate, unit, currency)
+            if self._storage_unknown:
+                self.observe(None)
+            raise
+        else:
+            self._apply_price(candidate, unit, currency)
+
+    def _apply_price(self, candidate: EnergyGoal, unit: float, currency: str | None) -> None:
+        self.model.take_cost(candidate)
+        if self._pending is not None and self._pending_generation == self._client.write_state.energy_goal_generation:
+            self._pending.take_cost(candidate)
+        self._priced_at = self._monotonic()
+        self._remember_price(unit, currency)
 
     async def async_set_target(self, value: object, *, cost: CostPart | None = None) -> None:
         """Persist a new ceiling before it can affect subsequent commands.

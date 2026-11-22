@@ -63,7 +63,7 @@ def test_a_command_refuses_fields_that_are_not_its_own(tmp_path):
 @pytest.mark.parametrize(("payload", "error"), [
     ({"command": "energy_goal", "value": 2000}, "energy_goal_invalid"),
     ({"command": "energy_goal", "value": -1}, "energy_goal_invalid"),
-    ({"command": "cost_goal", "value": 0.05, "price": 0.3}, "cost_goal_invalid"),
+    ({"command": "cost_goal", "value": 0.05, "price": 0.3, "currency": "EUR"}, "cost_goal_invalid"),
     ({"command": "set_current", "value": -1}, "charging_current_invalid"),
     ({"command": "set_current", "value": 3}, "charging_current_invalid"),
 ])
@@ -137,6 +137,35 @@ def test_an_armed_plan_keeps_a_pause_a_grant_would_end(tmp_path, monkeypatch, st
                 "expected_serial_number": SERIAL,
             })
             assert seen == [ends]
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_rejected_cost_change_keeps_the_amount_price_and_currency(tmp_path):
+    async def run():
+        service, _, _ = await service_fixture(tmp_path)
+        try:
+            async def command(name, **fields):
+                return await service.command({"command": name, "expected_serial_number": SERIAL, **fields})
+
+            with pytest.raises(DeviceValidationError, match="cost_goal_price_unknown"):
+                await command("cost_goal", value=10, price=0.25)
+            await command("cost_goal", value=10, price=0.25, currency="EUR")
+            goal = service.control.energy_goal
+            original = goal.snapshot()
+            with pytest.raises(DeviceValidationError):
+                await command("cost_goal", value=0.05, price=0.50, currency="CHF")
+            assert service.goal.currency == "EUR"
+            with pytest.raises(DeviceValidationError):
+                await command("cost_price", price=0.50, currency="CHF")
+            assert goal.snapshot() == original
+            assert service.goal.price == 0.25
+            assert goal.restore(original).cost.currency == "EUR"
+            await command("cost_goal", value=0, currency="CHF")
+            await command("cost_price", price=0.50, currency="CHF")
+            assert service.goal.currency == "CHF"
         finally:
             await service.stop()
 

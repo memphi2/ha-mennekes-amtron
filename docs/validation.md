@@ -261,7 +261,8 @@ cancelled by another publisher. Jobs have explicit time limits. Python jobs
 cache pip downloads by dependency lock and integration manifest, while still
 resolving and verifying the current latest stable HA on every run.
 
-PR and release validation each have exactly two HA targets: the fixed minimum
+PR and main validation each have two HA targets. The tag verifies the successful
+checks on its exact main commit and proceeds to packaging. The targets are the fixed minimum
 from `project-versions.json` and the automatically resolved latest stable release.
 Both run the full test suite; latest stable also runs strict typing. After tool
 and runtime dependency installation, CI verifies the installed HA version.

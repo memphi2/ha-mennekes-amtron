@@ -21,7 +21,7 @@ when you need it; you do not need to configure every option.
 | Recognize the connected car automatically | Optional profiles and cable/home signals | [Automatic selection](vehicle-setup.md#optional-automatic-vehicle-selection) |
 | Release charging for a recognized car | An active profile with fresh cable/home detection | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) |
 | Charge from solar surplus | A suitable power sensor and the PV blueprint | [PV charging](blueprints.md#set-up-pv-charging) |
-| Start a guest charge now, optionally ended by an energy target, cost target or target time | Write access | [Guest charging](user-guide.md#guest-charging) |
+| Start a guest charge now, with an optional energy or cost limit and optional end time | Write access | [Guest charging](user-guide.md#guest-charging) |
 | Estimate charging costs | A fixed gross price or existing dynamic price sensor | [Charging costs](charging-estimates.md#charging-costs-fixed-or-dynamic-price) |
 | Estimate losses | Battery energy from the matching vehicle charge | [Charging losses](charging-estimates.md#charging-losses-choose-the-available-data) |
 | Get notified when the car is unplugged, the wallbox faults or a command fails | Nothing extra; the **Activity** entity | [React to activity](automations.md#react-to-activity) |
@@ -31,7 +31,7 @@ when you need it; you do not need to configure every option.
 
 | Function | Starts or resumes charging? | Stops or limits charging? |
 |---|---|---|
-| Guest start | Starts now and grants this plug-in permission; a wait may still apply | The first reached energy target, cost target or target time ends it; the vehicle charge target does not apply |
+| Guest start | Starts now and grants this plug-in permission; a wait may still apply | Choose kWh or money and an optional end time. The first limit reached ends charging; the vehicle charge target does not apply |
 | Current slider | Can resume a paused charge | Limits current; **0 A removes the limit** |
 | Pause switch | Off requests resume | On requests pause; a configured wait can still apply |
 | Energy or cost target | Setting it does not start; a pause caused by a temporary meter outage has [specific recovery rules](user-guide.md#energy-target) | Pauses at the energy target or when the meter cannot be trusted |

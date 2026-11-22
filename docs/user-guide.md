@@ -13,7 +13,7 @@ app also provide German, French, Dutch and Italian labels.
 | Charge normally | Choose a current, enable **Charging release** and turn **Charging paused** off. |
 | Stop for now | Turn **Charging paused** on; wait for confirmation. |
 | Add 12 kWh and stop | Set **Energy target** to 12; start or resume separately. |
-| Charge a visitor's car | Optionally set an energy target, cost target or target time, then press **Start guest charging**. |
+| Charge a visitor's car | Optionally choose an energy or cost limit and set an end time, then press **Start guest charging**. |
 | Stop your car at 80% | Set up its optional battery source, then set **Vehicle charge target** to 80. |
 | Have your car ready for a trip | Enable [vehicle planning](departure-planning.md), choose a percentage and one departure time. |
 
@@ -51,8 +51,9 @@ from vehicle planning until unplugging.
 Energy and cost values are estimates from an uncalibrated meter reading (no
 MID or Eichrecht conformity) and must not be used to bill others.
 
-For guests, whichever of energy target, cost target and target time is reached
-first ends the charge. With none set, no automatic limit is added. Set the
+Choose **either kWh or a money amount**. Saving one replaces the other.
+For guests, you can also set a **Target time**, alone or alongside that limit.
+Charging ends at the first limit reached. With none set, no automatic limit is added. Set the
 energy, cost or vehicle charge target to **0** to disable it. Clear the time separately; in the Mushroom example, hold the time chip.
 
 Saving a positive kWh value starts a fresh baseline. Guest start uses that
@@ -68,8 +69,7 @@ a time can only be set while the service is reachable.
 **Requires write access.** No vehicle profile is needed.
 
 1. Plug in the car.
-2. Optionally set **Energy target**, **Cost target** and/or a future **Target time**. In the app,
-   save each changed field before starting.
+2. Optionally choose **Energy target** (kWh) or **Cost target** (money). You can also set a future **Target time**. In the app, save each changed field before starting.
 3. Press **Start guest charging**. This requests release and start together,
    lifts a manual pause and grants this plug-in permission even with virtual
    Plug & Charge enabled. A hardware write interval may still delay execution.

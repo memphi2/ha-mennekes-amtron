@@ -59,8 +59,7 @@ Set **Charging current limit** and use **Charging paused** to stop or resume.
 vehicle charge target when needed; setting a target does not start charging.
 
 **Start guest charging** releases the connected car now,
-optionally until the first reached energy target, cost target or target time. No guest order needs
-to be created. Intelligent vehicle planning is optional and configured in HA.
+with an optional energy or cost limit. You can also set an end time. Charging stops at the first limit reached. Intelligent vehicle planning is optional and configured in HA.
 
 | You want to… | Open |
 |---|---|

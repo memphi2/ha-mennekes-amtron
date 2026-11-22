@@ -242,7 +242,7 @@ def test_a_lifted_guest_deadline_does_not_resume_an_outage_pause(tmp_path, move,
     async def run():
         async with runtime.guest_service(tmp_path) as (service, transport, clock):
             control = service.control
-            await control.goal_controller.async_set_cost_target(10, 0.30)
+            await control.goal_controller.async_set_cost_target(10, 0.30, currency="EUR")
             await service.departure.set_trip(datetime.now(UTC) + timedelta(hours=1), "manual")
             await service.command({
                 "command": "guest_start", "expected_serial_number": service.identity.serial_number,

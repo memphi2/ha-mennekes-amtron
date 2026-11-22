@@ -689,11 +689,11 @@ def test_the_service_carries_an_amount_and_follows_its_price(tmp_path):
         try:
             serial = service.identity.serial_number
             await service.command({
-                "command": "cost_goal", "value": 10.0, "price": 0.25, "expected_serial_number": serial,
+                "command": "cost_goal", "value": 10.0, "price": 0.25, "currency": "EUR", "expected_serial_number": serial,
             })
             goal = service.control.energy_goal
             assert goal.target_kwh == 40.0
-            assert goal.cost.snapshot() == {"amount": 10.0, "spent": 0.0, "price": 0.25, "booked_kwh": 0.0}
+            assert goal.cost.snapshot() == {"amount": 10.0, "spent": 0.0, "price": 0.25, "booked_kwh": 0.0, "currency": "EUR"}
             assert service.snapshot()["control"]["energy_goal"]["cost"]["amount"] == 10.0
             # Within the minute the same price changes nothing.
             await service.command({"command": "cost_price", "price": 0.5, "expected_serial_number": serial})

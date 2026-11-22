@@ -194,7 +194,7 @@ cards:
             target:
               entity_id: button.mennekes_amtron_demarrer_la_recharge_invite
             confirmation:
-              text: "Démarrer la recharge invité ? Les objectifs énergétique et de coût et l’heure cible la terminent."
+              text: "Démarrer la recharge invité ? Elle se termine à la première limite atteinte (kWh ou montant, ou heure de fin)."
       - type: conditional
         conditions:
           - condition: state

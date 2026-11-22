@@ -26,9 +26,8 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 1 and service 1.0.0b3 or newer**,
-the first service that knows whose pause is in place, so a Plug & Charge
-grant ends only a pause set by hand. Raise the minimum when a newer
+separately. The current requirement is **API 1 and service 1.0.0b5 or newer**,
+the first service to persist the currency with a cost target. Raise the minimum when a newer
 service feature is required. The published or planned service
 release must satisfy the declared minimum.
 
@@ -74,8 +73,12 @@ restart its heartbeat.
 
 ## Publication order
 
-1. Revalidate the source, require successful canonical main CI and resolve the
-   service publication plan.
+1. Verify the successful Validate and CodeQL push runs for the current main
+   commit and confirm that the release tag points to it. The tag reuses the
+   minimum/latest HA, HACS, Hassfest, native service and resource checks from
+   main. The release checks the tested HA version against the current stable
+   release. If HA has moved on or the run’s version evidence has expired,
+   only the latest-HA validation runs again. Then resolve the service publication plan.
 2. **For a new app version**, build native images, exercise their
    API/authentication and clean shutdown, then push unique candidate tags.
    There is no wallbox connected in these tests.

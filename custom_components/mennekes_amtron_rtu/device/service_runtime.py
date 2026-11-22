@@ -672,18 +672,19 @@ class ModbusService:
         if lowered:
             _LOGGER.info("Control: charging current lowered to the %.1f A cap", control.max_charging_current)
 
-    async def persist(self) -> None:
+    async def persist(self, candidate: EnergyGoal | None = None) -> None:
         self.guest.stamp_permission()
         if self._store is not None and not self._intent_rejected:
             async with self._store_lock:
                 self._phase = "saving control intent"
                 original = self.client.write_state
+                goal = candidate or original.energy_goal
                 state = WriteState(
                     guest_permission=original.guest_permission,
                     charging_setpoint=original.charging_setpoint,
                     pause_requested=original.pause_requested,
                     charging_release_requested=original.charging_release_requested,
-                    energy_goal=EnergyGoal.restore(original.energy_goal.snapshot()),
+                    energy_goal=EnergyGoal.restore(goal.snapshot()),
                     soc_goal=SocGoal.restore(original.soc_goal.snapshot()),
                     plug_charge=replace(original.plug_charge, authorized=False),
                     unplug_release=replace(original.unplug_release),
@@ -875,19 +876,14 @@ class ModbusService:
         a long command must not make a poll time out, and a hanging one must
         not hide behind an old state.
         """
-        published = self.published
-        if (
-            patient and published is not None and self.command_lock.locked()
-            and time.monotonic() - published[0] <= _PUBLISHED_SECONDS
-        ):
+        if patient and self.command_lock.locked():
             try:
                 await asyncio.wait_for(self.command_lock.acquire(), _PATIENCE_SECONDS)
             except TimeoutError:
-                # A command that ended meanwhile may have replaced or
-                # withdrawn the state; only the current one is served.
-                if self.published is not None:
-                    return self.published[1]
-                return await self.stable_snapshot()
+                published = self.published
+                if published is None or time.monotonic() - published[0] > _PUBLISHED_SECONDS:
+                    raise
+                return published[1]
             try:
                 return self.publish()
             finally:

@@ -65,15 +65,15 @@ def test_the_amount_survives_a_restart_and_a_disabled_target_has_none():
 def test_an_amount_arms_its_energy_and_a_new_price_books_it():
     async def run():
         harness, control, runner, saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
         assert control.energy_goal.target_kwh == 33.3
-        assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.30)
-        assert saved[-1]["cost"] == {"amount": 10.0, "spent": 0.0, "price": 0.30, "booked_kwh": 0.0}
+        assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.30, currency="EUR")
+        assert saved[-1]["cost"] == {"amount": 10.0, "spent": 0.0, "price": 0.30, "booked_kwh": 0.0, "currency": "EUR"}
         generation = harness.client.write_state.energy_goal_generation
         runner.observe(_snapshot(harness, 110.0))
         await _settle(runner)
         clock[0] += 61
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         # 10 kWh at 0.30 cost 3; 7 left at 0.50 is 14 kWh more: 24 from 100.
         goal = control.energy_goal
         assert (goal.target_kwh, goal.baseline_kwh, goal.status) == (24.0, 100.0, "active")
@@ -84,7 +84,7 @@ def test_an_amount_arms_its_energy_and_a_new_price_books_it():
         runner.observe(_snapshot(harness, 114.0))
         await _settle(runner)
         clock[0] += 61
-        await runner.async_set_price(0.25)
+        await runner.async_set_price(0.25, currency="EUR")
         # 4 more kWh at 0.50 cost 2; 5 left at 0.25 is 20 kWh more than 14.
         assert control.energy_goal.target_kwh == 34.0
         assert control.energy_goal.cost.spent == pytest.approx(5.0)
@@ -95,12 +95,12 @@ def test_an_amount_arms_its_energy_and_a_new_price_books_it():
 def test_the_price_waits_a_minute_and_ignores_small_changes():
     async def run():
         _harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
-        await runner.async_set_price(0.50)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
+        await runner.async_set_price(0.50, currency="EUR")
         clock[0] += 61
         await runner.async_set_price(0.3005)
         assert control.energy_goal.target_kwh == 33.3
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         assert control.energy_goal.target_kwh == 20.0
         await runner.async_stop()
     asyncio.run(run())
@@ -109,17 +109,17 @@ def test_the_price_waits_a_minute_and_ignores_small_changes():
 def test_a_price_follows_only_a_running_amount():
     async def run():
         _harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         assert control.energy_goal.target_kwh == 0
         await runner.async_set_target(5)
         clock[0] += 61
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         assert control.energy_goal.target_kwh == 5
         assert control.energy_goal.cost is None
-        await runner.async_set_cost_target(10, 0.30)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
         control.energy_goal.observe(None)
         clock[0] += 61
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         assert control.energy_goal.target_kwh == 33.3
         await runner.async_stop()
     asyncio.run(run())
@@ -128,11 +128,11 @@ def test_a_price_follows_only_a_running_amount():
 def test_less_than_a_step_left_leaves_one_step_at_the_new_price():
     async def run():
         harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(1, 0.30)
+        await runner.async_set_cost_target(1, 0.30, currency="EUR")
         runner.observe(_snapshot(harness, 103.2))
         await _settle(runner)
         clock[0] += 61
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         # 0.04 left buys no step at 0.50: one step from the 3.2 kWh so far.
         assert control.energy_goal.target_kwh == 3.3
         assert control.energy_goal.cost.price == 0.50
@@ -144,7 +144,7 @@ def test_less_than_a_step_left_leaves_one_step_at_the_new_price():
 def test_a_price_keeps_a_stop_that_a_poll_latched_meanwhile():
     async def run():
         harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
         clock[0] += 61
         async with control.energy_goal_guard:
             # A command holds the guard while a poll sees the meter fall.
@@ -162,7 +162,7 @@ def test_a_price_keeps_a_stop_that_a_poll_latched_meanwhile():
 def test_a_price_folds_into_the_copy_a_poll_left_meanwhile():
     async def run():
         harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
         clock[0] += 61
         async with control.energy_goal_guard:
             # The price waits for the guard first, then a poll leaves its copy.
@@ -175,7 +175,7 @@ def test_a_price_folds_into_the_copy_a_poll_left_meanwhile():
         assert control.energy_goal.cost.booked_kwh == 10.0
         runner._stopping = True
         with pytest.raises(DeviceValidationError, match="energy_goal_unavailable"):
-            await runner.async_set_price(0.25)
+            await runner.async_set_price(0.25, currency="EUR")
         runner._stopping = False
         await runner.async_stop()
     asyncio.run(run())
@@ -184,11 +184,11 @@ def test_a_price_folds_into_the_copy_a_poll_left_meanwhile():
 def test_a_price_keeps_a_queued_recovery_resume():
     async def run():
         _harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
         clock[0] += 61
         calls = []
         control.cancel_goal_resume = lambda *a, **k: calls.append(1)
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         assert control.energy_goal.cost.price == 0.50
         assert calls == []
         await runner.async_stop()
@@ -212,7 +212,7 @@ def test_zero_ends_the_amount_with_its_target_but_keeps_a_plain_one():
         await runner.async_set_target(5)
         await runner.async_set_cost_target(0, None)
         assert control.energy_goal.target_kwh == 5
-        await runner.async_set_cost_target(10, 0.30)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
         await runner.async_set_cost_target(0, None)
         assert control.energy_goal.target_kwh == 0
         assert control.energy_goal.cost is None
@@ -231,7 +231,7 @@ def test_an_invalid_amount_or_price_is_refused(amount, price, key):
     async def run():
         _harness, control, runner, _saved, _clock = await _cost_runner()
         with pytest.raises(DeviceValidationError, match=key):
-            await runner.async_set_cost_target(amount, price)
+            await runner.async_set_cost_target(amount, price, currency="EUR")
         with pytest.raises(DeviceValidationError, match="cost_goal_price_unknown"):
             await runner.async_set_price("0.3")
         assert control.energy_goal.target_kwh == 0
@@ -251,11 +251,11 @@ def test_the_last_reported_price_arms_an_amount_without_one():
         _harness, control, runner, _saved, _clock = await _cost_runner()
         with pytest.raises(DeviceValidationError, match="cost_goal_price_unknown"):
             await runner.async_set_cost_target(10)
-        await runner.async_set_price(0.25)
+        await runner.async_set_price(0.25, currency="EUR")
         assert runner.price == 0.25
         await runner.async_set_cost_target(10)
         assert control.energy_goal.target_kwh == 40.0
-        assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.25)
+        assert control.energy_goal.cost == CostPart(10.0, 0.0, 0.25, currency="EUR")
         await runner.async_stop()
     asyncio.run(run())
 
@@ -275,7 +275,7 @@ def test_the_money_used_follows_the_polled_meter_between_prices():
 def test_the_price_of_an_amount_is_the_newest_price_known():
     async def run():
         harness, control, runner, _saved, _clock = await _cost_runner()
-        await runner.async_set_price(0.30)
+        await runner.async_set_price(0.30, currency="EUR")
         await runner.async_set_cost_target(10, 0.40)
         # The app arms at 0.40, not at the price reported before the amount.
         assert runner.price == 0.40
@@ -294,17 +294,17 @@ def test_the_price_of_an_amount_is_the_newest_price_known():
 def test_a_price_that_changes_nothing_opens_no_waiting_minute():
     async def run():
         harness, control, runner, _saved, clock = await _cost_runner()
-        await runner.async_set_cost_target(10, 0.30)
+        await runner.async_set_cost_target(10, 0.30, currency="EUR")
         clock[0] += 61
         runner.observe(_snapshot(harness, None))
         await _settle(runner)
         assert control.energy_goal.status == "meter_unavailable"
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         assert control.energy_goal.cost.price == 0.30
         runner.observe(_snapshot(harness, 100.0))
         await _settle(runner)
         clock[0] += 1
-        await runner.async_set_price(0.50)
+        await runner.async_set_price(0.50, currency="EUR")
         assert control.energy_goal.cost.price == 0.50
         await runner.async_stop()
     asyncio.run(run())
@@ -331,7 +331,7 @@ def test_the_money_used_at_the_end_counts_the_last_reading_and_survives_a_restar
 def test_a_reached_amount_is_saved_with_its_money_and_shown_after_a_restart():
     async def run():
         harness, control, runner, saved, _clock = await _cost_runner()
-        await runner.async_set_cost_target(3, 0.30)
+        await runner.async_set_cost_target(3, 0.30, currency="EUR")
         assert control.energy_goal.target_kwh == 10.0
         runner.observe(_snapshot(harness, 109.0))
         await _settle(runner)
@@ -374,3 +374,147 @@ def test_progress_follows_the_meter_for_energy_and_money():
     goal.observe(110.0)
     assert goal.status == "reached"
     assert goal.progress(None) == 1.0
+
+
+def test_a_cached_price_cannot_arm_a_target_in_another_currency():
+    async def run():
+        _, _, runner, _, _ = await _cost_runner()
+        await runner.async_set_price(0.30, currency="EUR")
+        with pytest.raises(DeviceValidationError, match="cost_goal_price_unknown"):
+            await runner.async_set_cost_target(10, currency="CHF")
+        assert runner.model.cost is None
+        assert (runner.price, runner.currency) == (0.30, "EUR")
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+def test_failed_repricing_keeps_the_same_ceiling_on_disk_and_after_restart(tmp_path, monkeypatch):
+    from tests.test_modbus_service import service_fixture
+
+    async def run():
+        service, _, clock = await service_fixture(tmp_path)
+        try:
+            goal = service.goal
+            goal._monotonic = lambda: clock[0]
+            await goal.async_set_cost_target(10, 0.25, currency="EUR")
+            clock[0] += 61
+
+            def fail(_state):
+                raise OSError("disk full before replacement")
+
+            with monkeypatch.context() as patch:
+                patch.setattr(service._store, "save", fail)
+                with pytest.raises(OSError, match="disk full"):
+                    await goal.async_set_price(0.50, currency="EUR")
+            assert (goal.model.target_kwh, goal.price) == (40, 0.25)
+            restarted, _, _ = await service_fixture(tmp_path)
+            try:
+                assert (restarted.goal.model.target_kwh, restarted.goal.price) == (40, 0.25)
+            finally:
+                await restarted.stop()
+            await goal.async_set_price(0.50, currency="EUR")
+            assert goal.model.target_kwh == 20
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_meter_evidence_survives_a_price_save_and_caller_cancellation(cancel):
+    async def run():
+        harness, _, runner, saved, clock = await _cost_runner()
+        await runner.async_set_cost_target(10, 0.25, currency="EUR")
+        clock[0] += 61
+        entered, release = asyncio.Event(), asyncio.Event()
+        persist = runner._persist
+
+        async def slow_save(candidate=None):
+            entered.set()
+            await release.wait()
+            await persist(candidate)
+
+        runner._persist = slow_save
+        task = asyncio.create_task(runner.async_set_price(0.50))
+        await entered.wait()
+        assert (runner.model.target_kwh, runner.price) == (40, 0.25)
+        runner.observe(_snapshot(harness, 125))
+        if cancel:
+            task.cancel()
+        release.set()
+        if cancel:
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            await task
+        await _settle(runner)
+        assert (runner.model.target_kwh, runner.price, runner.model.status) == (20, 0.50, "reached")
+        assert saved[-1]["status"] == "reached"
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("unknown", [True, False])
+def test_uncertain_price_replacement_retains_the_candidate_and_fences_unknown_storage(unknown):
+    from custom_components.mennekes_amtron_rtu.device.persistence import (
+        StorageCommitUncertainError,
+        StorageStateUnknownError,
+    )
+
+    async def run():
+        _, _, runner, _, clock = await _cost_runner()
+        await runner.async_set_cost_target(10, 0.25, currency="EUR")
+        clock[0] += 61
+        error = StorageStateUnknownError if unknown else StorageCommitUncertainError
+
+        async def fail(_candidate):
+            raise error("disk sync failed")
+
+        persist = runner._persist
+        runner._persist = fail
+        with pytest.raises(error):
+            await runner.async_set_price(0.50)
+        assert (runner.price, runner.model.target_kwh, runner.stop_requested) == (0.50, 20, unknown)
+        runner._persist = persist
+        await _settle(runner)
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+def test_an_independent_save_cannot_write_an_unaccepted_tariff(tmp_path):
+    import json
+
+    from tests.test_modbus_service import service_fixture
+
+    async def run():
+        service, _, clock = await service_fixture(tmp_path)
+        try:
+            goal = service.goal
+            goal._monotonic = lambda: clock[0]
+            await goal.async_set_cost_target(10, 0.25, currency="EUR")
+            clock[0] += 61
+            entered, release = asyncio.Event(), asyncio.Event()
+
+            async def fail(_candidate):
+                entered.set()
+                await release.wait()
+                raise OSError("save rejected")
+
+            goal._persist = fail
+            price = asyncio.create_task(goal.async_set_price(0.50))
+            try:
+                await asyncio.wait_for(entered.wait(), 1)
+                await service.persist()
+                stored = json.loads((tmp_path / "intent.json").read_text())
+                assert stored["energy_goal"]["target_kwh"] == 40
+            finally:
+                release.set()
+                with pytest.raises(OSError, match="save rejected"):
+                    await price
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

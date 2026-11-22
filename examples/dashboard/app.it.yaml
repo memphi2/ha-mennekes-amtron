@@ -194,7 +194,7 @@ cards:
             target:
               entity_id: button.mennekes_amtron_avvia_ricarica_ospite
             confirmation:
-              text: "Avviare ora la ricarica ospite? Obiettivo energetico, di costo e orario obiettivo la terminano."
+              text: "Avviare la ricarica ospite? Termina al raggiungimento del limite in kWh o in denaro oppure all’orario di fine, a seconda di quale arrivi prima."
       - type: conditional
         conditions:
           - condition: state

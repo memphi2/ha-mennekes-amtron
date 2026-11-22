@@ -473,7 +473,7 @@ def test_service_origin_is_validated_scoped_and_recorded(tmp_path):
     asyncio.run(run())
 
 
-def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hidden(tmp_path):
+def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hidden(tmp_path, caplog):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
@@ -489,15 +489,15 @@ def test_only_an_unknown_operation_is_not_found_and_a_fault_inside_one_is_not_hi
 
             service.read = broken
             # A programming error is no missing operation.
-            with pytest.raises(KeyError, match="internal"):
-                await api.dispatch("POST", "/v1/read", {"register": "error_code"})
+            assert await api.dispatch("POST", "/v1/read", {"register": "error_code"}) == (500, {"error": "internal_error"})
+            assert "request failed unexpectedly (KeyError)" in caplog.text
             # Over HTTP it is a server error, and the server keeps answering.
             headers = {"Authorization": f"Bearer {TOKEN}"}
             async with TestServer(create_app(service)) as server, ClientSession() as session:
                 async with session.post(
                     server.make_url("/v1/read"), json={"register": "error_code"}, headers=headers,
                 ) as response:
-                    assert response.status == 500
+                    assert (response.status, await response.json()) == (500, {"error": "internal_error"})
                 async with session.get(server.make_url("/v1/state"), headers=headers) as response:
                     assert response.status == 200
         finally:
