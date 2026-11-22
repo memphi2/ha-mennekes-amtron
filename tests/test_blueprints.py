@@ -108,6 +108,21 @@ def test_installing_twice_changes_nothing(tmp_path: Path) -> None:
     assert report.updated == []
 
 
+def test_identical_user_blueprint_is_never_adopted(tmp_path):
+    source, target = tmp_path / "source", tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    shipped, local = source / "custom.yaml", target / "custom.yaml"
+    shipped.write_text("original")
+    local.write_text("original")
+    install_blueprints(source, target)
+    shipped.write_text("update")
+    assert install_blueprints(source, target).kept == ["custom.yaml"]
+    shipped.unlink()
+    install_blueprints(source, target)
+    assert local.read_text() == "original"
+
+
 def test_an_edited_blueprint_is_left_alone(tmp_path: Path) -> None:
     """A file the user changed is theirs."""
 

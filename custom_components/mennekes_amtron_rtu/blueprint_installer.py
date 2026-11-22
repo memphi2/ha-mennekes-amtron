@@ -81,16 +81,17 @@ def install_blueprints(source: Path, target: Path) -> InstallReport:
             installed = target / name
             if not installed.exists():
                 _atomic_write(installed, content)
+                recorded[name] = digest(content)
                 report.installed.append(name)
             else:
                 current = digest(installed.read_text(encoding="utf-8"))
                 if current != digest(content):
                     if manifest.get(name) == current:
                         _atomic_write(installed, content)
+                        recorded[name] = digest(content)
                         report.updated.append(name)
                     else:
                         report.kept.append(name)
-            recorded[name] = digest(content)
         except OSError, UnicodeError:
             report.failed.append(name)
 
