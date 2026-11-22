@@ -457,14 +457,13 @@ def test_http_state_wait_is_bounded_without_a_cached_snapshot(tmp_path, monkeypa
         service, _, _ = await service_fixture(tmp_path)
         monkeypatch.setattr(service_runtime, "_PATIENCE_SECONDS", 0.02)
         try:
-            async with TestServer(create_app(service)) as server, ClientSession() as session:
-                async with service.command_lock:
-                    service.published = None
-                    for _ in range(3):
-                        async with asyncio.timeout(1), session.get(
-                            server.make_url("/v1/state"), headers={"Authorization": f"Bearer {TOKEN}"},
-                        ) as response:
-                            assert (response.status, await response.json()) == (503, {"error": "service_unavailable"})
+            async with TestServer(create_app(service)) as server, ClientSession() as session, service.command_lock:
+                service.published = None
+                for _ in range(3):
+                    async with asyncio.timeout(1), session.get(
+                        server.make_url("/v1/state"), headers={"Authorization": f"Bearer {TOKEN}"},
+                    ) as response:
+                        assert (response.status, await response.json()) == (503, {"error": "service_unavailable"})
         finally:
             await service.stop()
 
