@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from copy import copy
 from datetime import UTC, datetime
+from typing import Protocol
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError, AmtronRateLimitedError
@@ -37,6 +38,10 @@ from .registers import ENERGY_TOTAL
 _LOGGER = logging.getLogger(__name__)
 
 
+class _SaveGoal(Protocol):
+    def __call__(self, candidate: EnergyGoal | None = None, /) -> Awaitable[None]: ...
+
+
 class EnergyGoalController:
     """Observe real meter reads and serialize stop decisions with commands.
 
@@ -50,7 +55,7 @@ class EnergyGoalController:
         self,
         control: AmtronControl,
         client: MennekesModbusClient,
-        persist: Callable[[], Awaitable[None]],
+        persist: _SaveGoal,
         notify: Callable[[], None] | None = None,
         *,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -70,7 +75,6 @@ class EnergyGoalController:
         self._storage_unknown = False
         self._dirty = False
         self._monotonic = monotonic
-        self._price_candidate: EnergyGoal | None = None
         self._priced_at = -math.inf
         # The last price Home Assistant reported, per kWh.
         self._price: float | None = None
@@ -86,11 +90,6 @@ class EnergyGoalController:
         return self._control.energy_goal
 
     @property
-    def goal_to_save(self) -> EnergyGoal:
-        """The proposed price is visible to storage while polls still see the committed goal."""
-        return self._price_candidate or self.model
-
-    @property
     def stop_requested(self) -> bool:
         """Fence waiting starts as soon as terminal evidence has been observed."""
         return self._storage_unknown or self.model.stop_requested or (
@@ -99,10 +98,13 @@ class EnergyGoalController:
             and self._pending.stop_requested
         )
 
-    async def _save_state(self) -> None:
+    async def _save_state(self, candidate: EnergyGoal | None = None) -> None:
         """Fence an unknown disk state until any later save succeeds."""
         try:
-            await self._persist()
+            if candidate is None:
+                await self._persist()
+            else:
+                await self._persist(candidate)
         except StorageStateUnknownError:
             self._storage_unknown = True
             # A pause required by an unknown store cannot grant automatic
@@ -203,7 +205,7 @@ class EnergyGoalController:
                 pending = self._pending if self._pending_generation == self._client.write_state.energy_goal_generation else None
                 candidate = copy(pending or self.model)
                 if candidate.reprice(unit):
-                    await self._save_price(candidate, unit, denomination)
+                    await finish_goal_save(self._save_price(candidate, unit, denomination))
                     return
             self._remember_price(unit, denomination)
 
@@ -213,10 +215,9 @@ class EnergyGoalController:
         self._notify_changed()
 
     async def _save_price(self, candidate: EnergyGoal, unit: float, currency: str | None) -> None:
-        self._price_candidate = candidate
         try:
-            await finish_goal_save(self._save_state())
-        except (asyncio.CancelledError, StorageCommitUncertainError, StorageStateUnknownError):
+            await self._save_state(candidate)
+        except (StorageCommitUncertainError, StorageStateUnknownError):
             # Replacement completed, or its outcome is unknown and starts are fenced.
             self._apply_price(candidate, unit, currency)
             if self._storage_unknown:
@@ -224,8 +225,6 @@ class EnergyGoalController:
             raise
         else:
             self._apply_price(candidate, unit, currency)
-        finally:
-            self._price_candidate = None
 
     def _apply_price(self, candidate: EnergyGoal, unit: float, currency: str | None) -> None:
         self.model.take_cost(candidate)

@@ -672,13 +672,13 @@ class ModbusService:
         if lowered:
             _LOGGER.info("Control: charging current lowered to the %.1f A cap", control.max_charging_current)
 
-    async def persist(self) -> None:
+    async def persist(self, candidate: EnergyGoal | None = None) -> None:
         self.guest.stamp_permission()
         if self._store is not None and not self._intent_rejected:
             async with self._store_lock:
                 self._phase = "saving control intent"
                 original = self.client.write_state
-                goal = self.goal.goal_to_save if self.goal is not None else original.energy_goal
+                goal = candidate or original.energy_goal
                 state = WriteState(
                     guest_permission=original.guest_permission,
                     charging_setpoint=original.charging_setpoint,

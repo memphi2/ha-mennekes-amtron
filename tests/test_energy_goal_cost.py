@@ -430,10 +430,10 @@ def test_meter_evidence_survives_a_price_save_and_caller_cancellation(cancel):
         entered, release = asyncio.Event(), asyncio.Event()
         persist = runner._persist
 
-        async def slow_save():
+        async def slow_save(candidate=None):
             entered.set()
             await release.wait()
-            await persist()
+            await persist(candidate)
 
         runner._persist = slow_save
         task = asyncio.create_task(runner.async_set_price(0.50))
@@ -469,7 +469,7 @@ def test_uncertain_price_replacement_retains_the_candidate_and_fences_unknown_st
         clock[0] += 61
         error = StorageStateUnknownError if unknown else StorageCommitUncertainError
 
-        async def fail():
+        async def fail(_candidate):
             raise error("disk sync failed")
 
         persist = runner._persist
@@ -480,5 +480,41 @@ def test_uncertain_price_replacement_retains_the_candidate_and_fences_unknown_st
         runner._persist = persist
         await _settle(runner)
         await runner.async_stop()
+
+    asyncio.run(run())
+
+
+def test_an_independent_save_cannot_write_an_unaccepted_tariff(tmp_path):
+    import json
+
+    from tests.test_modbus_service import service_fixture
+
+    async def run():
+        service, _, clock = await service_fixture(tmp_path)
+        try:
+            goal = service.goal
+            goal._monotonic = lambda: clock[0]
+            await goal.async_set_cost_target(10, 0.25, currency="EUR")
+            clock[0] += 61
+            entered, release = asyncio.Event(), asyncio.Event()
+
+            async def fail(_candidate):
+                entered.set()
+                await release.wait()
+                raise OSError("save rejected")
+
+            goal._persist = fail
+            price = asyncio.create_task(goal.async_set_price(0.50))
+            try:
+                await asyncio.wait_for(entered.wait(), 1)
+                await service.persist()
+                stored = json.loads((tmp_path / "intent.json").read_text())
+                assert stored["energy_goal"]["target_kwh"] == 40
+            finally:
+                release.set()
+                with pytest.raises(OSError, match="save rejected"):
+                    await price
+        finally:
+            await service.stop()
 
     asyncio.run(run())

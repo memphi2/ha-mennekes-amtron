@@ -48,8 +48,8 @@ async def _runner(*, paused=False, read_only=False, persist=None, notify=None):
     control.charging_setpoint = 10
     persisted = []
 
-    async def save():
-        persisted.append(runner.goal_to_save.snapshot())
+    async def save(candidate=None):
+        persisted.append((candidate or control.energy_goal).snapshot())
 
     runner = EnergyGoalController(
         control, harness.client, persist or save, notify, sleep=harness._sleep,
