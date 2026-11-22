@@ -20,6 +20,9 @@ configuration:
   state_change_interval_seconds:
     name: Intervallo minimo tra cambiamenti di stato
     description: "Intervallo minimo in secondi tra avvii, pause e cambiamenti del consenso alla ricarica, del blocco o delle fasi (predefinito 300). I comandi anticipati vengono accodati; l’ultimo sostituisce il precedente. Rimane l’intervallo di cinque secondi tra le scritture della corrente. Impostare 0 per disabilitare l’intervallo più lungo."
+  pause_before_phase_switch:
+    name: "Sospendi prima del cambio di fase"
+    description: "Attiva se un veicolo richiede una pausa prima del cambio di fase. Disattiva solo se tutti i veicoli supportano il cambio diretto."
   phase_switch_grace_seconds:
     name: "Attesa aggiuntiva prima del cambio delle fasi"
     description: "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria."
