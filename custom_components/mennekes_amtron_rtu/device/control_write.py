@@ -429,11 +429,12 @@ class WritePath:
             ):
                 raise validation_error("phase_pause_state_unknown")
             if state != EvseState.IDLE:
+                opened = await self.async_read_switch(CHARGING_RELEASE, stopping=True) == 1
                 # Preparation physically pauses charging. Discard the older
                 # command before that write, including if persistence fails.
                 self._control._clear_pending()
                 await self.async_apply_current(CHARGING_PAUSE_CURRENT, phase_preparation=True)
-                change = PhaseChange(self._control._monotonic() + _PHASE_PAUSE_TIMEOUT)
+                change = PhaseChange(self._control._monotonic() + _PHASE_PAUSE_TIMEOUT, release_open=opened)
                 self._control._phase_change = change
         if change is not None:
             await self._async_confirm_phase_pause(change)
@@ -447,6 +448,25 @@ class WritePath:
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
             precondition=lambda read: self._async_check_phase_write(change, read),
         )
+        if change is not None and change.release_open:
+            await self._async_reopen_release()
+
+    async def _async_reopen_release(self) -> None:
+        """Open the release again that the wallbox closed with the phase pause.
+
+        The charge stays paused: with the pause current the release starts
+        nothing. A stop, a release withdrawn meanwhile or a closed Plug &
+        Charge gate keeps it closed.
+        """
+        if self._control.charging_release_requested is False or self._control.energy_goal_stop_requested:
+            return
+        if await self.async_read_switch(CHARGING_RELEASE, stopping=True) != 0:
+            return
+        try:
+            self._control._plug_charge.check_release()
+        except DeviceError:
+            return
+        await self.async_apply_release(True)
 
     async def _async_check_phase_write(
         self, change: PhaseChange | None, read: LockedRegisterReader,
@@ -477,7 +497,9 @@ class WritePath:
             # An observed unplug ends this vehicle's phase operation. A later
             # connection may be another car and cannot inherit its grace bypass.
             raise validation_error("phase_pause_state_unknown")
-        paused = state in (EvseState.IDLE, EvseState.EV_CONNECTED)
+        # A wallbox that closes the release with the pause reports its
+        # preconditions as valid instead of the car as connected.
+        paused = state in (EvseState.IDLE, EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID)
         if self._control._identity.layout_version >= CP_STATE.min_layout:
             try:
                 cp = await read(CP_STATE)

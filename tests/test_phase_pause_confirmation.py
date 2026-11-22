@@ -279,3 +279,47 @@ def test_heartbeat_can_write_while_phase_grace_is_waiting():
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("withdrawn", [False, True])
+def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(withdrawn):
+    """The AMTRON closes 0x0D05 itself and reports preconditions valid with B1."""
+    async def run():
+        harness = _harness(grace=5)
+        control = await harness.connect()
+        control.charging_release_requested = True
+
+        async def wallbox_closes_the_release(delay):
+            await harness._sleep(delay)
+            put(harness.transport.bank, R.EVSE_STATE, EvseState.PRECONDITIONS_VALID)
+            put(harness.transport.bank, R.CP_STATE, CpState.B1)
+            put(harness.transport.bank, R.CHARGING_RELEASE, 0)
+            if withdrawn:
+                # Switched off by hand while the switch waited.
+                control.charging_release_requested = False
+
+        control._sleep = wallbox_closes_the_release
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        await asyncio.wait_for(control._flush_task, 1)
+
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        # Opened again, but the charge stays paused until resumed.
+        assert harness.written(R.CHARGING_RELEASE) == ([] if withdrawn else [[1]])
+        assert control.is_paused is True
+        assert control.pending_action is None
+
+    asyncio.run(run())
+
+
+def test_a_release_closed_before_the_switch_stays_closed():
+    async def run():
+        harness = _harness(state=EvseState.PRECONDITIONS_VALID)
+        put(harness.transport.bank, R.CHARGING_RELEASE, 0)
+        control = await harness.connect()
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        await asyncio.wait_for(control._flush_task, 1)
+
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        assert harness.written(R.CHARGING_RELEASE) == []
+
+    asyncio.run(run())

@@ -342,6 +342,11 @@ pause remains and no phase command is sent. Check the wallbox connection and
 vehicle state before trying again; a pause command being accepted does not by
 itself confirm that the vehicle has stopped charging.
 
+A confirmed pause is the car connected without a charging signal: CP `b1`
+with the wallbox state `ev_connected`, or `preconditions_valid` on wallboxes
+that close the release with the pause. After the switch the release is open
+again if it was open before.
+
 While waiting for that confirmation, the `pending` attribute of **Charging wait
 reason** still shows the requested phase action but `pending_at` is absent. This is expected: the vehicle
 determines when confirmation arrives. Once confirmed, the due time shows the end

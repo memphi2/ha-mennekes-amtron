@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Phase switching while charging works on wallboxes that close the charging
+  release themselves with the pause: their `preconditions_valid` with CP `b1`
+  counts as a confirmed pause, and the release opens again after the switch.
 - An unload during a vehicle switch could leave the old car's charge level
   or charging loss observer running; a cancelled switch now waits until all
   of them have stopped.

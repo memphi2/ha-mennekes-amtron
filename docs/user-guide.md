@@ -186,7 +186,9 @@ keeps its last price.
 
 If the wallbox supports it, select single phase or all available phases. During
 charging, the controller first requests a pause, waits for confirmation and the
-configured grace, then switches. Failed confirmation leaves the charge paused.
+configured grace, then switches. Some wallboxes close **Charging release**
+themselves with the pause; the switch then opens it again, unless a target or
+Plug & Charge keeps it closed. Failed confirmation leaves the charge paused.
 Wait for completion, then resume explicitly. [Phase-switch help](troubleshooting.md#phase-switching-leaves-charging-paused).
 
 ## Heartbeat and Home Assistant restarts
