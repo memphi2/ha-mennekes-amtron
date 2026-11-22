@@ -74,8 +74,10 @@ restart its heartbeat.
 
 ## Publication order
 
-1. Revalidate the source, require successful canonical main CI and resolve the
-   service publication plan.
+1. Verify the successful Validate and CodeQL push runs for the current main
+   commit and confirm that the release tag points to it. The tag reuses the
+   minimum/latest HA, HACS, Hassfest, native service and resource checks from
+   main. Then resolve the service publication plan.
 2. **For a new app version**, build native images, exercise their
    API/authentication and clean shutdown, then push unique candidate tags.
    There is no wallbox connected in these tests.

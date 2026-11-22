@@ -388,18 +388,14 @@ def check_github_automation() -> list[str]:
     validate = (ROOT / ".github" / "workflows" / "validate.yml").read_text(
         encoding="utf-8"
     )
-    for workflow in ("validate.yml", "release.yml"):
-        contents = (ROOT / ".github" / "workflows" / workflow).read_text(
-            encoding="utf-8"
-        )
-        for key in ("min_homeassistant", "python"):
-            value = VERSION_CONFIG[key]
-            if value not in contents:
-                failures.append(f"{workflow} does not pin {key} {value}")
-        if 'homeassistant: "latest"' not in contents:
-            failures.append(f"{workflow} must resolve the latest stable Home Assistant")
-        if 'check_ha_channel.py --expected "$HA_TARGET"' not in contents:
-            failures.append(f"{workflow} must verify both installed HA targets after dependency resolution")
+    failures.extend(
+        f"validate.yml does not pin {key} {VERSION_CONFIG[key]}"
+        for key in ("min_homeassistant", "python") if VERSION_CONFIG[key] not in validate
+    )
+    if 'homeassistant: "latest"' not in validate:
+        failures.append("validate.yml must resolve the latest stable Home Assistant")
+    if 'check_ha_channel.py --expected "$HA_TARGET"' not in validate:
+        failures.append("validate.yml must verify both installed HA targets after dependency resolution")
     # The early-warning job deliberately resolves the newest pre-release
     # instead of pinning one, so that it never ends up testing a beta that a
     # later release has already superseded.

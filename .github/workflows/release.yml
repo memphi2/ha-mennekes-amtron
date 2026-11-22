@@ -30,83 +30,6 @@ env:
   RELEASE_SBOM: .release/sbom.spdx.json
 
 jobs:
-  validate:
-    name: release validate (${{ matrix.name }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # The minimum entry proves the integration runs on the oldest
-          # supported release; latest stable additionally type-checks it,
-          # because Home Assistant's own annotations moved from voluptuous to
-          # probatio in 2026.10 and cannot both be satisfied at once.
-          - name: min-ha
-            python-version: "3.14"
-            homeassistant: "2026.9.0"
-            requirements-lock: requirements-dev-min-ha.txt
-            validate-arguments: "--skip-typing"
-          - name: latest-ha
-            python-version: "3.14"
-            homeassistant: "latest"
-            requirements-lock: requirements-dev.txt
-            validate-arguments: ""
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install Python validation tools
-        env:
-          HA_TARGET: ${{ matrix.homeassistant }}
-          REQUIREMENTS_LOCK: ${{ matrix.requirements-lock }}
-        run: |
-          if [ "$HA_TARGET" = latest ]; then
-            python -m pip install --upgrade homeassistant
-          else
-            python -m pip install "homeassistant==$HA_TARGET"
-          fi
-          python -m pip install -r "$REQUIREMENTS_LOCK"
-          python scripts/check_pymodbus_pin.py --install
-          python -m pip check
-      - name: Verify installed Home Assistant target
-        env:
-          HA_TARGET: ${{ matrix.homeassistant }}
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/check_ha_channel.py --expected "$HA_TARGET"
-      - name: Validation gates
-        run: python scripts/check_validate.py ${{ matrix.validate-arguments }}
-
-  hacs:
-    name: release hacs
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
-      - name: HACS validation
-        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
-        with:
-          category: integration
-
-  hassfest:
-    name: release hassfest
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
-      - name: Hassfest
-        uses: home-assistant/actions/hassfest@cd6f3635a740c84d8a14f6121a90068b8ece6bf6 # master
-
   main-validation:
     name: main validation gate
     outputs:
@@ -130,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          tag_sha="$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")"
           git fetch --no-tags origin main
           main_sha="$(git rev-parse origin/main)"
           if [ "$tag_sha" != "$main_sha" ]; then
@@ -140,34 +63,42 @@ jobs:
 
           echo "commit=$tag_sha" >> "$GITHUB_OUTPUT"
 
-          for attempt in $(seq 1 90); do
-            conclusion="$(gh api \
-              --method GET \
-              -H "Accept: application/vnd.github+json" \
-              "/repos/${REPOSITORY}/actions/workflows/validate.yml/runs" \
-              -f branch=main -f event=push -f head_sha="$tag_sha" -f per_page=1 \
-              --jq '.workflow_runs[0] | "\(.status):\(.conclusion)"' || true)"
-            case "$conclusion" in
-              completed:success)
-                echo "Canonical main Validate workflow succeeded for $tag_sha"
-                exit 0
-                ;;
-              completed:*)
-                echo "::error::Validate workflow on main concluded $conclusion"
+          # GitHub's run and job records are the evidence. A green workflow
+          # alone can include skipped jobs, so check the required names too.
+          for workflow in validate.yml codeql.yml; do
+            if [[ "$workflow" == validate.yml ]]; then
+              required='["validate (min-ha)", "validate (latest-ha)", "hacs", "hassfest", "dependabot", "runtime resource soak", "standalone Modbus service (amd64)", "standalone Modbus service (aarch64)"]'
+            else
+              required='["analyze (actions)", "analyze (python)"]'
+            fi
+            for attempt in $(seq 1 90); do
+              run="$(gh api --method GET "/repos/$REPOSITORY/actions/workflows/$workflow/runs" \
+                -f branch=main -f event=push -f head_sha="$tag_sha" -f per_page=1 --jq '.workflow_runs[0]')"
+              if [[ "$(jq -r '.status' <<<"$run")" == completed ]]; then
+                jq -e --arg sha "$tag_sha" --arg repo "$REPOSITORY" '
+                  .conclusion == "success" and .head_sha == $sha and .head_branch == "main"
+                  and .event == "push" and .head_repository.full_name == $repo' <<<"$run" >/dev/null
+                run_id="$(jq -r '.id' <<<"$run")"
+                gh api --paginate "/repos/$REPOSITORY/actions/runs/$run_id/jobs?filter=all&per_page=100" |
+                  jq -se --argjson required "$required" --arg sha "$tag_sha" '
+                    [.[].jobs[] | select(.head_sha == $sha)] as $jobs |
+                    all($required[]; . as $name |
+                      ([$jobs[] | select(.name == $name)] | max_by(.run_attempt, .id)) |
+                      .status == "completed" and .conclusion == "success")' >/dev/null
+                echo "$workflow verified for $tag_sha (run $run_id)"
+                break
+              fi
+              if [[ "$attempt" == 90 ]]; then
+                echo "::error::Timed out waiting for $workflow on $tag_sha"
                 exit 1
-                ;;
-              *)
-                echo "Waiting for Validate on main for $tag_sha ($attempt/90): $conclusion"
-                sleep 10
-                ;;
-            esac
+              fi
+              sleep 10
+            done
           done
-          echo "::error::Timed out waiting for Validate on main for $tag_sha"
-          exit 1
 
   service-plan:
     name: plan independent app release
-    needs: [validate, hacs, hassfest, main-validation]
+    needs: [main-validation]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -366,17 +297,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
-      - validate
-      - hacs
-      - hassfest
       - main-validation
       - service-plan
       - service-manifest
     # Skipping an unchanged app is allowed; a failed/cancelled gate never is.
     if: >-
-      ${{ always() && needs.validate.result == 'success' &&
-          needs.hacs.result == 'success' && needs.hassfest.result == 'success' &&
-          needs.main-validation.result == 'success' && needs.service-plan.result == 'success' &&
+      ${{ always() && needs.main-validation.result == 'success' && needs.service-plan.result == 'success' &&
           ((needs.service-plan.outputs.catalog_required == 'false' &&
             needs.service-plan.outputs.build_required == 'false' && needs.service-manifest.result == 'skipped') ||
            (needs.service-plan.outputs.catalog_required == 'true' && needs.service-manifest.result == 'success')) }}
@@ -407,8 +333,6 @@ jobs:
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "ref=refs/tags/$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Release validation gates
-        run: python scripts/check_repo.py
       - name: Build HACS release zip
         run: python scripts/build_hacs_release.py
       - name: Generate release metadata

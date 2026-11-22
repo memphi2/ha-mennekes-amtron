@@ -41,8 +41,8 @@ def test_prose_test_vectors_and_unrelated_warnings_are_not_deprecations():
     assert not source_issues("import warnings\nwarnings.simplefilter('ignore', UserWarning)")
 
 
-@pytest.mark.parametrize("workflow", ["validate.yml", "release.yml"])
-def test_required_matrix_is_minimum_and_dynamic_latest_only(workflow):
+def test_required_matrix_is_minimum_and_dynamic_latest_only():
+    workflow = "validate.yml"
     jobs = yaml.safe_load((Path(".github/workflows") / workflow).read_text())["jobs"]
     entries = jobs["validate"]["strategy"]["matrix"]["include"]
     assert [entry["name"] for entry in entries] == ["min-ha", "latest-ha"]
@@ -89,13 +89,12 @@ def test_ci_cancels_only_superseded_prs_and_serializes_release_publication():
         assert all(job.get("timeout-minutes", 0) > 0 for job in workflow["jobs"].values())
 
 
-@pytest.mark.parametrize("job_name", ["validate", "publish"])
-def test_tag_release_jobs_cannot_share_dependency_caches(job_name):
+def test_tag_release_jobs_cannot_share_dependency_caches():
     """A moved tag must not feed cached executables to a privileged publisher."""
 
     release = yaml.safe_load(Path(".github/workflows/release.yml").read_text())
     assert release["env"]["PIP_NO_CACHE_DIR"] == "1"
-    steps = release["jobs"][job_name]["steps"]
+    steps = [step for job in release["jobs"].values() for step in job["steps"]]
     assert any(step.get("uses", "").startswith("actions/setup-python@") for step in steps)
     for step in steps:
         assert not step.get("uses", "").startswith("actions/cache")

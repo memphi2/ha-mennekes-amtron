@@ -823,7 +823,8 @@ def test_release_pipeline_orders_image_release_and_catalog_publication():
     jobs = workflow["jobs"]
     assert "main-validation" in jobs["service-images"]["needs"]
     assert "service-plan" in jobs["service-images"]["needs"]
-    assert set(jobs["service-plan"]["needs"]) == {"validate", "hacs", "hassfest", "main-validation"}
+    assert set(jobs["service-plan"]["needs"]) == {"main-validation"}
+    assert {"validate", "hacs", "hassfest"}.isdisjoint(jobs)
     assert "service-manifest" in jobs["publish"]["needs"]
     assert "publish" in jobs["service-catalog"]["needs"]
     assert "service-manifest" in jobs["service-catalog"]["needs"]
@@ -1054,7 +1055,7 @@ def test_release_workflow_allows_reuse_fresh_build_and_partial_publication_resum
     assert _job_runs(jobs, "service-catalog", results, build=build, publish=publish) is (publish == "true")
 
 
-@pytest.mark.parametrize("gate", ["validate", "hacs", "hassfest", "main-validation", "service-plan", "service-manifest"])
+@pytest.mark.parametrize("gate", ["main-validation", "service-plan", "service-manifest"])
 @pytest.mark.parametrize("failure", ["failure", "cancelled", "skipped"])
 def test_release_workflow_never_ignores_a_required_gate_failure(gate, failure):
     jobs = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())["jobs"]
@@ -1065,3 +1066,31 @@ def test_release_workflow_never_ignores_a_required_gate_failure(gate, failure):
 def test_app_image_failure_blocks_manifest_even_with_always(failure):
     jobs = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())["jobs"]
     assert not _job_runs(jobs, "service-manifest", {"service-images": failure}, build="true", publish="true")
+
+
+@pytest.mark.parametrize("case", ["valid", "missing", "skipped", "wrong_sha", "failed_retry"])
+def test_tag_reuse_requires_each_successful_main_job(case):
+    workflow = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())
+    gate = workflow["jobs"]["main-validation"]["steps"][-1]["run"]
+    expression = gate.split("jq -se --argjson required", 1)[1].split("'", 2)[1]
+    required = json.loads(re.search(r"required='(\[.*?\])'", gate)[1])
+    jobs = [
+        {"name": name, "id": i, "head_sha": "abc", "run_attempt": 1,
+         "status": "completed", "conclusion": "success"}
+        for i, name in enumerate(required)
+    ]
+    if case == "missing":
+        jobs.pop()
+    elif case == "skipped":
+        jobs[0]["conclusion"] = "skipped"
+    elif case == "wrong_sha":
+        jobs[0]["head_sha"] = "def"
+    elif case == "failed_retry":
+        jobs.append({**jobs[0], "run_attempt": 2, "conclusion": "failure"})
+    jq = shutil.which("jq")
+    assert jq is not None
+    result = subprocess.run(
+        [jq, "-se", "--argjson", "required", json.dumps(required), "--arg", "sha", "abc", expression],
+        input=json.dumps({"jobs": jobs}), text=True, capture_output=True, check=False,
+    )
+    assert (result.returncode == 0) == (case == "valid")
