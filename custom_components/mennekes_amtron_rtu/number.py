@@ -144,7 +144,7 @@ class AmtronNumber(AmtronEntity, NumberEntity):
     def native_unit_of_measurement(self) -> str | None:
         if self.entity_description.device_class is NumberDeviceClass.MONETARY:
             cost = self.runtime.control.energy_goal.cost
-            return (cost.currency if cost else None) or self.hass.config.currency
+            return cost.currency if cost is not None else self.hass.config.currency
         return self.entity_description.native_unit_of_measurement
 
     @property

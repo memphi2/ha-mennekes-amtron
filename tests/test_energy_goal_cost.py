@@ -419,3 +419,66 @@ def test_failed_repricing_keeps_the_same_ceiling_on_disk_and_after_restart(tmp_p
             await service.stop()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_meter_evidence_survives_a_price_save_and_caller_cancellation(cancel):
+    async def run():
+        harness, _, runner, saved, clock = await _cost_runner()
+        await runner.async_set_cost_target(10, 0.25, currency="EUR")
+        clock[0] += 61
+        entered, release = asyncio.Event(), asyncio.Event()
+        persist = runner._persist
+
+        async def slow_save():
+            entered.set()
+            await release.wait()
+            await persist()
+
+        runner._persist = slow_save
+        task = asyncio.create_task(runner.async_set_price(0.50))
+        await entered.wait()
+        assert (runner.model.target_kwh, runner.price) == (40, 0.25)
+        runner.observe(_snapshot(harness, 125))
+        if cancel:
+            task.cancel()
+        release.set()
+        if cancel:
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            await task
+        await _settle(runner)
+        assert (runner.model.target_kwh, runner.price, runner.model.status) == (20, 0.50, "reached")
+        assert saved[-1]["status"] == "reached"
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("unknown", [True, False])
+def test_uncertain_price_replacement_retains_the_candidate_and_fences_unknown_storage(unknown):
+    from custom_components.mennekes_amtron_rtu.device.persistence import (
+        StorageCommitUncertainError,
+        StorageStateUnknownError,
+    )
+
+    async def run():
+        _, _, runner, _, clock = await _cost_runner()
+        await runner.async_set_cost_target(10, 0.25, currency="EUR")
+        clock[0] += 61
+        error = StorageStateUnknownError if unknown else StorageCommitUncertainError
+
+        async def fail():
+            raise error("disk sync failed")
+
+        persist = runner._persist
+        runner._persist = fail
+        with pytest.raises(error):
+            await runner.async_set_price(0.50)
+        assert (runner.price, runner.model.target_kwh, runner.stop_requested) == (0.50, 20, unknown)
+        runner._persist = persist
+        await _settle(runner)
+        await runner.async_stop()
+
+    asyncio.run(run())
