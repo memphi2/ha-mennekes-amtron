@@ -413,7 +413,7 @@ def test_provider_exception_during_setup_does_not_block_wallbox_and_retries(tmp_
             return lambda: None
 
         with (
-            patch(READ, new=AsyncMock(side_effect=[ValueError("private vehicle data"), coordinator.record(8)])),
+            patch(READ, new=AsyncMock(side_effect=[ValueError("private vehicle data"), ValueError(), coordinator.record(8)])),
             patch(LATER, side_effect=schedule),
         ):
             try:
@@ -421,9 +421,14 @@ def test_provider_exception_during_setup_does_not_block_wallbox_and_retries(tmp_
                 assert observer.statistics.last_loss_percent is None
                 assert callbacks[0][0] == 60
                 assert "ValueError" in caplog.text
-                assert "private vehicle data" not in caplog.text
+                caplog.set_level("INFO")
                 callbacks[0][1](None)
                 await hass.async_block_till_done()
+                assert caplog.text.count("vehicle charging history failed") == 1
+                assert "private vehicle data" not in caplog.text
+                callbacks[1][1](None)
+                await hass.async_block_till_done()
+                assert caplog.text.count("vehicle charging history available again") == 1
                 assert observer.statistics.last_loss_percent == pytest.approx(20)
             finally:
                 await observer.async_stop()

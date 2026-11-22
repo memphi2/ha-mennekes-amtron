@@ -22,6 +22,7 @@ from .device.charge_loss import Charge, LossStatistics
 from .device.client_errors import AmtronConnectionError
 from .device.enums import EvseState
 from .device.errors import DeviceError
+from .device.notice import FailureNotice
 from .device.registers import EVSE_STATE
 from .loss_ledger import LossLedger
 from .vehicle_profiles import CONF_VEHICLE_PROFILE_ID
@@ -59,6 +60,7 @@ class RecordLoss:
     ) -> None:
         self._hass = hass
         self._entry = entry
+        self._history_notice = FailureNotice(_LOGGER, "Charging loss")
         self._ledger = ledger
         self._queue = queue
         self._restart = restart
@@ -151,7 +153,10 @@ class RecordLoss:
                 # exception types. Keep the wallbox and its setup usable;
                 # the same bounded retry policy applies to this provider.
                 # Do not log exception messages that may contain VINs.
-                _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
+                self._history_notice.failed("vehicle charging history failed", type(err).__name__)
+            else:
+                if records is not None:
+                    self._history_notice.recovered("vehicle charging history available again")
         for record in records or ():
             statistics = self._ledger.statistics
             accounted = statistics.accounted_end
