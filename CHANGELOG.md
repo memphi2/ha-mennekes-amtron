@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b5 — 2026-11-22
+
+This beta updates the HACS integration. The Modbus app stays at **1.0.0b4**.
+
+- BMW charging history now processes full result pages in the background and saves a batch of loss estimates together. Vehicle changes cancel pending history work. A fresh charging event restarts the retry timer.
+- Repeated vehicle history failures produce one warning per cause and a recovery message.
+- **Charge from PV surplus** now requires the **Charging paused** switch. Select it in existing automations before reloading them.
+- The blueprint installer tracks files it installed and skips unchanged manifests, preserving independently installed copies.
+
 ## 1.0.0b4 — 2026-11-22
 
 Fourth beta of 1.0.0. Integration and app go to 1.0.0b4; the integration
