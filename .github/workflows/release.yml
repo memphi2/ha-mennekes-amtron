@@ -35,7 +35,7 @@ jobs:
     outputs:
       commit: ${{ steps.source.outputs.commit }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       actions: read
       contents: read
@@ -85,6 +85,9 @@ jobs:
                     all($required[]; . as $name |
                       ([$jobs[] | select(.name == $name)] | max_by(.run_attempt, .id)) |
                       .status == "completed" and .conclusion == "success")' >/dev/null
+                if [[ "$workflow" == validate.yml ]]; then
+                  echo "validation_run=$run_id" >> "$GITHUB_OUTPUT"
+                fi
                 echo "$workflow verified for $tag_sha (run $run_id)"
                 break
               fi
@@ -95,6 +98,36 @@ jobs:
               sleep 10
             done
           done
+
+      - name: Compare main validation with current stable Home Assistant
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VALIDATION_RUN: ${{ steps.source.outputs.validation_run }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api repos/home-assistant/core/releases/latest --jq 'select(.draft == false and .prerelease == false) | .tag_name')"
+          [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          reusable="$(gh api --paginate "/repos/$REPOSITORY/actions/runs/$VALIDATION_RUN/artifacts?per_page=100" |
+            jq -s --arg prefix "latest-ha-$latest-attempt-" 'any(.[].artifacts[]; .expired == false and (.name | startswith($prefix)))')"
+          echo "reusable=$reusable" >> "$GITHUB_OUTPUT"
+      - name: Set up Python for refreshed latest HA validation
+        if: steps.freshness.outputs.reusable == 'false'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Validate latest HA when main has no current evidence
+        if: steps.freshness.outputs.reusable == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m pip install --upgrade homeassistant
+          python -m pip install -r requirements-dev.txt
+          python scripts/check_pymodbus_pin.py --install
+          python -m pip check
+          python scripts/check_ha_channel.py --expected latest
+          python scripts/check_validate.py
 
   service-plan:
     name: plan independent app release

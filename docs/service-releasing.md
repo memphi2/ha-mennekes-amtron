@@ -77,7 +77,9 @@ restart its heartbeat.
 1. Verify the successful Validate and CodeQL push runs for the current main
    commit and confirm that the release tag points to it. The tag reuses the
    minimum/latest HA, HACS, Hassfest, native service and resource checks from
-   main. Then resolve the service publication plan.
+   main. The release checks the tested HA version against the current stable
+   release. If HA has moved on or the run’s version evidence has expired,
+   only the latest-HA validation runs again. Then resolve the service publication plan.
 2. **For a new app version**, build native images, exercise their
    API/authentication and clean shutdown, then push unique candidate tags.
    There is no wallbox connected in these tests.

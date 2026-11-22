@@ -1071,7 +1071,7 @@ def test_app_image_failure_blocks_manifest_even_with_always(failure):
 @pytest.mark.parametrize("case", ["valid", "missing", "skipped", "wrong_sha", "failed_retry"])
 def test_tag_reuse_requires_each_successful_main_job(case):
     workflow = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())
-    gate = workflow["jobs"]["main-validation"]["steps"][-1]["run"]
+    gate = next(step["run"] for step in workflow["jobs"]["main-validation"]["steps"] if step.get("id") == "source")
     expression = gate.split("jq -se --argjson required", 1)[1].split("'", 2)[1]
     required = json.loads(re.search(r"required='(\[.*?\])'", gate)[1])
     jobs = [
@@ -1094,3 +1094,26 @@ def test_tag_reuse_requires_each_successful_main_job(case):
         input=json.dumps({"jobs": jobs}), text=True, capture_output=True, check=False,
     )
     assert (result.returncode == 0) == (case == "valid")
+
+
+@pytest.mark.parametrize(("name", "expired", "reusable"), [
+    ("latest-ha-2026.11.2-attempt-2", False, True),
+    ("latest-ha-2026.11.2-attempt-1", True, False),
+    ("latest-ha-2026.11.20-attempt-1", False, False),
+    ("latest-ha-2026.10.4-attempt-1", False, False),
+])
+def test_release_reuses_only_the_current_stable_version(name, expired, reusable):
+    jobs = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())["jobs"]
+    steps = jobs["main-validation"]["steps"]
+    comparison = next(step["run"] for step in steps if step.get("id") == "freshness")
+    expression = comparison.split("jq -s --arg prefix", 1)[1].split("'", 2)[1]
+    jq = shutil.which("jq")
+    assert jq is not None
+    result = subprocess.run(
+        [jq, "-s", "--arg", "prefix", "latest-ha-2026.11.2-attempt-", expression],
+        input=json.dumps({"artifacts": [{"name": name, "expired": expired}]}),
+        text=True, capture_output=True, check=True,
+    )
+    assert json.loads(result.stdout) is reusable
+    assert steps[-1]["if"] == "steps.freshness.outputs.reusable == 'false'"
+    assert "check_validate.py" in steps[-1]["run"]
