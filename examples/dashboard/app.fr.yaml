@@ -6,13 +6,15 @@ cards:
     primary: "AMTRON · {{ states('sensor.mennekes_amtron_puissance_totale', with_unit=True) if has_value('sensor.mennekes_amtron_puissance_totale') else '—' }}"
     secondary: >-
       {%- set p = namespace(l=[]) -%}
+      {%- set c = states('number.mennekes_amtron_objectif_de_cout') | float(0) -%}
       {%- set e = states('number.mennekes_amtron_objectif_energetique') | float(0) -%}
-      {%- if e > 0 %}{% set p.l = p.l + ['%g kWh' % e] %}{% endif -%}
+      {%- if c > 0 %}{% set p.l = p.l + [states('number.mennekes_amtron_objectif_de_cout', with_unit=True)] %}{% elif e > 0 %}{% set p.l = p.l + ['%g kWh' % e] %}{% endif -%}
       {%- if has_value('datetime.mennekes_amtron_heure_cible') %}{% set p.l = p.l + ['jusqu’à ' ~ as_local(as_datetime(states('datetime.mennekes_amtron_heure_cible'))).strftime('%H:%M')] %}{% endif -%}
       {%- set s = states('number.mennekes_amtron_objectif_de_charge_du_vehicule') | float(0) -%}
       {%- if s > 0 %}{% set p.l = p.l + ['%d %%' % s] %}{% endif -%}
       {%- set t = state_attr('sensor.mennekes_amtron_motif_dattente_de_la_recharge', 'departure_plan') -%}
       {{ 'En attente de la première mesure' if is_state(entity, 'unknown') else 'Connexion interrompue' if is_state(entity, 'unavailable') else state_translated(entity) }} · {{ states('sensor.mennekes_amtron_energie_de_la_session', with_unit=True) if has_value('sensor.mennekes_amtron_energie_de_la_session') else '—' }}
+      {%- if has_value('sensor.mennekes_amtron_cout_de_charge_estime_charge_actuelle') %} · {{ states('sensor.mennekes_amtron_cout_de_charge_estime_charge_actuelle', with_unit=True) }}{% endif %}
 
       {{ 'Objectifs : ' ~ p.l | join(' · ') if p.l else 'Aucun objectif' }}
       {%- if t not in [none, 'disabled'] %} · Planification: {{ state_attr_translated('sensor.mennekes_amtron_motif_dattente_de_la_recharge', 'departure_plan') }}{% endif %}
@@ -72,6 +74,33 @@ cards:
       - type: conditional
         conditions:
           - condition: state
+            entity: select.mennekes_amtron_phases_demandees
+            state_not: [unknown, unavailable]
+        chip:
+          type: template
+          entity: select.mennekes_amtron_phases_demandees
+          content: "{{ '1 phase' if is_state(entity, 'single_phase') else 'Toutes les phases' }}"
+          icon: mdi:sine-wave
+          tap_action:
+            action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.mennekes_amtron_annuler_la_modification_en_attente
+            state_not: unavailable
+        chip:
+          type: template
+          content: "Annuler le changement"
+          icon: mdi:close-circle-outline
+          icon_color: amber
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.mennekes_amtron_annuler_la_modification_en_attente
+      - type: conditional
+        conditions:
+          - condition: state
             entity: switch.mennekes_amtron_charge_en_pause
             state_not: [unknown, unavailable]
         chip:
@@ -105,6 +134,20 @@ cards:
         icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
         tap_action:
           action: more-info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: number.mennekes_amtron_objectif_de_cout
+            state_not: unavailable
+        chip:
+          type: template
+          entity: number.mennekes_amtron_objectif_de_cout
+          content: >-
+            {{ states(entity, with_unit=True) if states(entity) | float(0) > 0 else 'Objectif de coût' }}
+          icon: mdi:cash
+          icon_color: "{{ 'blue' if states(entity) | float(0) > 0 else 'grey' }}"
+          tap_action:
+            action: more-info
       - type: template
         entity: datetime.mennekes_amtron_heure_cible
         content: >-

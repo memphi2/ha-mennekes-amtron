@@ -1,11 +1,34 @@
-# Controleer de entiteits-ID’s vóór gebruik.
+# Eén handmatige kaart met ingebouwde HA-kaarten. Controleer de entiteit-ID’s vóór gebruik.
 type: vertical-stack
 cards:
 - type: entities
   title: Laadpaal
   show_header_toggle: false
   entities:
+  - sensor.mennekes_amtron_laadstatus
+  - sensor.mennekes_amtron_totaal_vermogen
+  - sensor.mennekes_amtron_energie_laadsessie
   - number.mennekes_amtron_laadstroomlimiet
   - switch.mennekes_amtron_laden_gepauzeerd
-  - sensor.mennekes_amtron_totaal_vermogen
+  - switch.mennekes_amtron_laadvrijgave
+  - number.mennekes_amtron_energiedoel
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_kostendoel
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_kostendoel
+  - datetime.mennekes_amtron_doeltijd
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_laaddoel_van_voertuig
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_laaddoel_van_voertuig
+  - type: conditional
+    conditions:
+    - entity: binary_sensor.mennekes_amtron_gastladen
+      state: "off"
+    row:
+      entity: button.mennekes_amtron_gastladen_starten
   - sensor.mennekes_amtron_totale_energie

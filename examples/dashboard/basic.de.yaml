@@ -1,11 +1,34 @@
-# Entity-IDs vor der Verwendung prüfen.
+# Eine manuelle Karte mit HA-eigenen Karten. Entity-IDs vor der Verwendung prüfen.
 type: vertical-stack
 cards:
 - type: entities
   title: Wallbox
   show_header_toggle: false
   entities:
+  - sensor.mennekes_amtron_ladestatus
+  - sensor.mennekes_amtron_gesamtleistung
+  - sensor.mennekes_amtron_energie_der_sitzung
   - number.mennekes_amtron_ladestrom_begrenzung
   - switch.mennekes_amtron_laden_pausiert
-  - sensor.mennekes_amtron_gesamtleistung
+  - switch.mennekes_amtron_ladefreigabe
+  - number.mennekes_amtron_ladeziel
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_kostenziel
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_kostenziel
+  - datetime.mennekes_amtron_zielzeitpunkt
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_fahrzeug_ladeziel
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_fahrzeug_ladeziel
+  - type: conditional
+    conditions:
+    - entity: binary_sensor.mennekes_amtron_gastladen
+      state: "off"
+    row:
+      entity: button.mennekes_amtron_gastladen_starten
   - sensor.mennekes_amtron_energie_insgesamt

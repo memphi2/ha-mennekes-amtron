@@ -1,11 +1,34 @@
-# Vérifiez les identifiants des entités avant utilisation.
+# Une carte manuelle avec les cartes intégrées de HA. Vérifiez les identifiants des entités avant utilisation.
 type: vertical-stack
 cards:
 - type: entities
   title: Borne
   show_header_toggle: false
   entities:
+  - sensor.mennekes_amtron_etat_de_la_recharge
+  - sensor.mennekes_amtron_puissance_totale
+  - sensor.mennekes_amtron_energie_de_la_session
   - number.mennekes_amtron_limite_du_courant_de_charge
   - switch.mennekes_amtron_charge_en_pause
-  - sensor.mennekes_amtron_puissance_totale
+  - switch.mennekes_amtron_autorisation_de_charge
+  - number.mennekes_amtron_objectif_energetique
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_objectif_de_cout
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_objectif_de_cout
+  - datetime.mennekes_amtron_heure_cible
+  - type: conditional
+    conditions:
+    - entity: number.mennekes_amtron_objectif_de_charge_du_vehicule
+      state_not: unavailable
+    row:
+      entity: number.mennekes_amtron_objectif_de_charge_du_vehicule
+  - type: conditional
+    conditions:
+    - entity: binary_sensor.mennekes_amtron_recharge_invite
+      state: "off"
+    row:
+      entity: button.mennekes_amtron_demarrer_la_recharge_invite
   - sensor.mennekes_amtron_energie_totale

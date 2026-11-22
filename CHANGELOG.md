@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- The dashboard examples show the cost target and the estimated cost so far,
+  and the Mushroom card the requested phases and a pending change to cancel.
+  The basic card lists status, controls and every target.
+
 ### Fixed
 
 - An unload during a vehicle switch could leave the old car's charge level
