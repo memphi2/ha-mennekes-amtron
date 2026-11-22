@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from aiohttp import ClientSession
+from aiohttp.test_utils import TestServer
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 
@@ -26,15 +28,22 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
-from custom_components.mennekes_amtron_rtu.device.service_api import ServiceBusyError
+from custom_components.mennekes_amtron_rtu.device.service_api import (
+    ServiceApi,
+    ServiceBusyError,
+)
+from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.waveshare_auth import (
     WaveshareAuthenticationRejectedError,
 )
-from custom_components.mennekes_amtron_rtu.service_transport import EmbeddedTransport
+from custom_components.mennekes_amtron_rtu.service_transport import (
+    EmbeddedTransport,
+    HttpTransport,
+)
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass, capture_timers
 from tests.test_init import _patch_client
-from tests.test_modbus_service import current_writes
+from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 
 MASTER = {CONF_CONTROL_MODE: CONTROL_MODE_MASTER}
 
@@ -256,14 +265,25 @@ def test_a_failed_abandoned_request_is_not_reported_twice(monkeypatch):
     asyncio.run(run())
 
 
-def test_a_busy_service_answers_like_its_http_api():
+@pytest.mark.parametrize(("error", "reply"), [
+    (ServiceBusyError(), (503, {"error": "service_unavailable"})),
+    (RuntimeError("operation failed"), (500, {"error": "internal_error"})),
+])
+def test_service_errors_have_one_reply_over_both_transports(tmp_path, monkeypatch, error, reply):
     async def run():
-        api = _Api(ServiceBusyError())
-        api.release.set()
-        transport = EmbeddedTransport(api)
-        assert await transport.call("POST", "/v1/command", {"command": "pause"}) == (
-            503, {"error": "service_unavailable"},
-        )
+        service, _, _ = await service_fixture(tmp_path)
+
+        async def failed(*_args):
+            raise error
+
+        monkeypatch.setattr(ServiceApi, "_route", failed)
+        try:
+            async with TestServer(create_app(service)) as server, ClientSession() as session:
+                http = HttpTransport(session, str(server.make_url("")).rstrip("/"), TOKEN)
+                for transport in (EmbeddedTransport(ServiceApi(service)), http):
+                    assert await transport.call("GET", "/v1/state", None) == reply
+        finally:
+            await service.stop()
 
     asyncio.run(run())
 

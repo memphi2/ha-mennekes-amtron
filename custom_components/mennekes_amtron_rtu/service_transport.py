@@ -13,8 +13,7 @@ from typing import Any, Protocol
 
 from aiohttp import ClientSession, ClientTimeout
 
-from .device.notice import FailureNotice
-from .device.service_api import ServiceApi, ServiceBusyError
+from .device.service_api import ServiceApi
 from .service_errors import ServiceConnectionError
 
 _TIMEOUT_SECONDS = 15
@@ -87,7 +86,6 @@ class EmbeddedTransport:
         self._api = api
         self._running: set[asyncio.Task[Reply]] = set()
         self._closed = False
-        self._fault_notice = FailureNotice(_LOGGER, "Service")
 
     async def call(self, method: str, path: str, payload: dict[str, Any] | None) -> Reply:
         if self._closed:
@@ -95,28 +93,12 @@ class EmbeddedTransport:
             return 503, {"error": "service_unavailable"}
         # JSON in both directions keeps the types and isolation HTTP gives.
         request = None if payload is None else _as_json(payload)
-        task = asyncio.create_task(self._dispatch(method, path, request))
+        task = asyncio.create_task(self._api.dispatch(method, path, request))
         self._running.add(task)
         task.add_done_callback(self._finished)
         async with asyncio.timeout(_TIMEOUT_SECONDS):
             status, body = await asyncio.shield(task)
         return status, _as_json(body)
-
-    async def _dispatch(self, method: str, path: str, payload: dict[str, Any] | None) -> Reply:
-        try:
-            reply = await self._api.dispatch(method, path, payload)
-        except ServiceBusyError:
-            return 503, {"error": "service_unavailable"}
-        except Exception as err:  # noqa: BLE001 - a fault inside an operation is answered, not raised
-            # The answer a web server gives for a fault inside an operation.
-            # The state is asked for after every poll: report it once.
-            self._fault_notice.failed(
-                "request failed unexpectedly", type(err).__name__,
-                level=logging.ERROR, exc_info=True,
-            )
-            return 500, {"error": "internal_error"}
-        self._fault_notice.recovered("requests are answered again")
-        return reply
 
     def _finished(self, task: asyncio.Task[Reply]) -> None:
         self._running.discard(task)

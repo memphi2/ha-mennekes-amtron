@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 
 from aiohttp import web
 
-from .service_api import GETS, POSTS, ServiceApi, ServiceBusyError
+from .service_api import GETS, POSTS, ServiceApi
 from .service_config import bearer_matches
 from .service_runtime import ModbusService
 
@@ -41,12 +41,9 @@ def create_app(service: ModbusService) -> web.Application:
             except (ValueError, RecursionError, LookupError):
                 # LookupError: a charset nobody knows.
                 return web.json_response({"error": "invalid_request"}, status=400)
-        try:
-            # A route for GET answers HEAD as well.
-            method = "GET" if request.method == "HEAD" else request.method
-            status, body = await api.dispatch(method, request.path, payload)
-        except ServiceBusyError:
-            raise web.HTTPServiceUnavailable from None
+        # A route for GET answers HEAD as well.
+        method = "GET" if request.method == "HEAD" else request.method
+        status, body = await api.dispatch(method, request.path, payload)
         return web.json_response(body, status=status)
 
     app.router.add_get("/health", health)

@@ -7,11 +7,13 @@ has one behavior and one error mapping whichever way it arrives.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from .client_errors import AmtronBusError
 from .errors import DeviceError, DeviceValidationError
 from .meter_log import moment
+from .notice import FailureNotice
 from .service_runtime import ModbusService
 
 Reply = tuple[int, dict[str, Any]]
@@ -30,6 +32,7 @@ class ServiceApi:
     """Versioned operations: commands and passive reads, no register writes."""
 
     def __init__(self, service: ModbusService) -> None:
+        self._fault_notice = FailureNotice(logging.getLogger(__name__), "Service")
         self._service = service
         self._bus_requests = asyncio.Semaphore(8)
 
@@ -38,12 +41,9 @@ class ServiceApi:
         return self._service
 
     async def dispatch(self, method: str, path: str, payload: object = None) -> Reply:
-        """Answer one request with a status and a JSON object, as HTTP would.
-
-        ServiceBusyError propagates: only the caller knows how to report it.
-        """
+        """Answer one request with a status and a JSON object, as HTTP would."""
         try:
-            return 200, await self._route(method, path, payload)
+            body = await self._route(method, path, payload)
         except _NotFoundError:
             return 404, {"error": "not_found"}
         except DeviceError as err:
@@ -54,8 +54,13 @@ class ServiceApi:
             }
         except (ValueError, TypeError, RecursionError):
             return 400, {"error": "invalid_request"}
-        except (AmtronBusError, OSError):
+        except (AmtronBusError, OSError, ServiceBusyError):
             return _UNAVAILABLE
+        except Exception as err:  # noqa: BLE001 - keep internal errors out of both transports
+            self._fault_notice.failed("request failed unexpectedly", type(err).__name__, level=logging.ERROR, exc_info=True)
+            return 500, {"error": "internal_error"}
+        self._fault_notice.recovered("requests are answered again")
+        return 200, body
 
     async def _route(self, method: str, path: str, payload: object) -> dict[str, Any]:
         service = self._service
