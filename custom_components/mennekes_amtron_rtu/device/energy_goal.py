@@ -237,7 +237,8 @@ class EnergyGoal:
 
         Energy above the baseline against the target, or for an amount of
         money what it cost so far against the amount. A reached goal is
-        used up; without a goal or a usable reading there is none.
+        used up and a running one stays below it; without a goal or a usable
+        reading there is none.
         """
         if self._status == "reached":
             return 1.0
@@ -252,7 +253,8 @@ class EnergyGoal:
         else:
             spent = cost.spent + (max(cost.booked_kwh, delivered) - cost.booked_kwh) * cost.price
             share = spent / cost.amount
-        return min(1.0, max(0.0, share))
+        # Used up only once the goal latched: a running one stays below.
+        return min(0.99, max(0.0, share))
 
     def take_cost(self, other: EnergyGoal) -> None:
         """Adopt the repriced target and amount of the same goal's copy."""

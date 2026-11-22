@@ -54,6 +54,11 @@ def test_goal_entities_never_start_charging_or_override_pause():
         assert status() == "active"
         assert progress.native_value == 0
         assert progress.extra_state_attributes == {"target": "energy", "target_value": 12}
+        goal = entry.runtime_data.control.energy_goal
+        # Rounded down: 98.7 % is 98, never a premature 99 or 100.
+        goal.progress = lambda _total: 0.987
+        assert progress.native_value == 98
+        del goal.progress
         entry.runtime_data.control.energy_goal.cost = CostPart(5.0, 0.0, 0.3, 0.0)
         assert progress.extra_state_attributes == {"target": "cost", "target_value": 5.0}
         assert control.pause_requested is True

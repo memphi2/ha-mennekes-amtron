@@ -474,17 +474,17 @@
         }
       },
       "target_progress": {
-        "name": "Progression de l'objectif",
+        "name": "Progression de la cible",
         "state_attributes": {
           "target": {
-            "name": "Objectif",
+            "name": "Cible",
             "state": {
               "energy": "Énergie",
               "cost": "Coût"
             }
           },
           "target_value": {
-            "name": "Valeur de l'objectif"
+            "name": "Valeur cible"
           }
         }
       },

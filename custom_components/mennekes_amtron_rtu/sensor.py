@@ -11,6 +11,7 @@ setting, ``none`` means nothing applies right now.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -167,9 +168,9 @@ def _waiting_details(runtime: Runtime) -> dict[str, Any]:
 
 
 def _target_progress(runtime: Runtime) -> StateType:
-    """Whole percent: at most a hundred history rows for one target."""
+    """Whole percent, rounded down: 100 only once the target is reached."""
     progress = runtime.control.energy_goal.progress(_energy_total(runtime))
-    return None if progress is None else round(progress * 100)
+    return None if progress is None else math.floor(progress * 100 + 1e-9)
 
 
 def _target_details(runtime: Runtime) -> dict[str, Any]:
