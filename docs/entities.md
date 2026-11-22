@@ -187,8 +187,8 @@ does not send a charging command.
 ## Guest charging and shared time
 
 **Start guest charging** (`button.*_start_guest_charging`) starts the
-connected guest immediately. The energy target, cost target and target time,
-if set, end the charge, whichever comes first. Use the normal
+connected guest immediately. Choose an energy or cost limit. A target time can apply alone or alongside that limit.
+The first limit reached ends charging. Use the normal
 pause to stop manually. **Guest charging** (`binary_sensor.*_guest_charging`)
 is on while a guest charge is active.
 

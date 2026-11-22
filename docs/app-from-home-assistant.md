@@ -84,9 +84,9 @@ planning editor.
 
 ## Guest charging
 
-Connect the guest, optionally set the energy target and target time, then press
-the guest button. It starts now; the energy target, cost target or target time
-ends it, whichever comes first. While active,
+Connect the guest and press the guest button to start immediately. To limit charging,
+choose an energy or cost target before starting. You can also set an end time.
+The first limit reached ends charging. While active,
 the card's button requests the ordinary pause. [Full behavior and restart limits](user-guide.md#guest-charging).
 
 ## Manual selection, automatic recognition and Plug & Charge

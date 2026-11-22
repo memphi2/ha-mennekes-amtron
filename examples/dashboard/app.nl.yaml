@@ -194,7 +194,7 @@ cards:
             target:
               entity_id: button.mennekes_amtron_gastladen_starten
             confirmation:
-              text: "Gastladen nu starten? Energiedoel, kostendoel en doeltijd beëindigen het."
+              text: "Gastladen nu starten? Het laden stopt bij de gekozen kWh- of geldlimiet of op de eindtijd, wat het eerst komt."
       - type: conditional
         conditions:
           - condition: state

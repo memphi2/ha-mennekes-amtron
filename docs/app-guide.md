@@ -117,8 +117,8 @@ the charge: guest charging does not wait for a planned start.
 
 Press **Start guest charging** to start now. It lifts a manual pause and grants
 permission for this connection, including when virtual Plug & Charge is enabled.
-The energy target, the cost target and the target time end the charge,
-whichever comes first; the card lists them, or says that none is set. The
+Choose an energy limit or a cost limit. Saving one replaces the other. You can
+also set an end time. The card lists the active limits. The first one reached ends charging. The
 vehicle charge target stays saved, shows **does not apply to the guest**
 meanwhile, and is not used. Locks, faults and electrical limits still apply.
 For example, set **10 kWh** and **07:30 tomorrow**, save both, then start.
