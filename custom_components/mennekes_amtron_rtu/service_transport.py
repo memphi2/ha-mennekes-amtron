@@ -78,8 +78,8 @@ def _as_json(value: Any) -> Any:
 class EmbeddedTransport:
     """The same service running inside Home Assistant, for a direct connection.
 
-    A request that times out or whose caller is cancelled keeps running, as it
-    would behind HTTP: a command must never be abandoned between its writes.
+    Bus operations finish even if their caller leaves. Passive state reads
+    can be cancelled safely while waiting for a command to finish.
     """
 
     def __init__(self, api: ServiceApi) -> None:
@@ -97,7 +97,10 @@ class EmbeddedTransport:
         self._running.add(task)
         task.add_done_callback(self._finished)
         async with asyncio.timeout(_TIMEOUT_SECONDS):
-            status, body = await asyncio.shield(task)
+            if method == "GET" or path == "/v1/energy":
+                status, body = await task
+            else:
+                status, body = await asyncio.shield(task)
         return status, _as_json(body)
 
     def _finished(self, task: asyncio.Task[Reply]) -> None:

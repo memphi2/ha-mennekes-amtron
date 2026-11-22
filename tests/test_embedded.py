@@ -251,13 +251,15 @@ def test_an_abandoned_request_keeps_running_until_the_service_drains(monkeypatch
     asyncio.run(run())
 
 
-def test_a_failed_abandoned_request_is_not_reported_twice(monkeypatch):
+def test_timed_out_status_polls_leave_no_waiters(monkeypatch):
     async def run():
-        api = _Api(DeviceError("service_unavailable"))
+        api = _Api()
         transport = EmbeddedTransport(api)
         monkeypatch.setattr(service_transport, "_TIMEOUT_SECONDS", 0.02)
-        with pytest.raises(TimeoutError):
-            await transport.call("GET", "/v1/state", None)
+        for _ in range(3):
+            with pytest.raises(TimeoutError):
+                await transport.call("GET", "/v1/state", None)
+            assert not transport._running
         api.release.set()
         await transport.async_drain()
         assert not transport._running
