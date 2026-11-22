@@ -1,5 +1,17 @@
 # Changes
 
+## 1.0.0b4
+
+- Fourth beta of 1.0.0. Works with integration 1.0.0b3 and 1.0.0b4.
+- Every start from a pause, a resume or a new charging current such as a
+  departure plan's start, opens the charging release again that the wallbox
+  closed with the pause, unless it was switched off by hand, a charge target
+  stopped the charge or Plug & Charge keeps it closed. A start that has to
+  wait opens nothing until it runs.
+- A phase switch while charging accepts the wallbox's own release closing as
+  a confirmed pause and opens the release again afterwards.
+- The meter log keeps the readings around a quick unplug and plug-in.
+
 ## 1.0.0b3
 
 - Third beta of 1.0.0. Integration and app must both be 1.0.0b3.
