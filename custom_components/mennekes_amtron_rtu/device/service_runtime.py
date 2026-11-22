@@ -875,19 +875,14 @@ class ModbusService:
         a long command must not make a poll time out, and a hanging one must
         not hide behind an old state.
         """
-        published = self.published
-        if (
-            patient and published is not None and self.command_lock.locked()
-            and time.monotonic() - published[0] <= _PUBLISHED_SECONDS
-        ):
+        if patient and self.command_lock.locked():
             try:
                 await asyncio.wait_for(self.command_lock.acquire(), _PATIENCE_SECONDS)
             except TimeoutError:
-                # A command that ended meanwhile may have replaced or
-                # withdrawn the state; only the current one is served.
-                if self.published is not None:
-                    return self.published[1]
-                return await self.stable_snapshot()
+                published = self.published
+                if published is None or time.monotonic() - published[0] > _PUBLISHED_SECONDS:
+                    raise
+                return published[1]
             try:
                 return self.publish()
             finally:
