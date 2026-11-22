@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b7 — 2026-11-22
+
+- Phase changes can now resume an interrupted charge on the same plug-in after the configured waiting interval. A manual pause, a reached target or a withdrawn release prevents the restart.
+- **Pause before switching phases** defaults to on. If every vehicle using the wallbox supports a direct change, turn it off in advanced wallbox settings or in the Modbus app.
+- **App users:** update the beta Modbus app to **1.0.0b6** first. Direct USB and LAN connections need only the integration update.
+
 ## 1.0.0b6 — 2026-11-22
 
 - Cost targets retain their currency across restarts. A failed tariff save leaves the previous charging limit in effect. An amount saved by an earlier beta without a currency keeps its kWh limit. Clear it and enter the amount again to use dynamic prices.
