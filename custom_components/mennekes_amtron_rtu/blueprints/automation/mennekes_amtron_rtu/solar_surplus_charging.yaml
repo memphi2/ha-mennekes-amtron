@@ -9,8 +9,7 @@ blueprint:
     This assumes a three-phase installation when all phases are selected.
     A wallbox without phase switching uses the configured phase count.
     It only writes while a vehicle is connected and charging is not paused.
-    Select the Charging paused input when updating an existing automation;
-    without it, the automation leaves the current unchanged.
+    Select the Charging paused switch for this wallbox.
 
     The manufacturer asks for at most one current change every five seconds.
     The integration enforces that by deferring a faster change and writing the
@@ -45,9 +44,7 @@ blueprint:
     charging_paused:
       name: Charging paused
       description: >-
-        Select this wallbox's charging-pause switch. Required for current
-        updates; an empty selection leaves existing automations inactive.
-      default: ""
+        Select this wallbox's charging-pause switch.
       selector:
         entity:
           filter:
@@ -153,10 +150,9 @@ triggers:
   - trigger: state
     entity_id: !input vehicle_connected
     to: "on"
-  # A template keeps the empty default valid for existing automations.
   - trigger: template
     value_template: >-
-      {{ paused_entity != '' and is_state(paused_entity, 'off') }}
+      {{ is_state(paused_entity, 'off') }}
 
 conditions:
   - condition: state
@@ -164,7 +160,7 @@ conditions:
     state: "on"
   - condition: template
     value_template: >-
-      {{ paused_entity != '' and is_state(paused_entity, 'off')
+      {{ is_state(paused_entity, 'off')
          and is_number(states(surplus_entity))
          and state_attr(surplus_entity, 'unit_of_measurement') in ['W', 'kW']
          and (phases_entity == ''

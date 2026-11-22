@@ -6,6 +6,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from homeassistant.components.blueprint.errors import MissingInput
 from homeassistant.components.blueprint.models import Blueprint, BlueprintInputs
 from homeassistant.components.blueprint.schemas import BLUEPRINT_SCHEMA
 from homeassistant.setup import async_setup_component
@@ -88,6 +89,10 @@ def test_current_blueprint_respects_pause_and_power_units(
                 inputs["switched_phases"] = "select.phases"
             if pause is not None:
                 inputs["charging_paused"] = "switch.paused"
+            else:
+                with pytest.raises(MissingInput):
+                    _expand("solar_surplus_charging.yaml", inputs)
+                return
             config = _expand("solar_surplus_charging.yaml", inputs)
             assert await async_setup_component(
                 hass, "automation", {"automation": [config]}
@@ -273,6 +278,10 @@ def test_current_blueprint_recalculates_with_a_stable_surplus(
             }
             if pause_input:
                 inputs["charging_paused"] = "switch.paused"
+            else:
+                with pytest.raises(MissingInput):
+                    _expand("solar_surplus_charging.yaml", inputs)
+                return
             config = _expand("solar_surplus_charging.yaml", inputs)
             assert await async_setup_component(
                 hass, "automation", {"automation": [config]}

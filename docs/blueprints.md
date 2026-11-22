@@ -186,10 +186,9 @@ vehicle before leaving an automation unattended.
 
 ## Updating existing blueprint automations
 
-The integration updates unchanged bundled blueprint files on setup. Reload
-automations afterwards and check the inputs of your automations: a new required
-input stays empty until you select it, and **Charge from PV surplus** sends no
-commands until **Charging paused** is selected.
+The integration updates unchanged bundled blueprint files on setup. For **Charge from PV surplus**,
+select the required **Charging paused** switch in each existing automation,
+save it and reload automations.
 
 Files you have edited are preserved, so those copies do **not** receive fixes
 automatically.
