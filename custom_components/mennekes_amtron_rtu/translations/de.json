@@ -486,6 +486,19 @@
           },
           "sample_count": {
             "name": "Berücksichtigte Ladungen"
+          },
+          "status": {
+            "name": "Letzte Ladung",
+            "state": {
+              "disabled": "Aus",
+              "waiting_for_session": "Noch keine Ladung",
+              "waiting_for_vehicle": "Warte auf den Wert des Autos",
+              "invalid": "Wert des Autos unbrauchbar",
+              "matched": "Gemessen",
+              "too_small": "Zu wenig geladen zum Messen",
+              "no_capacity": "Nutzbare Kapazität unbekannt",
+              "above_wallbox": "Mehr im Akku als geliefert"
+            }
           }
         }
       },

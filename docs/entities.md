@@ -381,7 +381,7 @@ wallbox is set up.
 
 | Entity | Name | Unit | Needs | Meaning |
 |---|---|---|---|---|
-| `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | vehicle profile with an energy source | Last matched charge; unknown when the newest completed charge cannot be matched. The `association` attribute says how it was matched (`history`, `changed_value` or `manual`). |
+| `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | vehicle profile with an energy source | Last matched charge; unknown when the newest completed charge cannot be matched. The `association` attribute says how it was matched (`history`, `changed_value` or `manual`); `status` says why it has a value or none (see [Charging losses](charging-estimates.md#bavariandata)). |
 | `sensor.*_average_estimated_charging_loss` | Average estimated charging loss | % | vehicle profile with an energy source | Energy-weighted average of accepted matches; `sample_count` counts accepted charges. |
 | `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | HA currency | fixed or dynamic price configured; enable the entity | Disabled by default to reduce Recorder writes. Running cost estimate: 0.00 from the plug-in, 0.00 again after the unplug. An incomplete observation shows the priced part with `complete` false. |
 | `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | HA currency | fixed or dynamic price configured | Taken over from the current charge whenever charging stops and at the unplug; retained across restarts. |

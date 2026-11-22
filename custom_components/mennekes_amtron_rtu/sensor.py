@@ -189,6 +189,8 @@ def _loss_details(last: bool) -> Callable[[Runtime], dict[str, Any]]:
         return {
             "sample_count": statistics.sample_count,
             "association": statistics.association if last else None,
+            # Why the last charge has a loss or has none.
+            "status": statistics.status if last else None,
         }
 
     return read

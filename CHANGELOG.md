@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Charging losses from the vehicle charging history use the car's rise in
+  charge level times the profile's usable capacity instead of BavarianData's
+  `energy_kwh`, which lags behind a changed charging current. A charge needs
+  a rise of at least 20 points. Every new record is measured, also behind a
+  newer one from elsewhere, and the history is read again after an unplug and
+  for up to six hours. The last-loss sensor's `status` attribute says why it
+  has no value. The average of this source starts anew.
 - The dashboard examples show the cost target and the estimated cost so far,
   and the Mushroom card the requested phases and a pending change to cancel.
   The basic card lists status, controls and every target.

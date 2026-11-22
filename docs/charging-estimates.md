@@ -36,7 +36,7 @@ unknown; a previous result is not passed off as the new one.
 | Source | What you select | How the charge is matched |
 |---|---|---|
 | Disabled | Nothing | No charging-loss entities or vehicle subscriptions. |
-| Vehicle charging history | The selected vehicle profile | The car's newest complete charging record, against the meter over that record's own time span; currently implemented for BavarianData. |
+| Vehicle charging history | The selected vehicle profile and its usable capacity | Each complete charging record of the car: its rise in charge level times the usable capacity, against the meter over that record's own time span; currently implemented for BavarianData. |
 | Charging losses from a sensor | An existing sensor for battery energy from the last charge | The sensor's value, assigned explicitly or by an optional new-value heuristic, against the meter between plug-in and unplug. |
 
 The two sensors are **Estimated charging loss, last charge** and **Average
@@ -71,7 +71,8 @@ creates long-term statistics.
 
 Configure the BavarianData car once under **Name and vehicle source** of its
 profile, select the profile, then choose **Use this profile's charging history**
-in **Charging losses**.
+in **Charging losses**. The profile's **usable capacity**, the same one
+departure planning uses, must be set.
 This selection saves immediately and enables history matching for that profile.
 The history belongs
 to the same active car used by the profile's other features.  The integration reads
@@ -79,22 +80,37 @@ BavarianData's existing local history through its public
 [`get_charging_sessions` action](https://justchr.github.io/BavarianData/docs/services/).
 It never requests a BMW history refresh or spends the BMW API quota.
 
-The last loss compares the car's newest complete record with the wallbox's
-total energy meter over that record's own time span, from the car's start to
-the car's end of charging. A record that follows a pause is measured on its
-own. DC charges, open, interrupted or late-start records and records below
-1 kWh are passed over; a truncated history is not used. The last loss stays
-unknown until a suitable record appears; local reads are retried a limited
-number of times and on charging-stop events. A record counts only when its
-span lies in a plug cycle the service saw at this wallbox from the plug-in on,
-and with vehicle profiles only in a cycle of that car; a charge elsewhere is
-passed over.
+Each complete record gives the car's start and end of charging and its charge
+level at both. The energy that reached the battery is the rise in charge level
+times the usable capacity; the wallbox's meter gives what it delivered over the
+same span. For example, 30 % to 60 % of 80 kWh is 24 kWh in the battery; with
+26 kWh delivered, the loss is about 8 %. Heating or cooling the battery while
+charging counts as loss.
 
-BavarianData's `energy_kwh` is estimated battery energy integrated from vehicle
-telemetry. Its `grid_kwh` is grid energy and is deliberately not substituted.
-A BMW-imported session that only has grid energy cannot supply this comparison.
-The result therefore remains an **estimate**, even with a good time match.
-See [BavarianData charging history](https://justchr.github.io/BavarianData/docs/charging-history-and-cost/).
+The car reports whole percent, so one charge can be off by up to one percent of
+the capacity. A charge that raised the level by less than 20 points is
+therefore not measured. The average adds up all measured charges, so these
+rounding errors largely cancel out.
+
+Every record not yet measured is taken into account, oldest first. DC
+charges and interrupted or late-start records are passed over; a truncated
+history is not used. A record counts only when its span lies in a plug cycle
+the service saw at this wallbox from the plug-in on, and with vehicle profiles
+only in a cycle of that car; a charge elsewhere is passed over. The history is
+read when a charge stops, when the car is unplugged and when BavarianData
+reports the end of a charge, and again after 1, 5 and 30 minutes and 2 and 6
+hours, never on every poll.
+
+BavarianData's `energy_kwh` is not used: it adds up the car's power reports,
+which lag behind a changed charging current by up to half an hour, so it
+reports too much after the current was lowered. Its `grid_kwh` is a different
+measurement. See [BavarianData charging history](https://justchr.github.io/BavarianData/docs/charging-history-and-cost/).
+
+**Estimated charging loss, last charge** says in its `status` attribute why it
+has a value or none: `matched`, `waiting_for_session` (no charge yet),
+`waiting_for_vehicle`, `too_small` (less than 20 points),
+`no_capacity` (no usable capacity), `above_wallbox` (more in the battery than
+the wallbox delivered) or `invalid`.
 
 ### Only a “last charge kWh” sensor
 

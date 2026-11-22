@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from collections.abc import Mapping
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -50,6 +51,7 @@ from .vehicle_trips import VehicleTripMemory
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
+    from .vehicle_sources import VehicleTelemetrySource
 
 from .device.notice import FailureNotice
 
@@ -88,6 +90,18 @@ def capacity_from_state(state: State | None) -> float | None:
     except (OverflowError, ValueError):
         return None
     return usable_capacity(value, state.attributes.get("unit_of_measurement", ""))
+
+
+def vehicle_capacity(
+    hass: HomeAssistant, telemetry: VehicleTelemetrySource | None, options: Mapping[str, Any],
+) -> float | None:
+    """The usable capacity a vehicle profile configures, from wherever it says."""
+    if options.get(CONF_DEPARTURE_USE_VEHICLE_CAPACITY) is True:
+        return telemetry.snapshot.capacity_kwh if telemetry is not None else None
+    entity = options.get(CONF_DEPARTURE_CAPACITY_ENTITY)
+    if entity:
+        return capacity_from_state(hass.states.get(entity))
+    return usable_capacity(options.get(CONF_DEPARTURE_CAPACITY_KWH))
 
 
 class DepartureObserver:
@@ -313,14 +327,7 @@ class DepartureObserver:
         await self._set_user_deadline(value, source=None, expected=original)
 
     def _capacity(self) -> float | None:
-        options = self._options
-        if options.get(CONF_DEPARTURE_USE_VEHICLE_CAPACITY) is True:
-            telemetry = self._runtime.vehicle_telemetry
-            return telemetry.snapshot.capacity_kwh if telemetry is not None else None
-        entity = options.get(CONF_DEPARTURE_CAPACITY_ENTITY)
-        if entity:
-            return capacity_from_state(self._hass.states.get(entity))
-        return usable_capacity(options.get(CONF_DEPARTURE_CAPACITY_KWH))
+        return vehicle_capacity(self._hass, self._runtime.vehicle_telemetry, self._options)
 
     def _minimum(self) -> float:
         """The level below which the car charges at once; zero is off."""

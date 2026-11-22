@@ -1,4 +1,9 @@
-"""The loss of a charge the car recorded itself, measured over the same span."""
+"""The loss of a charge the car recorded itself, measured over the same span.
+
+The car's record gives the span and the charge levels at its start and end;
+the profile's usable capacity turns the levels into the energy that reached
+the battery, and the wallbox meter gives what it delivered meanwhile.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +17,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later
 
 from .charge_watch import cycle_around, measurable_since
-from .device.charge_loss import Charge
+from .departure_observer import vehicle_capacity
+from .device.charge_loss import Charge, LossStatistics
 from .device.client_errors import AmtronConnectionError
 from .device.enums import EvseState
 from .device.errors import DeviceError
@@ -20,23 +26,29 @@ from .device.registers import EVSE_STATE
 from .loss_ledger import LossLedger
 from .vehicle_profiles import CONF_VEHICLE_PROFILE_ID
 from .vehicle_sources import resolve_history_source
+from .vehicle_sources.types import ChargeRecord
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
-# The car's record follows the end of a charge by a while.
-_RETRY_DELAYS = (60, 300, 1800)
+# The car's record follows the end of a charge by a while, at times by hours.
+_RETRY_DELAYS = (60, 300, 1800, 7200, 21600)
 # A change of the car's history is not asked for more often than this.
 _QUERY_SECONDS = 30
+# The car reports whole percent: below this many points the loss of one
+# charge is too uncertain to count.
+MIN_SOC_DELTA = 20.0
 
 
 class RecordLoss:
-    """Compares the car's newest charging record with the wallbox meter.
+    """Compares the car's charging records with the wallbox meter.
 
-    The car is asked when a charge stops here and a few times after that,
-    never on every poll. A record counts only inside a plug cycle the service
-    saw, and with vehicle profiles only in a cycle of that car.
+    The car is asked when a charge stops here or the car is unplugged, and a
+    few times over the following hours, never on every poll. Every record not
+    yet taken into account is measured, oldest first; one counts only inside
+    a plug cycle the service saw, and with vehicle profiles only in a cycle of
+    that car.
     """
 
     def __init__(
@@ -50,11 +62,13 @@ class RecordLoss:
         self._queue = queue
         self._restart = restart
         self._publish = publish
+        self._options = options
         self._profile_id: str | None = options.get(CONF_VEHICLE_PROFILE_ID)
         self._history = resolve_history_source(hass, options)
         self._ready = False
         self._was_available = self.available
         self._charging = False
+        self._plugged = False
         self._retry: CALLBACK_TYPE | None = None
         self._attempt = 0
         self.asked_at = float("-inf")
@@ -68,7 +82,8 @@ class RecordLoss:
         self._was_available = self.available
         if self._history is None or not self._history.available:
             return False
-        self._ledger.statistics.configure_source(self._history.source_key)
+        # Losses from charge levels start their own average.
+        self._ledger.statistics.configure_source(self._history.source_key + ":soc")
         self._ready = True
         return True
 
@@ -102,10 +117,14 @@ class RecordLoss:
             self._queue()
 
     def wants(self, *, initial: bool) -> bool:
-        """A charge stopped here: its record is due, now or after a while."""
-        charging = self._entry.runtime_data.coordinator.current_data().get(EVSE_STATE.key) == EvseState.CHARGING
+        """A charge stopped here or the car left: its record is due, now or later."""
+        data = self._entry.runtime_data.coordinator.current_data()
+        charging = data.get(EVSE_STATE.key) == EvseState.CHARGING
+        meter = data.charge_meter
+        plugged = meter is not None and meter["plugged_at"] is not None
         stopped, self._charging = self._charging and not charging, charging
-        if not (initial or stopped):
+        unplugged, self._plugged = self._plugged and not plugged, plugged
+        if not (initial or stopped or unplugged):
             return False
         self._attempt = 0
         self._forget_retry()
@@ -118,40 +137,63 @@ class RecordLoss:
         # Without a plug cycle seen here, no record of the car can be measured.
         since = measurable_since(self._entry)
         self.asked_at = time.monotonic()
-        record = None
+        records = None
         if self._history is not None and since is not None:
             try:
-                record = await self._history.async_latest(since=since, until=time.time())
+                records = await self._history.async_records(since=since, until=time.time())
             except (HomeAssistantError, TimeoutError):
-                record = None
+                records = None
             except Exception as err:  # noqa: BLE001 - isolate third-party services
                 # A third-party history service can fail with its own
                 # exception types. Keep the wallbox and its setup usable;
                 # the same bounded retry policy applies to this provider.
                 # Do not log exception messages that may contain VINs.
                 _LOGGER.warning("Charging loss: vehicle charging history failed (%s)", type(err).__name__)
-        wallbox = None
-        if record is not None:
+        booked = False
+        for record in records or ():
+            statistics = self._ledger.statistics
+            accounted = statistics.accounted_end
+            if accounted is not None and record.end < accounted:
+                continue
             cycle = cycle_around(self._entry, record.start, record.end)
             if cycle is None or (
                 self._profile_id is not None and (cycle.owner is None or cycle.owner.id != self._profile_id)
             ):
                 # Charged elsewhere, or another car was plugged in here meanwhile.
-                return
-            try:
-                wallbox = await self._entry.runtime_data.client.async_energy_between(record.start, record.end)
-            except (AmtronConnectionError, DeviceError):
-                wallbox = None
-        if record is None or wallbox is None or wallbox <= 0:
-            # No record yet, or the meter reading after its end is still to come.
+                continue
+            charge = statistics.known(record.start, record.end)
+            if charge is None:
+                try:
+                    wallbox = await self._entry.runtime_data.client.async_energy_between(record.start, record.end)
+                except (AmtronConnectionError, DeviceError):
+                    wallbox = None
+                if wallbox is None or wallbox <= 0:
+                    # The meter reading after its end is still to come.
+                    break
+                charge = Charge(record.start, record.end, wallbox)
+                booked = True
+            await self._book(charge, record)
+        if not booked:
+            # No record of a new charge yet.
             self._schedule_retry()
-            return
-        charge, vehicle_kwh = Charge(record.start, record.end, wallbox), record.vehicle_kwh
+
+    async def _book(self, charge: Charge, record: ChargeRecord) -> None:
+        capacity = vehicle_capacity(
+            self._hass, getattr(self._entry.runtime_data, "vehicle_telemetry", None), self._options,
+        )
+        points = record.soc_end - record.soc_start
+
+        def book(statistics: LossStatistics) -> None:
+            if points < MIN_SOC_DELTA:
+                statistics.reject(charge, "too_small")
+            elif capacity is None:
+                statistics.reject(charge, "no_capacity")
+            else:
+                statistics.apply(charge, points / 100 * capacity, association="history")
+
         async with self._ledger.lock:
             if not self._ledger.closed:
-                await self._ledger.commit(
-                    lambda statistics: statistics.apply(charge, vehicle_kwh, association="history"),
-                )
+                await self._ledger.commit(book)
 
     def _schedule_retry(self) -> None:
         if self._retry is not None or self._attempt >= len(_RETRY_DELAYS):

@@ -114,11 +114,12 @@ class ProviderSelection:
 
 @dataclass(frozen=True, slots=True)
 class ChargeRecord:
-    """One complete charge as the vehicle recorded it, with battery energy."""
+    """One complete charge as the vehicle recorded it: its span and charge levels."""
 
     start: float
     end: float
-    vehicle_kwh: float
+    soc_start: float
+    soc_end: float
 
 
 class DepartureSource(Protocol):
@@ -139,6 +140,8 @@ class ChargeHistorySource(Protocol):
     @property
     def available(self) -> bool: ...
 
-    async def async_latest(self, *, since: float, until: float) -> ChargeRecord | None: ...
+    async def async_records(self, *, since: float, until: float) -> tuple[ChargeRecord, ...] | None:
+        """Complete charges in the span, oldest first; None when unreadable."""
+        ...
 
     def subscribe(self, on_change: Callable[[], None]) -> CALLBACK_TYPE: ...

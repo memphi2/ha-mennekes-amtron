@@ -178,7 +178,8 @@ def test_invalid_vehicle_values_are_not_measurements(value):
 def test_impossible_vehicle_energy_is_not_clamped_to_zero_loss(energy):
     model = stats()
     accept(model, session(), energy)
-    assert model.status == "invalid"
+    # More in the battery than delivered says so; zero is no energy at all.
+    assert model.status == ("invalid" if energy == 0 else "above_wallbox")
     assert model.last_loss_percent is None
     assert model.average_loss_percent is None
 
@@ -342,3 +343,25 @@ def test_aggregate_has_constant_size_and_no_session_history():
         "last_match", "current_session", "status",
     }
     assert LossStatistics.restore(model.snapshot()).sample_count == 100
+
+
+def test_a_rejected_charge_is_the_newest_one_and_says_why():
+    model = stats()
+    assert model.accounted_end is None
+    accept(model, session(1))
+    assert model.accounted_end == session(1).end
+    # A charge already counted keeps its measurement.
+    assert not model.reject(session(1), "too_small")
+    assert model.status == "matched"
+    assert model.reject(session(2), "too_small")
+    assert model.status == "too_small"
+    assert model.accounted_end == session(2).end
+    assert model.last_loss_percent is None
+    assert model.average_loss_percent == pytest.approx(10)
+    assert LossStatistics.restore(model.snapshot()).snapshot() == model.snapshot()
+    # An older charge does not replace the newer one.
+    assert not model.reject(session(0), "no_capacity")
+    assert model.status == "too_small"
+    with pytest.raises(ValueError, match="rejection"):
+        model.reject(session(3), "matched")
+    assert not LossStatistics().reject(session(3), "too_small")

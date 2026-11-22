@@ -486,6 +486,19 @@
           },
           "sample_count": {
             "name": "Charges included"
+          },
+          "status": {
+            "name": "Last charge",
+            "state": {
+              "disabled": "Off",
+              "waiting_for_session": "No charge yet",
+              "waiting_for_vehicle": "Waiting for the car's record",
+              "invalid": "Car value unusable",
+              "matched": "Measured",
+              "too_small": "Charged too little to measure",
+              "no_capacity": "Usable capacity unknown",
+              "above_wallbox": "More in the battery than delivered"
+            }
           }
         }
       },

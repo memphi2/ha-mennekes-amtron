@@ -486,6 +486,19 @@
           },
           "sample_count": {
             "name": "Charges prises en compte"
+          },
+          "status": {
+            "name": "Dernière charge",
+            "state": {
+              "disabled": "Désactivé",
+              "waiting_for_session": "Pas encore de charge",
+              "waiting_for_vehicle": "En attente de la valeur du véhicule",
+              "invalid": "Valeur du véhicule inutilisable",
+              "matched": "Mesuré",
+              "too_small": "Trop peu chargé pour mesurer",
+              "no_capacity": "Capacité utile inconnue",
+              "above_wallbox": "Plus dans la batterie que fourni"
+            }
           }
         }
       },
