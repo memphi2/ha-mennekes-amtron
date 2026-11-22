@@ -359,7 +359,9 @@ class WritePath:
         if refresh and self._control._request_refresh is not None:
             await self._control._request_refresh()
 
-    async def async_apply_release(self, released: bool) -> None:
+    async def async_apply_release(
+        self, released: bool, *, restore_phase_release: WritePrecondition | None = None,
+    ) -> None:
         if released:
             self._control._plug_charge.check_release()
         current = await self.async_read_switch(CHARGING_RELEASE, stopping=not released)
@@ -385,7 +387,7 @@ class WritePath:
         try:
             await self.async_transition_write(
                 CHARGING_RELEASE, int(released), changed=lambda: switches,
-                precondition=admit if released and current != 1 else None,
+                precondition=restore_phase_release or (admit if released and current != 1 else None),
             )
         except (AmtronRateLimitedError, DepartureCommandCancelledError):
             # Nothing was sent; the request is not an intent yet.
@@ -468,10 +470,13 @@ class WritePath:
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
             precondition=lambda read: self._async_check_phase_write(change, read, direct=direct),
         )
-        if change is not None and change.plug_scope is not None and change.plug_scope != self._control.write_state.plug_cycle.scope:
-            return None
-        if change is not None and change.release_open and not change.unplug_confirmed:
-            await self._async_reopen_release()
+        if change is not None and change.release_open and not change.unplug_confirmed and change.plug_scope is not None:
+            scope = change.plug_scope
+
+            async def still_paused(read: LockedRegisterReader) -> None:
+                await self._async_check_phase_hold(read, phases, scope)
+
+            await self._async_reopen_release(restore_phase_release=still_paused)
             if change.resume_current is not None:
                 return PendingCommand(
                     "resume", change.resume_current, phase_scope=change.plug_scope,
@@ -479,7 +484,9 @@ class WritePath:
                 )
         return None
 
-    async def _async_reopen_release(self, *, starting: bool = False) -> None:
+    async def _async_reopen_release(
+        self, *, starting: bool = False, restore_phase_release: WritePrecondition | None = None,
+    ) -> None:
         """Open the release again that the wallbox closed with a pause.
 
         Opened while the pause current still holds the car, so the release
@@ -513,7 +520,22 @@ class WritePath:
             self._control._client.check_write_interval(
                 CHARGING_CURRENT_EMS, min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
             )
-        await self.async_apply_release(True)
+        await self.async_apply_release(True, restore_phase_release=restore_phase_release)
+
+    async def _async_check_phase_hold(
+        self, read: LockedRegisterReader, phases: int | None, scope: str,
+    ) -> None:
+        """Only restore a release or current while this switch still holds the same car."""
+        if (
+            await read(REQUESTED_PHASES) != phases or await read(LOCK_EVSE) != 0
+            or await read(CHARGING_CURRENT_EMS) != CHARGING_PAUSE_CURRENT
+            or await read(EVSE_STATE) not in (EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID)
+            or (self._control.layout_version >= CP_STATE.min_layout and await read(CP_STATE) != CpState.B1)
+        ):
+            raise DepartureCommandCancelledError("unknown")
+        cycle = self._control.write_state.plug_cycle
+        if cycle.present is not True or cycle.scope != scope:
+            raise DepartureCommandCancelledError("unknown")
 
     async def _async_check_phase_write(
         self, change: PhaseChange | None, read: LockedRegisterReader, *, direct: bool = False,
@@ -669,17 +691,10 @@ class WritePath:
             phase_resume = active is not None and active.phase_scope is not None
 
             async def check_preconditions(read: LockedRegisterReader) -> None:
-                if active is not None and phase_resume:
-                    if (
-                        await read(REQUESTED_PHASES) != active.requested_phases
-                        or await read(LOCK_EVSE) != 0 or await read(CHARGING_RELEASE) != 1
-                        or await read(CHARGING_CURRENT_EMS) != CHARGING_PAUSE_CURRENT
-                    ):
+                if active is not None and active.phase_scope is not None:
+                    if await read(CHARGING_RELEASE) != 1:
                         raise DepartureCommandCancelledError("unknown")
-                    if await read(EVSE_STATE) not in (EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID):
-                        raise DepartureCommandCancelledError("unknown")
-                    if self._control.layout_version >= CP_STATE.min_layout and await read(CP_STATE) != CpState.B1:
-                        raise DepartureCommandCancelledError("unknown")
+                    await self._async_check_phase_hold(read, active.requested_phases, active.phase_scope)
                 if bound:
                     await self._async_check_command_vehicle(read)
                 if precondition is not None:

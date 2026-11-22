@@ -282,12 +282,14 @@ def test_heartbeat_can_write_while_phase_grace_is_waiting():
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("withdrawn", [False, True])
-def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(withdrawn):
+@pytest.mark.parametrize("interruption", ["none", "withdrawn", "current_changed", "unknown_plug"])
+def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(interruption):
     """The AMTRON closes 0x0D05 itself and reports preconditions valid with B1."""
     async def run():
-        harness = _harness(grace=5)
+        harness = _harness(grace=5, state=EvseState.PRECONDITIONS_VALID)
         control = await harness.connect()
+        if interruption != "unknown_plug":
+            control.write_state.plug_cycle.observe(True)
         control.charging_release_requested = True
 
         async def wallbox_closes_the_release(delay):
@@ -295,7 +297,9 @@ def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(withdra
             put(harness.transport.bank, R.EVSE_STATE, EvseState.PRECONDITIONS_VALID)
             put(harness.transport.bank, R.CP_STATE, CpState.B1)
             put(harness.transport.bank, R.CHARGING_RELEASE, 0)
-            if withdrawn:
+            if interruption == "current_changed":
+                put(harness.transport.bank, R.CHARGING_CURRENT_EMS, 16.0)
+            if interruption == "withdrawn":
                 # Switched off by hand while the switch waited.
                 control.charging_release_requested = False
 
@@ -305,7 +309,7 @@ def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(withdra
 
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
         # Opened again, but the charge stays paused until resumed.
-        assert harness.written(R.CHARGING_RELEASE) == ([] if withdrawn else [[1]])
+        assert harness.written(R.CHARGING_RELEASE) == ([[1]] if interruption == "none" else [])
         assert control.is_paused is True
         assert control.pending_action is None
 
