@@ -27,7 +27,6 @@ from .device.registers import EVSE_STATE
 from .loss_ledger import LossLedger
 from .vehicle_profiles import CONF_VEHICLE_PROFILE_ID
 from .vehicle_sources import resolve_history_source, resolve_telemetry_source
-from .vehicle_sources.types import ChargeRecord
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
@@ -158,6 +157,7 @@ class RecordLoss:
             else:
                 if records is not None:
                     self._history_notice.recovered("vehicle charging history available again")
+        measurements: list[tuple[Charge, float]] = []
         for record in records or ():
             statistics = self._ledger.statistics
             accounted = statistics.accounted_end
@@ -182,27 +182,26 @@ class RecordLoss:
                     # newer one may still be measurable.
                     continue
                 charge = Charge(record.start, record.end, wallbox)
-            if not await self._book(charge, record):
-                # Not saved: nothing newer may pass it by.
-                break
+            measurements.append((charge, record.soc_end - record.soc_start))
+        if measurements:
+            capacity = vehicle_capacity(self._hass, self._telemetry, self._options)
+
+            def book(statistics: LossStatistics) -> None:
+                for charge, points in measurements:
+                    if points < MIN_SOC_DELTA:
+                        statistics.reject(charge, "too_small")
+                    elif capacity is None:
+                        statistics.reject(charge, "no_capacity")
+                    else:
+                        statistics.apply(charge, points / 100 * capacity, association="history")
+
+            async with self._ledger.lock:
+                if not self._ledger.closed:
+                    await self._ledger.commit(book)
         # The record of the latest charge can follow hours later; later
         # tries also correct a charge whose capacity was not known yet.
-        self._schedule_retry()
-
-    async def _book(self, charge: Charge, record: ChargeRecord) -> bool:
-        capacity = vehicle_capacity(self._hass, self._telemetry, self._options)
-        points = record.soc_end - record.soc_start
-
-        def book(statistics: LossStatistics) -> None:
-            if points < MIN_SOC_DELTA:
-                statistics.reject(charge, "too_small")
-            elif capacity is None:
-                statistics.reject(charge, "no_capacity")
-            else:
-                statistics.apply(charge, points / 100 * capacity, association="history")
-
-        async with self._ledger.lock:
-            return not self._ledger.closed and await self._ledger.commit(book)
+        if not self._ledger.closed:
+            self._schedule_retry()
 
     def _schedule_retry(self) -> None:
         if self._retry is not None or self._attempt >= len(_RETRY_DELAYS):

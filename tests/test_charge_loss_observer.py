@@ -1285,16 +1285,42 @@ def test_a_record_the_meter_log_cannot_cover_does_not_block_a_newer_one(tmp_path
     assert statistics.sample_count == 1
 
 
-def test_a_failed_save_stops_before_a_newer_record(tmp_path):
-    def act(observer, coordinator, read):
-        start, end = coordinator.span
-        read.return_value = (charged(start, start + 40, 4), charged(start + 50, end, 4))
-        commit = AsyncMock(return_value=False)
-        observer.ledger.commit = commit
-        return commit
+@pytest.mark.parametrize("stop_before_reply", [False, True])
+def test_history_starts_in_background_and_saves_one_batch(tmp_path, stop_before_reply):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        end = time.time()
+        start = end - 86400
+        coordinator.cycle(start, end)
+        records = tuple(charged(start + n * 1200, start + n * 1200 + 600, 8) for n in range(51))
+        entered, reply = asyncio.Event(), asyncio.Event()
 
-    _statistics, commit = _history_run(tmp_path, act)
-    commit.assert_awaited_once()
+        async def read(*args, **kwargs):
+            entered.set()
+            await reply.wait()
+            return records
+
+        coordinator.client.async_energy_between = AsyncMock(return_value=10)
+        with patch(READ, side_effect=read), patch.object(
+            observer.ledger.store, "async_save", wraps=observer.ledger.store.async_save,
+        ) as save:
+            try:
+                await asyncio.wait_for(observer.async_start(), timeout=2)
+                await asyncio.wait_for(entered.wait(), timeout=2)
+                if stop_before_reply:
+                    await observer.async_stop()
+                reply.set()
+                await hass.async_block_till_done()
+                assert save.await_count == (0 if stop_before_reply else 1)
+                assert coordinator.client.async_energy_between.await_count == (0 if stop_before_reply else 51)
+                assert observer.statistics.sample_count == (0 if stop_before_reply else 51)
+                if not stop_before_reply:
+                    assert (await observer.ledger.store.async_load()).sample_count == 51
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    asyncio.run(run())
 
 
 def test_the_cars_own_capacity_comes_from_its_profile(tmp_path):
