@@ -323,3 +323,30 @@ def test_a_release_closed_before_the_switch_stays_closed():
         assert harness.written(R.CHARGING_RELEASE) == []
 
     asyncio.run(run())
+
+
+def test_a_car_unplugged_during_the_switch_gets_no_release_opened():
+    async def run():
+        harness = _harness(grace=5)
+        control = await harness.connect()
+        control.charging_release_requested = True
+        calls = [0]
+
+        async def sleep(delay):
+            await harness._sleep(delay)
+            calls[0] += 1
+            if calls[0] == 1:
+                put(harness.transport.bank, R.EVSE_STATE, EvseState.PRECONDITIONS_VALID)
+                put(harness.transport.bank, R.CP_STATE, CpState.B1)
+                put(harness.transport.bank, R.CHARGING_RELEASE, 0)
+            else:
+                put(harness.transport.bank, R.EVSE_STATE, EvseState.IDLE)
+                put(harness.transport.bank, R.CP_STATE, CpState.A1)
+
+        control._sleep = sleep
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        await asyncio.wait_for(control._flush_task, 1)
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        assert harness.written(R.CHARGING_RELEASE) == []
+
+    asyncio.run(run())

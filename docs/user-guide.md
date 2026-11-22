@@ -25,6 +25,8 @@ charging order to create or save.
 - **Charging current limit:** choose 6 A or more, up to the available maximum.
   The vehicle can draw less than this offer.
 - **Charging paused:** on requests a pause; off resumes at the remembered current.
+  With a car plugged in, the wallbox switches **Charging release** off itself
+  during the pause; resuming switches it on again, unless you switched it off.
 - **Charging release:** permission from the wallbox controller. Use pause for
   everyday stops rather than repeatedly changing release.
 - **Wallbox locked:** a separate block. Guest start does not unlock the wallbox.
@@ -187,8 +189,9 @@ keeps its last price.
 If the wallbox supports it, select single phase or all available phases. During
 charging, the controller first requests a pause, waits for confirmation and the
 configured grace, then switches. Some wallboxes close **Charging release**
-themselves with the pause; the switch then opens it again, unless a target or
-Plug & Charge keeps it closed. Failed confirmation leaves the charge paused.
+themselves with the pause; the switch then opens it again, unless it was
+switched off by hand, a target stopped the charge or Plug & Charge keeps it
+closed. Failed confirmation leaves the charge paused.
 Wait for completion, then resume explicitly. [Phase-switch help](troubleshooting.md#phase-switching-leaves-charging-paused).
 
 ## Heartbeat and Home Assistant restarts

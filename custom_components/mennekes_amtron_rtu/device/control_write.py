@@ -448,15 +448,18 @@ class WritePath:
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
             precondition=lambda read: self._async_check_phase_write(change, read),
         )
-        if change is not None and change.release_open:
+        if change is not None and change.release_open and not change.unplug_confirmed:
+            # The car left during the switch: the release stays as it is.
             await self._async_reopen_release()
 
-    async def _async_reopen_release(self) -> None:
-        """Open the release again that the wallbox closed with the phase pause.
+    async def _async_reopen_release(self, *, starting: bool = False) -> None:
+        """Open the release again that the wallbox closed with a pause.
 
-        The charge stays paused: with the pause current the release starts
-        nothing. A stop, a release withdrawn meanwhile or a closed Plug &
-        Charge gate keeps it closed.
+        Opened while the pause current still holds the car, so the release
+        starts nothing by itself. A stop, a release withdrawn by hand or a
+        closed Plug & Charge gate keeps it closed. Before a start the current
+        that follows must be writable now: otherwise the whole start waits,
+        and nothing is opened for a start that may never come.
         """
         if self._control.charging_release_requested is False or self._control.energy_goal_stop_requested:
             return
@@ -466,6 +469,23 @@ class WritePath:
             self._control._plug_charge.check_release()
         except DeviceError:
             return
+        if starting:
+            if await self.async_vehicle_absent():
+                # Without a car the wallbox closes nothing with a pause.
+                return
+            try:
+                held = await self._control._client.async_read_register(CHARGING_CURRENT_EMS)
+            except AmtronBusError:
+                return
+            if not isinstance(held, (int, float)) or not 0 < held < CHARGING_CURRENT_MINIMUM:
+                # Only a release the pause closed is opened ahead of the
+                # current; above the pause current it would start the charge.
+                return
+            if (remaining := self._control._mode_change_remaining()) > 0:
+                raise AmtronRateLimitedError("state_change", remaining)
+            self._control._client.check_write_interval(
+                CHARGING_CURRENT_EMS, min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
+            )
         await self.async_apply_release(True)
 
     async def _async_check_phase_write(
@@ -546,6 +566,15 @@ class WritePath:
         elif command.action in ("set_current", "resume"):
             if command.grant_release:
                 await self._async_grant_release_for_start()
+            elif not 0 < command.value < CHARGING_CURRENT_MINIMUM and (
+                command.action == "resume" or self._current_transition(command.value)
+            ):
+                # A start from a pause: with a car plugged in, the wallbox
+                # closed the release with the pause and does not open it
+                # again by itself.
+                await self._async_reopen_release(starting=True)
+                # Its reads took time: a plan's command may be over meanwhile.
+                self._control._check_command_context()
             # A configuration change can lower the available current while
             # an accepted request is waiting. Reapply the active limit.
             await self.async_apply_current(min(command.value, self._control.max_charging_current))

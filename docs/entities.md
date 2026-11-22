@@ -172,7 +172,7 @@ does not send a charging command.
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
 | `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
-| `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
+| `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. With a car plugged in, the wallbox closes **Charging release** itself with the pause; resuming opens it again, unless it was switched off by hand. |
 | `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. With Virtual Plug & Charge enabled, switching it on releases the current or next connection by hand for any car until the next unplug; switching it off stops the current connection, also for a recognized car, until the next unplug. |
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | `all_available` or `single_phase`. A change while charging first pauses; resume separately after the waiting interval. The `switched` attribute is the wallbox's answer: the phases it will use when it next closes the relay. |
