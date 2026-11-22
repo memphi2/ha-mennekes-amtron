@@ -5,7 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.0b4 — 2026-11-22
+
+Fourth beta of 1.0.0. Integration and app go to 1.0.0b4; the integration
+still works with app 1.0.0b3, but the fixes for resuming, phase switching and
+the meter readings around a plug-in are in the app and need 1.0.0b4.
+The saved state of 1.0.0b3 is kept.
 
 ### Added
 
@@ -27,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Resuming a pause with a car plugged in charges again, and so does a
+  departure plan or a new current that starts the charge after a pause: the
+  wallbox closes the charging release itself with the pause and never opens
+  it again, so every start from a pause now opens it first, unless it was
+  switched off by hand, a charge target stopped the charge or Plug & Charge
+  keeps it closed. A start that has to wait opens nothing until it runs.
 - Phase switching while charging works on wallboxes that close the charging
   release themselves with the pause: their `preconditions_valid` with CP `b1`
   counts as a confirmed pause, and the release opens again after the switch.
