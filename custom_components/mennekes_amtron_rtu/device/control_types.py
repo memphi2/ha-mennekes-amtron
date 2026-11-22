@@ -25,6 +25,8 @@ class PhaseChange:
     # The release was open before the pause: some wallboxes close it
     # themselves with the pause, and the switch opens it again.
     release_open: bool = False
+    plug_scope: str | None = None
+    resume_current: float | None = None
 
 
 class PhaseWaitError(Exception):
@@ -55,6 +57,8 @@ class PendingCommand:
     deadline: datetime | None = None
     # Lowers the line without choosing a current to return to.
     keeps_setpoint: bool = False
+    phase_scope: str | None = None
+    requested_phases: int | None = None
 
 
 # Commands that end a charge or close the wallbox; and those among them that
@@ -70,6 +74,7 @@ class ControlOptions:
     current_cap: float | None = None
     state_change_interval_seconds: float = DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
     phase_switch_grace_seconds: float = DEFAULT_PHASE_SWITCH_GRACE_SECONDS
+    pause_before_phase_switch: bool = True
 
     def __post_init__(self) -> None:
         interval = self.state_change_interval_seconds

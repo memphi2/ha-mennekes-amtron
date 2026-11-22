@@ -40,7 +40,7 @@ def test_preview_and_save_apply_every_runtime_setting_without_bus_side_effects(t
                 headers, revision = await edit_context(client)
                 changes = {
                     "scan_interval": 11, "measurement_interval": 45, "current_cap": 8,
-                    "state_change_interval_seconds": 60, "phase_switch_grace_seconds": 10,
+                    "state_change_interval_seconds": 60, "phase_switch_grace_seconds": 10, "pause_before_phase_switch": False,
                 }
                 before = (list(transport.reads), list(transport.writes))
                 owner, heartbeat, poller, control = service.client, service.heartbeat, service._poller, service.control
@@ -52,7 +52,7 @@ def test_preview_and_save_apply_every_runtime_setting_without_bus_side_effects(t
                 assert preview["restart_fields"] == []
                 assert {change["key"]: change["effect"] for change in preview["changes"]} == {
                     "scan_interval": "next_cycle", "measurement_interval": "next_cycle", "current_cap": "immediate",
-                    "state_change_interval_seconds": "immediate", "phase_switch_grace_seconds": "next_switch",
+                    "state_change_interval_seconds": "immediate", "phase_switch_grace_seconds": "next_switch", "pause_before_phase_switch": "next_switch",
                 }
                 assert service.config.scan_interval == 5
                 assert control.max_charging_current == 16
@@ -61,7 +61,8 @@ def test_preview_and_save_apply_every_runtime_setting_without_bus_side_effects(t
                 assert result.status == 200
                 data = await result.json()
                 assert data["saved_ok"]
-                assert data["active"] == data["saved"] == {key: float(value) for key, value in changes.items()}
+                assert data["active"] == data["saved"] == changes
+                assert control.options.pause_before_phase_switch is False
                 assert not data["restart_required"]
                 assert service.config.scan_interval == 11
                 assert service.config.measurement_interval == 45

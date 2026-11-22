@@ -1194,11 +1194,13 @@
         "data": {
           "measurement_interval_seconds": "Intervallo delle misurazioni",
           "state_change_interval_seconds": "Intervallo minimo tra cambiamenti di stato",
+          "pause_before_phase_switch": "Sospendi prima del cambio di fase",
           "phase_switch_grace_seconds": "Attesa aggiuntiva prima del cambio delle fasi"
         },
         "data_description": {
           "measurement_interval_seconds": "Potenza, tensione, corrente e valori di sessione: 30 secondi riducono il carico sul database. I cambiamenti di stato aggiornano subito le letture. Senza veicolo, almeno 60 secondi. L'intervallo di stato determina il tempo minimo tra le letture.",
           "state_change_interval_seconds": "Intervallo minimo in secondi tra avvii, pause e cambiamenti del consenso alla ricarica, del blocco o delle fasi (predefinito 300). I comandi anticipati vengono accodati; l’ultimo sostituisce il precedente. Rimane l’intervallo di cinque secondi tra le scritture della corrente. Impostare 0 per disabilitare l’intervallo più lungo.",
+          "pause_before_phase_switch": "Attiva se un veicolo richiede una pausa prima del cambio di fase. Disattiva solo se tutti i veicoli supportano il cambio diretto.",
           "phase_switch_grace_seconds": "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria."
         },
         "description": "I valori predefiniti bilanciano aggiornamenti rapidi, meno misure memorizzate e cambi di stato graduali. Home Assistant mostra l’attesa residua dei comandi accodati. Questi intervalli non rallentano l’heartbeat indipendente."

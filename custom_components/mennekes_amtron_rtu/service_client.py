@@ -322,6 +322,9 @@ class ServiceClient:
                 or not 0 <= interval <= MAX_STATE_CHANGE_INTERVAL_SECONDS
             ):
                 raise ValueError("invalid state-change interval")
+            section = "control.pause_before_phase_switch"
+            if "pause_before_phase_switch" in control and type(control["pause_before_phase_switch"]) is not bool:
+                raise ValueError("invalid phase-switch pause policy")
             section = "control.phase_switch_grace_seconds"
             if "phase_switch_grace_seconds" in control:
                 grace = control["phase_switch_grace_seconds"]

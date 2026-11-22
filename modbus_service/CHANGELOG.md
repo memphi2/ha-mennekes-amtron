@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.0b6
+
+- Adds the optional preparatory pause for phase switching, enabled by default.
+- Restores the previous charging current after a prepared switch when the same vehicle is still connected and charging remains authorized.
+- Use with integration 1.0.0b7. Update the app first.
+
 ## 1.0.0b5
 
 - Use with integration 1.0.0b6. Update the app first.

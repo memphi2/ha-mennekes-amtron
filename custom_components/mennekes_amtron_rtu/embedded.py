@@ -27,6 +27,7 @@ from homeassistant.util.hass_dict import HassKey
 from .const import (
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_PAUSE_BEFORE_PHASE_SWITCH,
     CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
@@ -95,6 +96,7 @@ def embedded_config(entry: MennekesAmtronConfigEntry) -> ServerConfig:
         state_change_interval_seconds=seconds(
             CONF_STATE_CHANGE_INTERVAL_SECONDS, DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
         ),
+        pause_before_phase_switch=options.get(CONF_PAUSE_BEFORE_PHASE_SWITCH) is not False,
         phase_switch_grace_seconds=seconds(
             CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
         ),

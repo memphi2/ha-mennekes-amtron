@@ -59,12 +59,8 @@ one list item. Do not add a second `automation:` section to configuration.yaml.
 ## Change phases deliberately
 
 Select **Requested phases** on the device page before automating a change.
-The integration pauses first when the wallbox reports charging and leaves it
-paused. Resume separately after the waiting interval, once the vehicle and
-wallbox are ready. The PV blueprints do not coordinate dynamic phase switching.
-The phase command waits for live pause confirmation and the
-configured extra wait, then checks the state again. A failed confirmation leaves
-the phase command unsent and retains the pause.
+With the default preparation enabled, an active charge resumes automatically after the switch and the transition interval. An automation that sends a separate resume can replace a pending phase change. Failed confirmation retains the pause. The PV blueprints do not coordinate dynamic phase switching.
+
 See [Phase switching](user-guide.md#phase-switching).
 
 ## Recovery and notifications

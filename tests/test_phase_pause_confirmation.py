@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 import pytest
 
@@ -281,12 +282,14 @@ def test_heartbeat_can_write_while_phase_grace_is_waiting():
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("withdrawn", [False, True])
-def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(withdrawn):
+@pytest.mark.parametrize("interruption", ["none", "withdrawn", "current_changed", "unknown_plug"])
+def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(interruption):
     """The AMTRON closes 0x0D05 itself and reports preconditions valid with B1."""
     async def run():
-        harness = _harness(grace=5)
+        harness = _harness(grace=5, state=EvseState.PRECONDITIONS_VALID)
         control = await harness.connect()
+        if interruption != "unknown_plug":
+            control.write_state.plug_cycle.observe(True)
         control.charging_release_requested = True
 
         async def wallbox_closes_the_release(delay):
@@ -294,7 +297,9 @@ def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(withdra
             put(harness.transport.bank, R.EVSE_STATE, EvseState.PRECONDITIONS_VALID)
             put(harness.transport.bank, R.CP_STATE, CpState.B1)
             put(harness.transport.bank, R.CHARGING_RELEASE, 0)
-            if withdrawn:
+            if interruption == "current_changed":
+                put(harness.transport.bank, R.CHARGING_CURRENT_EMS, 16.0)
+            if interruption == "withdrawn":
                 # Switched off by hand while the switch waited.
                 control.charging_release_requested = False
 
@@ -304,7 +309,7 @@ def test_a_wallbox_that_closes_the_release_with_the_pause_still_switches(withdra
 
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
         # Opened again, but the charge stays paused until resumed.
-        assert harness.written(R.CHARGING_RELEASE) == ([] if withdrawn else [[1]])
+        assert harness.written(R.CHARGING_RELEASE) == ([[1]] if interruption == "none" else [])
         assert control.is_paused is True
         assert control.pending_action is None
 
@@ -348,5 +353,62 @@ def test_a_car_unplugged_during_the_switch_gets_no_release_opened():
         await asyncio.wait_for(control._flush_task, 1)
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
         assert harness.written(R.CHARGING_RELEASE) == []
+
+    asyncio.run(run())
+
+
+def test_direct_phase_switch_preserves_current_and_release():
+    async def run():
+        harness = _harness()
+        control = await harness.connect()
+        control._options = replace(control.options, pause_before_phase_switch=False)
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        assert not harness.written(R.CHARGING_CURRENT_EMS)
+        assert not harness.written(R.CHARGING_RELEASE)
+        assert control.pending_action is None
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("interruption", ["none", "unplug", "lock", "release", "manual_pause", "goal", "phase_mismatch", "fault"])
+def test_only_same_authorized_charge_resumes_after_switch(interruption):
+    async def run():
+        harness = _harness(grace=0)
+        control = await harness.connect()
+        control._options = replace(control.options, state_change_interval_seconds=20)
+        cycle = control.write_state.plug_cycle
+        cycle.observe(True)
+        put(harness.transport.bank, R.LOCK_EVSE, 0)
+
+        async def advance(delay):
+            await harness._sleep(delay)
+            _confirm_pause(harness)
+            if control.pending_action == "resume":
+                if interruption == "unplug":
+                    cycle.observe(False)
+                    cycle.observe(True)
+                elif interruption == "lock":
+                    put(harness.transport.bank, R.LOCK_EVSE, 1)
+                elif interruption == "release":
+                    put(harness.transport.bank, R.CHARGING_RELEASE, 0)
+                elif interruption == "phase_mismatch":
+                    put(harness.transport.bank, R.REQUESTED_PHASES, RequestedPhases.ALL_AVAILABLE)
+                elif interruption == "fault":
+                    put(harness.transport.bank, R.CP_STATE, CpState.E)
+                elif interruption == "goal":
+                    control.time_limit_reached = lambda: True
+                elif interruption == "manual_pause":
+                    await control.async_pause_charging()
+
+        control._sleep = advance
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        await asyncio.wait_for(control._flush_task, 2)
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        assert control.pending_action is None
+        assert control.is_paused is (interruption != "none")
+        if interruption == "none":
+            assert control.write_state.confirmed_current == 8
+            assert harness.clock[0] >= 1021
 
     asyncio.run(run())

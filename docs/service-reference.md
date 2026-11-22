@@ -128,14 +128,13 @@ same state does not extend the deadline. Recovery
 that reasserts existing intent and the independent heartbeat do not wait for
 this interval. A compound pause-before-phase command waits for live confirmation
 of the paused state for up to 30 seconds before sending the phase command.
-With a connected vehicle, layout v01.02 and newer require EVSE state 2 and CP
-state B1; layout v01.01 uses EVSE state 2 because CP state is unavailable.
+With a connected vehicle, layout v01.02 and newer require EVSE state 2 or 3 and CP
+state B1; layout v01.01 uses EVSE state 2 or 3 because CP state is unavailable.
 `phase_switch_grace_seconds` adds a separate wait after confirmation: whole
 seconds from 0 to 30, default 5. Status is rechecked after that wait. Zero removes
 only the extra grace time; confirmation and the state-change interval remain.
 A failed confirmation or timeout leaves the phase command unsent and retains
-the pause. A successful phase change still leaves charging paused; it does not
-automatically resume. Confirmation and grace waits run in the background queue,
+the pause. A successful prepared switch queues a guarded resume for the same previously charging vehicle. Confirmation and grace waits run in the background queue,
 so an HTTP command does not wait for the full sequence. During confirmation,
 the phase action remains pending with a `null` due timestamp; after confirmation,
 the timestamp gives the end of the grace period. An idle wallbox with no vehicle
@@ -269,6 +268,7 @@ The snapshot's `control` object includes:
 | Field | Meaning |
 |---|---|
 | `state_change_interval_seconds` | The service's configured interval, default 300 seconds |
+| `pause_before_phase_switch` | Request a confirmed charging pause before switching a connected vehicle, default true. False requests the phases directly. |
 | `phase_switch_grace_seconds` | Extra wait after confirmed pause before switching phases, default 5 seconds |
 | `pending_action` | The queued action, or `null` when nothing is pending |
 | `pending_until` | Fixed timezone-aware UTC timestamp for a timed wait; `null` with no pending action or while a phase change awaits vehicle pause confirmation |

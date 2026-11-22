@@ -4,7 +4,7 @@
   const languages = ["en", "de", "fr", "nl", "it"];
   const found = languages.indexOf((document.documentElement.lang || "").slice(0, 2).toLowerCase());
   const column = found < 0 ? 0 : found;
-  const names = ["scan_interval", "measurement_interval", "current_cap", "state_change_interval_seconds", "phase_switch_grace_seconds"];
+  const names = ["scan_interval", "measurement_interval", "current_cap", "state_change_interval_seconds", "phase_switch_grace_seconds", "pause_before_phase_switch"];
   const labels = {
     title:["Runtime settings","Betriebseinstellungen","Réglages de fonctionnement","Bedrijfsinstellingen","Impostazioni di funzionamento"],
     intro:["Preview every change before saving. Nothing here needs a restart: polling intervals apply at the next ordinary cycle without interrupting the current poll or wait, control limits apply at once.","Vor dem Speichern jede Änderung prüfen. Nichts davon braucht einen Neustart: Pollingintervalle gelten ab dem nächsten regulären Zyklus, ohne laufende Abfragen oder Wartezeiten zu unterbrechen; Steuerungsgrenzen gelten sofort.","Prévisualisez chaque modification avant de l’enregistrer. Aucun redémarrage n’est nécessaire : les intervalles d’interrogation s’appliquent au prochain cycle normal sans interrompre l’interrogation ou l’attente en cours, les limites de commande s’appliquent immédiatement.","Bekijk elke wijziging vóór het opslaan. Niets hiervan vereist een herstart: uitleesintervallen gelden vanaf de volgende gewone cyclus zonder de lopende uitlezing of wachttijd te onderbreken, regelgrenzen gelden meteen.","Visualizzare ogni modifica prima di salvarla. Nulla richiede un riavvio: gli intervalli di lettura valgono dal prossimo ciclo ordinario senza interrompere la lettura o l’attesa in corso, i limiti di controllo valgono subito."],
@@ -15,6 +15,9 @@
     measurement_interval:["Measurement interval (s)","Messintervall (s)","Intervalle de mesure (s)","Meetinterval (s)","Intervallo di misura (s)"],
     current_cap:["Service current cap (A)","Service-Stromobergrenze (A)","Limite de courant du service (A)","Stroomgrens van de service (A)","Limite di corrente del servizio (A)"],
     state_change_interval_seconds:["State-change interval (s)","Mindestabstand Zustandswechsel (s)","Intervalle entre changements d’état (s)","Interval tussen toestandswijzigingen (s)","Intervallo tra cambi di stato (s)"],
+    pause_before_phase_switch:["Pause before switching phases", "Vor dem Phasenwechsel pausieren", "Mettre en pause avant de changer de phases", "Pauzeren vóór fasewisseling", "Sospendi prima del cambio di fase"],
+    on:["On","Ein","Activé","Aan","Attivo"], off:["Off","Aus","Désactivé","Uit","Disattivo"],
+    phase_help:["Enable for vehicles that need a charging pause before switching phases. Disable only if all vehicles using this wallbox support a direct change.", "Aktivieren, wenn ein Fahrzeug vor dem Phasenwechsel eine Ladepause benötigt. Nur ausschalten, wenn alle Fahrzeuge an dieser Wallbox direkt umschalten können.", "Activez cette option si un véhicule doit interrompre la charge avant la commutation. Désactivez-la uniquement si tous vos véhicules acceptent une commutation directe.", "Schakel dit in als een voertuig vóór de fasewisseling moet pauzeren. Zet dit alleen uit als alle voertuigen direct kunnen omschakelen.", "Attiva se un veicolo richiede una pausa prima del cambio di fase. Disattiva solo se tutti i veicoli supportano il cambio diretto."],
     phase_switch_grace_seconds:["Phase-switch grace (s)","Wartezeit Phasenwechsel (s)","Délai de commutation de phase (s)","Wachttijd faseomschakeling (s)","Attesa commutazione di fase (s)"],
     restart:["Requires restart","Neustart erforderlich","Redémarrage requis","Herstart vereist","Riavvio necessario"],
     limits_title:["Control limits","Steuerungsgrenzen","Limites de commande","Regelgrenzen","Limiti di controllo"],
@@ -48,6 +51,7 @@
     runtime_settings_invalid:["Values outside the allowed range.", "Werte außerhalb des erlaubten Bereichs.", "Valeurs hors de la plage autorisée.", "Waarden buiten het toegestane bereik.", "Valori fuori dall’intervallo consentito."]
   };
   const text = key => labels[key]?.[column] || key;
+  const display = value => typeof value === "boolean" ? text(value ? "on" : "off") : String(value);
   // A known server key names the cause; anything else stays the generic text.
   const failure = err => { const key = err?.message === "options_save_uncertain" ? "blocked" : err?.message; return labels[key] ? text(key) : text("error"); };
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = text(node.dataset.text); });
@@ -59,7 +63,7 @@
   function invalidate() { pending=null; el("runtime_preview").hidden=true; buttons(); }
   function values(data) {
     if (!data || data.schema!==1 || !data.active || !data.saved || !Array.isArray(data.restart_fields)) throw new Error("invalid settings");
-    const rows=names.map(key=>{ const tr=document.createElement("tr"); [text(key),data.active[key],data.saved[key]].forEach(value=>{const td=document.createElement("td");td.textContent=String(value);tr.appendChild(td);});return tr; });
+    const rows=names.map(key=>{ const tr=document.createElement("tr"); [text(key),data.active[key],data.saved[key]].forEach(value=>{const td=document.createElement("td");td.textContent=display(value);tr.appendChild(td);});return tr; });
     el("runtime_values").replaceChildren(...rows);
     el("runtime_restart").textContent=data.restart_required ? `${text("restart")}: ${data.restart_fields.map(text).join(", ")}` : text("no_restart");
   }
@@ -78,7 +82,7 @@
     busy=true; invalidate(); el("runtime_error").hidden=true; el("runtime_notice").textContent=text("loading");
     try {
       const data=await request("./api/runtime"); values(data); state=data; blocked=data.write_blocked===true;
-      names.forEach(key=>{el(key).value=String(data.saved[key]);});
+      names.forEach(key=>{if (key==="pause_before_phase_switch") el(key).checked=data.saved[key]===true; else el(key).value=String(data.saved[key]);});
       el("runtime_changes").replaceChildren();el("runtime_preview").hidden=!data.restart_required;
       // A change from the Configuration tab waits; saving it here applies it.
       const unapplied=names.some(key=>data.active[key]!==data.saved[key]);
@@ -89,12 +93,12 @@
   el("runtime_form").addEventListener("input",invalidate);
   el("runtime_form").addEventListener("submit",async event=>{
     event.preventDefault(); if (busy||blocked||!state||!el("runtime_form").reportValidity()) return;
-    const changes=Object.fromEntries(names.map(key=>[key,Number(el(key).value)]));
+    const changes=Object.fromEntries(names.map(key=>[key,key==="pause_before_phase_switch" ? el(key).checked : Number(el(key).value)]));
     busy=true; invalidate(); el("runtime_error").hidden=true;
     try {
       const data=await request("./api/runtime/preview",{revision:state.revision,changes}); values(data);
       pending={revision:data.revision,changes};
-      const rows=data.changes.map(change=>{const li=document.createElement("li");li.textContent=`${text(change.key)}: ${change.effective} → ${change.proposed} · ${text(change.effect)}`;return li;});
+      const rows=data.changes.map(change=>{const li=document.createElement("li");li.textContent=`${text(change.key)}: ${display(change.effective)} → ${display(change.proposed)} · ${text(change.effect)}`;return li;});
       if (!rows.length) { const li=document.createElement("li");li.textContent=text("no_changes");rows.push(li); }
       el("runtime_changes").replaceChildren(...rows); el("runtime_preview").hidden=false;
     } catch (err) { el("runtime_error").textContent=failure(err);el("runtime_error").hidden=false; }

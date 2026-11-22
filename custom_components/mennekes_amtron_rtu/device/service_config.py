@@ -66,6 +66,7 @@ class ServerConfig:
     # Use the wallbox's own maximum as the cap; ``current_cap`` applies until
     # the wallbox has been identified.
     cap_from_wallbox: bool = False
+    pause_before_phase_switch: bool = True
 
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> ServerConfig:
@@ -87,7 +88,7 @@ class ServerConfig:
             "listen",
             "port",
             "state_change_interval_seconds",
-            "phase_switch_grace_seconds",
+            "phase_switch_grace_seconds", "pause_before_phase_switch",
         }
         if values.keys() - allowed:
             raise ValueError("unknown service configuration option")
@@ -96,6 +97,9 @@ class ServerConfig:
         read_only = values.get("read_only", True)
         if not isinstance(read_only, bool):
             raise ValueError("read_only must be boolean")
+        pause_before_switch = values.get("pause_before_phase_switch", True)
+        if type(pause_before_switch) is not bool:
+            raise ValueError("pause_before_phase_switch must be boolean")
         listen = values.get("listen", "127.0.0.1")
         if not isinstance(listen, str) or not listen or len(listen) > 253:
             raise ValueError("invalid listen address")
@@ -118,6 +122,7 @@ class ServerConfig:
                 values.get("phase_switch_grace_seconds", DEFAULT_PHASE_SWITCH_GRACE_SECONDS),
                 "phase_switch_grace_seconds", 0, MAX_PHASE_SWITCH_GRACE_SECONDS,
             ),
+            pause_before_phase_switch=pause_before_switch,
         )
 
 

@@ -48,13 +48,15 @@ repeated identical commands, newer requests superseding pending work, a queued
 stop replacing a pending start, and same-intent recovery while the longer
 interval is active.
 
-Phase-switch tests must prove that the pause command alone does not authorize
+Direct-switch tests must verify that only the phase request is written. A prepared switch must resume only a previously active charge on the same authorized plug-in.
+
+With preparation enabled, tests must prove that the pause command alone does not authorize
 the phase write: live status must first confirm the paused state. Cover delayed
 confirmation, invalid or failed reads, timeout and cancellation without a phase
 write or automatic resume. Verify the configurable grace time (default 5 seconds,
 range 0–30), the live recheck after that wait and the independence of the shared
 state-change interval. Zero grace time must not skip pause confirmation.
-Connected vehicles require EVSE state 2 and, when the layout provides it, CP
+Connected vehicles require EVSE state 2 or 3 and, when the layout provides it, CP
 state B1. An idle EVSE without a vehicle needs neither confirmation nor grace
 time. Test the corresponding register-layout and idle paths. The long-interval
 exception requires fresh Idle plus CP A1/A2, never cached state alone. Cover
@@ -162,6 +164,35 @@ test failure or timeout retains the available samples. CI uploads this report
 even when the test fails. With `--json-output`, checkpoints are written directly
 to the artifact path so they also survive interruption of the runner itself.
 A partial report cannot pass validation.
+
+## Recorder checks
+
+Use disposable SQLite databases to compare the same simulated charging day with
+different history settings. Pass a fresh output directory for each run.
+
+```bash
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-full --scenario charging --profile full
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-lean --scenario charging --profile lean
+```
+
+Compare the JSON state-row and attribute counts. To compare measurement intervals,
+keep the scenario and profile fixed and vary `--measurement-interval`. The replay
+accelerates polling time. The [resource measurements](#resource-measurements)
+exercise reconnects, queue growth and repacking in real time.
+
+```bash
+.venv/bin/python -m pytest tests/test_recorder_service_plans.py tests/test_statistics.py tests/test_recorder_retention.py
+```
+
+These tests check three separate effects:
+
+- Repeated departure and guest updates leave charging status, wait reason and guest history unchanged and generate no extra Modbus reads.
+- Hourly statistics retain energy increments and power averages under the configured exclusion profiles.
+- Purging and repacking remove old state history while preserving long-term energy statistics and SQLite integrity.
+
+See [Recorder settings](recorder.md) for user configuration and the
+[archived measurements](https://github.com/memphi2/ha-mennekes-amtron/blob/v1.0.0b6/docs/recorder-validation.md)
+for the earlier comparison tables.
 
 ## AppArmor enforcement
 

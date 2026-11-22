@@ -118,7 +118,7 @@ Behavior tests cover unlimited-current opt-in, refusal of the invalid
 0.01–5.99 A range, pause preservation, register-write intervals, serialized bus
 access and heartbeat recovery. Real HA lifecycle and HTTP tests cover service
 access, reconnection and unloading. Recorder tests check state-change filtering,
-statistics and retention; see [database validation](recorder-validation.md).
+statistics and retention; see [database validation](validation.md#recorder-checks).
 
 [Identity-binding tests](../tests/test_identity_binding.py) verify that a known
 wallbox is not silently replaced through setup or service snapshots.

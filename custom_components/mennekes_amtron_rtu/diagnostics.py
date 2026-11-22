@@ -44,6 +44,7 @@ _CONTROL_KEYS = (
     "read_only", "current_cap", "max_charging_current", "charging_setpoint",
     "pause_requested", "charging_release_requested", "guest_mode", "intent_rejected",
     "pending_action", "pending_until", "state_change_interval_seconds",
+    "pause_before_phase_switch",
     "phase_switch_grace_seconds",
 )
 
