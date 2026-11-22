@@ -119,6 +119,7 @@ class RecordLoss:
             self.asked_at = float("-inf")
         if time.monotonic() - self.asked_at >= _QUERY_SECONDS:
             self._attempt = 0
+            self._forget_retry()
             self._queue()
 
     def wants(self, *, initial: bool) -> bool:

@@ -7,7 +7,7 @@ import logging
 import threading
 import time
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import atomicwrites
 import pytest
@@ -395,6 +395,35 @@ def test_the_span_the_vehicle_names_is_measured_once_the_meter_covers_it(tmp_pat
                     await hass.async_block_till_done()
                     assert client.async_energy_between.await_count == asked
                     assert observer.statistics.sample_count == 1
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_new_history_event_replaces_an_old_retry(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        coordinator.complete()
+        timers = []
+        def schedule(_hass, delay, callback):
+            cancel = Mock()
+            timers.append((delay, callback, cancel))
+            return cancel
+        with patch(READ, new=AsyncMock(return_value=None)), patch(LATER, side_effect=schedule):
+            try:
+                await observer.async_start()
+                await hass.async_block_till_done()
+                timers[-1][1](None)
+                await hass.async_block_till_done()
+                delay, _, old_cancel = timers[-1]
+                assert delay == 240
+                observer.source.asked_at -= 31
+                hass.bus.async_fire("bavariandata_charging_stopped", {})
+                await hass.async_block_till_done()
+                old_cancel.assert_called_once()
+                assert timers[-1][0] == 60
             finally:
                 await observer.async_stop()
                 await hass.async_stop()
