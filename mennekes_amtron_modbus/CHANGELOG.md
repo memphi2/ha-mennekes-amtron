@@ -1,5 +1,70 @@
 # Changes
 
+## 1.0.0
+
+- First stable version of 1.0. Use with integration 1.0.0.
+- Runtime settings save with one **Save** button: checked, stored and applied in one step.
+- The charging status shows **Switching phases** while the wallbox withholds its charging signal after a phase change.
+- Home Assistant can save the phase-switch pause and its wait through the app; the current cap, the intervals and the connection stay on the app's pages.
+
+## 1.0.0b6
+
+- Adds the optional preparatory pause for phase switching, enabled by default.
+- Restores the previous charging current after a prepared switch when the same vehicle is still connected and charging remains authorized.
+- Use with integration 1.0.0b7. Update the app first.
+
+## 1.0.0b5
+
+- Use with integration 1.0.0b6. Update the app first.
+- Preserve the cost target’s currency and the committed kWh limit when tariff updates fail.
+- Bound status waits during long commands and return structured service errors.
+- Clarify guest energy, cost and time limits on the charging page.
+
+## 1.0.0b4
+
+- Fourth beta of 1.0.0. Works with integration 1.0.0b3 and 1.0.0b4.
+- Every start from a pause, a resume or a new charging current such as a
+  departure plan's start, opens the charging release again that the wallbox
+  closed with the pause, unless it was switched off by hand, a charge target
+  stopped the charge or Plug & Charge keeps it closed. A start that has to
+  wait opens nothing until it runs.
+- A phase switch while charging accepts the wallbox's own release closing as
+  a confirmed pause and opens the release again afterwards.
+- The meter log keeps the readings around a quick unplug and plug-in.
+
+## 1.0.0b3
+
+- Third beta of 1.0.0. Integration and app must both be 1.0.0b3.
+- **API:** `plug_charge_authorize` with `end_pause` ends only a pause set by
+  hand, from Home Assistant or the app, that the wallbox reads back; a pause
+  of a plan, a target or guest charging stays, and so does one restored
+  after a restart or one an armed departure plan keeps until its start.
+- Thinning the meter log keeps the ends of a rest, so no energy moves into it.
+- A guest stop that holds reads the bus and saves only when something changed.
+
+## 1.0.0b2
+
+- Second beta of 1.0.0. Integration and app must both be 1.0.0b2.
+- **API:** `plug_charge_authorize` takes `end_pause`: the grant comes first,
+  and a manual pause ends only after it succeeded. The new command
+  `soc_stop_pause_end` ends only the stop pause the charge target wrote.
+- A resume or unlock is admitted again on the bus right before its write.
+- The meter log keeps the plug-in reading of a long plug-in and holds at most
+  2048 readings.
+
+## 1.0.0b1
+
+- Beta of 1.0.0. Integration and app must both be 1.0.0b1; the API starts again at version 1,
+  and each side refuses the other's older version.
+- **Breaking (API):** the endpoints are under `/v1/`; a charge level carries
+  its age (`soc_age`), and the app counts it as known for 15 minutes after the
+  car reported it, no longer after a report of the car's limit or a poll.
+- **Breaking:** control state saved by 0.10 is not taken over; confirm the
+  reset in Home Assistant's Repairs and set the targets again.
+- The Charging page keeps a draft that was changed elsewhere marked as
+  changed when another target is saved, instead of saving it over the newer
+  value.
+
 ## 0.10.0
 
 - Publish the 0.10 service in both stable and beta app catalogs. Integration

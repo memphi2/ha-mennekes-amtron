@@ -1,5 +1,5 @@
 name: Mennekes Amtron Modbus Service
-version: 0.10.0
+version: 1.0.0
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
 description: Unofficial Modbus connection and heartbeat for Mennekes Amtron wallboxes
@@ -35,6 +35,7 @@ options:
   read_only: true
   current_cap: 6
   state_change_interval_seconds: 300
+  pause_before_phase_switch: true
   phase_switch_grace_seconds: 5
   scan_interval: 5
   measurement_interval: 30
@@ -53,6 +54,7 @@ schema:
   read_only: bool
   current_cap: float(6,32)
   state_change_interval_seconds: int(0,3600)
+  pause_before_phase_switch: bool
   phase_switch_grace_seconds: int(0,30)
   scan_interval: int(2,300)
   measurement_interval: int(2,300)
