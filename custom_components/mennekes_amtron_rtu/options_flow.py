@@ -145,12 +145,19 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         if CONF_SERVER_URL not in self.config_entry.data:
             return await self.async_step_init()
         # The one wallbox rule that Home Assistant applies itself.
-        draft = self._begin("wallbox", {CONF_RELEASE_OFF_ON_UNPLUG})
-        phase = _service_phase(self.config_entry)
         errors: dict[str, str] = {}
+        if user_input is None:
+            draft = self._begin("wallbox", {CONF_RELEASE_OFF_ON_UNPLUG})
+            # Compared on submit, so a change made in the app meanwhile stays.
+            self._details["service_phase"] = _service_phase(self.config_entry)
+        elif (section := self._section("wallbox")) is None:
+            return await self.async_step_init()
+        else:
+            draft = section
+        shown: dict[str, Any] | None = self._details.get("service_phase")
         if user_input is not None:
-            changes = {} if phase is None else {
-                key: user_input[key] for key in phase if key in user_input and user_input[key] != phase[key]
+            changes = {} if shown is None else {
+                key: user_input[key] for key in shown if key in user_input and user_input[key] != shown[key]
             }
             if CONF_PHASE_SWITCH_GRACE_SECONDS in changes:
                 changes[CONF_PHASE_SWITCH_GRACE_SECONDS] = int(changes[CONF_PHASE_SWITCH_GRACE_SECONDS])
@@ -164,9 +171,14 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             if not errors:
                 draft.values[CONF_RELEASE_OFF_ON_UNPLUG] = user_input.get(CONF_RELEASE_OFF_ON_UNPLUG) is True
                 return await self._finish_section()
+        # After a refusal the form keeps what was entered.
+        entered = user_input or {}
         return self.async_show_form(
             step_id="wallbox_service",
-            data_schema=service_wallbox_schema(draft.values, phase=phase),
+            data_schema=service_wallbox_schema(
+                {**draft.values, **{key: entered[key] for key in (CONF_RELEASE_OFF_ON_UNPLUG,) if key in entered}},
+                phase=None if shown is None else {**shown, **{key: entered[key] for key in shown if key in entered}},
+            ),
             description_placeholders=_service_values(self.config_entry),
             errors=errors,
             last_step=True,

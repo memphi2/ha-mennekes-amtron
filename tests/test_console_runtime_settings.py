@@ -8,6 +8,7 @@ from dataclasses import replace
 from unittest.mock import AsyncMock
 
 import pytest
+from aiohttp import ServerDisconnectedError
 from aiohttp.test_utils import TestClient, TestServer
 
 from custom_components.mennekes_amtron_rtu.device import app_settings as ui
@@ -259,21 +260,40 @@ def test_home_assistant_saves_only_its_fields_through_the_same_store(tmp_path, m
             status, body = await api.dispatch("POST", "/v1/settings", {"changes": {
                 "pause_before_phase_switch": False, "phase_switch_grace_seconds": 12,
             }})
-            assert status == 200
-            assert body["control"]["pause_before_phase_switch"] is False
-            assert body["control"]["phase_switch_grace_seconds"] == 12
+            assert (status, body) == (200, {"saved": True})
+            control = service.snapshot()["control"]
+            assert (control["pause_before_phase_switch"], control["phase_switch_grace_seconds"]) == (False, 12)
             assert service.control.options.pause_before_phase_switch is False
             assert (settings.options["pause_before_phase_switch"], settings.options["phase_switch_grace_seconds"]) == (False, 12)
-            # The other stored values stay and, as on the page, apply now.
+            # The other stored values stay, and one saved elsewhere keeps waiting.
             assert settings.options["current_cap"] == 16
-            assert service.config.scan_interval == 7
+            assert settings.options["scan_interval"] == 7
+            assert service.config.scan_interval == 5
             assert (transport.reads, transport.writes) == before
+            # The cap and the write interval stay with an administrator.
+            for other in ({"current_cap": 32}, {"state_change_interval_seconds": 0}, {"pause_before_phase_switch": True, "scan_interval": 2}, {}, []):
+                status, body = await api.dispatch("POST", "/v1/settings", {"changes": other})
+                assert (status, body["error"], body["validation"]) == (409, "runtime_settings_invalid", True)
+            assert settings.options["current_cap"] == 16
             for bad in ({}, {"changes": {}, "extra": 1}, None):
                 assert (await api.dispatch("POST", "/v1/settings", bad))[0] == 400
             status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"phase_switch_grace_seconds": 31}})
             assert (status, body["error"], body["validation"]) == (409, "runtime_settings_invalid", True)
             with pytest.raises(DeviceValidationError):
                 await settings.save_runtime_settings({"token": "not-permitted"})
+            # Another save holds the lock: HA does not wait for it.
+            async with settings._lock:
+                status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": True}})
+            assert (status, body["error"], body["validation"]) == (409, "busy", False)
+            original = settings._request
+
+            async def unreachable(method, path, payload=None):
+                raise ServerDisconnectedError
+
+            settings._request = unreachable
+            status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": True}})
+            assert (status, body["error"]) == (409, "supervisor_unavailable")
+            settings._request = original
             settings._options_write_uncertain = True
             status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": True}})
             assert (status, body["error"], body["validation"]) == (409, "options_save_uncertain", False)
@@ -295,9 +315,10 @@ def test_home_assistant_client_saves_through_the_app_and_reports_failures(tmp_pa
             await remote.async_connect()
             assert remote.snapshot["control"]["settings_writable"] is True
             await remote.async_save_settings({"pause_before_phase_switch": False})
-            # The answer is the new state; no extra poll is needed.
-            assert remote.snapshot["control"]["pause_before_phase_switch"] is False
             assert settings.options["pause_before_phase_switch"] is False
+            # The next poll shows the value.
+            await remote.update()
+            assert remote.snapshot["control"]["pause_before_phase_switch"] is False
             with pytest.raises(DeviceValidationError, match="runtime_settings_invalid"):
                 await remote.async_save_settings({"phase_switch_grace_seconds": 31})
             settings._options_write_uncertain = True

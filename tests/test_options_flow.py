@@ -201,6 +201,26 @@ def test_app_connection_saves_phase_settings_in_the_app():
     asyncio.run(run())
 
 
+def test_app_connection_keeps_a_change_made_in_the_app_meanwhile():
+    async def run():
+        client = SettingsClient(dict(PHASE_CONTROL))
+        flow = Flow(app_entry(client))
+        await flow.async_step_wallbox()
+        # Saved on the app's Runtime page while the form was open.
+        client.snapshot["control"]["phase_switch_grace_seconds"] = 10
+        saved = await flow.async_step_wallbox_service({
+            "release_off_on_unplug": True, "pause_before_phase_switch": True, "phase_switch_grace_seconds": 5,
+        })
+        assert saved["type"] == "create_entry"
+        assert client.saved == []
+        # A submit without the shown form saves nothing.
+        late = await Flow(app_entry(client)).async_step_wallbox_service({"release_off_on_unplug": True})
+        assert late["step_id"] == "init"
+        assert client.saved == []
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize(("failure", "error"), [
     (DeviceValidationError("runtime_settings_invalid"), "service_settings_invalid"),
     (DeviceError("options_save_uncertain"), "service_settings_failed"),
@@ -218,6 +238,11 @@ def test_app_connection_keeps_the_form_when_the_app_refuses(failure, error):
         assert shown["errors"] == {"base": error}
         # HA's own rule is not saved without the app's part either.
         assert flow.config_entry.options == {"current_limit": 8}
+        # The form keeps what was entered, so the refused value stays visible.
+        defaults = {marker.schema: marker.default() for marker in shown["data_schema"].schema}
+        assert defaults == {
+            "release_off_on_unplug": True, "pause_before_phase_switch": False, "phase_switch_grace_seconds": 5,
+        }
 
     asyncio.run(run())
 

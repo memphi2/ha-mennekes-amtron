@@ -547,16 +547,14 @@ class ServiceClient:
             raise _request_error(err) from err
 
     async def async_save_settings(self, changes: dict[str, Any]) -> None:
-        """Have the app store and apply runtime settings, as its own page does."""
+        """Have the app store and apply runtime settings; the next poll shows them."""
         try:
-            async with self.publication:
-                if not self._connected:
-                    raise ServiceConnectionError("service_not_ready", "service is unavailable")
-                self.apply_snapshot(
-                    await self.request("POST", "/v1/settings", {"changes": changes}),
-                    require_available=False, consume_energy=False,
-                )
-        except AmtronConnectionError as err:
+            if not self._connected:
+                raise ServiceConnectionError("service_not_ready", "service is unavailable")
+            # No published state changes, so no publication lock is needed.
+            if await self.request("POST", "/v1/settings", {"changes": changes}) != {"saved": True}:
+                raise ValueError("invalid settings reply")
+        except (AmtronConnectionError, ValueError) as err:
             raise _request_error(err) from err
 
     async def async_energy_between(self, start: float, end: float) -> float | None:
@@ -603,7 +601,7 @@ class ServiceClient:
         return words
 
 
-def _request_error(err: AmtronConnectionError) -> DeviceError:
+def _request_error(err: AmtronConnectionError | ValueError) -> DeviceError:
     """The command error for a failed connection, by its known reason."""
     reason = err.reason if isinstance(err, ServiceConnectionError) else None
     if reason == "service_identity_changed":

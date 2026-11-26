@@ -442,6 +442,7 @@
           "preparing": "Préparation de la recharge",
           "waiting_for_vehicle": "En attente du véhicule",
           "checking_status": "Vérification de l’état",
+          "phase_switching": "Changement de phases en cours",
           "state_uncertain": "État ambigu",
           "data_missing": "En attente de mesures"
         },
@@ -1088,6 +1089,15 @@
     },
     "settings_not_writable": {
       "message": "Le service Modbus ne peut pas enregistrer de réglages. Modifiez-les dans son fichier d’options et redémarrez-le."
+    },
+    "busy": {
+      "message": "L’application Modbus enregistre d’autres réglages. Réessayez dans un instant."
+    },
+    "supervisor_unavailable": {
+      "message": "Home Assistant Supervisor n’a pas répondu à l’application Modbus. Rien n’a été enregistré."
+    },
+    "runtime_settings_invalid": {
+      "message": "L’application Modbus a refusé ces réglages."
     }
   },
   "issues": {

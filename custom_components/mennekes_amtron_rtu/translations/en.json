@@ -442,6 +442,7 @@
           "preparing": "Preparing to charge",
           "waiting_for_vehicle": "Waiting for vehicle",
           "checking_status": "Checking status",
+          "phase_switching": "Switching phases",
           "state_uncertain": "State is ambiguous",
           "data_missing": "Waiting for readings"
         },
@@ -1088,6 +1089,15 @@
     },
     "settings_not_writable": {
       "message": "The Modbus service has no place to store settings. Change them in its options file and restart it."
+    },
+    "busy": {
+      "message": "The Modbus app is saving other settings. Try again shortly."
+    },
+    "supervisor_unavailable": {
+      "message": "Home Assistant Supervisor did not answer the Modbus app. Nothing was saved."
+    },
+    "runtime_settings_invalid": {
+      "message": "The Modbus app rejected these settings."
     }
   },
   "issues": {

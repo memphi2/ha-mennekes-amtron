@@ -96,7 +96,8 @@ class ServiceApi:
             if set(payload) != {"changes"}:
                 raise ValueError("invalid settings change")
             await service.save_settings(payload["changes"])
-            return await service.stable_snapshot(patient=True)
+            # The next state poll shows the values; no wait for a command here.
+            return {"saved": True}
         if self._bus_requests.locked():
             raise ServiceBusyError
         if path == "/v1/soc-goal/commit":

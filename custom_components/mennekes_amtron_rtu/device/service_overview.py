@@ -101,7 +101,7 @@ def overview_snapshot(
         reason = "missing_readings"
     elif status == "state_uncertain":
         reason = "inconsistent_readings"
-    elif status in ("initializing", "wallbox_error", "service_mode", "no_vehicle", "checking_status"):
+    elif status in ("initializing", "wallbox_error", "service_mode", "no_vehicle", "checking_status", "phase_switching"):
         reason = status
     elif goal_stop:
         reason = "goal_stop_requested"

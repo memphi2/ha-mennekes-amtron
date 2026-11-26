@@ -442,6 +442,7 @@
           "preparing": "Preparazione della ricarica",
           "waiting_for_vehicle": "In attesa del veicolo",
           "checking_status": "Verifica dello stato",
+          "phase_switching": "Cambio di fase in corso",
           "state_uncertain": "Stato non univoco",
           "data_missing": "In attesa di letture"
         },
@@ -1088,6 +1089,15 @@
     },
     "settings_not_writable": {
       "message": "Il servizio Modbus non può salvare impostazioni. Modificale nel suo file di opzioni e riavvialo."
+    },
+    "busy": {
+      "message": "L’app Modbus sta salvando altre impostazioni. Riprova tra poco."
+    },
+    "supervisor_unavailable": {
+      "message": "Home Assistant Supervisor non ha risposto all’app Modbus. Non è stato salvato nulla."
+    },
+    "runtime_settings_invalid": {
+      "message": "L’app Modbus ha rifiutato queste impostazioni."
     }
   },
   "issues": {

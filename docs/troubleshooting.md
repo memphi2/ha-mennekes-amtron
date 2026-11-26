@@ -329,6 +329,13 @@ timers.
 
 ## Phase switching leaves charging paused
 
+After every phase change the AMTRON gives no charging signal for about two
+minutes, with or without the preparatory pause. Without the pause it still
+reports charging meanwhile, and **Charging status** shows **Switching phases**.
+The car continues on its own afterwards; do not pause or resume in this time.
+With the pause, the queued **Resume** runs after the state-change interval,
+and the car charges once the wallbox gives the signal again.
+
 Check **Charging wait reason** first. If **Resume** is pending, the previous charge will continue after the state-change interval. A new command can replace it. A car already paused or waiting before the switch stays paused. If the release was withdrawn, a target was reached, or the same plug-in could not be verified, check the reason before resuming by hand.
 
 With **Pause before switching phases** enabled, the vehicle must confirm its pause before the phase command runs. A timeout or failed read leaves the pause in place. Check the connection and vehicle state before retrying.

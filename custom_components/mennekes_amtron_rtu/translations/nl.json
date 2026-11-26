@@ -442,6 +442,7 @@
           "preparing": "Laden voorbereiden",
           "waiting_for_vehicle": "Wachten op het voertuig",
           "checking_status": "Status wordt gecontroleerd",
+          "phase_switching": "Fasewisseling bezig",
           "state_uncertain": "Status niet eenduidig",
           "data_missing": "Wachten op metingen"
         },
@@ -1088,6 +1089,15 @@
     },
     "settings_not_writable": {
       "message": "De Modbus-service kan geen instellingen opslaan. Wijzig ze in het optiebestand en herstart de service."
+    },
+    "busy": {
+      "message": "De Modbus-app slaat andere instellingen op. Probeer het zo opnieuw."
+    },
+    "supervisor_unavailable": {
+      "message": "Home Assistant Supervisor heeft de Modbus-app niet geantwoord. Er is niets opgeslagen."
+    },
+    "runtime_settings_invalid": {
+      "message": "De Modbus-app heeft deze instellingen geweigerd."
     }
   },
   "issues": {

@@ -299,7 +299,7 @@ cost and loss estimates; times are epoch seconds:
 | `POST /v1/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v1/energy` | Authenticated: the energy the meter delivered between `start` and `end` (epoch seconds), from the service's bounded meter log; `null` when the log does not cover the span. No bus access. |
 | `POST /v1/command` | Authenticated named control command with an identity precondition. |
-| `POST /v1/settings` | Authenticated: `{"changes": {...}}` with runtime settings, as on the app's **Runtime** page. The app stores them in its options and applies them without a restart, then returns the state. Unchanged fields keep their stored values. A standalone service refuses with `settings_not_writable`. |
+| `POST /v1/settings` | Authenticated: `{"changes": {...}}` with `pause_before_phase_switch` and/or `phase_switch_grace_seconds`. The app stores them in its options and applies them without a restart, then answers `{"saved": true}`; the next state shows them. Other saved but unapplied values keep waiting. The current cap, intervals and connection stay with an administrator on the app's pages. While another save runs it answers `busy`; a standalone service refuses with `settings_not_writable`. |
 | `POST /v1/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number

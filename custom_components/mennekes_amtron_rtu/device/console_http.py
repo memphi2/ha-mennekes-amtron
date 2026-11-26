@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from aiohttp import web
+from aiohttp import ClientError, web
 
 from .app_settings import AppSettings, SettingsError, create_settings_app, serve_asset
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .errors import DeviceError, DeviceValidationError
-from .runtime_settings import runtime_candidate, runtime_preview
+from .runtime_settings import HOME_ASSISTANT_FIELDS, runtime_candidate, runtime_preview
 from .service_config import ServerConfig
 
 if TYPE_CHECKING:
@@ -85,19 +86,28 @@ class ServiceConsole(AppSettings):
         return web.json_response(await self._save_runtime(payload["changes"], revision=payload["revision"]))
 
     async def save_runtime_settings(self, changes: object) -> None:
-        """Home Assistant's way in: the same checks and storage as the page."""
+        """Home Assistant's way in: only its own fields, stored and applied as on the page."""
+        if not isinstance(changes, dict) or not changes or changes.keys() - HOME_ASSISTANT_FIELDS:
+            # The cap and the write interval stay with an administrator.
+            raise DeviceValidationError("runtime_settings_invalid")
+        if self._lock.locked():
+            # Another save or an adapter change runs; HA must not wait past its timeout.
+            raise DeviceError("busy")
         try:
             await self._save_runtime(changes, revision=None)
         except SettingsError as err:
             if err.key == "runtime_settings_invalid":
                 raise DeviceValidationError(err.key) from err
             raise DeviceError(err.key) from err
+        except ClientError as err:
+            raise DeviceError("supervisor_unavailable") from err
 
     async def _save_runtime(self, changes: object, *, revision: str | None) -> dict[str, Any]:
         """Validate, store in the app options and apply at once, in one step.
 
-        The page names the options it has shown; Home Assistant passes no
-        revision and changes only the fields it sends.
+        The page names the options it has shown and applies every saved
+        value. Home Assistant passes no revision and applies only its own
+        fields; other values saved meanwhile wait, as the page shows them.
         """
         service = self._configured_service()
         async with self._lock:
@@ -111,6 +121,8 @@ class ServiceConsole(AppSettings):
                 updated, candidate = runtime_candidate(options, changes, token=self._runtime_token)
             except ValueError as err:
                 raise SettingsError("runtime_settings_invalid") from err
+            if revision is None and isinstance(changes, dict):
+                candidate = replace(service.config, **{key: getattr(candidate, key) for key in changes})
             changed = runtime_preview(service.config, original, candidate)["changes"]
             # Native Supervisor edits do not share this process's lock.
             if await self._options() != options:
@@ -123,9 +135,9 @@ class ServiceConsole(AppSettings):
                 # Saved state may already be durable. Report uncertainty rather
                 # than rolling back over another administrator's newer changes.
                 raise SettingsError("runtime_apply_pending", 503) from err
-            # What this save changed; everything is in effect now.
+            saved = self._saved_config(updated)
             return {
-                "schema": 1, **runtime_preview(service.config, candidate, candidate),
+                "schema": 1, **runtime_preview(service.config, saved, saved),
                 "changes": changed, "saved_ok": True, "revision": self._revision(updated),
             }
 

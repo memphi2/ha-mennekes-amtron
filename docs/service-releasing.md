@@ -29,8 +29,8 @@ For an integration-only beta, reuse the published app at its existing version.
 The integration's minimum required service version is a separate decision.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 1 and service 1.0.0b8 or newer**,
-the first service with configurable phase-switch preparation and guarded charging resume. Raise the minimum when a newer
+separately. The current requirement is **API 1 and service 1.0.0 or newer**,
+the first stable service, which also saves the phase-switch settings Home Assistant changes. Raise the minimum when a newer
 service feature is required. The published or planned service
 release must satisfy the declared minimum.
 
