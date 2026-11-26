@@ -32,7 +32,7 @@ def test_per_module_threshold_cannot_hide_behind_high_global_coverage():
     assert coverage.validate_report(report, modules={MODULE, other}) == []
 
 
-@pytest.mark.parametrize("file", coverage.FLOW_MODULES)
+@pytest.mark.parametrize("file", sorted(coverage.FLOW_MODULES))
 def test_flow_coverage_requires_every_statement_and_branch(file):
     module = f"{coverage.COMPONENT}/{file}"
     report = {"files": {module: measured(50, 50, 50, 49)}}
@@ -86,6 +86,9 @@ def test_command_validates_only_a_successful_fresh_test_report(monkeypatch, outc
 
     def run(command, **kwargs):
         assert kwargs["cwd"] == coverage.ROOT
+        # One worker per logical CPU, with work stealing for the long files.
+        assert "--numprocesses=logical" in command
+        assert "--dist=worksteal" in command
         report_arg = next(arg for arg in command if arg.startswith("--cov-report=json:"))
         path = Path(report_arg.removeprefix("--cov-report=json:"))
         if outcome not in {"missing", "tests_fail"}:

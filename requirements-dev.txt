@@ -5,5 +5,6 @@ mypy==2.4.1
 pymodbus[serial]==3.13.1
 pytest==9.2.0
 pytest-cov==7.1.0
+pytest-xdist==3.8.0
 ruff==0.17.3
 spdx-tools==0.8.5

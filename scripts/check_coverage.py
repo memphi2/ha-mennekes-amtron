@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Measure global, per-module and complete config-flow coverage for this source."""
+"""Measure global, per-module and complete config-flow coverage for this source.
+
+The suite runs on one pytest-xdist worker per logical CPU with work stealing,
+so a few long files do not leave one worker running alone at the end.
+PYTEST_XDIST_AUTO_NUM_WORKERS sets another worker count, for example on a
+machine that other jobs share.
+"""
 
 from __future__ import annotations
 
@@ -88,7 +94,8 @@ def main() -> int:
         report_path = Path(temporary) / "coverage.json"
         result = subprocess.run(
             [
-                sys.executable, "-m", "pytest", f"--cov={COMPONENT}",
+                sys.executable, "-m", "pytest",
+                "--numprocesses=logical", "--dist=worksteal", f"--cov={COMPONENT}",
                 "--cov-report=term-missing:skip-covered",
                 f"--cov-report=json:{report_path}",
                 f"--cov-fail-under={MINIMUM_COVERAGE}", "-q",

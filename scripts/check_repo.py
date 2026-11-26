@@ -93,7 +93,7 @@ VOLUPTUOUS_IMPORT = re.compile(r"^(?:import voluptuous|from voluptuous)\b")
 # Keep the allowed direct packages separate from their version pins. A paired
 # requirements-dev.in would make Dependabot treat the .txt as pip-compile output.
 DIRECT_VALIDATION_DEPENDENCIES = frozenset(
-    {"mypy", "pymodbus", "pytest", "pytest-cov", "ruff", "spdx-tools"}
+    {"mypy", "pymodbus", "pytest", "pytest-cov", "pytest-xdist", "ruff", "spdx-tools"}
 )
 REQUIREMENTS_LOCKS = ("requirements-dev.txt", "requirements-dev-min-ha.txt")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
