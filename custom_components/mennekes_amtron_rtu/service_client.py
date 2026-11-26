@@ -551,8 +551,9 @@ class ServiceClient:
         try:
             if not self._connected:
                 raise ServiceConnectionError("service_not_ready", "service is unavailable")
-            # No published state changes, so no publication lock is needed.
-            if await self.request("POST", "/v1/settings", {"changes": changes}) != {"saved": True}:
+            # A refused or failed save is no lost connection: the entities stay.
+            reply = await self.request("POST", "/v1/settings", {"changes": changes}, update_connection=False)
+            if reply != {"saved": True}:
                 raise ValueError("invalid settings reply")
         except (AmtronConnectionError, ValueError) as err:
             raise _request_error(err) from err

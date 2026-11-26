@@ -99,7 +99,9 @@ class ServiceConsole(AppSettings):
             if err.key == "runtime_settings_invalid":
                 raise DeviceValidationError(err.key) from err
             raise DeviceError(err.key) from err
-        except ClientError as err:
+        except (ClientError, TimeoutError, OSError) as err:
+            # Supervisor did not answer before anything was stored; a failed
+            # write itself is reported as options_save_uncertain.
             raise DeviceError("supervisor_unavailable") from err
 
     async def _save_runtime(self, changes: object, *, revision: str | None) -> dict[str, Any]:

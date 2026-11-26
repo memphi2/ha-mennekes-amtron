@@ -161,6 +161,7 @@ does not require adding the wallbox again. For changed blueprints,
 | App USB/LAN connection | App **Open Web UI → Connection**, or native Configuration where needed |
 | App polling intervals | App **Open Web UI → Runtime**; applies without restart |
 | App current cap and charging waits | App **Open Web UI → Settings → Runtime**: no restart; native **Configuration**: restart the app |
+| App phase-switch pause and its wait | Integration **Configure → Wallbox**, or the app's **Runtime** page; both apply at once |
 | App write permission | App **Configuration**, then save and restart the app |
 | Vehicles and charging costs | Integration **Configure**, in the relevant section |
 | Wallbox options of a direct connection | Integration **Configure → Wallbox**; with the app this page only shows the app's values |

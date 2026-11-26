@@ -106,6 +106,7 @@ def test_shared_display_survives_remote_transport_without_counting_api_reads(tmp
                 assert service.snapshot()["charging_display"] == service.data.charging_display
                 reads = list(transport.reads)
                 for state, reason in [("checking_status", "checking_status"),
+                                      ("phase_switching", "phase_switching"),
                                       ("state_uncertain", "inconsistent_readings"),
                                       ("data_missing", "missing_readings")]:
                     service.data.charging_display = state
@@ -130,7 +131,7 @@ def test_shared_display_survives_remote_transport_without_counting_api_reads(tmp
 @pytest.mark.parametrize("language", ["de", "en", "fr", "nl", "it"])
 @pytest.mark.parametrize(("state", "color"), [
     ("unknown", "grey"), ("unavailable", "red"), ("checking_status", "grey"),
-    ("state_uncertain", "amber"), ("data_missing", "amber"),
+    ("phase_switching", "amber"), ("state_uncertain", "amber"), ("data_missing", "amber"),
 ])
 def test_mushroom_status_templates_render_without_unknown_measurements(language, state, color):
     from pathlib import Path

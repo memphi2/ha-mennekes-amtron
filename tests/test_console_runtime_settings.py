@@ -287,12 +287,13 @@ def test_home_assistant_saves_only_its_fields_through_the_same_store(tmp_path, m
             assert (status, body["error"], body["validation"]) == (409, "busy", False)
             original = settings._request
 
-            async def unreachable(method, path, payload=None):
-                raise ServerDisconnectedError
+            for failure in (ServerDisconnectedError(), TimeoutError()):
+                async def unreachable(method, path, payload=None, failure=failure):
+                    raise failure
 
-            settings._request = unreachable
-            status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": True}})
-            assert (status, body["error"]) == (409, "supervisor_unavailable")
+                settings._request = unreachable
+                status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": True}})
+                assert (status, body["error"]) == (409, "supervisor_unavailable")
             settings._request = original
             settings._options_write_uncertain = True
             status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": True}})
@@ -325,6 +326,23 @@ def test_home_assistant_client_saves_through_the_app_and_reports_failures(tmp_pa
             with pytest.raises(DeviceError, match="options_save_uncertain"):
                 await remote.async_save_settings({"pause_before_phase_switch": True})
             assert remote.connected
+            # An unreachable app fails the save but leaves the entities alone.
+            service.settings_writer = None
+            with pytest.raises(DeviceValidationError, match="settings_not_writable"):
+                await remote.async_save_settings({"pause_before_phase_switch": True})
+            service.settings_writer = settings
+            with pytest.raises(DeviceError, match="service_unavailable"):
+                await ServiceClient(transport=_Unavailable()).async_save_settings({"pause_before_phase_switch": True})
+            settings._options_write_uncertain = False
+            remote._transport = _Unavailable()
+            with pytest.raises(DeviceError, match="service_unavailable"):
+                await remote.async_save_settings({"pause_before_phase_switch": True})
+            assert remote.connected
         finally:
             await service.stop()
     asyncio.run(run())
+
+
+class _Unavailable:
+    async def call(self, method, path, payload):
+        return 503, {"error": "service_unavailable"}
