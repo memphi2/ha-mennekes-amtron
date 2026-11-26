@@ -442,6 +442,7 @@
           "preparing": "Preparazione della ricarica",
           "waiting_for_vehicle": "In attesa del veicolo",
           "checking_status": "Verifica dello stato",
+          "phase_switching": "Cambio di fase in corso",
           "state_uncertain": "Stato non univoco",
           "data_missing": "In attesa di letture"
         },
@@ -1085,6 +1086,18 @@
     },
     "cost_goal_price_unknown": {
       "message": "L’obiettivo di costo richiede un prezzo dell’elettricità attuale. Controllare la fonte del prezzo dei costi di ricarica."
+    },
+    "settings_not_writable": {
+      "message": "Il servizio Modbus non può salvare impostazioni. Modificale nel suo file di opzioni e riavvialo."
+    },
+    "busy": {
+      "message": "L’app Modbus sta salvando altre impostazioni. Riprova tra poco."
+    },
+    "supervisor_unavailable": {
+      "message": "Home Assistant Supervisor non ha risposto all’app Modbus. Non è stato salvato nulla."
+    },
+    "runtime_settings_invalid": {
+      "message": "L’app Modbus ha rifiutato queste impostazioni."
     }
   },
   "issues": {
@@ -1165,12 +1178,16 @@
       },
       "wallbox_service": {
         "title": "Impostazioni della wallbox nell’app",
-        "description": "Questa wallbox passa dall’app Modbus. Le sue impostazioni si trovano quindi lì e valgono anche per Home Assistant.\n\nLimite di corrente: {current_cap} A\nTempo minimo tra i cambi di stato: {state_change_interval} s\nAttesa aggiuntiva prima dei cambi di fase: {phase_switch_grace} s\n\nModifica questi valori, gli intervalli di lettura e la connessione nell’app, in Apri interfaccia utente web. Il permesso di scrittura si trova nella scheda Configurazione dell’app.",
+        "description": "Questa wallbox passa dall’app Modbus. Le sue impostazioni si trovano quindi lì e valgono anche per Home Assistant.\n\nLimite di corrente: {current_cap} A\nTempo minimo tra i cambi di stato: {state_change_interval} s\n\nModifica questi valori, gli intervalli di lettura e la connessione nell’app, in Apri interfaccia utente web. Il permesso di scrittura si trova nella scheda Configurazione dell’app. Le impostazioni del cambio di fase, se mostrate qui sotto, vengono salvate nell’app e valgono subito.",
         "data": {
-          "release_off_on_unplug": "Disattiva l'abilitazione alla ricarica allo scollegamento"
+          "release_off_on_unplug": "Disattiva l'abilitazione alla ricarica allo scollegamento",
+          "pause_before_phase_switch": "Sospendi prima del cambio di fase",
+          "phase_switch_grace_seconds": "Attesa aggiuntiva prima del cambio delle fasi"
         },
         "data_description": {
-          "release_off_on_unplug": "Dopo uno scollegamento confermato l’abilitazione alla ricarica viene disattivata; il veicolo successivo richiede un’abilitazione esplicita. Ignorato con Virtual Plug & Charge attivo."
+          "release_off_on_unplug": "Dopo uno scollegamento confermato l’abilitazione alla ricarica viene disattivata; il veicolo successivo richiede un’abilitazione esplicita. Ignorato con Virtual Plug & Charge attivo.",
+          "pause_before_phase_switch": "Attiva se un veicolo richiede una pausa prima del cambio di fase. Disattiva solo se tutti i veicoli supportano il cambio diretto.",
+          "phase_switch_grace_seconds": "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria."
         }
       },
       "wallbox_basic": {
@@ -1667,7 +1684,9 @@
       "vehicle_detection_source_invalid": "Seleziona una delle fonti di rilevamento disponibili.",
       "vehicle_detection_entity_invalid": "Seleziona un sensore binario del cavo esistente e un’entità di presenza a casa supportata.",
       "vehicle_detection_entities_distinct": "Seleziona entità diverse per il cavo e la presenza a casa.",
-      "vehicle_connected_states_invalid": "Scegli da uno a otto stati collegato, ciascuno esattamente come lo segnala il sensore."
+      "vehicle_connected_states_invalid": "Scegli da uno a otto stati collegato, ciascuno esattamente come lo segnala il sensore.",
+      "service_settings_invalid": "L’app ha rifiutato questi valori.",
+      "service_settings_failed": "L’app non ha potuto salvare l’impostazione in modo sicuro. Verificala nell’app in Impostazioni di funzionamento."
     }
   },
   "selector": {

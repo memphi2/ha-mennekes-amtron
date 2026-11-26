@@ -10,6 +10,9 @@ RUNTIME_FIELDS = (
     "scan_interval", "measurement_interval", "current_cap", "pause_before_phase_switch",
     "state_change_interval_seconds", "phase_switch_grace_seconds",
 )
+# What Home Assistant may change through the service API: the phase-switch
+# preparation. The current cap and write intervals stay with an administrator.
+HOME_ASSISTANT_FIELDS = frozenset({"pause_before_phase_switch", "phase_switch_grace_seconds"})
 # When a saved change takes effect; every runtime field applies without a restart.
 EFFECTS = {
     "scan_interval": "next_cycle", "measurement_interval": "next_cycle",

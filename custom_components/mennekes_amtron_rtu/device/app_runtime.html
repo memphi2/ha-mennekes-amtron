@@ -4,7 +4,7 @@
 <body><!-- app-nav -->
 <main id="runtime">
 <h1 data-text="title">Runtime settings</h1>
-<p data-text="intro">Preview every change before saving. Nothing here needs a restart: polling intervals apply at the next ordinary cycle without interrupting the current poll or wait, control limits apply at once.</p>
+<p data-text="intro">Saving applies the values without a restart: polling intervals apply at the next ordinary cycle without interrupting the current poll or wait, control limits apply at once.</p>
 <p id="runtime_notice" role="status" aria-live="polite"></p><p id="runtime_error" role="alert" hidden></p>
 <form id="runtime_form" class="card" hidden>
 <div class="table-scroll"><table><thead><tr><th data-text="setting">Setting</th><th data-text="effective">Effective</th><th data-text="saved">Saved</th></tr></thead><tbody id="runtime_values"></tbody></table></div>
@@ -15,6 +15,6 @@
 <div><label for="pause_before_phase_switch" data-text="pause_before_phase_switch">Pause before switching phases</label><input id="pause_before_phase_switch" type="checkbox"><small data-text="phase_help">Enable for vehicles that need a charging pause before switching phases. Disable only if all vehicles using this wallbox support a direct change.</small></div>
 <div><label for="phase_switch_grace_seconds" data-text="phase_switch_grace_seconds">Phase-switch grace (s)</label><input id="phase_switch_grace_seconds" type="number" min="0" max="30" step="1" required></div></div>
 <p class="hint" data-text="limits">New commands use a lower current cap at once; a charge running above it is lowered after the next poll. A start or stop waiting for the state-change interval is timed again. A phase-switch wait that already runs keeps its length.</p></fieldset>
-<section id="runtime_preview" class="card" aria-live="polite" hidden><h2 data-text="preview">Change preview</h2><ul id="runtime_changes"></ul><p id="runtime_restart"></p></section>
-<div class="actions"><button id="runtime_reload" type="button" class="secondary" data-text="reload">Reload</button><button id="runtime_check" type="submit" data-text="preview">Preview</button><button id="runtime_save" type="button" disabled data-text="save">Confirm and save</button></div>
+<section id="runtime_result" class="card" aria-live="polite" hidden><h2 data-text="changed">Changes</h2><ul id="runtime_changes"></ul><p id="runtime_restart"></p></section>
+<div class="actions"><button id="runtime_reload" type="button" class="secondary" data-text="reload">Reload</button><button id="runtime_save" type="submit" disabled data-text="save">Save</button></div>
 </form></main></body></html>

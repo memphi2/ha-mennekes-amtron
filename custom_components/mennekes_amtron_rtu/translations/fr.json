@@ -442,6 +442,7 @@
           "preparing": "Préparation de la recharge",
           "waiting_for_vehicle": "En attente du véhicule",
           "checking_status": "Vérification de l’état",
+          "phase_switching": "Changement de phases en cours",
           "state_uncertain": "État ambigu",
           "data_missing": "En attente de mesures"
         },
@@ -1085,6 +1086,18 @@
     },
     "cost_goal_price_unknown": {
       "message": "L’objectif de coût nécessite un prix de l’électricité actuel. Vérifiez la source de prix des coûts de recharge."
+    },
+    "settings_not_writable": {
+      "message": "Le service Modbus ne peut pas enregistrer de réglages. Modifiez-les dans son fichier d’options et redémarrez-le."
+    },
+    "busy": {
+      "message": "L’application Modbus enregistre d’autres réglages. Réessayez dans un instant."
+    },
+    "supervisor_unavailable": {
+      "message": "Home Assistant Supervisor n’a pas répondu à l’application Modbus. Rien n’a été enregistré."
+    },
+    "runtime_settings_invalid": {
+      "message": "L’application Modbus a refusé ces réglages."
     }
   },
   "issues": {
@@ -1165,12 +1178,16 @@
       },
       "wallbox_service": {
         "title": "Réglages de la borne dans l’application",
-        "description": "Cette borne passe par l’application Modbus. Ses réglages s’y trouvent donc et valent aussi pour Home Assistant.\n\nLimite de courant : {current_cap} A\nDélai minimal entre changements d’état : {state_change_interval} s\nAttente supplémentaire avant un changement de phases : {phase_switch_grace} s\n\nModifiez ces valeurs, les intervalles de lecture et la connexion dans l’application, sous Ouvrir l’interface utilisateur web. L’autorisation d’écriture se trouve dans l’onglet Configuration de l’application.",
+        "description": "Cette borne passe par l’application Modbus. Ses réglages s’y trouvent donc et valent aussi pour Home Assistant.\n\nLimite de courant : {current_cap} A\nDélai minimal entre changements d’état : {state_change_interval} s\n\nModifiez ces valeurs, les intervalles de lecture et la connexion dans l’application, sous Ouvrir l’interface utilisateur web. L’autorisation d’écriture se trouve dans l’onglet Configuration de l’application. Les réglages du changement de phases, s’ils sont affichés ci-dessous, sont enregistrés dans l’application et s’appliquent immédiatement.",
         "data": {
-          "release_off_on_unplug": "Désactiver l'autorisation de charge au débranchement"
+          "release_off_on_unplug": "Désactiver l'autorisation de charge au débranchement",
+          "pause_before_phase_switch": "Mettre en pause avant de changer de phases",
+          "phase_switch_grace_seconds": "Attente supplémentaire avant changement de phases"
         },
         "data_description": {
-          "release_off_on_unplug": "Après un débranchement confirmé, l’autorisation de charge est désactivée ; le véhicule suivant doit être autorisé explicitement. Ignoré tant que Virtual Plug & Charge est actif."
+          "release_off_on_unplug": "Après un débranchement confirmé, l’autorisation de charge est désactivée ; le véhicule suivant doit être autorisé explicitement. Ignoré tant que Virtual Plug & Charge est actif.",
+          "pause_before_phase_switch": "Activez cette option si un véhicule doit interrompre la charge avant la commutation. Désactivez-la uniquement si tous vos véhicules acceptent une commutation directe.",
+          "phase_switch_grace_seconds": "Secondes d’attente supplémentaires entre la confirmation de la pause de charge par le véhicule et le changement de phases (5 par défaut, de 0 à 30). La valeur 0 supprime uniquement cette attente supplémentaire ; la confirmation de la pause reste obligatoire."
         }
       },
       "wallbox_basic": {
@@ -1667,7 +1684,9 @@
       "vehicle_detection_source_invalid": "Choisissez une source de détection proposée.",
       "vehicle_detection_entity_invalid": "Choisissez un capteur binaire de câble existant et une entité de présence à domicile compatible.",
       "vehicle_detection_entities_distinct": "Choisissez des entités différentes pour le câble et la présence à domicile.",
-      "vehicle_connected_states_invalid": "Choisissez entre un et huit états branché, chacun exactement comme le capteur le signale."
+      "vehicle_connected_states_invalid": "Choisissez entre un et huit états branché, chacun exactement comme le capteur le signale.",
+      "service_settings_invalid": "L’application a refusé ces valeurs.",
+      "service_settings_failed": "L’application n’a pas pu enregistrer le réglage de façon sûre. Vérifiez-le dans l’application sous Réglages de fonctionnement."
     }
   },
   "selector": {

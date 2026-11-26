@@ -23,11 +23,14 @@ Versions use `X.Y.Z` for stable, `X.Y.ZbN` for beta or `X.Y.ZrcN` for candidates
 Each integration release needs a new integration version and
 `v<INTEGRATION_VERSION>` tag. Change the app version only for a relevant app
 change, subject to the promotion rule below. The integration tag identifies
-the reviewed source; it does not require the service to use the same number.
+the reviewed source. When a beta includes app changes, give the new app the
+same beta version as the integration. Skip any intervening app numbers.
+For an integration-only beta, reuse the published app at its existing version.
+The integration's minimum required service version is a separate decision.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 1 and service 1.0.0b6 or newer**,
-the first service with configurable phase-switch preparation and guarded charging resume. Raise the minimum when a newer
+separately. The current requirement is **API 1 and service 1.0.0 or newer**,
+the first stable service, which also saves the phase-switch settings Home Assistant changes. Raise the minimum when a newer
 service feature is required. The published or planned service
 release must satisfy the declared minimum.
 

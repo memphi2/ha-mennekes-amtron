@@ -190,7 +190,7 @@ On supported wallboxes, use **Requested phases** to select single phase or all a
 
 **Pause before switching phases** is on by default. With a vehicle plugged in, the controller pauses, waits for confirmation and the configured grace period, then requests the new phases. If the vehicle was charging, the controller queues a return to its previous current after the state-change interval. A deliberate pause, a reached target, a withdrawn release or a different plug-in prevents a restart. The queue shows **Resume** while it waits.
 
-If every vehicle using this wallbox supports switching during charging, you can turn the option off. In direct mode, open the integration’s advanced wallbox settings. With the Modbus app, open its runtime settings. The controller then changes only the requested phases. The wallbox handles the electrical switch and its own switching pause. The setting also applies to guest vehicles. [Phase-switch help](troubleshooting.md#phase-switching-leaves-charging-paused).
+If every vehicle using this wallbox supports switching during charging, you can turn the option off. In direct mode, open the integration’s advanced wallbox settings. With the Modbus app, open the integration’s wallbox settings or the app’s runtime settings; both save the value in the app. The controller then changes only the requested phases. The wallbox handles the electrical switch and its own switching pause: for about two minutes it gives no charging signal, and **Charging status** shows **Switching phases**. The car continues on its own afterwards. The setting also applies to guest vehicles. [Phase-switch help](troubleshooting.md#phase-switching-leaves-charging-paused).
 
 ## Heartbeat and Home Assistant restarts
 

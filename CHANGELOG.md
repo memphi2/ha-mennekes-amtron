@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0 — 2026-11-26
+
+First stable version of 1.0, compared with 1.0.0b7. Integration and Modbus
+app are both 1.0.0; the integration needs app 1.0.0. The release notes
+summarize the changes since the last stable version 0.10.0.
+
+- With the Modbus app, the integration's wallbox settings now include **Pause before switching phases** and the extra wait before phase changes. Home Assistant saves them in the app, which applies them at once.
+- The app's **Runtime** page saves with one **Save** button. It checks, stores and applies the values in one step and then lists what changed; the separate preview is gone.
+- **Charging status** shows **Switching phases** instead of **State is ambiguous** while the wallbox withholds its charging signal after a phase change. The AMTRON does this for about two minutes after every change; the docs explain it.
+- Home Assistant can change only the phase-switch pause and its wait in the app. The current cap, the intervals and the connection stay on the app's pages.
+
 ## 1.0.0b7 — 2026-11-22
 
 - Phase changes can now resume an interrupted charge on the same plug-in after the configured waiting interval. A manual pause, a reached target or a withdrawn release prevents the restart.

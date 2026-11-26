@@ -22,7 +22,7 @@ cards:
     multiline_secondary: true
     icon: mdi:ev-station
     color: >-
-      {% set s = states(entity) %}{{ 'green' if s == 'charging' else 'amber' if s == 'paused'
+      {% set s = states(entity) %}{{ 'green' if s == 'charging' else 'amber' if s in ['paused', 'phase_switching']
       else 'red' if s in ['wallbox_error', 'unavailable']
       else 'amber' if s in ['state_uncertain', 'data_missing']
       else 'grey' if s in ['unknown', 'checking_status', 'initializing'] else 'blue' }}

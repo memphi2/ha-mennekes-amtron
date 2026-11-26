@@ -88,13 +88,13 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/connection`, `/api/config`, `/api/adapter` | Connection settings and LAN-adapter setup |
 | `/log`, `/api/modbus-debug` | Live log, in RAM only |
 | `/registers`, `GET /api/registers` | Register page under **Diagnostics**, from passive observations |
-| `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
+| `/runtime`, `/api/runtime` | Runtime settings: read, and save in one step |
 | `/charging`, `/api/charging` | Targets and explicit guest start |
 
-Values saved on the **Runtime** page apply without a restart. Each previewed
+Values saved on the **Runtime** page apply without a restart. Each saved
 change names its `effect`: `next_cycle` for the polling intervals, `immediate`
 for the current cap and the state-change interval, `next_switch` for the
-phase-switch grace. After every poll the service lowers a charging current
+phase-switch pause and grace. After every poll the service lowers a charging current
 above its cap, unless a queued command, a phase switch, a reached goal prevents the change. `restart_fields` lists the
 connection, read-only mode, listen address and port when their saved value
 differs from the running one.
@@ -269,6 +269,7 @@ The snapshot's `control` object includes:
 |---|---|
 | `state_change_interval_seconds` | The service's configured interval, default 300 seconds |
 | `pause_before_phase_switch` | Request a confirmed charging pause before switching a connected vehicle, default true. False requests the phases directly. |
+| `settings_writable` | True in the Home Assistant app, where `POST /v1/settings` can store runtime settings; false for a standalone service |
 | `phase_switch_grace_seconds` | Extra wait after confirmed pause before switching phases, default 5 seconds |
 | `pending_action` | The queued action, or `null` when nothing is pending |
 | `pending_until` | Fixed timezone-aware UTC timestamp for a timed wait; `null` with no pending action or while a phase change awaits vehicle pause confirmation |
@@ -298,6 +299,7 @@ cost and loss estimates; times are epoch seconds:
 | `POST /v1/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v1/energy` | Authenticated: the energy the meter delivered between `start` and `end` (epoch seconds), from the service's bounded meter log; `null` when the log does not cover the span. No bus access. |
 | `POST /v1/command` | Authenticated named control command with an identity precondition. |
+| `POST /v1/settings` | Authenticated: `{"changes": {...}}` with `pause_before_phase_switch` and/or `phase_switch_grace_seconds`. The app stores them in its options and applies them without a restart, then answers `{"saved": true}`; the next state shows them. Other saved but unapplied values keep waiting. The current cap, intervals and connection stay with an administrator on the app's pages. While another save runs it answers `busy`; a standalone service refuses with `settings_not_writable`. |
 | `POST /v1/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number

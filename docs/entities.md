@@ -83,6 +83,7 @@ does not infer a full battery or identify an undocumented restriction.
 | `preparing` | Everything on the wallbox side allows charging; the wallbox prepares the charge. |
 | `waiting_for_vehicle` | The wallbox is ready; the car does not draw current yet, for example because it is full or its own timer waits. |
 | `checking_status` | The readings do not fit together yet. Brief ambiguity is neutral. |
+| `phase_switching` | Up to five minutes after a phase change, the wallbox reports charging but gives no charging signal (CP `b1` or `c1`). The AMTRON does this for about two minutes after every phase change; the car continues on its own. |
 | `state_uncertain` | The readings stayed contradictory for at least two polls and ten seconds. See [Charging status is being checked](troubleshooting.md#charging-status-is-being-checked). |
 | `data_missing` | A reading needed for the status is missing. |
 
@@ -335,7 +336,7 @@ and templates see.
 
 | Entity | States |
 |---|---|
-| `sensor.*_charging_status` | `initializing`, `wallbox_error`, `service_mode`, `no_vehicle`, `charging`, `locked`, `release_disabled`, `paused`, `authorization_required`, `preparing`, `waiting_for_vehicle`, `checking_status`, `state_uncertain`, `data_missing` |
+| `sensor.*_charging_status` | `initializing`, `wallbox_error`, `service_mode`, `no_vehicle`, `charging`, `locked`, `release_disabled`, `paused`, `authorization_required`, `preparing`, `waiting_for_vehicle`, `checking_status`, `phase_switching`, `state_uncertain`, `data_missing` |
 | `sensor.*_charging_wait_reason` | `none`, `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, `meter_unavailable`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`, `target_reached`, `paused` |
 | `sensor.*_connection_quality` | `good`, `degraded` |
 | `sensor.*_authorization` | `authorized`, `not_authorized`, `not_used` |

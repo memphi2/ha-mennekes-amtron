@@ -106,6 +106,7 @@ def test_shared_display_survives_remote_transport_without_counting_api_reads(tmp
                 assert service.snapshot()["charging_display"] == service.data.charging_display
                 reads = list(transport.reads)
                 for state, reason in [("checking_status", "checking_status"),
+                                      ("phase_switching", "phase_switching"),
                                       ("state_uncertain", "inconsistent_readings"),
                                       ("data_missing", "missing_readings")]:
                     service.data.charging_display = state
@@ -130,7 +131,7 @@ def test_shared_display_survives_remote_transport_without_counting_api_reads(tmp
 @pytest.mark.parametrize("language", ["de", "en", "fr", "nl", "it"])
 @pytest.mark.parametrize(("state", "color"), [
     ("unknown", "grey"), ("unavailable", "red"), ("checking_status", "grey"),
-    ("state_uncertain", "amber"), ("data_missing", "amber"),
+    ("phase_switching", "amber"), ("state_uncertain", "amber"), ("data_missing", "amber"),
 ])
 def test_mushroom_status_templates_render_without_unknown_measurements(language, state, color):
     from pathlib import Path
@@ -168,3 +169,64 @@ def test_fresh_fault_is_immediate_even_when_evse_read_failed(state):
     # A held error is not a newly confirmed fault, either.
     data.held = frozenset({"evse_state", "error_code"})
     assert display.observe(data, cp_supported=True, now=1) == "data_missing"
+
+
+def _switch(**values):
+    return _data(**{
+        "evse_state": EvseState.CHARGING, "cp_state": CpState.C2, "charging_current_ems": 0.0,
+        "requested_phases": 0, "switched_phases": 0, **values,
+    })
+
+
+def test_a_phase_change_without_charging_signal_shows_the_switch_not_a_contradiction():
+    """The recorded i4 switch: charging with C1, then B1 for about two minutes."""
+    display = ChargingDisplay()
+    assert display.observe(_switch(), cp_supported=True, now=0) == "charging"
+    # The phase write and the wallbox's signal stop show in the same poll.
+    assert display.observe(_switch(requested_phases=1, cp_state=CpState.C1), cp_supported=True, now=5) == "phase_switching"
+    for now in (14, 60, 125, 305):
+        observed = _switch(requested_phases=1, switched_phases=1, cp_state=CpState.B1)
+        assert display.observe(observed, cp_supported=True, now=now) == "phase_switching"
+    # Back to a charging signal: the plain status again.
+    assert display.observe(_switch(requested_phases=1, switched_phases=1), cp_supported=True, now=130) == "charging"
+    # Longer than the wallbox's switch: a contradiction after all.
+    stuck = _switch(requested_phases=1, switched_phases=1, cp_state=CpState.B1)
+    # The last change was switched_phases at 14 s.
+    assert display.observe(stuck, cp_supported=True, now=315) == "checking_status"
+    assert display.observe(stuck, cp_supported=True, now=325) == "state_uncertain"
+
+
+@pytest.mark.parametrize("values", [
+    {"cp_state": CpState.B2},  # the wallbox gives its signal; something else disagrees
+    {"evse_state": EvseState.EV_CONNECTED, "cp_state": CpState.C2},
+    {"cp_state": CpState.B1, "charging_release": 0},  # the release disagrees as well
+    {"cp_state": CpState.C1, "charging_current_ems": 1.0},  # and so does a pause current
+])
+def test_only_charging_without_signal_after_a_phase_change_counts_as_switching(values):
+    display = ChargingDisplay()
+    display.observe(_switch(), cp_supported=True, now=0)
+    shown = display.observe(_switch(requested_phases=1, **values), cp_supported=True, now=5)
+    assert shown != "phase_switching"
+
+
+def test_no_phase_change_no_unknown_baseline_and_no_cp_mean_no_switch():
+    # Without a change, charging without signal stays a contradiction.
+    display = ChargingDisplay()
+    display.observe(_switch(), cp_supported=True, now=0)
+    assert display.observe(_switch(cp_state=CpState.B1), cp_supported=True, now=5) == "checking_status"
+    # The first reading is a baseline, not a change; an unreadable value neither.
+    display = ChargingDisplay()
+    assert display.observe(_switch(requested_phases=1, cp_state=CpState.B1), cp_supported=True, now=0) == "checking_status"
+    display.observe(_switch(requested_phases=None), cp_supported=True, now=1)
+    display.observe(_switch(requested_phases=True), cp_supported=True, now=2)
+    assert display.observe(_switch(requested_phases=1, cp_state=CpState.B1), cp_supported=True, now=3) == "checking_status"
+    # A wallbox without CP readings never shows it.
+    display = ChargingDisplay()
+    display.observe(_switch(), cp_supported=False, now=0)
+    assert display.observe(_switch(requested_phases=1, cp_state=CpState.B1), cp_supported=False, now=5) == "charging"
+    # A failed poll keeps the change.
+    display = ChargingDisplay()
+    display.observe(_switch(), cp_supported=True, now=0)
+    display.observe(_switch(switched_phases=1), cp_supported=True, now=5)
+    display.reset()
+    assert display.observe(_switch(switched_phases=1, cp_state=CpState.B1), cp_supported=True, now=20) == "phase_switching"

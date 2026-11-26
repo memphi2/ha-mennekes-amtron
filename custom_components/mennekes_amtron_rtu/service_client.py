@@ -325,6 +325,9 @@ class ServiceClient:
             section = "control.pause_before_phase_switch"
             if "pause_before_phase_switch" in control and type(control["pause_before_phase_switch"]) is not bool:
                 raise ValueError("invalid phase-switch pause policy")
+            section = "control.settings_writable"
+            if type(control.get("settings_writable")) is not bool:
+                raise ValueError("invalid settings capability")
             section = "control.phase_switch_grace_seconds"
             if "phase_switch_grace_seconds" in control:
                 grace = control["phase_switch_grace_seconds"]
@@ -541,13 +544,19 @@ class ServiceClient:
                     consume_energy=False,
                 )
         except AmtronConnectionError as err:
-            if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
-                raise DeviceError("service_auth_failed") from err
-            if isinstance(err, ServiceConnectionError) and err.reason == "service_identity_changed":
-                raise DeviceError("device_identity_changed") from err
-            if isinstance(err, ServiceConnectionError) and err.reason == "service_version_mismatch":
-                raise DeviceError("service_version_mismatch") from err
-            raise DeviceError("service_unavailable") from err
+            raise _request_error(err) from err
+
+    async def async_save_settings(self, changes: dict[str, Any]) -> None:
+        """Have the app store and apply runtime settings; the next poll shows them."""
+        try:
+            if not self._connected:
+                raise ServiceConnectionError("service_not_ready", "service is unavailable")
+            # A refused or failed save is no lost connection: the entities stay.
+            reply = await self.request("POST", "/v1/settings", {"changes": changes}, update_connection=False)
+            if reply != {"saved": True}:
+                raise ValueError("invalid settings reply")
+        except (AmtronConnectionError, ValueError) as err:
+            raise _request_error(err) from err
 
     async def async_energy_between(self, start: float, end: float) -> float | None:
         """What the meter delivered in a time span, from the service's log."""
@@ -591,3 +600,13 @@ class ServiceClient:
         ):
             raise AmtronConnectionError("invalid register image")
         return words
+
+
+def _request_error(err: AmtronConnectionError | ValueError) -> DeviceError:
+    """The command error for a failed connection, by its known reason."""
+    reason = err.reason if isinstance(err, ServiceConnectionError) else None
+    if reason == "service_identity_changed":
+        return DeviceError("device_identity_changed")
+    if reason in ("service_auth_failed", "service_version_mismatch"):
+        return DeviceError(reason)
+    return DeviceError("service_unavailable")

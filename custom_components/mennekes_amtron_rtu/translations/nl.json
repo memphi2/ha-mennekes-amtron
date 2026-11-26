@@ -442,6 +442,7 @@
           "preparing": "Laden voorbereiden",
           "waiting_for_vehicle": "Wachten op het voertuig",
           "checking_status": "Status wordt gecontroleerd",
+          "phase_switching": "Fasewisseling bezig",
           "state_uncertain": "Status niet eenduidig",
           "data_missing": "Wachten op metingen"
         },
@@ -1085,6 +1086,18 @@
     },
     "cost_goal_price_unknown": {
       "message": "Het kostendoel heeft een actuele stroomprijs nodig. Controleer de prijsbron van de laadkosten."
+    },
+    "settings_not_writable": {
+      "message": "De Modbus-service kan geen instellingen opslaan. Wijzig ze in het optiebestand en herstart de service."
+    },
+    "busy": {
+      "message": "De Modbus-app slaat andere instellingen op. Probeer het zo opnieuw."
+    },
+    "supervisor_unavailable": {
+      "message": "Home Assistant Supervisor heeft de Modbus-app niet geantwoord. Er is niets opgeslagen."
+    },
+    "runtime_settings_invalid": {
+      "message": "De Modbus-app heeft deze instellingen geweigerd."
     }
   },
   "issues": {
@@ -1165,12 +1178,16 @@
       },
       "wallbox_service": {
         "title": "Wallbox-instellingen van de app",
-        "description": "Deze wallbox loopt via de Modbus-app. De instellingen staan daarom daar en gelden ook voor Home Assistant.\n\nStroomlimiet: {current_cap} A\nMinimale tijd tussen statuswijzigingen: {state_change_interval} s\nExtra wachttijd vóór fasewissels: {phase_switch_grace} s\n\nWijzig deze waarden, de uitleesintervallen en de verbinding in de app onder Open webinterface. De schrijftoestemming staat op het tabblad Configuratie van de app.",
+        "description": "Deze wallbox loopt via de Modbus-app. De instellingen staan daarom daar en gelden ook voor Home Assistant.\n\nStroomlimiet: {current_cap} A\nMinimale tijd tussen statuswijzigingen: {state_change_interval} s\n\nWijzig deze waarden, de uitleesintervallen en de verbinding in de app onder Open webinterface. De schrijftoestemming staat op het tabblad Configuratie van de app. De instellingen voor de fasewisseling, als ze hieronder staan, worden in de app opgeslagen en gelden meteen.",
         "data": {
-          "release_off_on_unplug": "Laadvrijgave uitschakelen bij loskoppelen"
+          "release_off_on_unplug": "Laadvrijgave uitschakelen bij loskoppelen",
+          "pause_before_phase_switch": "Pauzeren vóór fasewisseling",
+          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen"
         },
         "data_description": {
-          "release_off_on_unplug": "Na een bevestigde ontkoppeling wordt de laadvrijgave uitgeschakeld; de volgende auto heeft een expliciete vrijgave nodig. Genegeerd zolang Virtual Plug & Charge aan staat."
+          "release_off_on_unplug": "Na een bevestigde ontkoppeling wordt de laadvrijgave uitgeschakeld; de volgende auto heeft een expliciete vrijgave nodig. Genegeerd zolang Virtual Plug & Charge aan staat.",
+          "pause_before_phase_switch": "Schakel dit in als een voertuig vóór de fasewisseling moet pauzeren. Zet dit alleen uit als alle voertuigen direct kunnen omschakelen.",
+          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
         }
       },
       "wallbox_basic": {
@@ -1667,7 +1684,9 @@
       "vehicle_detection_source_invalid": "Kies een van de beschikbare herkenningsbronnen.",
       "vehicle_detection_entity_invalid": "Kies een bestaande binaire kabelsensor en een ondersteunde entiteit voor aanwezigheid thuis.",
       "vehicle_detection_entities_distinct": "Kies verschillende entiteiten voor de kabelverbinding en aanwezigheid thuis.",
-      "vehicle_connected_states_invalid": "Kies één tot acht statussen voor aangesloten, elk precies zoals de sensor ze meldt."
+      "vehicle_connected_states_invalid": "Kies één tot acht statussen voor aangesloten, elk precies zoals de sensor ze meldt.",
+      "service_settings_invalid": "De app heeft deze waarden geweigerd.",
+      "service_settings_failed": "De app kon de instelling niet zeker opslaan. Controleer deze in de app onder Bedrijfsinstellingen."
     }
   },
   "selector": {

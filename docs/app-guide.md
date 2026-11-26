@@ -145,16 +145,18 @@ Modbus traffic and no Recorder history. The serial number is hidden.
 
 ## Runtime settings
 
-**Runtime** (German: **Betrieb**) shows each setting three times: **Effective**
-(in use now), **Saved** and your proposed change. Select **Change preview**,
-check the result and select **Confirm and save**.
+**Runtime** (German: **Betrieb**) shows each setting twice: **Effective**
+(in use now) and **Saved**. Change a value and select **Save**. The app checks,
+stores and applies it in one step, then lists what changed. If someone saved
+on the app's **Configuration** tab in the meantime, nothing is stored; reload
+and save again.
 
 | Setting | When it takes effect |
 |---|---|
 | Status interval, measurement interval | At the next polling cycle. |
 | Service current cap | At once for new commands. A charge running above a lower cap is lowered after the next poll. |
 | State-change interval | At once, also for a start or stop that already waits. |
-| Phase-switch grace | For the next phase-switch wait; a wait that already runs keeps its length. |
+| Pause before switching phases, phase-switch grace | For the next phase switch; a wait that already runs keeps its length. |
 
 None of them needs a restart, and the page never restarts the app. The app
 lowers a charging current above its cap after the next poll, also after an app
@@ -162,8 +164,8 @@ restart with a lower cap. A queued command, a guest session and Home Assistant's
 departure plan use the new cap when they next set the current.
 
 A value changed in the app's **Configuration** tab is only read at the next app
-restart. Until then the page shows it as saved but not yet effective; **Change
-preview** and **Confirm and save** apply it at once. A changed connection, read-only mode,
+restart. Until then the page shows it as saved but not yet effective; **Save**
+applies it at once. A changed connection, read-only mode,
 listen address or port always needs an app restart; the page lists them.
 
 If someone changed the settings meanwhile, the page asks you to reload. If a

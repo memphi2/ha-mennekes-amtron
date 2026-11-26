@@ -91,6 +91,13 @@ class ServiceApi:
             if set(payload) != {"token"}:
                 raise ValueError("invalid percentage-goal resolution")
             return await service.soc_transactions.resolve(payload["token"])
+        if path == "/v1/settings":
+            # Stored in the app options, no bus access.
+            if set(payload) != {"changes"}:
+                raise ValueError("invalid settings change")
+            await service.save_settings(payload["changes"])
+            # The next state poll shows the values; no wait for a command here.
+            return {"saved": True}
         if self._bus_requests.locked():
             raise ServiceBusyError
         if path == "/v1/soc-goal/commit":
@@ -105,5 +112,5 @@ class ServiceApi:
 GETS = ("/v1/state", "/v1/diagnostics")
 POSTS = (
     "/v1/command", "/v1/read", "/v1/energy", "/v1/soc-goal/reserve",
-    "/v1/soc-goal/commit", "/v1/soc-goal/resolve",
+    "/v1/soc-goal/commit", "/v1/soc-goal/resolve", "/v1/settings",
 )

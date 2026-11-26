@@ -279,9 +279,24 @@ def _unplug_field(current: dict[str, Any]) -> dict[Any, Any]:
     }
 
 
-def unplug_schema(current: dict[str, Any]) -> probatio.Schema:
-    """The rule Home Assistant applies itself, also with the app."""
-    return probatio.Schema(_unplug_field(current))
+def service_wallbox_schema(current: dict[str, Any], *, phase: dict[str, Any] | None) -> probatio.Schema:
+    """With the app: the unplug rule HA applies, and the app's phase settings."""
+    fields = _unplug_field(current)
+    if phase is not None:
+        fields.update(_phase_fields(phase))
+    return probatio.Schema(fields)
+
+
+def _phase_fields(current: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        probatio.Required(
+            CONF_PAUSE_BEFORE_PHASE_SWITCH, default=current.get(CONF_PAUSE_BEFORE_PHASE_SWITCH, True),
+        ): BooleanSelector(),
+        probatio.Required(
+            CONF_PHASE_SWITCH_GRACE_SECONDS,
+            default=current.get(CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS),
+        ): _seconds_selector(0, MAX_PHASE_SWITCH_GRACE_SECONDS),
+    }
 
 
 def advanced_schema(current: dict[str, Any], *, phase_switch: bool) -> probatio.Schema:
@@ -302,18 +317,7 @@ def advanced_schema(current: dict[str, Any], *, phase_switch: bool) -> probatio.
         ): _seconds_selector(0, MAX_STATE_CHANGE_INTERVAL_SECONDS),
     }
     if phase_switch:
-        fields[probatio.Required(
-            CONF_PAUSE_BEFORE_PHASE_SWITCH, default=current.get(CONF_PAUSE_BEFORE_PHASE_SWITCH, True),
-        )] = BooleanSelector()
-        fields[
-            probatio.Required(
-                CONF_PHASE_SWITCH_GRACE_SECONDS,
-                default=current.get(
-                    CONF_PHASE_SWITCH_GRACE_SECONDS,
-                    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
-                ),
-            )
-        ] = _seconds_selector(0, MAX_PHASE_SWITCH_GRACE_SECONDS)
+        fields.update(_phase_fields(current))
     return probatio.Schema(fields)
 
 

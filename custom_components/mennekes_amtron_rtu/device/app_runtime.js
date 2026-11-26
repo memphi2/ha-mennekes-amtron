@@ -1,4 +1,4 @@
-/* Explicit preview/confirm flow. Never retry a configuration POST automatically. */
+/* One save that validates, stores and applies. Never retry a configuration POST automatically. */
 (() => {
   "use strict";
   const languages = ["en", "de", "fr", "nl", "it"];
@@ -7,7 +7,7 @@
   const names = ["scan_interval", "measurement_interval", "current_cap", "state_change_interval_seconds", "phase_switch_grace_seconds", "pause_before_phase_switch"];
   const labels = {
     title:["Runtime settings","Betriebseinstellungen","Réglages de fonctionnement","Bedrijfsinstellingen","Impostazioni di funzionamento"],
-    intro:["Preview every change before saving. Nothing here needs a restart: polling intervals apply at the next ordinary cycle without interrupting the current poll or wait, control limits apply at once.","Vor dem Speichern jede Änderung prüfen. Nichts davon braucht einen Neustart: Pollingintervalle gelten ab dem nächsten regulären Zyklus, ohne laufende Abfragen oder Wartezeiten zu unterbrechen; Steuerungsgrenzen gelten sofort.","Prévisualisez chaque modification avant de l’enregistrer. Aucun redémarrage n’est nécessaire : les intervalles d’interrogation s’appliquent au prochain cycle normal sans interrompre l’interrogation ou l’attente en cours, les limites de commande s’appliquent immédiatement.","Bekijk elke wijziging vóór het opslaan. Niets hiervan vereist een herstart: uitleesintervallen gelden vanaf de volgende gewone cyclus zonder de lopende uitlezing of wachttijd te onderbreken, regelgrenzen gelden meteen.","Visualizzare ogni modifica prima di salvarla. Nulla richiede un riavvio: gli intervalli di lettura valgono dal prossimo ciclo ordinario senza interrompere la lettura o l’attesa in corso, i limiti di controllo valgono subito."],
+    intro:["Saving applies the values without a restart: polling intervals apply at the next ordinary cycle without interrupting the current poll or wait, control limits apply at once.","Speichern übernimmt die Werte ohne Neustart: Pollingintervalle gelten ab dem nächsten regulären Zyklus, ohne laufende Abfragen oder Wartezeiten zu unterbrechen; Steuerungsgrenzen gelten sofort.","L’enregistrement applique les valeurs sans redémarrage : les intervalles d’interrogation s’appliquent au prochain cycle normal sans interrompre l’interrogation ou l’attente en cours, les limites de commande s’appliquent immédiatement.","Opslaan past de waarden toe zonder herstart: uitleesintervallen gelden vanaf de volgende gewone cyclus zonder de lopende uitlezing of wachttijd te onderbreken, regelgrenzen gelden meteen.","Il salvataggio applica i valori senza riavvio: gli intervalli di lettura valgono dal prossimo ciclo ordinario senza interrompere la lettura o l’attesa in corso, i limiti di controllo valgono subito."],
     setting:["Setting","Einstellung","Réglage","Instelling","Impostazione"],
     effective:["Effective","Wirksam","En vigueur","Actief","In vigore"],
     saved:["Saved","Gespeichert","Enregistré","Opgeslagen","Salvato"],
@@ -24,13 +24,13 @@
     next_cycle:["Next polling cycle","Nächster Pollzyklus","Prochain cycle d’interrogation","Volgende uitleescyclus","Prossimo ciclo di lettura"],
     immediate:["Applies at once","Gilt sofort","S’applique immédiatement","Geldt meteen","Vale subito"],
     next_switch:["Next phase-switch wait","Nächste Wartezeit beim Phasenwechsel","Prochaine attente de commutation de phase","Volgende wachttijd voor faseomschakeling","Prossima attesa di commutazione di fase"],
-    preview:["Change preview","Änderungen prüfen","Aperçu des modifications","Voorbeeld van wijzigingen","Anteprima delle modifiche"],
-    save:["Confirm and save","Bestätigen und speichern","Confirmer et enregistrer","Bevestigen en opslaan","Confermare e salvare"],
+    changed:["Changes","Änderungen","Modifications","Wijzigingen","Modifiche"],
+    save:["Save","Speichern","Enregistrer","Opslaan","Salvare"],
     reload:["Reload","Neu laden","Recharger","Herladen","Ricaricare"],
     limits:["New commands use a lower current cap at once; a charge running above it is lowered after the next poll. A start or stop waiting for the state-change interval is timed again. A phase-switch wait that already runs keeps its length.","Neue Befehle nutzen eine niedrigere Stromobergrenze sofort; ein Ladevorgang darüber wird nach dem nächsten Poll abgesenkt. Ein Start oder Stopp, der auf den Mindestabstand wartet, wird neu berechnet. Eine bereits laufende Wartezeit beim Phasenwechsel behält ihre Länge.","Les nouvelles commandes appliquent immédiatement une limite de courant plus basse ; une charge au-dessus est réduite après la prochaine interrogation. Un démarrage ou un arrêt qui attend l’intervalle entre changements d’état est recalculé. Une attente de commutation de phase déjà en cours garde sa durée.","Nieuwe opdrachten gebruiken een lagere stroomgrens meteen; een lading daarboven wordt na de volgende uitlezing verlaagd. Een start of stop die op het interval tussen toestandswijzigingen wacht, wordt opnieuw berekend. Een lopende wachttijd voor faseomschakeling behoudt zijn duur.","I nuovi comandi usano subito un limite di corrente più basso; una ricarica al di sopra viene ridotta dopo la prossima lettura. Un avvio o un arresto in attesa dell’intervallo tra cambi di stato viene ricalcolato. Un’attesa di commutazione di fase già in corso mantiene la sua durata."],
     loading:["Loading settings…","Einstellungen werden geladen…","Chargement des réglages…","Instellingen laden…","Caricamento delle impostazioni…"],
-    ready:["Settings loaded. Changes need confirmation.","Einstellungen geladen. Änderungen müssen bestätigt werden.","Réglages chargés. Les modifications doivent être confirmées.","Instellingen geladen. Wijzigingen moeten worden bevestigd.","Impostazioni caricate. Le modifiche devono essere confermate."],
-    unapplied:["Some saved values are not in use yet. Select Change preview, then Confirm and save, to apply them without a restart.","Einige gespeicherte Werte sind noch nicht wirksam. Mit „Änderungen prüfen“ und „Bestätigen und speichern“ gelten sie ohne Neustart.","Certaines valeurs enregistrées ne sont pas encore en vigueur. Avec « Aperçu des modifications » puis « Confirmer et enregistrer », elles s’appliquent sans redémarrage.","Sommige opgeslagen waarden zijn nog niet actief. Met ‘Voorbeeld van wijzigingen’ en ‘Bevestigen en opslaan’ gelden ze zonder herstart.","Alcuni valori salvati non sono ancora in vigore. Con «Anteprima delle modifiche» e «Confermare e salvare» valgono senza riavvio."],
+    ready:["Settings loaded.","Einstellungen geladen.","Réglages chargés.","Instellingen geladen.","Impostazioni caricate."],
+    unapplied:["Some saved values are not in use yet. Select Save to apply them without a restart.","Einige gespeicherte Werte sind noch nicht wirksam. Mit „Speichern“ gelten sie ohne Neustart.","Certaines valeurs enregistrées ne sont pas encore en vigueur. Avec « Enregistrer », elles s’appliquent sans redémarrage.","Sommige opgeslagen waarden zijn nog niet actief. Met ‘Opslaan’ gelden ze zonder herstart.","Alcuni valori salvati non sono ancora in vigore. Con «Salvare» valgono senza riavvio."],
     no_changes:["No changes.","Keine Änderungen.","Aucune modification.","Geen wijzigingen.","Nessuna modifica."],
     no_restart:["No restart needed for this change.","Für diese Änderung ist kein Neustart nötig.","Aucun redémarrage nécessaire pour cette modification.","Voor deze wijziging is geen herstart nodig.","Per questa modifica non serve un riavvio."],
     done:["Saved. Effective and saved values are shown separately below.","Gespeichert. Wirksame und gespeicherte Werte stehen getrennt in der Tabelle.","Enregistré. Les valeurs en vigueur et enregistrées sont affichées séparément ci-dessous.","Opgeslagen. Actieve en opgeslagen waarden staan hieronder apart.","Salvato. I valori in vigore e salvati sono mostrati separatamente qui sotto."],
@@ -54,13 +54,14 @@
   const display = value => typeof value === "boolean" ? text(value ? "on" : "off") : String(value);
   // A known server key names the cause; anything else stays the generic text.
   const failure = err => { const key = err?.message === "options_save_uncertain" ? "blocked" : err?.message; return labels[key] ? text(key) : text("error"); };
+  // Refused before anything was stored: correct or reload, then save again.
+  const refusals = ["settings_changed", "runtime_settings_invalid", "invalid_request", "reload_required", "admin_required", "busy", "supervisor_update_required"];
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = text(node.dataset.text); });
   // The page shows once its texts are in the page language.
   document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id);
-  let state = null, pending = null, busy = false, blocked = false;
-  function buttons() { names.forEach(key=>{el(key).disabled=busy||blocked;}); el("runtime_check").disabled=busy||blocked; el("runtime_reload").disabled=busy; el("runtime_save").disabled=busy||blocked||!pending; }
-  function invalidate() { pending=null; el("runtime_preview").hidden=true; buttons(); }
+  let state = null, busy = false, blocked = false;
+  function buttons() { names.forEach(key=>{el(key).disabled=busy||blocked;}); el("runtime_reload").disabled=busy; el("runtime_save").disabled=busy||blocked||!state; }
   function values(data) {
     if (!data || data.schema!==1 || !data.active || !data.saved || !Array.isArray(data.restart_fields)) throw new Error("invalid settings");
     const rows=names.map(key=>{ const tr=document.createElement("tr"); [text(key),data.active[key],data.saved[key]].forEach(value=>{const td=document.createElement("td");td.textContent=display(value);tr.appendChild(td);});return tr; });
@@ -79,38 +80,31 @@
   }
   async function load() {
     if (busy) return;
-    busy=true; invalidate(); el("runtime_error").hidden=true; el("runtime_notice").textContent=text("loading");
+    busy=true; buttons(); el("runtime_result").hidden=true; el("runtime_error").hidden=true; el("runtime_notice").textContent=text("loading");
     try {
       const data=await request("./api/runtime"); values(data); state=data; blocked=data.write_blocked===true;
       names.forEach(key=>{if (key==="pause_before_phase_switch") el(key).checked=data.saved[key]===true; else el(key).value=String(data.saved[key]);});
-      el("runtime_changes").replaceChildren();el("runtime_preview").hidden=!data.restart_required;
+      el("runtime_changes").replaceChildren();el("runtime_result").hidden=!data.restart_required;
       // A change from the Configuration tab waits; saving it here applies it.
       const unapplied=names.some(key=>data.active[key]!==data.saved[key]);
       el("runtime_form").hidden=false; el("runtime_notice").textContent=text(blocked ? "blocked" : unapplied ? "unapplied" : "ready");
     } catch (_) { state=null;blocked=true;el("runtime_form").hidden=false;el("runtime_values").replaceChildren();names.forEach(key=>{el(key).value="";});el("runtime_notice").textContent=text("error"); }
     finally { busy=false; buttons(); }
   }
-  el("runtime_form").addEventListener("input",invalidate);
   el("runtime_form").addEventListener("submit",async event=>{
     event.preventDefault(); if (busy||blocked||!state||!el("runtime_form").reportValidity()) return;
     const changes=Object.fromEntries(names.map(key=>[key,key==="pause_before_phase_switch" ? el(key).checked : Number(el(key).value)]));
-    busy=true; invalidate(); el("runtime_error").hidden=true;
+    busy=true; buttons(); el("runtime_error").hidden=true;
     try {
-      const data=await request("./api/runtime/preview",{revision:state.revision,changes}); values(data);
-      pending={revision:data.revision,changes};
+      const data=await request("./api/runtime",{revision:state.revision,changes}); values(data); state={...state,...data};
       const rows=data.changes.map(change=>{const li=document.createElement("li");li.textContent=`${text(change.key)}: ${display(change.effective)} → ${display(change.proposed)} · ${text(change.effect)}`;return li;});
       if (!rows.length) { const li=document.createElement("li");li.textContent=text("no_changes");rows.push(li); }
-      el("runtime_changes").replaceChildren(...rows); el("runtime_preview").hidden=false;
-    } catch (err) { el("runtime_error").textContent=failure(err);el("runtime_error").hidden=false; }
-    finally {busy=false;buttons();}
-  });
-  el("runtime_save").addEventListener("click",async()=>{
-    if (busy||blocked||!pending) return;
-    const payload={...pending,confirm:true};busy=true;buttons();el("runtime_error").hidden=true;
-    try {
-      const data=await request("./api/runtime",payload);values(data);state={...state,...data};
-      pending=null;el("runtime_preview").hidden=false;el("runtime_changes").replaceChildren();el("runtime_notice").textContent=text("done");
-    } catch (err) {pending=null;blocked=true;el("runtime_error").textContent=failure(err);el("runtime_error").hidden=false;}
+      el("runtime_changes").replaceChildren(...rows); el("runtime_result").hidden=false; el("runtime_notice").textContent=text("done");
+    } catch (err) {
+      // An uncertain outcome blocks until a reload shows what is stored.
+      if (!refusals.includes(err?.message)) blocked=true;
+      el("runtime_error").textContent=failure(err);el("runtime_error").hidden=false;
+    }
     finally {busy=false;buttons();}
   });
   el("runtime_reload").addEventListener("click",()=>void load());

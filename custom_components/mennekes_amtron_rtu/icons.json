@@ -78,6 +78,7 @@
           "preparing": "mdi:timer-sand",
           "waiting_for_vehicle": "mdi:car-clock",
           "checking_status": "mdi:progress-clock",
+          "phase_switching": "mdi:swap-horizontal",
           "state_uncertain": "mdi:help-circle-outline",
           "data_missing": "mdi:database-clock-outline"
         }

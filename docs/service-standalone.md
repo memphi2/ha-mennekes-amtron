@@ -6,7 +6,7 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-Run service **1.0.0b6 or newer** (API 1) with this integration, and
+Run service **1.0.0 or newer** (API 1) with this integration, and
 update the service first. See [Updates](#operation-and-updates). The app's web
 pages, including guest charging, are part of the Home Assistant app and need
 Supervisor Ingress; a standalone service offers the same guest charging through
@@ -60,6 +60,9 @@ technical write guards remain. See
 [Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 Set `"pause_before_phase_switch": false` only if all vehicles using the wallbox support direct phase switching. With preparation enabled (default), a previously active charge can resume on the same plug-in after the state-change interval.
+
+A standalone service reads `options.json` only at its start. Home Assistant
+does not offer these settings for it; edit the file and restart the service.
 
 The service also accepts `"phase_switch_grace_seconds": 5` (whole seconds,
 0–30). This is an additional wait after live pause confirmation, before the

@@ -15,7 +15,7 @@ from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from time import time as wall_clock
-from typing import Any
+from typing import Any, Protocol
 
 from .charge_meter_store import ChargeMeterStore
 from .client import MennekesModbusClient
@@ -73,6 +73,13 @@ METER_GRACE_SECONDS = 60.0
 _PUBLISHED_SECONDS = 60.0
 
 
+class RuntimeSettingsWriter(Protocol):
+    """Stores runtime settings where the app keeps its options, then applies them."""
+
+    async def save_runtime_settings(self, changes: object) -> None:
+        """Raise DeviceValidationError for invalid values, DeviceError otherwise."""
+
+
 class ModbusService:
     """All stateful operations remain here when HA disconnects or restarts."""
 
@@ -115,6 +122,9 @@ class ModbusService:
         self._meter_notice = FailureNotice(_LOGGER, "Charging loss")
         self.client.modbus_trace.register_monitor = self.register_monitor
         self.control: AmtronControl | None = None
+        # Only the app has a place to keep changed settings; a standalone
+        # service reads its file once.
+        self.settings_writer: RuntimeSettingsWriter | None = None
         # Guest permission and departure plan: parts of this one service.
         self.guest = GuestLimits(self)
         self.planner = DeparturePlanner(self)
@@ -798,6 +808,7 @@ class ModbusService:
                 "read_only": self.config.read_only or self._intent_rejected,
                 "intent_rejected": self._intent_rejected,
                 "current_cap": self.config.current_cap,
+                "settings_writable": self.settings_writer is not None,
                 "state_change_interval_seconds": self.config.state_change_interval_seconds,
                 "pause_before_phase_switch": self.config.pause_before_phase_switch,
                 "phase_switch_grace_seconds": self.config.phase_switch_grace_seconds,
@@ -865,6 +876,12 @@ class ModbusService:
             pause_before_phase_switch=options.pause_before_phase_switch,
             phase_switch_grace_seconds=options.phase_switch_grace_seconds,
         )
+
+    async def save_settings(self, changes: object) -> None:
+        """Save and apply runtime settings for Home Assistant, as the app page does."""
+        if self.settings_writer is None:
+            raise DeviceValidationError("settings_not_writable")
+        await self.settings_writer.save_runtime_settings(changes)
 
     def resolved_config(self, config: ServerConfig) -> ServerConfig:
         """Settings with the wallbox's maximum as the cap where asked for."""

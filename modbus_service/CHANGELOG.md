@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.0
+
+- First stable version of 1.0. Use with integration 1.0.0.
+- Runtime settings save with one **Save** button: checked, stored and applied in one step.
+- The charging status shows **Switching phases** while the wallbox withholds its charging signal after a phase change.
+- Home Assistant can save the phase-switch pause and its wait through the app; the current cap, the intervals and the connection stay on the app's pages.
+
 ## 1.0.0b6
 
 - Adds the optional preparatory pause for phase switching, enabled by default.

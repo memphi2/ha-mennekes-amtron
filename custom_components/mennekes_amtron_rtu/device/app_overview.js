@@ -103,6 +103,7 @@
     problem: ["not confirmed in time", "nicht rechtzeitig bestätigt", "non confirmé à temps", "niet op tijd bevestigd", "non confermato in tempo"],
     unknown: ["Not yet confirmed", "Noch nicht bestätigt", "Pas encore confirmé", "Nog niet bevestigd", "Non ancora confermato"],
     checking_status: ["Checking status", "Status wird abgeglichen", "Vérification de l’état", "Status wordt gecontroleerd", "Verifica dello stato"],
+    phase_switching: ["Switching phases", "Phasenwechsel läuft", "Changement de phases en cours", "Fasewisseling bezig", "Cambio di fase in corso"],
     state_uncertain: ["State is ambiguous", "Zustand nicht eindeutig", "État ambigu", "Status niet eenduidig", "Stato non univoco"],
     data_missing: ["Waiting for readings", "Warte auf Messwerte", "En attente de mesures", "Wachten op metingen", "In attesa di letture"],
     connection_lost: ["Connection interrupted", "Verbindung unterbrochen", "Connexion interrompue", "Verbinding verbroken", "Connessione interrotta"],
@@ -178,7 +179,7 @@
         || !Array.isArray(data.commands) || data.commands.length > 32
         || (data.operation && !(data.operation.next && data.operation.target))) throw new Error("invalid overview");
     put("charge_state", text(data.state));
-    el("charge_state").className="state charging-state "+(["setup_required","service_starting"].includes(data.state)?"state-muted":!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle","state_uncertain","data_missing"].includes(data.state)?"state-wait":"state-muted");
+    el("charge_state").className="state charging-state "+(["setup_required","service_starting"].includes(data.state)?"state-muted":!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle","phase_switching","state_uncertain","data_missing"].includes(data.state)?"state-wait":"state-muted");
     put("charge_reason", text(data.reason));
     el("charge_reason").hidden=text(data.reason)===text(data.state);
     put("service_mode", text(data.read_only === true ? "readonly" : data.read_only === false ? "writable" : "unknown"));
