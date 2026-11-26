@@ -9,7 +9,7 @@ from aiohttp import web
 
 from .app_settings import AppSettings, SettingsError, create_settings_app, serve_asset
 from .client_errors import AmtronBusError, AmtronRateLimitedError
-from .errors import DeviceError
+from .errors import DeviceError, DeviceValidationError
 from .runtime_settings import runtime_candidate, runtime_preview
 from .service_config import ServerConfig
 
@@ -77,33 +77,41 @@ class ServiceConsole(AppSettings):
             "write_blocked": self._options_write_uncertain,
         })
 
-    async def preview_runtime(self, request: web.Request) -> web.Response:
-        return await self._runtime_edit(request, save=False)
-
     async def save_runtime(self, request: web.Request) -> web.Response:
-        return await self._runtime_edit(request, save=True)
-
-    async def _runtime_edit(self, request: web.Request, *, save: bool) -> web.Response:
         _, payload = await self._edit_request(request)
-        if request.query:
+        # A page always names the options it showed; only HA saves without.
+        if request.query or payload.keys() != {"revision", "changes"} or not isinstance(payload["revision"], str):
             raise SettingsError("invalid_request")
-        expected = {"revision", "changes", "confirm"} if save else {"revision", "changes"}
-        if payload.keys() != expected or (save and payload["confirm"] is not True):
-            raise SettingsError("invalid_request")
+        return web.json_response(await self._save_runtime(payload["changes"], revision=payload["revision"]))
+
+    async def save_runtime_settings(self, changes: object) -> None:
+        """Home Assistant's way in: the same checks and storage as the page."""
+        try:
+            await self._save_runtime(changes, revision=None)
+        except SettingsError as err:
+            if err.key == "runtime_settings_invalid":
+                raise DeviceValidationError(err.key) from err
+            raise DeviceError(err.key) from err
+
+    async def _save_runtime(self, changes: object, *, revision: str | None) -> dict[str, Any]:
+        """Validate, store in the app options and apply at once, in one step.
+
+        The page names the options it has shown; Home Assistant passes no
+        revision and changes only the fields it sends.
+        """
         service = self._configured_service()
         async with self._lock:
             if self._options_write_uncertain:
                 raise SettingsError("options_save_uncertain", 503)
             options = await self._options()
-            self._check_revision(payload["revision"], options)
+            if revision is not None:
+                self._check_revision(revision, options)
             original = self._saved_config(options)
             try:
-                updated, candidate = runtime_candidate(options, payload["changes"], token=self._runtime_token)
+                updated, candidate = runtime_candidate(options, changes, token=self._runtime_token)
             except ValueError as err:
                 raise SettingsError("runtime_settings_invalid") from err
-            result = runtime_preview(service.config, original, candidate)
-            if not save:
-                return web.json_response({"schema": 1, **result, "revision": self._revision(options)})
+            changed = runtime_preview(service.config, original, candidate)["changes"]
             # Native Supervisor edits do not share this process's lock.
             if await self._options() != options:
                 raise SettingsError("settings_changed", 409)
@@ -115,10 +123,11 @@ class ServiceConsole(AppSettings):
                 # Saved state may already be durable. Report uncertainty rather
                 # than rolling back over another administrator's newer changes.
                 raise SettingsError("runtime_apply_pending", 503) from err
-            return web.json_response({
+            # What this save changed; everything is in effect now.
+            return {
                 "schema": 1, **runtime_preview(service.config, candidate, candidate),
-                "saved_ok": True, "revision": self._revision(updated),
-            })
+                "changes": changed, "saved_ok": True, "revision": self._revision(updated),
+            }
 
     async def read_registers(self, request: web.Request) -> web.Response:
         await self._authorize(request)
@@ -260,7 +269,6 @@ def create_console_app(settings: ServiceConsole) -> web.Application:
     add_console_asset_routes(app)
     app.router.add_get("/api/registers", settings.read_registers)
     app.router.add_get("/api/runtime", settings.read_runtime)
-    app.router.add_post("/api/runtime/preview", settings.preview_runtime)
     app.router.add_post("/api/runtime", settings.save_runtime)
     app.router.add_get("/api/charging", settings.read_charging)
     app.router.add_post("/api/charging", settings.save_charging)

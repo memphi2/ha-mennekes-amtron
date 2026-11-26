@@ -16,7 +16,7 @@ from .config_schemas import (
     departure_configure_schema,
     departure_entity_schema,
     options_schema,
-    unplug_schema,
+    service_wallbox_schema,
     vehicle_device_schema,
     vehicle_limit_schema,
     vehicle_profile_soc_schema,
@@ -49,6 +49,7 @@ from .departure_const import (
     DEPARTURE_WEEKDAYS,
 )
 from .device.capabilities import phase_switch_is_supported
+from .device.errors import DeviceError, DeviceValidationError
 from .service_client import CONF_SERVER_URL
 from .vehicle_profiles import (
     CONF_DEPARTURE_USE_VEHICLE_CAPACITY,
@@ -140,18 +141,34 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     async def async_step_wallbox_service(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show the app's wallbox settings; with the app they are changed there."""
+        """With the app: its phase settings are saved there, the unplug rule here."""
         if CONF_SERVER_URL not in self.config_entry.data:
             return await self.async_step_init()
         # The one wallbox rule that Home Assistant applies itself.
         draft = self._begin("wallbox", {CONF_RELEASE_OFF_ON_UNPLUG})
+        phase = _service_phase(self.config_entry)
+        errors: dict[str, str] = {}
         if user_input is not None:
-            draft.values[CONF_RELEASE_OFF_ON_UNPLUG] = user_input.get(CONF_RELEASE_OFF_ON_UNPLUG) is True
-            return await self._finish_section()
+            changes = {} if phase is None else {
+                key: user_input[key] for key in phase if key in user_input and user_input[key] != phase[key]
+            }
+            if CONF_PHASE_SWITCH_GRACE_SECONDS in changes:
+                changes[CONF_PHASE_SWITCH_GRACE_SECONDS] = int(changes[CONF_PHASE_SWITCH_GRACE_SECONDS])
+            if changes:
+                try:
+                    await self.config_entry.runtime_data.client.async_save_settings(changes)
+                except DeviceValidationError:
+                    errors["base"] = "service_settings_invalid"
+                except DeviceError:
+                    errors["base"] = "service_settings_failed"
+            if not errors:
+                draft.values[CONF_RELEASE_OFF_ON_UNPLUG] = user_input.get(CONF_RELEASE_OFF_ON_UNPLUG) is True
+                return await self._finish_section()
         return self.async_show_form(
             step_id="wallbox_service",
-            data_schema=unplug_schema(draft.values),
+            data_schema=service_wallbox_schema(draft.values, phase=phase),
             description_placeholders=_service_values(self.config_entry),
+            errors=errors,
             last_step=True,
         )
 
@@ -681,12 +698,17 @@ def _normalized(user_input: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _service_values(entry: Any) -> dict[str, str]:
-    """The app's current cap and waits as the last status reported them."""
+def _service_control(entry: Any) -> dict[str, Any]:
+    """The app's control settings as its last status reported them."""
     client = getattr(getattr(entry, "runtime_data", None), "client", None)
     snapshot = getattr(client, "snapshot", None)
     control = snapshot.get("control") if isinstance(snapshot, dict) else None
-    values = control if isinstance(control, dict) else {}
+    return control if isinstance(control, dict) else {}
+
+
+def _service_values(entry: Any) -> dict[str, str]:
+    """The app's current cap and wait as the last status reported them."""
+    values = _service_control(entry)
 
     def shown(key: str) -> str:
         value = values.get(key)
@@ -697,8 +719,23 @@ def _service_values(entry: Any) -> dict[str, str]:
     return {
         "current_cap": shown("current_cap"),
         "state_change_interval": shown("state_change_interval_seconds"),
-        "phase_switch_grace": shown("phase_switch_grace_seconds"),
     }
+
+
+def _service_phase(entry: Any) -> dict[str, Any] | None:
+    """The app's phase settings, when its wallbox switches phases and the app can save."""
+    control = _service_control(entry)
+    identity = getattr(getattr(entry, "runtime_data", None), "identity", None)
+    pause, grace = control.get(CONF_PAUSE_BEFORE_PHASE_SWITCH), control.get(CONF_PHASE_SWITCH_GRACE_SECONDS)
+    if (
+        control.get("settings_writable") is not True
+        or not isinstance(pause, bool)
+        or not isinstance(grace, (int, float))
+        or isinstance(grace, bool)
+        or not phase_switch_is_supported(getattr(identity, "phase_options_hw", None))
+    ):
+        return None
+    return {CONF_PAUSE_BEFORE_PHASE_SWITCH: pause, CONF_PHASE_SWITCH_GRACE_SECONDS: int(grace)}
 
 
 def _vehicle_errors(values: dict[str, Any]) -> dict[str, str]:

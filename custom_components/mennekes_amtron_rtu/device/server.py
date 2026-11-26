@@ -60,14 +60,16 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
         await site.start()
         _LOGGER.info("Service: API ready on port %s", config.port)
         if supervisor_token:
-            settings_runner = web.AppRunner(
-                create_console_app(ServiceConsole(
-                    supervisor_token, config.token, service=service,
-                    overview=lambda: service_overview(service),
-                    modbus_trace=service.client.modbus_trace if service is not None else None,
-                    configuration_guard=(service.client.async_connection_configuration if service is not None else None),
-                )), access_log=None,
+            console = ServiceConsole(
+                supervisor_token, config.token, service=service,
+                overview=lambda: service_overview(service),
+                modbus_trace=service.client.modbus_trace if service is not None else None,
+                configuration_guard=(service.client.async_connection_configuration if service is not None else None),
             )
+            if service is not None:
+                # Home Assistant saves runtime settings the way the page does.
+                service.settings_writer = console
+            settings_runner = web.AppRunner(create_console_app(console), access_log=None)
             await settings_runner.setup()
             await web.TCPSite(settings_runner, config.listen, INGRESS_PORT).start()
             _LOGGER.info("Service: app connection settings ready through Home Assistant ingress")

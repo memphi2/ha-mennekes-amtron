@@ -12,7 +12,13 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from custom_components.mennekes_amtron_rtu.device import app_settings as ui
 from custom_components.mennekes_amtron_rtu.device.console_http import create_console_app
-from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
+    DeviceValidationError,
+)
+from custom_components.mennekes_amtron_rtu.device.service_api import ServiceApi
+from custom_components.mennekes_amtron_rtu.service_client import ServiceClient
+from custom_components.mennekes_amtron_rtu.service_transport import EmbeddedTransport
 from tests.test_app_settings import BASE, HEADERS
 from tests.test_console_registers import FixtureConsole, console_fixture
 
@@ -30,7 +36,7 @@ async def edit_context(client):
     return {**HEADERS, "X-Amtron-CSRF": data["csrf"]}, data["revision"]
 
 
-def test_preview_and_save_apply_every_runtime_setting_without_bus_side_effects(tmp_path, monkeypatch):
+def test_one_save_applies_every_runtime_setting_without_bus_side_effects(tmp_path, monkeypatch):
     async def run():
         service, transport = await console_fixture(tmp_path)
         try:
@@ -46,20 +52,15 @@ def test_preview_and_save_apply_every_runtime_setting_without_bus_side_effects(t
                 owner, heartbeat, poller, control = service.client, service.heartbeat, service._poller, service.control
                 retry_history = deepcopy(poller._block_retries)
                 read_history = deepcopy(poller._block_read_at)
-                response = await client.post("/api/runtime/preview", headers=headers, json={"revision": revision, "changes": changes})
-                assert response.status == 200
-                preview = await response.json()
-                assert preview["restart_fields"] == []
-                assert {change["key"]: change["effect"] for change in preview["changes"]} == {
+                result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": changes})
+                assert result.status == 200
+                data = await result.json()
+                assert data["restart_fields"] == []
+                # What this save changed, with when each change takes effect.
+                assert {change["key"]: change["effect"] for change in data["changes"]} == {
                     "scan_interval": "next_cycle", "measurement_interval": "next_cycle", "current_cap": "immediate",
                     "state_change_interval_seconds": "immediate", "phase_switch_grace_seconds": "next_switch", "pause_before_phase_switch": "next_switch",
                 }
-                assert service.config.scan_interval == 5
-                assert control.max_charging_current == 16
-                assert not any(method == "POST" for method, _path, _payload in settings.calls)
-                result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": changes, "confirm": True})
-                assert result.status == 200
-                data = await result.json()
                 assert data["saved_ok"]
                 assert data["active"] == data["saved"] == changes
                 assert control.options.pause_before_phase_switch is False
@@ -82,7 +83,7 @@ def test_preview_and_save_apply_every_runtime_setting_without_bus_side_effects(t
                 assert poller._block_retries == retry_history
                 assert poller._block_read_at == read_history
                 assert (transport.reads, transport.writes) == before
-                assert (await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": changes, "confirm": True})).status == 409
+                assert (await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": changes})).status == 409
                 for path in ("/runtime", "/app_runtime.js"):
                     assert (await client.get(path)).status == 200
         finally:
@@ -100,11 +101,14 @@ def test_runtime_requires_real_peer_admin_csrf_and_exact_payload(tmp_path, monke
                 monkeypatch.setattr(ui, "SUPERVISOR_PEER", "127.0.0.1")
                 assert (await client.get("/api/runtime")).status == 403
                 headers, revision = await edit_context(client)
-                payload = {"revision": revision, "changes": {"scan_interval": 10}, "confirm": True}
+                payload = {"revision": revision, "changes": {"scan_interval": 10}}
                 assert (await client.post("/api/runtime", headers=HEADERS, json=payload)).status == 403
                 assert (await client.get("/api/runtime?force=1", headers=HEADERS)).status == 400
                 assert (await client.post("/api/runtime?force=1", headers=headers, json=payload)).status == 400
-                for bad in ({}, {**payload, "confirm": 1}, {**payload, "extra": True}, {**payload, "changes": {"token": "not-permitted"}}, {**payload, "changes": {"scan_interval": 0}}):
+                for bad in (
+                    {}, {**payload, "confirm": True}, {**payload, "extra": True}, {**payload, "revision": None},
+                    {**payload, "changes": {"token": "not-permitted"}}, {**payload, "changes": {"scan_interval": 0}},
+                ):
                     assert (await client.post("/api/runtime", headers=headers, json=bad)).status == 400
                 settings._options_write_uncertain = True
                 assert (await client.post("/api/runtime", headers=headers, json=payload)).status == 503
@@ -131,7 +135,7 @@ def test_saved_but_not_applied_remains_visible_and_retry_requires_new_revision(t
             monkeypatch.setattr(service, "apply_runtime_settings", AsyncMock(side_effect=failure))
             async with TestClient(TestServer(create_console_app(settings))) as client:
                 headers, revision = await edit_context(client)
-                response = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}, "confirm": True})
+                response = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}})
                 assert response.status == 503
                 assert (await response.json())["error"] == "runtime_apply_pending"
                 result = await (await client.get("/api/runtime", headers=HEADERS)).json()
@@ -139,7 +143,7 @@ def test_saved_but_not_applied_remains_visible_and_retry_requires_new_revision(t
                 assert result["saved"]["scan_interval"] == 10
                 assert result["revision"] != revision
                 monkeypatch.setattr(service, "apply_runtime_settings", original)
-                retry = await client.post("/api/runtime", headers=headers, json={"revision": result["revision"], "changes": {"scan_interval": 10}, "confirm": True})
+                retry = await client.post("/api/runtime", headers=headers, json={"revision": result["revision"], "changes": {"scan_interval": 10}})
                 assert retry.status == 200
                 assert service.config.scan_interval == 10
                 assert sum(method == "POST" for method, _path, _payload in settings.calls) == 1
@@ -167,7 +171,7 @@ def test_concurrent_native_settings_are_not_overwritten(tmp_path, monkeypatch):
                     return await original(method, path, payload)
 
                 monkeypatch.setattr(settings, "_request", request)
-                result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}, "confirm": True})
+                result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}})
                 assert result.status == 409
                 assert settings.options["state_change_interval_seconds"] == 400
                 assert settings.options["scan_interval"] == 5
@@ -197,7 +201,7 @@ def test_lost_supervisor_reply_is_resolved_or_fenced_not_retried(tmp_path, monke
                     return await original(method, path, payload)
 
                 monkeypatch.setattr(settings, "_request", request)
-                result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}, "confirm": True})
+                result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}})
                 assert result.status == (200 if applied else 503)
                 assert len(posts) == 1
                 assert service.config.scan_interval == (10 if applied else 5)
@@ -235,4 +239,71 @@ def test_runtime_update_preserves_cadence_and_refuses_an_unready_or_stopping_ser
             await service.stop()
         with pytest.raises(DeviceError):
             await service.apply_runtime_settings(replace(service.config, scan_interval=7))
+    asyncio.run(run())
+
+
+def test_home_assistant_saves_only_its_fields_through_the_same_store(tmp_path, monkeypatch):
+    async def run():
+        service, transport = await console_fixture(tmp_path)
+        try:
+            settings = settings_for(service)
+            api = ServiceApi(service)
+            # A standalone service has nowhere to keep a change.
+            status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": False}})
+            assert (status, body["error"], body["validation"]) == (409, "settings_not_writable", True)
+            assert service.snapshot()["control"]["settings_writable"] is False
+            service.settings_writer = settings
+            assert service.snapshot()["control"]["settings_writable"] is True
+            settings.options["scan_interval"] = 7  # saved on the Configuration tab, not applied yet
+            before = (list(transport.reads), list(transport.writes))
+            status, body = await api.dispatch("POST", "/v1/settings", {"changes": {
+                "pause_before_phase_switch": False, "phase_switch_grace_seconds": 12,
+            }})
+            assert status == 200
+            assert body["control"]["pause_before_phase_switch"] is False
+            assert body["control"]["phase_switch_grace_seconds"] == 12
+            assert service.control.options.pause_before_phase_switch is False
+            assert (settings.options["pause_before_phase_switch"], settings.options["phase_switch_grace_seconds"]) == (False, 12)
+            # The other stored values stay and, as on the page, apply now.
+            assert settings.options["current_cap"] == 16
+            assert service.config.scan_interval == 7
+            assert (transport.reads, transport.writes) == before
+            for bad in ({}, {"changes": {}, "extra": 1}, None):
+                assert (await api.dispatch("POST", "/v1/settings", bad))[0] == 400
+            status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"phase_switch_grace_seconds": 31}})
+            assert (status, body["error"], body["validation"]) == (409, "runtime_settings_invalid", True)
+            with pytest.raises(DeviceValidationError):
+                await settings.save_runtime_settings({"token": "not-permitted"})
+            settings._options_write_uncertain = True
+            status, body = await api.dispatch("POST", "/v1/settings", {"changes": {"pause_before_phase_switch": True}})
+            assert (status, body["error"], body["validation"]) == (409, "options_save_uncertain", False)
+            assert settings.options["pause_before_phase_switch"] is False
+        finally:
+            await service.stop()
+    asyncio.run(run())
+
+
+def test_home_assistant_client_saves_through_the_app_and_reports_failures(tmp_path):
+    async def run():
+        service, _transport = await console_fixture(tmp_path)
+        try:
+            settings = settings_for(service)
+            service.settings_writer = settings
+            remote = ServiceClient(transport=EmbeddedTransport(ServiceApi(service)))
+            with pytest.raises(DeviceError, match="service_unavailable"):
+                await remote.async_save_settings({"pause_before_phase_switch": False})
+            await remote.async_connect()
+            assert remote.snapshot["control"]["settings_writable"] is True
+            await remote.async_save_settings({"pause_before_phase_switch": False})
+            # The answer is the new state; no extra poll is needed.
+            assert remote.snapshot["control"]["pause_before_phase_switch"] is False
+            assert settings.options["pause_before_phase_switch"] is False
+            with pytest.raises(DeviceValidationError, match="runtime_settings_invalid"):
+                await remote.async_save_settings({"phase_switch_grace_seconds": 31})
+            settings._options_write_uncertain = True
+            with pytest.raises(DeviceError, match="options_save_uncertain"):
+                await remote.async_save_settings({"pause_before_phase_switch": True})
+            assert remote.connected
+        finally:
+            await service.stop()
     asyncio.run(run())

@@ -78,7 +78,7 @@ def test_service_grace_requires_an_integer_within_range(value: Any):
         ServerConfig.from_dict({**SERVICE_OPTIONS, "phase_switch_grace_seconds": value})
 
 
-def test_service_integration_options_do_not_edit_service_owned_grace_setting():
+def test_service_entry_without_a_status_offers_only_the_unplug_rule():
     async def run():
         entry = FakeConfigEntry(
             data={"server_url": "http://service:8765"},

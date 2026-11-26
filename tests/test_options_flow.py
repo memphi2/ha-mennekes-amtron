@@ -13,6 +13,11 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
     options_schema,
     user_schema,
 )
+from custom_components.mennekes_amtron_rtu.device.enums import PhaseOptionsHardware
+from custom_components.mennekes_amtron_rtu.device.errors import (
+    DeviceError,
+    DeviceValidationError,
+)
 from custom_components.mennekes_amtron_rtu.options_flow import (
     MennekesAmtronOptionsFlow,
     _max_current,
@@ -121,10 +126,10 @@ def test_app_connection_only_shows_the_apps_wallbox_settings():
         assert shown["step_id"] == "wallbox_service"
         # Submitting saves and closes, so the button must not say "Next".
         assert shown["last_step"] is True
-        # Only the rule Home Assistant applies itself can be changed here.
+        # Without a phase switch or a writable app, only HA's own rule.
         assert set(fields(shown)) == {"release_off_on_unplug"}
         assert shown["description_placeholders"] == {
-            "current_cap": "13.5", "state_change_interval": "300", "phase_switch_grace": "-",
+            "current_cap": "13.5", "state_change_interval": "300",
         }
         saved = await flow.async_step_wallbox_service({"release_off_on_unplug": True})
         assert saved["type"] == "create_entry"
@@ -138,6 +143,99 @@ def test_app_connection_only_shows_the_apps_wallbox_settings():
         assert set((await flow.async_step_wallbox())["description_placeholders"].values()) == {"-"}
         # A direct connection has no such page.
         assert (await Flow(FakeConfigEntry()).async_step_wallbox_service())["step_id"] == "init"
+
+    asyncio.run(run())
+
+
+class SettingsClient:
+    def __init__(self, control: dict[str, Any], failure: Exception | None = None) -> None:
+        self.snapshot = {"control": control}
+        self.saved: list[dict[str, Any]] = []
+        self.failure = failure
+
+    async def async_save_settings(self, changes: dict[str, Any]) -> None:
+        self.saved.append(changes)
+        if self.failure is not None:
+            raise self.failure
+
+
+def app_entry(client: SettingsClient, phases: int = PhaseOptionsHardware.ONE_OR_THREE_PHASES) -> FakeConfigEntry:
+    entry = FakeConfigEntry(data={"server_url": "http://app:8765"}, options={"current_limit": 8})
+    entry.runtime_data = SimpleNamespace(client=client, identity=SimpleNamespace(phase_options_hw=phases))
+    return entry
+
+
+PHASE_CONTROL = {
+    "current_cap": 16, "state_change_interval_seconds": 300, "settings_writable": True,
+    "pause_before_phase_switch": True, "phase_switch_grace_seconds": 5,
+}
+
+
+def test_app_connection_saves_phase_settings_in_the_app():
+    async def run():
+        client = SettingsClient(dict(PHASE_CONTROL))
+        flow = Flow(app_entry(client))
+        shown = await flow.async_step_wallbox()
+        assert set(fields(shown)) == {
+            "release_off_on_unplug", "pause_before_phase_switch", "phase_switch_grace_seconds",
+        }
+        defaults = {marker.schema: marker.default() for marker in shown["data_schema"].schema}
+        assert defaults["pause_before_phase_switch"] is True
+        assert defaults["phase_switch_grace_seconds"] == 5
+        saved = await flow.async_step_wallbox_service({
+            "release_off_on_unplug": True, "pause_before_phase_switch": False, "phase_switch_grace_seconds": 5.0,
+        })
+        assert saved["type"] == "create_entry"
+        # Only what changed goes to the app; the entry keeps HA's own rule.
+        assert client.saved == [{"pause_before_phase_switch": False}]
+        assert saved["data"] == {"current_limit": 8, "release_off_on_unplug": True}
+        # Unchanged values send nothing.
+        flow = Flow(app_entry(client))
+        await flow.async_step_wallbox()
+        await flow.async_step_wallbox_service({
+            "release_off_on_unplug": False, "pause_before_phase_switch": True, "phase_switch_grace_seconds": 12.0,
+        })
+        assert client.saved[-1] == {"phase_switch_grace_seconds": 12}
+        assert type(client.saved[-1]["phase_switch_grace_seconds"]) is int
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("failure", "error"), [
+    (DeviceValidationError("runtime_settings_invalid"), "service_settings_invalid"),
+    (DeviceError("options_save_uncertain"), "service_settings_failed"),
+    (DeviceError("service_unavailable"), "service_settings_failed"),
+])
+def test_app_connection_keeps_the_form_when_the_app_refuses(failure, error):
+    async def run():
+        client = SettingsClient(dict(PHASE_CONTROL), failure)
+        flow = Flow(app_entry(client))
+        await flow.async_step_wallbox()
+        shown = await flow.async_step_wallbox_service({
+            "release_off_on_unplug": True, "pause_before_phase_switch": False, "phase_switch_grace_seconds": 5,
+        })
+        assert shown["type"] == "form"
+        assert shown["errors"] == {"base": error}
+        # HA's own rule is not saved without the app's part either.
+        assert flow.config_entry.options == {"current_limit": 8}
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("control", "phases"), [
+    ({**PHASE_CONTROL, "settings_writable": False}, PhaseOptionsHardware.ONE_OR_THREE_PHASES),
+    (PHASE_CONTROL, PhaseOptionsHardware.THREE_PHASES_ONLY),
+    ({**PHASE_CONTROL, "pause_before_phase_switch": None}, PhaseOptionsHardware.ONE_OR_THREE_PHASES),
+    ({**PHASE_CONTROL, "phase_switch_grace_seconds": None}, PhaseOptionsHardware.ONE_OR_THREE_PHASES),
+])
+def test_app_connection_hides_phase_settings_it_cannot_save(control, phases):
+    async def run():
+        client = SettingsClient(dict(control))
+        flow = Flow(app_entry(client, phases))
+        shown = await flow.async_step_wallbox()
+        assert set(fields(shown)) == {"release_off_on_unplug"}
+        await flow.async_step_wallbox_service({"release_off_on_unplug": True})
+        assert client.saved == []
 
     asyncio.run(run())
 

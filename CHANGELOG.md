@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0b8 — 2026-11-26
+
+- With the Modbus app, the integration's wallbox settings now include **Pause before switching phases** and the extra wait before phase changes. Home Assistant saves them in the app, which applies them at once.
+- The app's **Runtime** page saves with one **Save** button. It checks, stores and applies the values in one step and then lists what changed; the separate preview is gone.
+- **App users:** update the beta Modbus app to **1.0.0b8** first. Direct USB and LAN connections need only the integration update.
+
 ## 1.0.0b7 — 2026-11-22
 
 - Phase changes can now resume an interrupted charge on the same plug-in after the configured waiting interval. A manual pause, a reached target or a withdrawn release prevents the restart.

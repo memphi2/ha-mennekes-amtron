@@ -1085,6 +1085,9 @@
     },
     "cost_goal_price_unknown": {
       "message": "Das Kostenziel braucht einen aktuellen Strompreis. Prüfe die Preisquelle der Ladekosten."
+    },
+    "settings_not_writable": {
+      "message": "Der Modbus-Dienst kann keine Einstellungen speichern. Ändere sie in seiner Optionsdatei und starte ihn neu."
     }
   },
   "issues": {
@@ -1165,12 +1168,16 @@
       },
       "wallbox_service": {
         "title": "Wallbox-Einstellungen der App",
-        "description": "Diese Wallbox läuft über die Modbus-App. Ihre Einstellungen liegen deshalb dort und gelten auch für Home Assistant.\n\nStromgrenze: {current_cap} A\nMindestabstand zwischen Zustandswechseln: {state_change_interval} s\nZusätzliche Wartezeit vor Phasenwechseln: {phase_switch_grace} s\n\nDiese Werte, die Abfrageintervalle und die Verbindung änderst du in der App unter Benutzeroberfläche öffnen. Die Schreibfreigabe steht im Reiter Konfiguration der App.",
+        "description": "Diese Wallbox läuft über die Modbus-App. Ihre Einstellungen liegen deshalb dort und gelten auch für Home Assistant.\n\nStromgrenze: {current_cap} A\nMindestabstand zwischen Zustandswechseln: {state_change_interval} s\n\nDiese Werte, die Abfrageintervalle und die Verbindung änderst du in der App unter Benutzeroberfläche öffnen. Die Schreibfreigabe steht im Reiter Konfiguration der App. Die Einstellungen zum Phasenwechsel, sofern unten angezeigt, werden in der App gespeichert und gelten sofort.",
         "data": {
-          "release_off_on_unplug": "Ladefreigabe beim Abstecken ausschalten"
+          "release_off_on_unplug": "Ladefreigabe beim Abstecken ausschalten",
+          "pause_before_phase_switch": "Vor dem Phasenwechsel pausieren",
+          "phase_switch_grace_seconds": "Zusätzliche Wartezeit vor Phasenwechseln"
         },
         "data_description": {
-          "release_off_on_unplug": "Nach bestätigtem Abstecken wird die Ladefreigabe ausgeschaltet; das nächste Fahrzeug braucht eine ausdrückliche Freigabe. Wird bei eingeschaltetem Virtual Plug & Charge ignoriert."
+          "release_off_on_unplug": "Nach bestätigtem Abstecken wird die Ladefreigabe ausgeschaltet; das nächste Fahrzeug braucht eine ausdrückliche Freigabe. Wird bei eingeschaltetem Virtual Plug & Charge ignoriert.",
+          "pause_before_phase_switch": "Aktivieren, wenn ein Fahrzeug vor dem Phasenwechsel eine Ladepause benötigt. Nur ausschalten, wenn alle Fahrzeuge an dieser Wallbox direkt umschalten können.",
+          "phase_switch_grace_seconds": "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden."
         }
       },
       "wallbox_basic": {
@@ -1667,7 +1674,9 @@
       "vehicle_detection_source_invalid": "Wähle eine der angebotenen Erkennungsquellen.",
       "vehicle_detection_entity_invalid": "Wähle einen vorhandenen Kabel-Binärsensor und eine unterstützte Entität für die Anwesenheit zu Hause.",
       "vehicle_detection_entities_distinct": "Wähle unterschiedliche Entitäten für Kabelverbindung und Anwesenheit zu Hause.",
-      "vehicle_connected_states_invalid": "Wähle einen bis acht Zustände für angeschlossen, jeweils genau so, wie der Sensor sie meldet."
+      "vehicle_connected_states_invalid": "Wähle einen bis acht Zustände für angeschlossen, jeweils genau so, wie der Sensor sie meldet.",
+      "service_settings_invalid": "Die App hat die Werte abgelehnt.",
+      "service_settings_failed": "Die App konnte die Einstellung nicht sicher speichern. Prüfe sie in der App unter Betriebseinstellungen."
     }
   },
   "selector": {

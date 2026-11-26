@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.0b8
+
+- Runtime settings save with one **Save** button: checked, stored and applied in one step.
+- Home Assistant can save runtime settings such as the phase-switch pause through the app.
+- Use with integration 1.0.0b8. Update the app first.
+
 ## 1.0.0b6
 
 - Adds the optional preparatory pause for phase switching, enabled by default.
