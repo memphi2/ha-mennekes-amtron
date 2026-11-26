@@ -22,7 +22,7 @@ Find the symptom first; collect diagnostics before restarting if the problem is 
 | A target or departure behaves unexpectedly | [Targets](#targets-and-departure-planning) |
 | Cost or loss is unknown | [Estimates](#loss-or-cost-estimates-are-unknown) |
 | History takes too much space | [Database](#the-database-keeps-growing) |
-| Reset after an update | [Saved settings Repair](#saved-charging-settings-could-not-be-loaded) |
+| Reset after a beta update | [Saved settings Repair](#saved-charging-settings-could-not-be-loaded) |
 | Need logs for a report | [Diagnostics](#diagnostics-for-intermittent-problems) |
 
 ## A documented feature is missing

@@ -15,7 +15,6 @@ summarize the changes since the last stable version 0.10.0.
 - The app's **Runtime** page saves with one **Save** button. It checks, stores and applies the values in one step and then lists what changed; the separate preview is gone.
 - **Charging status** shows **Switching phases** instead of **State is ambiguous** while the wallbox withholds its charging signal after a phase change. The AMTRON does this for about two minutes after every change; the docs explain it.
 - Home Assistant can change only the phase-switch pause and its wait in the app. The current cap, the intervals and the connection stay on the app's pages.
-- **App users:** update the Modbus app to **1.0.0** first. Direct USB and LAN connections need only the integration update.
 
 ## 1.0.0b7 — 2026-11-22
 
